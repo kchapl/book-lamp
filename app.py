@@ -53,7 +53,7 @@ def init_db():
         db.session.add(user)
         print(f"Default user '{username}' created.")
     db.session.commit()
-    print("Database initialized.")
+    return "Database initialized and default user created/updated."
 
 if __name__ == '__main__':
     app.run(debug=True)
