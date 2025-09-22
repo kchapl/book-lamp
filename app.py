@@ -38,7 +38,7 @@ def home():
 def about():
     return '<h1>About</h1><p>This is a simple Flask web application.</p>'
 
-@app.cli.command("init-db")
+@app.route("init-db")
 def init_db():
     """Initialize the database and create/update a default user."""
     db.create_all()
