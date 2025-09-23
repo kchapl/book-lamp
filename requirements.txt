@@ -1,2 +1,8 @@
-Flask==2.3.3
+authlib==1.6.4
+click==8.3.0
+Flask==3.1.2
+flask_sqlalchemy==3.1.1
+python-dotenv==1.1.1
+requests==2.31.0
+psycopg2
 gunicorn==23.0.0
