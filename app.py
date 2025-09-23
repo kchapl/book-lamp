@@ -1,4 +1,4 @@
-from flask import Flask, session, redirect, url_for
+from flask import Flask, session, redirect, url_for, render_template
 from authlib.integrations.flask_client import OAuth
 from flask_sqlalchemy import SQLAlchemy
 import click
@@ -22,7 +22,21 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=True)
     name = db.Column(db.String(120), nullable=True)
 
+class AllowedUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
 
+
+
+from functools import wraps
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('unauthorized'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 def home():
@@ -32,17 +46,13 @@ def home():
     return '<h1>Hello World!</h1><p>You are not logged in.</p><a href="/login">Login with Google</a>'
 
 @app.route('/about')
+@login_required
 def about():
-    if 'user_id' in session:
-        return '<h1>About</h1><p>This is a simple Flask web application.</p>'
-    return redirect('/')
+    return '<h1>About</h1><p>This is a simple Flask web application.</p>'
 
-@app.route("/init-db")
-def init_db():
-    """Drop all tables and re-initialize the database."""
-    db.drop_all()
-    db.create_all()
-    return "Database re-initialized (all data was deleted)."
+@app.route('/unauthorized')
+def unauthorized():
+    return render_template('unauthorized.html'), 401
 
 # Secret key for session management
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -78,6 +88,10 @@ def authorize():
     token = oauth.google.authorize_access_token()
     user_info = oauth.google.userinfo(token=token)
     
+    # Check if user is in the allow list
+    if not AllowedUser.query.filter_by(email=user_info['email']).first():
+        return redirect(url_for('unauthorized'))
+
     # Check if user exists, if not create a new one
     user = User.query.filter_by(google_id=user_info['sub']).first()
     if not user:
@@ -98,6 +112,26 @@ def authorize():
 def logout():
     session.pop('user_id', None)
     return redirect('/')
+
+@app.cli.command("init-db")
+def init_db_command():
+    """Drop all tables and re-initialize the database."""
+    db.drop_all()
+    db.create_all()
+    click.echo("Database re-initialized (all data was deleted).")
+
+@app.cli.command("add-user")
+@click.argument("email")
+def add_user(email):
+    """Add a user to the allow list."""
+    if AllowedUser.query.filter_by(email=email).first():
+        print(f"User {email} already in allow list.")
+        return
+
+    new_user = AllowedUser(email=email)
+    db.session.add(new_user)
+    db.session.commit()
+    print(f"User {email} added to allow list.")
 
 if __name__ == '__main__':
     app.run(debug=True)
