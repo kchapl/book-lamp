@@ -1,9 +1,10 @@
-from flask import Flask, session, redirect, url_for, render_template
-from authlib.integrations.flask_client import OAuth
-from flask_sqlalchemy import SQLAlchemy
-import click
 import os
+
+import click
+from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
+from flask import Flask, redirect, render_template, session, url_for
+from flask_sqlalchemy import SQLAlchemy
 
 load_dotenv()
 
