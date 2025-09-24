@@ -5,6 +5,9 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from functools import wraps
+
+
 
 load_dotenv()
 
@@ -28,9 +31,6 @@ class User(db.Model):
 class AllowedUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-
-
-from functools import wraps
 
 
 def login_required(f):

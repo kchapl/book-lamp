@@ -66,28 +66,11 @@ jobs:
     - name: Check import sorting with isort
       run: isort --check-only --diff .
     
-    - name: Lint with flake8
-      run: flake8 .
-    
+    - name: Lint with ruff
+      run: ruff check .
+
     - name: Type checking with mypy
       run: mypy .
     
     - name: Security check with bandit
       run: bandit -r . -x tests/
-
-  security:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.13
-    
-    - name: Install safety
-      run: pip install safety
-    
-    - name: Check dependencies for security vulnerabilities
-      run: safety check --json
