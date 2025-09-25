@@ -1,12 +1,11 @@
 import os
+from functools import wraps
 
 import click
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, session, url_for
 from flask_sqlalchemy import SQLAlchemy
-from functools import wraps
-
 
 load_dotenv()
 

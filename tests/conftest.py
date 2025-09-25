@@ -1,5 +1,6 @@
 import os
 import sys
+
 import pytest
 
 # Ensure the app uses an in-memory SQLite database during tests
@@ -10,6 +11,7 @@ os.environ.setdefault("GOOGLE_CLIENT_SECRET", "dummy-client-secret")
 
 # Ensure the project root is importable when pytest changes CWD
 from pathlib import Path
+
 PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
