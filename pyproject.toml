@@ -26,6 +26,7 @@ dev = [
     "mypy==1.0.0",
     "bandit==1.7.0",
     "ruff==0.13.1",
+    "pbr==7.0.1",
 ]
 
 [tool.pytest.ini_options]
