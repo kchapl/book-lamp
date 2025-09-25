@@ -34,7 +34,7 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
- [tool.ruff]
+[tool.ruff]
 line-length = 120
 exclude = [".venv"]
 
