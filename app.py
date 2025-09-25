@@ -1,8 +1,9 @@
 import os
 from functools import wraps
+from typing import Any, Callable
 
 import click
-from authlib.integrations.flask_client import OAuth
+from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
 from flask import Flask, redirect, render_template, session, url_for
 from flask_sqlalchemy import SQLAlchemy
@@ -17,7 +18,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 
-class User(db.Model):
+class User(db.Model):  # type: ignore
     user_id = db.Column(db.Integer, primary_key=True)
     user_name = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(80), nullable=True)
@@ -26,14 +27,14 @@ class User(db.Model):
     name = db.Column(db.String(120), nullable=True)
 
 
-class AllowedUser(db.Model):
+class AllowedUser(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
 
 
-def login_required(f):
+def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args: Any, **kwargs: Any) -> Any:
         if "user_id" not in session:
             return redirect(url_for("unauthorized"))
         return f(*args, **kwargs)
