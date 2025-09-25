@@ -8,7 +8,6 @@ from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 
 
-
 load_dotenv()
 
 app = Flask(__name__)

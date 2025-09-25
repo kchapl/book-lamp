@@ -19,4 +19,4 @@ from app import app as flask_app  # noqa: E402
 @pytest.fixture()
 def client():
     with flask_app.test_client() as client:
-        yield client 
+        yield client
