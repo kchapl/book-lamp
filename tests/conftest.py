@@ -9,7 +9,8 @@ os.environ.setdefault("GOOGLE_CLIENT_ID", "dummy-client-id")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "dummy-client-secret")
 
 # Ensure the project root is importable when pytest changes CWD
-PROJECT_ROOT = "/Users/kelvin/code/book-lamp"
+from pathlib import Path
+PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
