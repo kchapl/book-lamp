@@ -18,30 +18,24 @@ jobs:
       with:
         python-version: 3.13
     
-    - name: Cache pip dependencies
+    - name: Install Poetry
+      uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+    
+    - name: Load cached venv
+      id: cached-poetry-dependencies
       uses: actions/cache@v3
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
     
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Install project in editable mode with dev dependencies
-        pip install -e ".[dev]"
+      run: poetry install --no-interaction --no-root
     
     - name: Run tests with pytest
-      run: |
-        pytest --cov=app --cov-report=xml --cov-report=html
+      run: poetry run pytest --cov=app --cov-report=xml --cov-report=html
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
+      uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
 
   lint-and-format:
     runs-on: ubuntu-latest
@@ -54,23 +48,30 @@ jobs:
       with:
         python-version: 3.13
     
-    - name: Install linting tools
-      run: |
-        python -m pip install --upgrade pip
-        # Install project with dev dependencies (includes linting tools)
-        pip install -e ".[dev]"
+    - name: Install Poetry
+      uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+    
+    - name: Load cached venv
+      id: cached-poetry-dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+    
+    - name: Install dependencies
+      run: poetry install --no-interaction --no-root
     
     - name: Check code formatting with Black
-      run: black --check --diff .
+      run: poetry run black --check --diff .
     
     - name: Check import sorting with isort
-      run: isort --check-only --diff .
+      run: poetry run isort --check-only --diff .
     
     - name: Lint with ruff
-      run: ruff check .
+      run: poetry run ruff check .
 
     - name: Type checking with mypy
-      run: mypy .
+      run: poetry run mypy .
     
     - name: Security check with bandit
-      run: bandit -r . -x ./.venv,./tests
+      run: poetry run bandit -r . -x ./.venv,./tests
