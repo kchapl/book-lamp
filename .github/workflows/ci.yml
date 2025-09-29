@@ -32,10 +32,14 @@ jobs:
           installer-parallel: true
 
       - name: Load cached venv
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
@@ -69,10 +73,14 @@ jobs:
           installer-parallel: true
 
       - name: Load cached venv
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
