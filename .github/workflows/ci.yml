@@ -44,48 +44,50 @@ jobs:
         run: poetry run pytest --cov=app --cov-report=xml --cov-report=html
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7
-
-  lint-and-format:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@v4
+        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          fail_ci_if_error: true
 
-      - name: Install Poetry
-        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
+lint-and-format:
+  runs-on: ubuntu-latest
 
-      - name: Load cached venv
-        uses: actions/cache@v3
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+    - name: Set up Python
+      id: setup-python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Check code formatting with Black
-        run: poetry run black --check --diff .
+    - name: Install Poetry
+      uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+      with:
+        version: ${{ env.POETRY_VERSION }}
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        installer-parallel: true
 
-      - name: Check import sorting with isort
-        run: poetry run isort --check-only --diff .
+    - name: Load cached venv
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
-      - name: Lint with ruff
-        run: poetry run ruff check .
+    - name: Install dependencies
+      run: poetry install --no-interaction --no-root
 
-      - name: Type checking with mypy
-        run: poetry run mypy .
+    - name: Check code formatting with Black
+      run: poetry run black --check --diff .
 
-      - name: Security check with bandit
-        run: poetry run bandit -r . -x ./.venv,./tests
+    - name: Check import sorting with isort
+      run: poetry run isort --check-only --diff .
+
+    - name: Lint with ruff
+      run: poetry run ruff check .
+
+    - name: Type checking with mypy
+      run: poetry run mypy .
+
+    - name: Security check with bandit
+      run: poetry run bandit -r . -x ./.venv,./tests
