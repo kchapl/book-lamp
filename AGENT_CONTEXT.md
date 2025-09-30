@@ -27,6 +27,7 @@ This file provides shared context and guardrails for Cursor and other AI agents 
   - Early returns; handle errors and edge cases first.
   - Keep functions small; prefer pure helpers for logic.
   - Do not add comments for the obvious; document "why" more than "how".
+  - css should be in a separate file to html
 - **Structure**:
   - Keep Flask routes thin; delegate to services/use-cases (pure where possible).
   - Keep SQLAlchemy models focused on persistence concerns; no business logic in models.
@@ -59,3 +60,7 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - Write the test first for the behavior you intend to change.
 - Optimize for readability for the next engineer. 
 - Comments and naming generally must always be in British English.
+
+### Commits
+ - Subject line should be maximum of 50 chars in semantic commit format.
+ - Body lines should be maximum of 72 chars.
