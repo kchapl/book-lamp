@@ -1,12 +1,13 @@
 import os
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import click
 from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
-from flask import Flask, redirect, render_template, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql import func
 
 load_dotenv()
 
@@ -32,11 +33,22 @@ class AllowedUser(db.Model):  # type: ignore
     email = db.Column(db.String(120), unique=True, nullable=False)
 
 
+class Book(db.Model):  # type: ignore
+    id = db.Column(db.Integer, primary_key=True)
+    isbn13 = db.Column(db.String(13), unique=True, nullable=False, index=True)
+    title = db.Column(db.String(300), nullable=False)
+    author = db.Column(db.String(200), nullable=False)
+    publication_year = db.Column(db.Integer, nullable=True)
+    thumbnail_url = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
     def decorated_function(*args: Any, **kwargs: Any) -> Any:
         if "user_id" not in session:
             return redirect(url_for("unauthorized"))
+
         return f(*args, **kwargs)
 
     return decorated_function
@@ -98,27 +110,27 @@ def login():
 @app.route("/authorize")
 def authorize():
     token = oauth.google.authorize_access_token()
-    user_info = oauth.google.userinfo(token=token)
-
-    # Check if user is in the allow list
-    if not AllowedUser.query.filter_by(email=user_info["email"]).first():
+    userinfo = token.get("userinfo")
+    if not userinfo or "email" not in userinfo:
         return redirect(url_for("unauthorized"))
 
-    # Check if user exists, if not create a new one
-    user = User.query.filter_by(google_id=user_info["sub"]).first()
+    allowed = AllowedUser.query.filter_by(email=userinfo["email"]).first()
+    if not allowed:
+        return redirect(url_for("unauthorized"))
+
+    user = User.query.filter_by(email=userinfo["email"]).first()
     if not user:
         user = User(
-            google_id=user_info["sub"],
-            email=user_info["email"],
-            name=user_info["name"],
-            user_name=user_info["email"],
+            user_name=userinfo.get("email", ""),
+            google_id=userinfo.get("sub", None),
+            email=userinfo.get("email", None),
+            name=userinfo.get("name", None),
         )
         db.session.add(user)
         db.session.commit()
 
-    # Store user in session
     session["user_id"] = user.user_id
-    return redirect("/")
+    return redirect(url_for("home"))
 
 
 @app.route("/logout")
@@ -140,13 +152,101 @@ def init_db_command():
 def add_user(email):
     """Add a user to the allow list."""
     if AllowedUser.query.filter_by(email=email).first():
-        print(f"User {email} already in allow list.")
+        click.echo("User already allowed.")
         return
 
-    new_user = AllowedUser(email=email)
-    db.session.add(new_user)
+    allowed = AllowedUser(email=email)
+    db.session.add(allowed)
     db.session.commit()
     print(f"User {email} added to allow list.")
+
+
+# -----------------------------
+# Books feature
+# -----------------------------
+
+def is_valid_isbn13(isbn: str) -> bool:
+    """Validate ISBN-13 using checksum algorithm and format constraints."""
+    if len(isbn) != 13 or not isbn.isdigit():
+        return False
+    checksum = 0
+    for index, char in enumerate(isbn[:12]):
+        digit = ord(char) - 48
+        weight = 1 if index % 2 == 0 else 3
+        checksum += digit * weight
+    check_digit = (10 - (checksum % 10)) % 10
+    return check_digit == (ord(isbn[12]) - 48)
+
+
+def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
+    if not publish_date:
+        return None
+    # Extract first 4-digit year anywhere in the string (e.g., '2019-05-02', 'July 2019')
+    for token in publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split():
+        if len(token) == 4 and token.isdigit():
+            return int(token)
+    return None
+
+
+@app.route("/books/new", methods=["GET"])
+def new_book_form():
+    return render_template("add_book.html")
+
+
+@app.route("/books", methods=["GET"])
+def list_books():
+    books = Book.query.order_by(Book.created_at.desc()).all()
+    return render_template("books.html", books=books)
+
+
+@app.route("/books", methods=["POST"])
+def create_book():
+    isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
+    if not is_valid_isbn13(isbn):
+        flash("Please enter a valid 13-digit ISBN.", "error")
+        return redirect(url_for("new_book_form"))
+
+    # Avoid duplicates
+    existing = Book.query.filter_by(isbn13=isbn).first()
+    if existing:
+        
+        flash("This book has already been added.", "info")
+        return redirect(url_for("new_book_form"))
+
+    # Lookup via Open Library Books API
+    from services.book_lookup import lookup_book_by_isbn13
+
+    try:
+        data = lookup_book_by_isbn13(isbn)
+    except Exception as exc:  # noqa: BLE001
+        flash(f"Failed to fetch book details: {exc}", "error")
+        return redirect(url_for("new_book_form"))
+
+    if not data:
+        flash("No book data found for that ISBN.", "error")
+        return redirect(url_for("new_book_form"))
+
+    title = data.get("title") or ""
+    author = data.get("author") or ""
+    publish_date = data.get("publish_date")
+    year = parse_publication_year(publish_date)
+    thumbnail_url = data.get("thumbnail_url")
+
+    if not title or not author:
+        flash("The external service did not return required fields.", "error")
+        return redirect(url_for("new_book_form"))
+
+    book = Book(
+        isbn13=isbn,
+        title=title[:300],
+        author=author[:200],
+        publication_year=year,
+        thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
+    )
+    db.session.add(book)
+    db.session.commit()
+    flash("Book added successfully.", "success")
+    return redirect(url_for("list_books"))
 
 
 if __name__ == "__main__":
