@@ -5,7 +5,8 @@ from typing import Any, Callable, Optional
 import click
 from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
-from flask import Flask, redirect, render_template, request, session, url_for, flash
+from flask import (Flask, flash, redirect, render_template, request, session,
+                   url_for)
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.sql import func
 
