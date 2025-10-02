@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Books</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.75rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .thumb {
+            width: 64px;
+            height: 96px;
+            object-fit: cover;
+            background: #f3f4f6;
+        }
+
+        .meta {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            font-weight: 600;
+        }
+
+        .author,
+        .year {
+            color: #374151;
+            font-size: 0.95rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        a.btn {
+            padding: 0.4rem 0.7rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Books</h1>
+        <a class="btn" href="{{ url_for('new_book_form') }}">Add another</a>
+    </header>
+
+    <div class="messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    {% if books %}
+    <div class="grid">
+        {% for book in books %}
+        <div class="card">
+            {% if book.thumbnail_url %}
+            <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
+            {% else %}
+            <div class="thumb"></div>
+            {% endif %}
+            <div class="meta">
+                <div class="title">{{ book.title }}</div>
+                <div class="author">{{ book.author }}</div>
+                {% if book.publication_year %}
+                <div class="year">{{ book.publication_year }}</div>
+                {% endif %}
+                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>No books yet. <a href="{{ url_for('new_book_form') }}">Add one</a>.</p>
+    {% endif %}
+</body>
+
+</html>
