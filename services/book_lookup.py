@@ -41,4 +41,4 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         "author": author_name,
         "publish_date": publish_date,
         "thumbnail_url": thumbnail_url,
-    } 
+    }

@@ -40,7 +40,9 @@ class Book(db.Model):  # type: ignore
     author = db.Column(db.String(200), nullable=False)
     publication_year = db.Column(db.Integer, nullable=True)
     thumbnail_url = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = db.Column(
+        db.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
@@ -165,6 +167,7 @@ def add_user(email):
 # Books feature
 # -----------------------------
 
+
 def is_valid_isbn13(isbn: str) -> bool:
     """Validate ISBN-13 using checksum algorithm and format constraints."""
     if len(isbn) != 13 or not isbn.isdigit():
@@ -182,7 +185,9 @@ def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
     if not publish_date:
         return None
     # Extract first 4-digit year anywhere in the string (e.g., '2019-05-02', 'July 2019')
-    for token in publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split():
+    for token in (
+        publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split()
+    ):
         if len(token) == 4 and token.isdigit():
             return int(token)
     return None
@@ -209,7 +214,7 @@ def create_book():
     # Avoid duplicates
     existing = Book.query.filter_by(isbn13=isbn).first()
     if existing:
-        
+
         flash("This book has already been added.", "info")
         return redirect(url_for("new_book_form"))
 
