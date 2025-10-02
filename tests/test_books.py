@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app import app, db, is_valid_isbn13, parse_publication_year, Book
+from app import Book, app, db, is_valid_isbn13, parse_publication_year
 
 
 @pytest.fixture(autouse=True)

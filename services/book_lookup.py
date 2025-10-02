@@ -1,5 +1,6 @@
-import requests
 from typing import Dict, Optional
+
+import requests
 
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 
