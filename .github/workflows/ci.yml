@@ -85,12 +85,6 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
 
-      - name: Check code formatting with Black
-        run: poetry run black --check --diff .
-
-      - name: Check import sorting with isort
-        run: poetry run isort --check-only --diff .
-
       - name: Lint with ruff
         run: poetry run ruff check .
 

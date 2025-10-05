@@ -25,6 +25,8 @@ mypy = "^1.11.0"
 bandit = "1.7.0"
 ruff = "0.13.1"
 pbr = "7.0.1"
+pre-commit = "^4.3.0"
+types-requests = "^2.32.4.20250913"
 
 [build-system]
 requires = ["poetry-core"]
@@ -45,6 +47,7 @@ ignore = ["E203"]
 
 [tool.mypy]
 python_version = "3.13"
-cache_dir = ".mypy_cache"
-ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
 exclude = "(^\\.venv/|^tests/fixtures/)"
