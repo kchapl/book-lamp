@@ -163,6 +163,14 @@ def add_user(email):
     print(f"User {email} added to allow list.")
 
 
+@app.cli.command("list-users")
+def list_users():
+    """List all users in the allow list."""
+    users = AllowedUser.query.all()
+    for user in users:
+        print(user.email)
+
+
 # -----------------------------
 # Books feature
 # -----------------------------
