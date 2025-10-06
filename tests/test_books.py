@@ -90,3 +90,28 @@ def test_add_book_invalid_isbn(client):
     resp = client.post("/books", data={"isbn": "1234567890123"}, follow_redirects=True)
     assert resp.status_code == 200
     assert b"valid 13-digit ISBN" in resp.data
+
+
+def test_delete_book_success(client):
+    # Create a book directly in the DB
+    with app.app_context():
+        book = Book(isbn13="9780306406157", title="T", author="A")
+        db.session.add(book)
+        db.session.commit()
+        book_id = book.id
+
+    # Delete it via endpoint
+    resp = client.post(f"/books/{book_id}/delete", follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Book deleted" in resp.data
+
+    # Ensure it's gone
+    with app.app_context():
+        assert db.session.get(Book, book_id) is None
+
+
+def test_delete_book_not_found(client):
+    # Deleting a non-existent book should redirect back with an error message
+    resp = client.post("/books/999/delete", follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Book not found" in resp.data
