@@ -59,6 +59,19 @@
             border-radius: 6px;
             text-decoration: none;
         }
+
+        form.inline {
+            margin-top: 0.5rem;
+        }
+
+        button.danger {
+            padding: 0.35rem 0.6rem;
+            border: 1px solid #ef4444;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 6px;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -94,6 +107,10 @@
                 <div class="year">{{ book.publication_year }}</div>
                 {% endif %}
                 <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                <form class="inline" method="post" action="{{ url_for('delete_book', book_id=book.id) }}"
+                    onsubmit="return confirm('Delete this book?');">
+                    <button class="danger" type="submit">Delete</button>
+                </form>
             </div>
         </div>
         {% endfor %}
