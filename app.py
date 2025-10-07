@@ -14,7 +14,14 @@ load_dotenv()
 app = Flask(__name__)
 
 # Database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URL")
+# Enable lightweight, file-backed SQLite DB in test mode for Playwright
+TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
+if TEST_MODE:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "DB_URL", f"sqlite:////{os.path.abspath('e2e_test.db')}"
+    )
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
@@ -106,6 +113,9 @@ def login():
         redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
     else:
         redirect_uri = url_for("authorize", _external=True)
+    if TEST_MODE:
+        # In test mode, skip external OAuth to keep e2e deterministic.
+        return redirect(url_for("test_login"))
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -226,14 +236,23 @@ def create_book():
         flash("This book has already been added.", "info")
         return redirect(url_for("new_book_form"))
 
-    # Lookup via Open Library Books API
+    # Lookup via Open Library Books API (stubbed in TEST_MODE)
     from services.book_lookup import lookup_book_by_isbn13
 
-    try:
-        data = lookup_book_by_isbn13(isbn)
-    except Exception as exc:  # noqa: BLE001
-        flash(f"Failed to fetch book details: {exc}", "error")
-        return redirect(url_for("new_book_form"))
+    # Deterministic stub for E2E tests
+    if TEST_MODE and isbn == "9780000000000":
+        data = {
+            "title": "Test Driven Development",
+            "author": "Test Author",
+            "publish_date": "2019-05-02",
+            "thumbnail_url": None,
+        }
+    else:
+        try:
+            data = lookup_book_by_isbn13(isbn)
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Failed to fetch book details: {exc}", "error")
+            return redirect(url_for("new_book_form"))
 
     if not data:
         flash("No book data found for that ISBN.", "error")
@@ -260,6 +279,49 @@ def create_book():
     db.session.commit()
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
+
+
+# -----------------------------
+# Test utilities (enabled only when TEST_MODE=1)
+# -----------------------------
+
+if TEST_MODE:
+
+    @app.route("/test/reset", methods=["POST"])
+    def test_reset():
+        """Reset database and seed a default allowed and app user.
+
+        Only available when TEST_MODE=1.
+        """
+        db.drop_all()
+        db.create_all()
+
+        # Seed allowed user and a matching application user
+        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+        allowed = AllowedUser(email=allowed_email)
+        db.session.add(allowed)
+        user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+        db.session.add(user)
+        db.session.commit()
+        return {"status": "ok"}
+
+    @app.route("/test/login", methods=["GET"])  # simple GET for convenience
+    def test_login():
+        """Log in as the seeded test user.
+
+        Only available when TEST_MODE=1.
+        """
+        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+        user = User.query.filter_by(email=allowed_email).first()
+        if not user:
+            # If DB isn't reset yet, create minimal seed on the fly
+            allowed = AllowedUser(email=allowed_email)
+            db.session.add(allowed)
+            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+            db.session.add(user)
+            db.session.commit()
+        session["user_id"] = user.user_id
+        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
