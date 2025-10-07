@@ -378,6 +378,19 @@ if TEST_MODE:
         session["user_id"] = user.user_id
         return redirect(url_for("home"))
 
+@app.route("/books/<int:book_id>/delete", methods=["POST"])
+def delete_book(book_id: int):
+    book = db.session.get(Book, book_id)
+    if not book:
+        flash("Book not found.", "error")
+        return redirect(url_for("list_books"))
+
+    db.session.delete(book)
+    db.session.commit()
+    flash("Book deleted.", "success")
+    return redirect(url_for("list_books"))
+
+
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
     app.run(debug=debug_mode)
