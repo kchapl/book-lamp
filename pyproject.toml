@@ -3,7 +3,7 @@ name = "book-lamp"
 version = "0.1.0"
 description = "Reading history."
 readme = "README.md"
-packages = []
+packages = [{include = "book_lamp"}]
 
 [tool.poetry.dependencies]
 python = "^3.13"
