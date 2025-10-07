@@ -280,7 +280,6 @@ def create_book():
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
 
-
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
 def delete_book(book_id: int):
     book = db.session.get(Book, book_id)
@@ -336,6 +335,48 @@ if TEST_MODE:
         session["user_id"] = user.user_id
         return redirect(url_for("home"))
 
+
+# -----------------------------
+# Test utilities (enabled only when TEST_MODE=1)
+# -----------------------------
+
+if TEST_MODE:
+
+    @app.route("/test/reset", methods=["POST"])
+    def test_reset():
+        """Reset database and seed a default allowed and app user.
+
+        Only available when TEST_MODE=1.
+        """
+        db.drop_all()
+        db.create_all()
+
+        # Seed allowed user and a matching application user
+        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+        allowed = AllowedUser(email=allowed_email)
+        db.session.add(allowed)
+        user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+        db.session.add(user)
+        db.session.commit()
+        return {"status": "ok"}
+
+    @app.route("/test/login", methods=["GET"])  # simple GET for convenience
+    def test_login():
+        """Log in as the seeded test user.
+
+        Only available when TEST_MODE=1.
+        """
+        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+        user = User.query.filter_by(email=allowed_email).first()
+        if not user:
+            # If DB isn't reset yet, create minimal seed on the fly
+            allowed = AllowedUser(email=allowed_email)
+            db.session.add(allowed)
+            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+            db.session.add(user)
+            db.session.commit()
+        session["user_id"] = user.user_id
+        return redirect(url_for("home"))
 
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
