@@ -99,7 +99,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1/2, 2/2] # run two shards in parallel
+        shard: [1, 2] # run two shards in parallel
 
     steps:
       - name: Checkout
