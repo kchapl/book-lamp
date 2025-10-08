@@ -237,7 +237,7 @@ def create_book():
         return redirect(url_for("new_book_form"))
 
     # Lookup via Open Library Books API (stubbed in TEST_MODE)
-    from services.book_lookup import lookup_book_by_isbn13
+    from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
     # Deterministic stub for E2E tests
     if TEST_MODE and isbn == "9780000000000":
