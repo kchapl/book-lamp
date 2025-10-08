@@ -157,7 +157,7 @@ jobs:
       - name: Run Playwright tests (sharded)
         env:
           CI: true
-        run: npm test -- --shard=${{ matrix.shard }} --reporter=list
+        run: npm test -- --shard="${{ matrix.shard }}/2" --reporter=list
 
       - name: Upload Playwright report
         if: always()
