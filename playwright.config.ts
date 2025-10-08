@@ -18,7 +18,7 @@ export default defineConfig({
         video: 'retain-on-failure',
     },
     webServer: {
-        command: `TEST_MODE=1 FLASK_DEBUG=false FLASK_APP=app.py DB_URL=sqlite:///e2e_test.db poetry run flask run --port ${PORT} --host 127.0.0.1`,
+        command: `TEST_MODE=1 FLASK_DEBUG=false FLASK_APP=book_lamp.app:create_app DB_URL=sqlite:///e2e_test.db poetry run flask run --port ${PORT} --host 127.0.0.1`,
         url: BASE_URL,
         timeout: 60_000,
         reuseExistingServer: !process.env.CI,
