@@ -1,2 +1,4 @@
 [tools]
+node = "latest"
+poetry = "latest"
 python = "latest"

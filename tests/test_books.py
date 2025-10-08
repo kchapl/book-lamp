@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app import Book, app, db, is_valid_isbn13, parse_publication_year
+from book_lamp.app import Book, app, db, is_valid_isbn13, parse_publication_year
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +43,7 @@ def _mock_open_library_response() -> Dict:
     }
 
 
-@patch("services.book_lookup.requests.get")
+@patch("book_lamp.services.book_lookup.requests.get")
 def test_add_book_success(mock_get, client):
     class MockResp:
         def raise_for_status(self):
@@ -67,7 +67,7 @@ def test_add_book_success(mock_get, client):
         assert book.thumbnail_url is not None
 
 
-@patch("services.book_lookup.requests.get")
+@patch("book_lamp.services.book_lookup.requests.get")
 def test_add_book_duplicate(mock_get, client):
     class MockResp:
         def raise_for_status(self):
