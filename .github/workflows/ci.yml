@@ -145,14 +145,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}-${{ hashFiles('package.json') }}
           restore-keys: |
+            ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers and deps
         env:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
-        run: npx playwright install --with-deps
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright install-deps chromium
 
       - name: Run Playwright tests (sharded)
         env:
