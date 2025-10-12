@@ -141,27 +141,36 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Install Playwright browsers and deps
+      - name: Install system dependencies
         env:
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
           DEBIAN_FRONTEND: noninteractive
           UCF_FORCE_CONFFNEW: 1
-          MAN_DISABLE_UPDATE: 1
         run: |
           # Prevent man-db from hanging during installation
           echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
           echo "man-db man-db/install-docs boolean false" | sudo debconf-set-selections
 
-          # Disable man-db updates system-wide
-          sudo systemctl stop man-db || true
-          sudo systemctl disable man-db || true
+          # Install only essential system dependencies for browsers
+          sudo apt-get update
+          sudo apt-get install -y \
+            libnss3 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxrandr2 \
+            libgbm1 \
+            libxss1 \
+            libasound2
 
-          # Install all browsers and dependencies with timeout
-          echo "Installing Playwright browsers and dependencies..."
-          timeout 300 npx playwright install --with-deps || {
-            echo "Installation timed out or failed, trying without system deps..."
-            npx playwright install
-          }
+      - name: Install Playwright browsers
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+        run: |
+          # Install all browsers without system dependencies
+          echo "Installing Playwright browsers..."
+          npx playwright install
 
           # Verify installation
           echo "Verifying browser installation..."
@@ -170,6 +179,14 @@ jobs:
           # Check if browsers are properly installed
           echo "Checking installed browsers:"
           ls -la ~/.cache/ms-playwright/ || echo "No browsers found"
+
+          # Specifically check for chromium-headless-shell
+          if [ -d ~/.cache/ms-playwright/chromium_headless_shell* ]; then
+            echo "✓ chromium-headless-shell found:"
+            ls -la ~/.cache/ms-playwright/chromium_headless_shell*/
+          else
+            echo "✗ chromium-headless-shell not found"
+          fi
 
       - name: Run Playwright tests (sharded)
         env:
