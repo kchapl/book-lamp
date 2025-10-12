@@ -154,7 +154,12 @@ jobs:
       - name: Install Playwright browsers and deps
         env:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+          DEBIAN_FRONTEND: noninteractive
+          UCF_FORCE_CONFFNEW: 1
         run: |
+          # Prevent man-db from hanging during installation
+          echo "man-db man-db/auto-update boolean false" | debconf-set-selections
+
           # Ensure cache directory exists
           mkdir -p ~/.cache/ms-playwright
 
