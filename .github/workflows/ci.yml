@@ -142,6 +142,7 @@ jobs:
         run: npm ci
 
       - name: Cache Playwright browsers
+        id: cache-playwright
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -154,8 +155,25 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
         run: |
-          npx playwright install --with-deps chromium
-          npx playwright install-deps chromium
+          # If cache was restored, verify browsers exist, otherwise install fresh
+          if [ ! -d ~/.cache/ms-playwright/chromium* ] || [ "${{ steps.cache-playwright.outputs.cache-hit }}" != "true" ]; then
+            echo "Installing fresh Playwright browsers..."
+            rm -rf ~/.cache/ms-playwright/chromium*
+            npx playwright install chromium
+            npx playwright install-deps chromium
+          else
+            echo "Using cached Playwright browsers..."
+            # Verify cached browsers work
+            npx playwright install chromium --dry-run || {
+              echo "Cached browsers are corrupted, reinstalling..."
+              rm -rf ~/.cache/ms-playwright/chromium*
+              npx playwright install chromium
+              npx playwright install-deps chromium
+            }
+          fi
+          # Verify installation
+          npx playwright --version
+          ls -la ~/.cache/ms-playwright/
 
       - name: Run Playwright tests (sharded)
         env:
