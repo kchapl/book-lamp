@@ -158,7 +158,7 @@ jobs:
           UCF_FORCE_CONFFNEW: 1
         run: |
           # Prevent man-db from hanging during installation
-          echo "man-db man-db/auto-update boolean false" | debconf-set-selections
+          echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
 
           # Ensure cache directory exists
           mkdir -p ~/.cache/ms-playwright
