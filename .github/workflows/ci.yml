@@ -141,16 +141,6 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Cache Playwright browsers
-        id: cache-playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}-${{ hashFiles('package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-playwright-
-
       - name: Install Playwright browsers and deps
         env:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
@@ -160,27 +150,17 @@ jobs:
           # Prevent man-db from hanging during installation
           echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
 
-          # Ensure cache directory exists
-          mkdir -p ~/.cache/ms-playwright
+          # Install all browsers and dependencies
+          echo "Installing Playwright browsers and dependencies..."
+          npx playwright install --with-deps
 
-          # If cache was restored, verify browsers exist, otherwise install fresh
-          if [ ! -d ~/.cache/ms-playwright/chromium* ] || [ "${{ steps.cache-playwright.outputs.cache-hit }}" != "true" ]; then
-            echo "Installing fresh Playwright browsers..."
-            rm -rf ~/.cache/ms-playwright/chromium*
-            npx playwright install --with-deps
-          else
-            echo "Using cached Playwright browsers..."
-            # Verify cached browsers work
-            npx playwright install chromium --dry-run || {
-              echo "Cached browsers are corrupted, reinstalling..."
-              rm -rf ~/.cache/ms-playwright/chromium*
-              npx playwright install --with-deps
-            }
-          fi
           # Verify installation
+          echo "Verifying browser installation..."
           npx playwright --version
-          echo "Playwright cache directory contents:"
-          ls -la ~/.cache/ms-playwright/ || echo "Directory is empty or doesn't exist"
+
+          # Check if browsers are properly installed
+          echo "Checking installed browsers:"
+          ls -la ~/.cache/ms-playwright/ || echo "No browsers found"
 
       - name: Run Playwright tests (sharded)
         env:
