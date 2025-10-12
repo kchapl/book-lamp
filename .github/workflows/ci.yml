@@ -167,16 +167,14 @@ jobs:
           if [ ! -d ~/.cache/ms-playwright/chromium* ] || [ "${{ steps.cache-playwright.outputs.cache-hit }}" != "true" ]; then
             echo "Installing fresh Playwright browsers..."
             rm -rf ~/.cache/ms-playwright/chromium*
-            npx playwright install chromium
-            npx playwright install-deps chromium
+            npx playwright install --with-deps
           else
             echo "Using cached Playwright browsers..."
             # Verify cached browsers work
             npx playwright install chromium --dry-run || {
               echo "Cached browsers are corrupted, reinstalling..."
               rm -rf ~/.cache/ms-playwright/chromium*
-              npx playwright install chromium
-              npx playwright install-deps chromium
+              npx playwright install --with-deps
             }
           fi
           # Verify installation
