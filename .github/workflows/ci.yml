@@ -155,6 +155,9 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
         run: |
+          # Ensure cache directory exists
+          mkdir -p ~/.cache/ms-playwright
+
           # If cache was restored, verify browsers exist, otherwise install fresh
           if [ ! -d ~/.cache/ms-playwright/chromium* ] || [ "${{ steps.cache-playwright.outputs.cache-hit }}" != "true" ]; then
             echo "Installing fresh Playwright browsers..."
@@ -173,7 +176,8 @@ jobs:
           fi
           # Verify installation
           npx playwright --version
-          ls -la ~/.cache/ms-playwright/
+          echo "Playwright cache directory contents:"
+          ls -la ~/.cache/ms-playwright/ || echo "Directory is empty or doesn't exist"
 
       - name: Run Playwright tests (sharded)
         env:
