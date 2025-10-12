@@ -189,10 +189,38 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
+        run: |
+          if [ -d "playwright-report" ] && [ "$(ls -A playwright-report)" ]; then
+            echo "Uploading Playwright report..."
+            # Create a simple index if it doesn't exist
+            if [ ! -f "playwright-report/index.html" ]; then
+              echo "<html><body><h1>No Playwright report available</h1><p>Tests may have failed before report generation.</p></body></html>" > playwright-report/index.html
+            fi
+          else
+            echo "No Playwright report found, creating placeholder..."
+            mkdir -p playwright-report
+            echo "<html><body><h1>No Playwright report available</h1><p>Tests may have failed before report generation.</p></body></html>" > playwright-report/index.html
+          fi
+        continue-on-error: true
+
+      - name: Upload Playwright report artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ matrix.shard }}
           path: playwright-report
+
+      - name: Prepare test results
+        if: always()
+        run: |
+          if [ -d "test-results" ] && [ "$(ls -A test-results)" ]; then
+            echo "Test results found, preparing for upload..."
+          else
+            echo "No test results found, creating placeholder..."
+            mkdir -p test-results
+            echo "No test results available - tests may have failed before results were generated" > test-results/README.txt
+          fi
+        continue-on-error: true
 
       - name: Upload test results
         if: always()
