@@ -146,13 +146,22 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
           DEBIAN_FRONTEND: noninteractive
           UCF_FORCE_CONFFNEW: 1
+          MAN_DISABLE_UPDATE: 1
         run: |
           # Prevent man-db from hanging during installation
           echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
+          echo "man-db man-db/install-docs boolean false" | sudo debconf-set-selections
 
-          # Install all browsers and dependencies
+          # Disable man-db updates system-wide
+          sudo systemctl stop man-db || true
+          sudo systemctl disable man-db || true
+
+          # Install all browsers and dependencies with timeout
           echo "Installing Playwright browsers and dependencies..."
-          npx playwright install --with-deps
+          timeout 300 npx playwright install --with-deps || {
+            echo "Installation timed out or failed, trying without system deps..."
+            npx playwright install
+          }
 
           # Verify installation
           echo "Verifying browser installation..."
