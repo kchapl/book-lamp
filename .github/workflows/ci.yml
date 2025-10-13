@@ -143,7 +143,18 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
+          echo "=== Starting Playwright browser installation ==="
+
+          # Check initial state
+          echo "Initial state:"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Current directory: $(pwd)"
+          echo "Environment variables:"
+          env | grep -E "(PLAYWRIGHT|PATH)" || echo "No Playwright env vars found"
+
           # Use GitHub Actions' built-in Playwright setup
+          echo "Installing Chromium browser..."
           npx playwright install chromium
 
           # Verify installation
@@ -174,13 +185,24 @@ jobs:
           npx playwright test --version || {
             echo "Browser test failed, trying to install system dependencies..."
             npx playwright install-deps chromium || echo "System deps installation failed"
+            echo "Retrying browser test after installing deps..."
             npx playwright test --version || echo "Browser test still failed after installing deps"
           }
+
+          echo "=== Browser installation complete ==="
 
       - name: Run Playwright tests (sharded)
         env:
           CI: true
-        run: npm test -- --shard="${{ matrix.shard }}/2" --reporter=list
+        run: |
+          echo "=== Starting Playwright tests ==="
+          echo "Shard: ${{ matrix.shard }}/2"
+          echo "Current directory: $(pwd)"
+          echo "Checking if test files exist:"
+          ls -la tests-e2e/ || echo "No tests-e2e directory found"
+          echo "Running tests..."
+          npm test -- --shard="${{ matrix.shard }}/2" --reporter=list
+          echo "=== Tests completed ==="
 
       - name: Upload Playwright report
         if: always()
