@@ -191,9 +191,23 @@ jobs:
 
           echo "=== Browser installation complete ==="
 
+      - name: Initialize test database
+        env:
+          TEST_MODE: 1
+          FLASK_DEBUG: false
+          FLASK_APP: book_lamp.app
+          DB_URL: sqlite:///e2e_test.db
+        run: |
+          echo "=== Initializing test database ==="
+          poetry run flask --app book_lamp.app init-db
+          echo "=== Database initialized ==="
+
       - name: Run Playwright tests (sharded)
         env:
           CI: true
+          TEST_MODE: 1
+          FLASK_DEBUG: false
+          DB_URL: sqlite:///e2e_test.db
         run: |
           echo "=== Starting Playwright tests ==="
           echo "Shard: ${{ matrix.shard }}/2"
