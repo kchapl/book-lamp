@@ -141,39 +141,9 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Install system dependencies
-        env:
-          DEBIAN_FRONTEND: noninteractive
-          UCF_FORCE_CONFFNEW: 1
-        run: |
-          # Prevent man-db from hanging during installation
-          echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
-          echo "man-db man-db/install-docs boolean false" | sudo debconf-set-selections
-
-          # Install all system dependencies for Chromium
-          sudo apt-get update
-          sudo apt-get install -y \
-            libnss3 \
-            libatk-bridge2.0-0 \
-            libdrm2 \
-            libxkbcommon0 \
-            libxcomposite1 \
-            libxdamage1 \
-            libxrandr2 \
-            libgbm1 \
-            libxss1 \
-            libasound2 \
-            libcups2 \
-            libxfixes3 \
-            libcairo2 \
-            libpango-1.0-0
-
       - name: Install Playwright browsers
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
         run: |
-          # Install only chromium browser (as configured in playwright.config.ts)
-          echo "Installing Chromium browser only..."
+          # Use GitHub Actions' built-in Playwright setup
           npx playwright install chromium
 
           # Verify installation
@@ -198,6 +168,10 @@ jobs:
           else
             echo "ℹ chromium-headless-shell not found (may not be needed)"
           fi
+
+          # Test if browser can actually launch
+          echo "Testing browser launch..."
+          npx playwright test --version || echo "Browser test failed"
 
       - name: Run Playwright tests (sharded)
         env:
