@@ -212,10 +212,34 @@ jobs:
           echo "=== Starting Playwright tests ==="
           echo "Shard: ${{ matrix.shard }}/2"
           echo "Current directory: $(pwd)"
+
+          echo "Checking Python environment:"
+          poetry run python --version
+          poetry run flask --version || echo "Flask not found"
+
+          echo "Checking Node environment:"
+          node --version
+          npm --version
+          npx playwright --version
+
           echo "Checking if test files exist:"
           ls -la tests-e2e/ || echo "No tests-e2e directory found"
+
+          echo "Checking Playwright config:"
+          cat playwright.config.ts
+
+          echo "Testing Flask app can be imported:"
+          poetry run python -c "from book_lamp.app import app; print('Flask app imported successfully')" || echo "Failed to import Flask app"
+
           echo "Running tests..."
-          npm test -- --shard="${{ matrix.shard }}/2" --reporter=list
+          npm test -- --shard="${{ matrix.shard }}/2" --reporter=list || {
+            EXIT_CODE=$?
+            echo "Tests failed with exit code: $EXIT_CODE"
+            echo "Checking for any generated files:"
+            ls -la playwright-report/ 2>/dev/null || echo "No playwright-report directory"
+            ls -la test-results/ 2>/dev/null || echo "No test-results directory"
+            exit $EXIT_CODE
+          }
           echo "=== Tests completed ==="
 
       - name: Upload Playwright report
