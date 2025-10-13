@@ -150,7 +150,7 @@ jobs:
           echo "man-db man-db/auto-update boolean false" | sudo debconf-set-selections
           echo "man-db man-db/install-docs boolean false" | sudo debconf-set-selections
 
-          # Install only essential system dependencies for browsers
+          # Install all system dependencies for Chromium
           sudo apt-get update
           sudo apt-get install -y \
             libnss3 \
@@ -162,7 +162,11 @@ jobs:
             libxrandr2 \
             libgbm1 \
             libxss1 \
-            libasound2
+            libasound2 \
+            libcups2 \
+            libxfixes3 \
+            libcairo2 \
+            libpango-1.0-0
 
       - name: Install Playwright browsers
         env:
