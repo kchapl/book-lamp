@@ -155,14 +155,14 @@ jobs:
           ls -la ~/.cache/ms-playwright/ || echo "No browsers found"
 
           # Check for both chromium variants that might be needed
-          if [ -d ~/.cache/ms-playwright/chromium* ]; then
+          if ls ~/.cache/ms-playwright/chromium* >/dev/null 2>&1; then
             echo "✓ chromium found:"
             ls -la ~/.cache/ms-playwright/chromium*/
           else
             echo "✗ chromium not found"
           fi
 
-          if [ -d ~/.cache/ms-playwright/chromium_headless_shell* ]; then
+          if ls ~/.cache/ms-playwright/chromium_headless_shell* >/dev/null 2>&1; then
             echo "✓ chromium-headless-shell found:"
             ls -la ~/.cache/ms-playwright/chromium_headless_shell*/
           else
@@ -171,7 +171,11 @@ jobs:
 
           # Test if browser can actually launch
           echo "Testing browser launch..."
-          npx playwright test --version || echo "Browser test failed"
+          npx playwright test --version || {
+            echo "Browser test failed, trying to install system dependencies..."
+            npx playwright install-deps chromium || echo "System deps installation failed"
+            npx playwright test --version || echo "Browser test still failed after installing deps"
+          }
 
       - name: Run Playwright tests (sharded)
         env:
