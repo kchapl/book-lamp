@@ -331,8 +331,9 @@ if TEST_MODE:
         user = User.query.filter_by(email=allowed_email).first()
         if not user:
             # If DB isn't reset yet, create minimal seed on the fly
-            allowed = AllowedUser(email=allowed_email)
-            db.session.add(allowed)
+            if not AllowedUser.query.filter_by(email=allowed_email).first():
+                allowed = AllowedUser(email=allowed_email)
+                db.session.add(allowed)
             user = User(user_name=allowed_email, email=allowed_email, name="Test User")
             db.session.add(user)
             db.session.commit()
