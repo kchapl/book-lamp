@@ -301,29 +301,17 @@ if TEST_MODE:
 
     @app.route("/test/reset", methods=["POST"])
     def test_reset():
-        """Reset database and seed a default allowed and app user.
+        """Reset database.
 
         Only available when TEST_MODE=1.
         """
         db.drop_all()
         db.create_all()
-
-        # Seed allowed user and a matching application user
-        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
-        if not AllowedUser.query.filter_by(email=allowed_email).first():
-            allowed = AllowedUser(email=allowed_email)
-            db.session.add(allowed)
-
-        if not User.query.filter_by(email=allowed_email).first():
-            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
-            db.session.add(user)
-
-        db.session.commit()
         return {"status": "ok"}
 
     @app.route("/test/login", methods=["GET"])  # simple GET for convenience
     def test_login():
-        """Log in as the seeded test user.
+        """Log in as the seeded test user, creating if necessary.
 
         Only available when TEST_MODE=1.
         """
@@ -331,9 +319,8 @@ if TEST_MODE:
         user = User.query.filter_by(email=allowed_email).first()
         if not user:
             # If DB isn't reset yet, create minimal seed on the fly
-            if not AllowedUser.query.filter_by(email=allowed_email).first():
-                allowed = AllowedUser(email=allowed_email)
-                db.session.add(allowed)
+            allowed = AllowedUser(email=allowed_email)
+            db.session.add(allowed)
             user = User(user_name=allowed_email, email=allowed_email, name="Test User")
             db.session.add(user)
             db.session.commit()
