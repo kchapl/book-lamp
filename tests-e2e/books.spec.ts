@@ -30,6 +30,7 @@ test('adding duplicate shows info message', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
     await page.getByRole('button', { name: 'Add' }).click();
+    await expect(page).toHaveURL(/.*\/books$/);
     await expect(page.locator('.messages .info', { hasText: 'already been added' })).toBeVisible();
 });
 
