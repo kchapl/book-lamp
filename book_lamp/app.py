@@ -170,7 +170,7 @@ def add_user(email):
     allowed = AllowedUser(email=email)
     db.session.add(allowed)
     db.session.commit()
-    print(f"User {email} added to allow list.")
+    click.echo(f"User {email} added to allow list.")
 
 
 @app.cli.command("list-users")
@@ -232,9 +232,8 @@ def create_book():
     # Avoid duplicates
     existing = Book.query.filter_by(isbn13=isbn).first()
     if existing:
-
         flash("This book has already been added.", "info")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
     # Lookup via Open Library Books API (stubbed in TEST_MODE)
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
