@@ -67,7 +67,10 @@ def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
 def home():
     if "user_id" in session:
         user = db.session.get(User, session["user_id"])
-        return f'<h1>Hello {user.name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
+        if user:
+            return f'<h1>Hello {user.name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
+        # Stale session, clear it
+        session.pop("user_id", None)
     return '<h1>Hello World!</h1><p>You are not logged in.</p><a href="/login">Login with Google</a>'
 
 
