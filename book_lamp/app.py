@@ -254,11 +254,11 @@ def create_book():
             data = lookup_book_by_isbn13(isbn)
         except Exception as exc:  # noqa: BLE001
             flash(f"Failed to fetch book details: {exc}", "error")
-            return redirect(url_for("new_book_form"))
+            return redirect(url_for("list_books"))
 
     if not data:
         flash("No book data found for that ISBN.", "error")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
     title = data.get("title") or ""
     author = data.get("author") or ""
@@ -268,7 +268,7 @@ def create_book():
 
     if not title or not author:
         flash("The external service did not return required fields.", "error")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
     book = Book(
         isbn13=isbn,
@@ -280,8 +280,7 @@ def create_book():
     db.session.add(book)
     db.session.commit()
     flash("Book added successfully.", "success")
-    response = redirect(url_for("list_books"))
-    return response
+    return redirect(url_for("list_books"))
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
