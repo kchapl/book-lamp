@@ -310,10 +310,14 @@ if TEST_MODE:
 
         # Seed allowed user and a matching application user
         allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
-        allowed = AllowedUser(email=allowed_email)
-        db.session.add(allowed)
-        user = User(user_name=allowed_email, email=allowed_email, name="Test User")
-        db.session.add(user)
+        if not AllowedUser.query.filter_by(email=allowed_email).first():
+            allowed = AllowedUser(email=allowed_email)
+            db.session.add(allowed)
+
+        if not User.query.filter_by(email=allowed_email).first():
+            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+            db.session.add(user)
+
         db.session.commit()
         return {"status": "ok"}
 
