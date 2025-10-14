@@ -280,7 +280,8 @@ def create_book():
     db.session.add(book)
     db.session.commit()
     flash("Book added successfully.", "success")
-    return redirect(url_for("list_books"))
+    response = redirect(url_for("list_books"))
+    return response
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
