@@ -96,10 +96,6 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2] # run two shards in parallel
 
     steps:
       - name: Checkout
@@ -202,7 +198,7 @@ jobs:
           poetry run flask --app book_lamp.app init-db
           echo "=== Database initialized ==="
 
-      - name: Run Playwright tests (sharded)
+      - name: Run Playwright tests
         env:
           CI: true
           TEST_MODE: 1
@@ -210,7 +206,6 @@ jobs:
           DB_URL: sqlite:///e2e_test.db
         run: |
           echo "=== Starting Playwright tests ==="
-          echo "Shard: ${{ matrix.shard }}/2"
           echo "Current directory: $(pwd)"
 
           echo "Checking Python environment:"
@@ -232,7 +227,7 @@ jobs:
           poetry run python -c "from book_lamp.app import app; print('Flask app imported successfully')" || echo "Failed to import Flask app"
 
           echo "Running tests..."
-          npm test -- --shard="${{ matrix.shard }}/2" --reporter=list || {
+          npm test --reporter=list || {
             EXIT_CODE=$?
             echo "Tests failed with exit code: $EXIT_CODE"
             echo "Checking for any generated files:"
@@ -262,7 +257,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.shard }}
+          name: playwright-report
           path: playwright-report
 
       - name: Prepare test results
@@ -281,5 +276,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.shard }}
+          name: test-results
           path: test-results
