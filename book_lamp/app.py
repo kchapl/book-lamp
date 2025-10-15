@@ -16,6 +16,9 @@ app = Flask(__name__)
 # Database configuration
 # Enable lightweight, file-backed SQLite DB in test mode for Playwright
 TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
+# Test ISBN used for E2E testing
+TEST_ISBN = "9780000000000"
+
 if TEST_MODE:
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
         "DB_URL", f"sqlite:////{os.path.abspath('e2e_test.db')}"
@@ -191,7 +194,7 @@ def list_users():
 
 def is_valid_isbn13(isbn: str) -> bool:
     """Validate ISBN-13 using checksum algorithm and format constraints."""
-    if TEST_MODE and isbn == "9780000000000":
+    if TEST_MODE and isbn == TEST_ISBN:
         return True
 
     if len(isbn) != 13 or not isbn.isdigit():
@@ -245,7 +248,7 @@ def create_book():
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
     # Deterministic stub for E2E tests
-    if TEST_MODE and isbn == "9780000000000":
+    if TEST_MODE and isbn == TEST_ISBN:
         data = {
             "title": "Test Driven Development",
             "author": "Test Author",
