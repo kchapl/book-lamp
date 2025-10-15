@@ -316,6 +316,18 @@ if TEST_MODE:
         """
         db.drop_all()
         db.create_all()
+
+        # Verify database is ready by performing a test write/read
+        try:
+            test_user = User(user_name="test", email="test@example.com")
+            db.session.add(test_user)
+            db.session.commit()
+            db.session.delete(test_user)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return {"status": "error", "message": str(e)}, 500
+
         return {"status": "ok"}
 
     @app.route("/test/login", methods=["GET"])  # simple GET for convenience

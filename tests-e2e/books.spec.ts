@@ -1,7 +1,25 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page, request }) => {
-    await request.post('/test/reset');
+    // Try to reset the database up to 3 times
+    let attempts = 0;
+    while (attempts < 3) {
+        try {
+            const res = await request.post('/test/reset');
+            if (!res.ok()) {
+                throw new Error(`Failed to reset DB: ${res.status()}`);
+            }
+            break;
+        } catch (error) {
+            attempts++;
+            if (attempts === 3) {
+                throw error;
+            }
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
     await page.goto('/test/login');
 });
 
