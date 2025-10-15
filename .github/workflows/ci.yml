@@ -161,7 +161,7 @@ jobs:
       - name: Initialize test database
         env:
           TEST_MODE: 1
-          FLASK_DEBUG: false
+          FLASK_DEBUG: true
           FLASK_APP: book_lamp.app
           DB_URL: sqlite:///e2e_test.db
         run: poetry run flask --app book_lamp.app init-db
