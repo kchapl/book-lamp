@@ -23,8 +23,11 @@ test('adding invalid ISBN shows error', async ({ page }) => {
 test('adding duplicate shows info message', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
-    await page.getByRole('button', { name: 'Add' }).click();
-    await expect(page).toHaveURL(/.*\/books$/);
+    await Promise.all([
+        page.waitForURL(/.*\/books$/),
+        page.getByRole('button', { name: 'Add' }).click()
+    ]);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.messages .success', { hasText: 'Book added successfully' })).toBeVisible();
 
     await page.goto('/books/new');
@@ -37,7 +40,11 @@ test('adding duplicate shows info message', async ({ page }) => {
 test('successful add shows on list with metadata', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
-    await page.getByRole('button', { name: 'Add' }).click();
+    await Promise.all([
+        page.waitForURL(/.*\/books$/),
+        page.getByRole('button', { name: 'Add' }).click()
+    ]);
+    await page.waitForLoadState('networkidle');
     await expect(page.locator('.messages .success', { hasText: 'Book added successfully' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible();
     await expect(page.locator('.card .title', { hasText: 'Test Driven Development' })).toBeVisible();
