@@ -45,7 +45,15 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run tests with pytest
-        run: poetry run pytest --cov=book_lamp --cov-report=xml --cov-report=html
+        run: |
+          poetry run pytest --cov=book_lamp --cov-report=xml --cov-report=html --junit-xml=pytest-results.xml
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: pytest-results.xml
+          comment_mode: off
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
@@ -139,53 +147,8 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          echo "=== Starting Playwright browser installation ==="
-
-          # Check initial state
-          echo "Initial state:"
-          echo "Node version: $(node --version)"
-          echo "NPM version: $(npm --version)"
-          echo "Current directory: $(pwd)"
-          echo "Environment variables:"
-          env | grep -E "(PLAYWRIGHT|PATH)" || echo "No Playwright env vars found"
-
-          # Use GitHub Actions' built-in Playwright setup
-          echo "Installing Chromium browser..."
           npx playwright install chromium
-
-          # Verify installation
-          echo "Verifying browser installation..."
-          npx playwright --version
-
-          # Check if chromium is properly installed
-          echo "Checking installed browsers:"
-          ls -la ~/.cache/ms-playwright/ || echo "No browsers found"
-
-          # Check for both chromium variants that might be needed
-          if ls ~/.cache/ms-playwright/chromium* >/dev/null 2>&1; then
-            echo "✓ chromium found:"
-            ls -la ~/.cache/ms-playwright/chromium*/
-          else
-            echo "✗ chromium not found"
-          fi
-
-          if ls ~/.cache/ms-playwright/chromium_headless_shell* >/dev/null 2>&1; then
-            echo "✓ chromium-headless-shell found:"
-            ls -la ~/.cache/ms-playwright/chromium_headless_shell*/
-          else
-            echo "ℹ chromium-headless-shell not found (may not be needed)"
-          fi
-
-          # Test if browser can actually launch
-          echo "Testing browser launch..."
-          npx playwright test --version || {
-            echo "Browser test failed, trying to install system dependencies..."
-            npx playwright install-deps chromium || echo "System deps installation failed"
-            echo "Retrying browser test after installing deps..."
-            npx playwright test --version || echo "Browser test still failed after installing deps"
-          }
-
-          echo "=== Browser installation complete ==="
+          npx playwright install-deps chromium
 
       - name: Initialize test database
         env:
@@ -193,10 +156,7 @@ jobs:
           FLASK_DEBUG: false
           FLASK_APP: book_lamp.app
           DB_URL: sqlite:///e2e_test.db
-        run: |
-          echo "=== Initializing test database ==="
-          poetry run flask --app book_lamp.app init-db
-          echo "=== Database initialized ==="
+        run: poetry run flask --app book_lamp.app init-db
 
       - name: Run Playwright tests
         env:
@@ -204,43 +164,15 @@ jobs:
           TEST_MODE: 1
           FLASK_DEBUG: false
           DB_URL: sqlite:///e2e_test.db
-        run: |
-          npm test --reporter=list
+        run: npx playwright test --reporter=github
 
       - name: Upload Playwright report
-        if: always()
-        run: |
-          if [ -d "playwright-report" ] && [ "$(ls -A playwright-report)" ]; then
-            echo "Uploading Playwright report..."
-            # Create a simple index if it doesn't exist
-            if [ ! -f "playwright-report/index.html" ]; then
-              echo "<html><body><h1>No Playwright report available</h1><p>Tests may have failed before report generation.</p></body></html>" > playwright-report/index.html
-            fi
-          else
-            echo "No Playwright report found, creating placeholder..."
-            mkdir -p playwright-report
-            echo "<html><body><h1>No Playwright report available</h1><p>Tests may have failed before report generation.</p></body></html>" > playwright-report/index.html
-          fi
-        continue-on-error: true
-
-      - name: Upload Playwright report artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report
-
-      - name: Prepare test results
-        if: always()
-        run: |
-          if [ -d "test-results" ] && [ "$(ls -A test-results)" ]; then
-            echo "Test results found, preparing for upload..."
-          else
-            echo "No test results found, creating placeholder..."
-            mkdir -p test-results
-            echo "No test results available - tests may have failed before results were generated" > test-results/README.txt
-          fi
-        continue-on-error: true
+          if-no-files-found: ignore
 
       - name: Upload test results
         if: always()
@@ -248,3 +180,4 @@ jobs:
         with:
           name: test-results
           path: test-results
+          if-no-files-found: ignore
