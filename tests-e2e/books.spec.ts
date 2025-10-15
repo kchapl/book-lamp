@@ -23,12 +23,16 @@ test('adding invalid ISBN shows error', async ({ page }) => {
 test('adding duplicate shows info message', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
+    const successMessage = page.locator('.messages .success', { hasText: 'Book added successfully' });
     await Promise.all([
         page.waitForURL(/.*\/books$/),
         page.getByRole('button', { name: 'Add' }).click()
     ]);
+    // Wait for both network idle and DOM content to be ready
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.messages .success', { hasText: 'Book added successfully' })).toBeVisible();
+    await page.waitForLoadState('domcontentloaded');
+    // Wait specifically for the success message with a custom timeout
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
 
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
@@ -40,12 +44,16 @@ test('adding duplicate shows info message', async ({ page }) => {
 test('successful add shows on list with metadata', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
+    const successMessage = page.locator('.messages .success', { hasText: 'Book added successfully' });
     await Promise.all([
         page.waitForURL(/.*\/books$/),
         page.getByRole('button', { name: 'Add' }).click()
     ]);
+    // Wait for both network idle and DOM content to be ready
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('.messages .success', { hasText: 'Book added successfully' })).toBeVisible();
+    await page.waitForLoadState('domcontentloaded');
+    // Wait specifically for the success message with a custom timeout
+    await expect(successMessage).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible();
     await expect(page.locator('.card .title', { hasText: 'Test Driven Development' })).toBeVisible();
     await expect(page.locator('.card .author', { hasText: 'Test Author' })).toBeVisible();

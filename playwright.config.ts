@@ -28,6 +28,8 @@ export default defineConfig({
             FLASK_APP: 'book_lamp.app',
             DB_URL: 'sqlite:///e2e_test.db',
         },
+        stdout: 'pipe',
+        stderr: 'pipe',
     },
     projects: [
         {
