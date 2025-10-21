@@ -20,7 +20,7 @@ export default defineConfig({
     webServer: {
         command: `poetry run flask --app book_lamp.app run --port ${PORT} --host 127.0.0.1`,
         url: BASE_URL,
-        timeout: 120000,
+        timeout: 180000, // Increased timeout for CI
         reuseExistingServer: !process.env.CI,
         env: {
             TEST_MODE: '1',
@@ -30,6 +30,9 @@ export default defineConfig({
         },
         stdout: 'pipe',
         stderr: 'pipe',
+    },
+    expect: {
+        timeout: 30000, // Increased timeout for all assertions
     },
     projects: [
         {

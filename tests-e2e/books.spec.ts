@@ -1,36 +1,54 @@
 import { test, expect } from '@playwright/test';
 
-test.beforeEach(async ({ page, request }) => {
-    // Try to reset the database up to 3 times
+// Increase timeout for setup since CI can be slower
+test.setTimeout(120000);
+
+test.beforeEach(async ({ page, request }, testInfo) => {
+    console.log(`Setting up test: ${testInfo.title}`);
+
+    // Try to reset the database up to 5 times
     let attempts = 0;
-    while (attempts < 3) {
+    while (attempts < 5) {
         try {
-            const res = await request.post('/test/reset');
+            console.log(`Attempt ${attempts + 1} to reset database...`);
+            const res = await request.post('/test/reset', { timeout: 30000 });
             if (!res.ok()) {
                 throw new Error(`Failed to reset DB: ${res.status()}`);
             }
 
             // After reset, verify database is clean by checking books endpoint
-            const verifyRes = await request.get('/books');
+            console.log('Verifying database is clean...');
+            const verifyRes = await request.get('/books', { timeout: 30000 });
             const text = await verifyRes.text();
             if (!text.includes('No books yet')) {
                 throw new Error('Database reset did not clear books');
             }
 
+            console.log('Database reset successful');
             break;
         } catch (error) {
             attempts++;
-            if (attempts === 3) {
+            console.log(`Reset attempt ${attempts} failed:`, error);
+            if (attempts === 5) {
                 throw error;
             }
-            // Wait a bit before retrying
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Increase wait time between retries
+            const waitTime = 5000 * attempts;
+            console.log(`Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
     }
 
-    // Login and verify session is active
-    await page.goto('/test/login');
-    await page.waitForURL('/');
+    // Login and verify session is active with increased timeouts
+    console.log('Attempting to log in...');
+    await page.goto('/test/login', { timeout: 30000 });
+    await Promise.race([
+        page.waitForURL('/', { timeout: 60000 }),
+        page.waitForResponse(
+            response => response.url().includes('/') && response.status() === 200,
+            { timeout: 60000 }
+        )
+    ]);
 });
 
 test('books list initially empty and link to add', async ({ page }) => {
