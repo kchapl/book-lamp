@@ -169,7 +169,11 @@ jobs:
           FLASK_DEBUG: true
           FLASK_APP: book_lamp.app
           DB_URL: sqlite:///e2e_test.db
-        run: poetry run flask --app book_lamp.app init-db
+        run: |
+          mkdir -p $(dirname e2e_test.db)
+          poetry run flask --app book_lamp.app init-db
+          # Verify database initialization
+          poetry run flask --app book_lamp.app list-users
 
       - name: Run Playwright tests
         env:
