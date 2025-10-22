@@ -6,10 +6,11 @@ const BASE_URL = process.env.BASE_URL || `http://127.0.0.1:${PORT}`;
 export default defineConfig({
     testDir: './tests-e2e',
     globalSetup: require.resolve('./tests-e2e/global.setup'),
-    fullyParallel: true,
+    // Run tests serially to prevent database conflicts
+    fullyParallel: false,
     forbidOnly: !!process.env.CI,
     retries: 0,
-    workers: process.env.CI ? 2 : undefined,
+    workers: 1,
     reporter: [['html', { open: 'never' }], ['list']],
     use: {
         baseURL: BASE_URL,
