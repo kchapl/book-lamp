@@ -314,16 +314,33 @@ if TEST_MODE:
 
         Only available when TEST_MODE=1.
         """
-        db.drop_all()
-        db.create_all()
-
-        # Verify database is ready by performing a test write/read
         try:
-            test_user = User(user_name="test", email="test@example.com")
+            # Clear session and drop all tables
+            db.session.remove()
+            db.drop_all()
+            db.session.commit()
+
+            # Create all tables fresh
+            db.create_all()
+            db.session.commit()
+
+            # Create test user and allowed user
+            test_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+            allowed = AllowedUser(email=test_email)
+            db.session.add(allowed)
+            test_user = User(user_name=test_email, email=test_email, name="Test User")
             db.session.add(test_user)
             db.session.commit()
-            db.session.delete(test_user)
-            db.session.commit()
+
+            # Verify database access
+            books = Book.query.all()
+            if len(books) > 0:
+                db.session.rollback()
+                return {
+                    "status": "error",
+                    "message": "Database reset failed - books still present",
+                }, 500
+
         except Exception as e:
             db.session.rollback()
             return {"status": "error", "message": str(e)}, 500
@@ -332,21 +349,23 @@ if TEST_MODE:
 
     @app.route("/test/login", methods=["GET"])  # simple GET for convenience
     def test_login():
-        """Log in as the seeded test user, creating if necessary.
+        """Log in as the seeded test user.
 
         Only available when TEST_MODE=1.
+        This expects the test user to already exist from the /test/reset endpoint.
         """
         allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
-        user = User.query.filter_by(email=allowed_email).first()
-        if not user:
-            # If DB isn't reset yet, create minimal seed on the fly
-            allowed = AllowedUser(email=allowed_email)
-            db.session.add(allowed)
-            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
-            db.session.add(user)
-            db.session.commit()
-        session["user_id"] = user.user_id
-        return redirect(url_for("home"))
+        try:
+            user = User.query.filter_by(email=allowed_email).first()
+            if not user:
+                return {
+                    "status": "error",
+                    "message": "Test user not found. Call /test/reset first.",
+                }, 500
+            session["user_id"] = user.user_id
+            return redirect(url_for("home"))
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500
 
 
 if __name__ == "__main__":

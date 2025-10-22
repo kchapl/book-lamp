@@ -7,9 +7,15 @@ test('auth guard redirects to unauthorized when not logged in', async ({ page })
 });
 
 test('auth guard allows access after test login', async ({ page }) => {
+    // Go to login and wait for successful redirect
     await page.goto('/test/login');
+    await page.waitForURL('/', { timeout: 30000 });
+    await page.waitForSelector('text=Hello Test User!', { timeout: 30000 });
+
+    // Then navigate to about page and verify content
     await page.goto('/about');
-    await expect(page.locator('text=This is a simple Flask web application.')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
 });
 
 
