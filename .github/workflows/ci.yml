@@ -49,19 +49,14 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          poetry run pytest --cov=book_lamp --cov-report=xml --cov-report=html --junit-xml=pytest-results.xml
+          poetry run pytest --junit-xml=pytest-results.xml
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
+        uses: EnricoMi/publish-unit-test-result-action@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6 # v2.20.0
         if: always()
         with:
           files: pytest-results.xml
           comment_mode: off
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        with:
-          fail_ci_if_error: true
 
   lint-and-format:
     runs-on: ubuntu-latest
