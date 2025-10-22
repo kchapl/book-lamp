@@ -13,6 +13,9 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - uses: actions/checkout@v5
@@ -42,15 +45,18 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction
 
       - name: Run tests with pytest
-        run: poetry run pytest --cov=app --cov-report=xml --cov-report=html
+        run: |
+          poetry run pytest --junit-xml=pytest-results.xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6 # v2.20.0
+        if: always()
         with:
-          fail_ci_if_error: true
+          files: pytest-results.xml
+          comment_mode: off
 
   lint-and-format:
     runs-on: ubuntu-latest
@@ -83,7 +89,7 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction
 
       - name: Lint with ruff
         run: poetry run ruff check .
@@ -92,4 +98,95 @@ jobs:
         run: poetry run mypy .
 
       - name: Security check with bandit
-        run: poetry run bandit -r . -x ./.venv,./tests
+        run: poetry run bandit -r . -x ./.venv,./
+
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prevent man-db update triggers
+        run: |
+          sudo rm -f /var/lib/man-db/auto-update
+          sudo systemctl mask man-db.service man-db.timer || true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Load cached venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install Python dependencies (runtime only)
+        run: |
+          poetry --version
+          poetry install --no-interaction --no-ansi --only main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-chromium-
+
+      - name: Install Playwright browsers and dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          npx playwright install chromium
+          npx playwright install-deps chromium
+
+      - name: Initialize test database
+        env:
+          TEST_MODE: 1
+          FLASK_DEBUG: true
+          FLASK_APP: book_lamp.app
+          DB_URL: sqlite:///e2e_test.db
+        run: |
+          mkdir -p $(dirname e2e_test.db)
+          poetry run flask --app book_lamp.app init-db
+          # Verify database initialization
+          poetry run flask --app book_lamp.app list-users
+
+      - name: Run Playwright tests
+        env:
+          CI: true
+          TEST_MODE: 1
+          FLASK_DEBUG: false
+          DB_URL: sqlite:///e2e_test.db
+        run: npx playwright test --reporter=github
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore

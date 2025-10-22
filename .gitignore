@@ -208,3 +208,10 @@ __marimo__/
 
 # VS Code
 .vscode
+
+# Node
+node_modules/
+
+# Playwright
+playwright-report/
+test-results/

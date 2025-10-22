@@ -14,7 +14,17 @@ load_dotenv()
 app = Flask(__name__)
 
 # Database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URL")
+# Enable lightweight, file-backed SQLite DB in test mode for Playwright
+TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
+# Test ISBN used for E2E testing
+TEST_ISBN = "9780000000000"
+
+if TEST_MODE:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "DB_URL", f"sqlite:////{os.path.abspath('e2e_test.db')}"
+    )
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
@@ -60,7 +70,10 @@ def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
 def home():
     if "user_id" in session:
         user = db.session.get(User, session["user_id"])
-        return f'<h1>Hello {user.name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
+        if user:
+            return f'<h1>Hello {user.name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
+        # Stale session, clear it
+        session.pop("user_id", None)
     return '<h1>Hello World!</h1><p>You are not logged in.</p><a href="/login">Login with Google</a>'
 
 
@@ -106,6 +119,9 @@ def login():
         redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
     else:
         redirect_uri = url_for("authorize", _external=True)
+    if TEST_MODE:
+        # In test mode, skip external OAuth to keep e2e deterministic.
+        return redirect(url_for("test_login"))
     return oauth.google.authorize_redirect(redirect_uri)
 
 
@@ -160,7 +176,7 @@ def add_user(email):
     allowed = AllowedUser(email=email)
     db.session.add(allowed)
     db.session.commit()
-    print(f"User {email} added to allow list.")
+    click.echo(f"User {email} added to allow list.")
 
 
 @app.cli.command("list-users")
@@ -178,6 +194,9 @@ def list_users():
 
 def is_valid_isbn13(isbn: str) -> bool:
     """Validate ISBN-13 using checksum algorithm and format constraints."""
+    if TEST_MODE and isbn == TEST_ISBN:
+        return True
+
     if len(isbn) != 13 or not isbn.isdigit():
         return False
     checksum = 0
@@ -222,22 +241,30 @@ def create_book():
     # Avoid duplicates
     existing = Book.query.filter_by(isbn13=isbn).first()
     if existing:
-
         flash("This book has already been added.", "info")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
-    # Lookup via Open Library Books API
-    from services.book_lookup import lookup_book_by_isbn13
+    # Lookup via Open Library Books API (stubbed in TEST_MODE)
+    from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
-    try:
-        data = lookup_book_by_isbn13(isbn)
-    except Exception as exc:  # noqa: BLE001
-        flash(f"Failed to fetch book details: {exc}", "error")
-        return redirect(url_for("new_book_form"))
+    # Deterministic stub for E2E tests
+    if TEST_MODE and isbn == TEST_ISBN:
+        data = {
+            "title": "Test Driven Development",
+            "author": "Test Author",
+            "publish_date": "2019-05-02",
+            "thumbnail_url": None,
+        }
+    else:
+        try:
+            data = lookup_book_by_isbn13(isbn)
+        except Exception as exc:  # noqa: BLE001
+            flash(f"Failed to fetch book details: {exc}", "error")
+            return redirect(url_for("list_books"))
 
     if not data:
         flash("No book data found for that ISBN.", "error")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
     title = data.get("title") or ""
     author = data.get("author") or ""
@@ -247,7 +274,7 @@ def create_book():
 
     if not title or not author:
         flash("The external service did not return required fields.", "error")
-        return redirect(url_for("new_book_form"))
+        return redirect(url_for("list_books"))
 
     book = Book(
         isbn13=isbn,
@@ -273,6 +300,53 @@ def delete_book(book_id: int):
     db.session.commit()
     flash("Book deleted.", "success")
     return redirect(url_for("list_books"))
+
+
+# -----------------------------
+# Test utilities (enabled only when TEST_MODE=1)
+# -----------------------------
+
+if TEST_MODE:
+
+    @app.route("/test/reset", methods=["POST"])
+    def test_reset():
+        """Reset database.
+
+        Only available when TEST_MODE=1.
+        """
+        db.drop_all()
+        db.create_all()
+
+        # Verify database is ready by performing a test write/read
+        try:
+            test_user = User(user_name="test", email="test@example.com")
+            db.session.add(test_user)
+            db.session.commit()
+            db.session.delete(test_user)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return {"status": "error", "message": str(e)}, 500
+
+        return {"status": "ok"}
+
+    @app.route("/test/login", methods=["GET"])  # simple GET for convenience
+    def test_login():
+        """Log in as the seeded test user, creating if necessary.
+
+        Only available when TEST_MODE=1.
+        """
+        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
+        user = User.query.filter_by(email=allowed_email).first()
+        if not user:
+            # If DB isn't reset yet, create minimal seed on the fly
+            allowed = AllowedUser(email=allowed_email)
+            db.session.add(allowed)
+            user = User(user_name=allowed_email, email=allowed_email, name="Test User")
+            db.session.add(user)
+            db.session.commit()
+        session["user_id"] = user.user_id
+        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
