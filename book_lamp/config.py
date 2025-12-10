@@ -12,5 +12,15 @@ ALLOWED_USER_EMAIL_HASH = os.environ.get(
 
 def verify_email(email: str) -> bool:
     """Verify if the provided email matches the allowed user hash."""
-    email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    email_normalized = email.strip().lower()
+    email_hash = hashlib.sha256(email_normalized.encode()).hexdigest()
+    
+    logger.info(f"Email verification for: {email_normalized}")
+    logger.info(f"Computed hash: {email_hash}")
+    logger.info(f"Expected hash: {ALLOWED_USER_EMAIL_HASH}")
+    logger.info(f"Match: {email_hash == ALLOWED_USER_EMAIL_HASH}")
+    
     return email_hash == ALLOWED_USER_EMAIL_HASH

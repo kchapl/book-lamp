@@ -1,3 +1,4 @@
+import logging
 import os
 from functools import wraps
 from typing import Any, Callable, Optional
@@ -5,12 +6,23 @@ from typing import Any, Callable, Optional
 import click
 from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
+
+load_dotenv()
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 
 from book_lamp.config import verify_email
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 
-load_dotenv()
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+logging.getLogger("book_lamp").setLevel(logging.INFO)
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 app = Flask(__name__)
 
@@ -68,44 +80,94 @@ app.config["GOOGLE_DISCOVERY_URL"] = (
     "https://accounts.google.com/.well-known/openid-configuration"
 )
 
+# Validate OAuth configuration (skip in test mode)
+if not TEST_MODE:
+    if not app.config["GOOGLE_CLIENT_ID"]:
+        raise ValueError(
+            "GOOGLE_CLIENT_ID environment variable is required. "
+            "Please set it in your .env file. "
+            "Get credentials from https://console.cloud.google.com/"
+        )
+    if not app.config["GOOGLE_CLIENT_SECRET"]:
+        raise ValueError(
+            "GOOGLE_CLIENT_SECRET environment variable is required. "
+            "Please set it in your .env file. "
+            "Get credentials from https://console.cloud.google.com/"
+        )
+
 oauth = OAuth(app)
-oauth.register(
-    name="google",
-    client_id=app.config["GOOGLE_CLIENT_ID"],
-    client_secret=app.config["GOOGLE_CLIENT_SECRET"],
-    server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-    client_kwargs={"scope": "openid email profile"},
-)
+if not TEST_MODE:
+    oauth.register(
+        name="google",
+        client_id=app.config["GOOGLE_CLIENT_ID"],
+        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
+        client_kwargs={"scope": "openid email profile"},
+    )
 
 
 @app.route("/login")
 def login():
-    if (
-        "CODESPACE_NAME" in os.environ
-        and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
-    ):
-        codespace_name = os.environ["CODESPACE_NAME"]
-        domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
-        redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
-    else:
-        redirect_uri = url_for("authorize", _external=True)
     if TEST_MODE:
         return redirect(url_for("test_login"))
-    return oauth.google.authorize_redirect(redirect_uri)
+    
+    try:
+        if (
+            "CODESPACE_NAME" in os.environ
+            and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
+        ):
+            codespace_name = os.environ["CODESPACE_NAME"]
+            domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
+            redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
+        else:
+            redirect_uri = url_for("authorize", _external=True)
+        
+        app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
+        return oauth.google.authorize_redirect(redirect_uri)
+    except Exception as e:
+        app.logger.error(f"OAuth login failed: {str(e)}")
+        return (
+            f"<h1>Login Error</h1>"
+            f"<p>Failed to initiate Google OAuth login.</p>"
+            f"<p>Error: {str(e)}</p>"
+            f"<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
+            f"<a href='/'>Go back</a>"
+        ), 500
 
 
 @app.route("/authorize")
 def authorize():
-    token = oauth.google.authorize_access_token()
+    try:
+        token = oauth.google.authorize_access_token()
+        app.logger.info("OAuth token received successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to authorize access token: {str(e)}")
+        return (
+            f"<h1>Authorization Error</h1>"
+            f"<p>Failed to complete Google OAuth authorization.</p>"
+            f"<p>Error: {str(e)}</p>"
+            f"<p>This might be due to:</p>"
+            f"<ul>"
+            f"<li>Invalid OAuth credentials</li>"
+            f"<li>Incorrect redirect URI configuration</li>"
+            f"<li>User cancelled the login</li>"
+            f"</ul>"
+            f"<a href='/'>Go back</a>"
+        ), 401
+    
     userinfo = token.get("userinfo")
     if not userinfo or "email" not in userinfo:
+        app.logger.warning("No userinfo or email in OAuth response")
         return redirect(url_for("unauthorized"))
 
     # Check if email matches the allowed user hash
-    if not verify_email(userinfo["email"]):
+    user_email = userinfo["email"]
+    if not verify_email(user_email):
+        app.logger.warning(f"Unauthorized login attempt from: {user_email}")
         return redirect(url_for("unauthorized"))
 
-    session["user_email"] = userinfo["email"]
+    app.logger.info(f"Successful login for: {user_email}")
+    session["user_email"] = user_email
     session["user_name"] = userinfo.get("name", "User")
     return redirect(url_for("home"))
 
@@ -324,4 +386,5 @@ if TEST_MODE:
 
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
-    app.run(debug=debug_mode)
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
