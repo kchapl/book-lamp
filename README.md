@@ -1,7 +1,21 @@
 # book-lamp
 
-Using `colima` for local docker management.
-# TODO stop and start automatically
+A personal reading history tracker using Google Sheets for storage.
+
+## Setup
+
+1. Install dependencies: `poetry install`
+2. Follow [SHEETS_SETUP.md](SHEETS_SETUP.md) to configure Google Sheets
+3. Create `.env` file with required variables:
+   ```
+   GOOGLE_SPREADSHEET_ID=your_spreadsheet_id
+   GOOGLE_CLIENT_ID=your_oauth_client_id
+   GOOGLE_CLIENT_SECRET=your_oauth_client_secret
+   ALLOWED_USER_EMAIL_HASH=your_email_hash
+   SECRET_KEY=your_secret_key
+   ```
+4. Initialize sheets: `poetry run flask --app book_lamp.app init-sheets`
+5. Run the app: `poetry run flask --app book_lamp.app run`
 
 ## End-to-end tests (Playwright)
 
