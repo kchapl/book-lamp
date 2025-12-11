@@ -3,17 +3,24 @@ import os
 from functools import wraps
 from typing import Any, Callable, Optional
 
-import click
-from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
 
 load_dotenv()
-from flask import Flask, flash, redirect, render_template, request, session, url_for
 
-from book_lamp.config import verify_email
-from book_lamp.services.sheets_storage import GoogleSheetsStorage
+import click  # noqa: E402
+from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
+from flask import (  # noqa: E402
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
-
+from book_lamp.config import verify_email  # noqa: E402
+from book_lamp.services.sheets_storage import GoogleSheetsStorage  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,9 +38,10 @@ TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
 TEST_ISBN = "9780000000000"
 
 # Initialize Google Sheets storage
+storage: Any
 if TEST_MODE:
     # In test mode, use a mock storage (we'll implement this)
-    storage = None  # type: ignore
+    storage = None
 else:
     SPREADSHEET_ID = os.environ.get("GOOGLE_SPREADSHEET_ID")
     if not SPREADSHEET_ID:
@@ -110,7 +118,7 @@ if not TEST_MODE:
 def login():
     if TEST_MODE:
         return redirect(url_for("test_login"))
-    
+
     try:
         if (
             "CODESPACE_NAME" in os.environ
@@ -121,7 +129,7 @@ def login():
             redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
         else:
             redirect_uri = url_for("authorize", _external=True)
-        
+
         app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
         return oauth.google.authorize_redirect(redirect_uri)
     except Exception as e:
@@ -154,7 +162,7 @@ def authorize():
             f"</ul>"
             f"<a href='/'>Go back</a>"
         ), 401
-    
+
     userinfo = token.get("userinfo")
     if not userinfo or "email" not in userinfo:
         app.logger.warning("No userinfo or email in OAuth response")
@@ -194,12 +202,12 @@ def init_sheets_command():
 def hash_email_command(email: str):
     """Generate SHA-256 hash of an email address for ALLOWED_USER_EMAIL_HASH."""
     import hashlib
+
     email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()
     click.echo(f"Email: {email}")
     click.echo(f"Hash:  {email_hash}")
     click.echo("\nAdd to .env file:")
     click.echo(f"ALLOWED_USER_EMAIL_HASH={email_hash}")
-
 
 
 # -----------------------------
@@ -342,7 +350,9 @@ if TEST_MODE:
                     return book
             return None
 
-        def add_book(self, isbn13, title, author, publication_year=None, thumbnail_url=None):
+        def add_book(
+            self, isbn13, title, author, publication_year=None, thumbnail_url=None
+        ):
             book = {
                 "id": self.next_id,
                 "isbn13": isbn13,

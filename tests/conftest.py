@@ -33,4 +33,3 @@ def authenticated_client(client):
         sess["user_email"] = "user@example.com"
         sess["user_name"] = "Test User"
     return client
-

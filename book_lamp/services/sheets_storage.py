@@ -1,4 +1,5 @@
 """Google Sheets storage adapter for book data."""
+
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -15,7 +16,7 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 class GoogleSheetsStorage:
     """Adapter for storing book data in Google Sheets.
-    
+
     Expected sheet structure:
     - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at
     """
@@ -43,9 +44,11 @@ class GoogleSheetsStorage:
                     creds = None
 
             if not creds:
-                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.credentials_path, SCOPES
+                )
                 creds = flow.run_local_server(port=8080)
-            
+
             with open(token_path, "w") as token:
                 token.write(creds.to_json())
 
@@ -53,6 +56,7 @@ class GoogleSheetsStorage:
 
     def _get_next_id(self, tab_name: str) -> int:
         """Get the next available ID for a tab."""
+        assert self.service is not None
         try:
             result = (
                 self.service.spreadsheets()
@@ -71,6 +75,7 @@ class GoogleSheetsStorage:
 
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
+        assert self.service is not None
         try:
             result = (
                 self.service.spreadsheets()
@@ -94,7 +99,9 @@ class GoogleSheetsStorage:
                     "isbn13": row[1],
                     "title": row[2],
                     "author": row[3],
-                    "publication_year": int(row[4]) if row[4] and row[4].isdigit() else None,
+                    "publication_year": (
+                        int(row[4]) if row[4] and row[4].isdigit() else None
+                    ),
                     "thumbnail_url": row[5] if row[5] else None,
                     "created_at": row[6] if row[6] else None,
                 }
@@ -128,6 +135,7 @@ class GoogleSheetsStorage:
         thumbnail_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
+        assert self.service is not None
         book_id = self._get_next_id("Books")
         created_at = datetime.utcnow().isoformat()
 
@@ -163,6 +171,7 @@ class GoogleSheetsStorage:
 
     def delete_book(self, book_id: int) -> bool:
         """Delete a book by ID."""
+        assert self.service is not None
         try:
             # Get all data
             result = (
@@ -207,22 +216,34 @@ class GoogleSheetsStorage:
 
     def _get_sheet_id(self, tab_name: str) -> int:
         """Get the sheet ID for a given tab name."""
+        assert self.service is not None
         try:
-            sheet_metadata = self.service.spreadsheets().get(spreadsheetId=self.spreadsheet_id).execute()
+            sheet_metadata = (
+                self.service.spreadsheets()
+                .get(spreadsheetId=self.spreadsheet_id)
+                .execute()
+            )
             for sheet in sheet_metadata.get("sheets", []):
                 if sheet["properties"]["title"] == tab_name:
-                    return sheet["properties"]["sheetId"]
+                    return int(sheet["properties"]["sheetId"])
             raise Exception(f"Tab '{tab_name}' not found")
         except HttpError as error:
             raise Exception(f"Failed to get sheet ID: {error}") from error
 
     def initialize_sheets(self) -> None:
         """Initialize the spreadsheet with required tabs and headers."""
+        assert self.service is not None
         try:
             # Check if Books tab exists
-            sheet_metadata = self.service.spreadsheets().get(spreadsheetId=self.spreadsheet_id).execute()
+            sheet_metadata = (
+                self.service.spreadsheets()
+                .get(spreadsheetId=self.spreadsheet_id)
+                .execute()
+            )
             sheets = sheet_metadata.get("sheets", [])
-            books_exists = any(sheet["properties"]["title"] == "Books" for sheet in sheets)
+            books_exists = any(
+                sheet["properties"]["title"] == "Books" for sheet in sheets
+            )
 
             if not books_exists:
                 # Create Books tab
@@ -241,7 +262,17 @@ class GoogleSheetsStorage:
             values = result.get("values", [])
 
             if not values:
-                headers = [["id", "isbn13", "title", "author", "publication_year", "thumbnail_url", "created_at"]]
+                headers = [
+                    [
+                        "id",
+                        "isbn13",
+                        "title",
+                        "author",
+                        "publication_year",
+                        "thumbnail_url",
+                        "created_at",
+                    ]
+                ]
                 self.service.spreadsheets().values().update(
                     spreadsheetId=self.spreadsheet_id,
                     range="Books!A1:G1",

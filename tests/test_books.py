@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from book_lamp.app import app, is_valid_isbn13, parse_publication_year, storage
+from book_lamp.app import is_valid_isbn13, parse_publication_year, storage
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +52,9 @@ def test_add_book_success(mock_get, authenticated_client):
 
     mock_get.return_value = MockResp()
 
-    resp = authenticated_client.post("/books", data={"isbn": "9780306406157"}, follow_redirects=True)
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"Book added successfully" in resp.data
 
@@ -78,20 +80,26 @@ def test_add_book_duplicate(mock_get, authenticated_client):
     # First add
     authenticated_client.post("/books", data={"isbn": "9780306406157"})
     # Duplicate add
-    resp = authenticated_client.post("/books", data={"isbn": "9780306406157"}, follow_redirects=True)
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"already been added" in resp.data
 
 
 def test_add_book_invalid_isbn(authenticated_client):
-    resp = authenticated_client.post("/books", data={"isbn": "1234567890123"}, follow_redirects=True)
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "1234567890123"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"valid 13-digit ISBN" in resp.data
 
 
 def test_delete_book_success(authenticated_client):
     # Add a book to storage
-    book = storage.add_book(isbn13="9780306406157", title="Test Book", author="Test Author")
+    book = storage.add_book(
+        isbn13="9780306406157", title="Test Book", author="Test Author"
+    )
     book_id = book["id"]
 
     # Delete it via endpoint
@@ -119,4 +127,3 @@ def test_add_book_requires_auth(client):
     """Verify adding books requires authentication."""
     resp = client.post("/books", data={"isbn": "9780306406157"}, follow_redirects=True)
     assert resp.status_code == 401 or b"unauthorized" in resp.data.lower()
-
