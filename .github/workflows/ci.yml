@@ -48,6 +48,8 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Run tests with pytest
+        env:
+          TEST_MODE: 1
         run: |
           poetry run pytest --junit-xml=pytest-results.xml
 
