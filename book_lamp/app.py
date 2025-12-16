@@ -1,66 +1,59 @@
+import logging
 import os
 from functools import wraps
 from typing import Any, Callable, Optional
 
-import click
-from authlib.integrations.flask_client import OAuth  # type: ignore
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, session, url_for
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.sql import func
 
 load_dotenv()
 
+import click  # noqa: E402
+from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
+from flask import (  # noqa: E402
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+
+from book_lamp.config import verify_email  # noqa: E402
+from book_lamp.services.sheets_storage import GoogleSheetsStorage  # noqa: E402
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    force=True,
+)
+logging.getLogger("book_lamp").setLevel(logging.INFO)
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
 app = Flask(__name__)
 
-# Database configuration
-# Enable lightweight, file-backed SQLite DB in test mode for Playwright
+# Test mode configuration
 TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
-# Test ISBN used for E2E testing
 TEST_ISBN = "9780000000000"
 
+# Initialize Google Sheets storage
+storage: Any
 if TEST_MODE:
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-        "DB_URL", f"sqlite:////{os.path.abspath('e2e_test.db')}"
-    )
+    # In test mode, use a mock storage (we'll implement this)
+    storage = None
 else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DB_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
-
-
-class User(db.Model):  # type: ignore
-    user_id = db.Column(db.Integer, primary_key=True)
-    user_name = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(80), nullable=True)
-    google_id = db.Column(db.String(120), unique=True, nullable=True)
-    email = db.Column(db.String(120), unique=True, nullable=True)
-    name = db.Column(db.String(120), nullable=True)
-
-
-class AllowedUser(db.Model):  # type: ignore
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-
-
-class Book(db.Model):  # type: ignore
-    id = db.Column(db.Integer, primary_key=True)
-    isbn13 = db.Column(db.String(13), unique=True, nullable=False, index=True)
-    title = db.Column(db.String(300), nullable=False)
-    author = db.Column(db.String(200), nullable=False)
-    publication_year = db.Column(db.Integer, nullable=True)
-    thumbnail_url = db.Column(db.String(500), nullable=True)
-    created_at = db.Column(
-        db.DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    SPREADSHEET_ID = os.environ.get("GOOGLE_SPREADSHEET_ID")
+    if not SPREADSHEET_ID:
+        raise ValueError("GOOGLE_SPREADSHEET_ID environment variable is required")
+    storage = GoogleSheetsStorage(SPREADSHEET_ID)
 
 
 def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(f)
     def decorated_function(*args: Any, **kwargs: Any) -> Any:
-        if "user_id" not in session:
+        if "user_email" not in session:
             return redirect(url_for("unauthorized"))
-
         return f(*args, **kwargs)
 
     return decorated_function
@@ -68,12 +61,9 @@ def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
 
 @app.route("/")
 def home():
-    if "user_id" in session:
-        user = db.session.get(User, session["user_id"])
-        if user:
-            return f'<h1>Hello {user.name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
-        # Stale session, clear it
-        session.pop("user_id", None)
+    if "user_email" in session:
+        user_name = session.get("user_name", "User")
+        return f'<h1>Hello {user_name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
     return '<h1>Hello World!</h1><p>You are not logged in.</p><a href="/login">Login with Google</a>'
 
 
@@ -98,93 +88,126 @@ app.config["GOOGLE_DISCOVERY_URL"] = (
     "https://accounts.google.com/.well-known/openid-configuration"
 )
 
+# Validate OAuth configuration (skip in test mode)
+if not TEST_MODE:
+    if not app.config["GOOGLE_CLIENT_ID"]:
+        raise ValueError(
+            "GOOGLE_CLIENT_ID environment variable is required. "
+            "Please set it in your .env file. "
+            "Get credentials from https://console.cloud.google.com/"
+        )
+    if not app.config["GOOGLE_CLIENT_SECRET"]:
+        raise ValueError(
+            "GOOGLE_CLIENT_SECRET environment variable is required. "
+            "Please set it in your .env file. "
+            "Get credentials from https://console.cloud.google.com/"
+        )
+
 oauth = OAuth(app)
-oauth.register(
-    name="google",
-    client_id=app.config["GOOGLE_CLIENT_ID"],
-    client_secret=app.config["GOOGLE_CLIENT_SECRET"],
-    server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-    client_kwargs={"scope": "openid email profile"},
-)
+if not TEST_MODE:
+    oauth.register(
+        name="google",
+        client_id=app.config["GOOGLE_CLIENT_ID"],
+        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
+        server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
+        client_kwargs={"scope": "openid email profile"},
+    )
 
 
 @app.route("/login")
 def login():
-    if (
-        "CODESPACE_NAME" in os.environ
-        and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
-    ):
-        codespace_name = os.environ["CODESPACE_NAME"]
-        domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
-        redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
-    else:
-        redirect_uri = url_for("authorize", _external=True)
     if TEST_MODE:
-        # In test mode, skip external OAuth to keep e2e deterministic.
         return redirect(url_for("test_login"))
-    return oauth.google.authorize_redirect(redirect_uri)
+
+    try:
+        if (
+            "CODESPACE_NAME" in os.environ
+            and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
+        ):
+            codespace_name = os.environ["CODESPACE_NAME"]
+            domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
+            redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
+        else:
+            redirect_uri = url_for("authorize", _external=True)
+
+        app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
+        return oauth.google.authorize_redirect(redirect_uri)
+    except Exception as e:
+        app.logger.error(f"OAuth login failed: {str(e)}")
+        return (
+            f"<h1>Login Error</h1>"
+            f"<p>Failed to initiate Google OAuth login.</p>"
+            f"<p>Error: {str(e)}</p>"
+            f"<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
+            f"<a href='/'>Go back</a>"
+        ), 500
 
 
 @app.route("/authorize")
 def authorize():
-    token = oauth.google.authorize_access_token()
+    try:
+        token = oauth.google.authorize_access_token()
+        app.logger.info("OAuth token received successfully")
+    except Exception as e:
+        app.logger.error(f"Failed to authorize access token: {str(e)}")
+        return (
+            f"<h1>Authorization Error</h1>"
+            f"<p>Failed to complete Google OAuth authorization.</p>"
+            f"<p>Error: {str(e)}</p>"
+            f"<p>This might be due to:</p>"
+            f"<ul>"
+            f"<li>Invalid OAuth credentials</li>"
+            f"<li>Incorrect redirect URI configuration</li>"
+            f"<li>User cancelled the login</li>"
+            f"</ul>"
+            f"<a href='/'>Go back</a>"
+        ), 401
+
     userinfo = token.get("userinfo")
     if not userinfo or "email" not in userinfo:
+        app.logger.warning("No userinfo or email in OAuth response")
         return redirect(url_for("unauthorized"))
 
-    allowed = AllowedUser.query.filter_by(email=userinfo["email"]).first()
-    if not allowed:
+    # Check if email matches the allowed user hash
+    user_email = userinfo["email"]
+    if not verify_email(user_email):
+        app.logger.warning(f"Unauthorized login attempt from: {user_email}")
         return redirect(url_for("unauthorized"))
 
-    user = User.query.filter_by(email=userinfo["email"]).first()
-    if not user:
-        user = User(
-            user_name=userinfo.get("email", ""),
-            google_id=userinfo.get("sub", None),
-            email=userinfo.get("email", None),
-            name=userinfo.get("name", None),
-        )
-        db.session.add(user)
-        db.session.commit()
-
-    session["user_id"] = user.user_id
+    app.logger.info(f"Successful login for: {user_email}")
+    session["user_email"] = user_email
+    session["user_name"] = userinfo.get("name", "User")
     return redirect(url_for("home"))
 
 
 @app.route("/logout")
 def logout():
-    session.pop("user_id", None)
+    session.pop("user_email", None)
+    session.pop("user_name", None)
     return redirect("/")
 
 
-@app.cli.command("init-db")
-def init_db_command():
-    """Drop all tables and re-initialize the database."""
-    db.drop_all()
-    db.create_all()
-    click.echo("Database re-initialized (all data was deleted).")
-
-
-@app.cli.command("add-user")
-@click.argument("email")
-def add_user(email):
-    """Add a user to the allow list."""
-    if AllowedUser.query.filter_by(email=email).first():
-        click.echo("User already allowed.")
+@app.cli.command("init-sheets")
+def init_sheets_command():
+    """Initialize Google Sheets with required tabs and headers."""
+    if TEST_MODE:
+        click.echo("Not available in test mode.")
         return
-
-    allowed = AllowedUser(email=email)
-    db.session.add(allowed)
-    db.session.commit()
-    click.echo(f"User {email} added to allow list.")
+    storage.initialize_sheets()
+    click.echo("Google Sheets initialized successfully.")
 
 
-@app.cli.command("list-users")
-def list_users():
-    """List all users in the allow list."""
-    users = AllowedUser.query.all()
-    for user in users:
-        print(user.email)
+@app.cli.command("hash-email")
+@click.argument("email")
+def hash_email_command(email: str):
+    """Generate SHA-256 hash of an email address for ALLOWED_USER_EMAIL_HASH."""
+    import hashlib
+
+    email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()
+    click.echo(f"Email: {email}")
+    click.echo(f"Hash:  {email_hash}")
+    click.echo("\nAdd to .env file:")
+    click.echo(f"ALLOWED_USER_EMAIL_HASH={email_hash}")
 
 
 # -----------------------------
@@ -211,7 +234,6 @@ def is_valid_isbn13(isbn: str) -> bool:
 def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
     if not publish_date:
         return None
-    # Extract first 4-digit year anywhere in the string (e.g., '2019-05-02', 'July 2019')
     for token in (
         publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split()
     ):
@@ -221,17 +243,22 @@ def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
 
 
 @app.route("/books/new", methods=["GET"])
+@login_required
 def new_book_form():
     return render_template("add_book.html")
 
 
 @app.route("/books", methods=["GET"])
+@login_required
 def list_books():
-    books = Book.query.order_by(Book.created_at.desc()).all()
+    books = storage.get_all_books()
+    # Sort by created_at descending
+    books.sort(key=lambda b: b.get("created_at", ""), reverse=True)
     return render_template("books.html", books=books)
 
 
 @app.route("/books", methods=["POST"])
+@login_required
 def create_book():
     isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
     if not is_valid_isbn13(isbn):
@@ -239,15 +266,14 @@ def create_book():
         return redirect(url_for("new_book_form"))
 
     # Avoid duplicates
-    existing = Book.query.filter_by(isbn13=isbn).first()
+    existing = storage.get_book_by_isbn(isbn)
     if existing:
         flash("This book has already been added.", "info")
         return redirect(url_for("list_books"))
 
-    # Lookup via Open Library Books API (stubbed in TEST_MODE)
+    # Lookup via Open Library Books API
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
-    # Deterministic stub for E2E tests
     if TEST_MODE and isbn == TEST_ISBN:
         data = {
             "title": "Test Driven Development",
@@ -276,29 +302,25 @@ def create_book():
         flash("The external service did not return required fields.", "error")
         return redirect(url_for("list_books"))
 
-    book = Book(
+    storage.add_book(
         isbn13=isbn,
         title=title[:300],
         author=author[:200],
         publication_year=year,
         thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
     )
-    db.session.add(book)
-    db.session.commit()
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
+@login_required
 def delete_book(book_id: int):
-    book = db.session.get(Book, book_id)
-    if not book:
+    success = storage.delete_book(book_id)
+    if not success:
         flash("Book not found.", "error")
-        return redirect(url_for("list_books"))
-
-    db.session.delete(book)
-    db.session.commit()
-    flash("Book deleted.", "success")
+    else:
+        flash("Book deleted.", "success")
     return redirect(url_for("list_books"))
 
 
@@ -307,67 +329,72 @@ def delete_book(book_id: int):
 # -----------------------------
 
 if TEST_MODE:
+    # Mock storage for tests
+    class MockStorage:
+        def __init__(self):
+            self.books = []
+            self.next_id = 1
+
+        def get_all_books(self):
+            return self.books
+
+        def get_book_by_id(self, book_id):
+            for book in self.books:
+                if book["id"] == book_id:
+                    return book
+            return None
+
+        def get_book_by_isbn(self, isbn13):
+            for book in self.books:
+                if book["isbn13"] == isbn13:
+                    return book
+            return None
+
+        def add_book(
+            self, isbn13, title, author, publication_year=None, thumbnail_url=None
+        ):
+            book = {
+                "id": self.next_id,
+                "isbn13": isbn13,
+                "title": title,
+                "author": author,
+                "publication_year": publication_year,
+                "thumbnail_url": thumbnail_url,
+                "created_at": "2024-01-01T00:00:00",
+            }
+            self.books.append(book)
+            self.next_id += 1
+            return book
+
+        def delete_book(self, book_id):
+            for i, book in enumerate(self.books):
+                if book["id"] == book_id:
+                    self.books.pop(i)
+                    return True
+            return False
+
+    storage = MockStorage()
 
     @app.route("/test/reset", methods=["POST"])
     def test_reset():
-        """Reset database.
-
-        Only available when TEST_MODE=1.
-        """
+        """Reset test storage."""
         try:
-            # Clear session and drop all tables
-            db.session.remove()
-            db.drop_all()
-            db.session.commit()
-
-            # Create all tables fresh
-            db.create_all()
-            db.session.commit()
-
-            # Create test user and allowed user
-            test_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
-            allowed = AllowedUser(email=test_email)
-            db.session.add(allowed)
-            test_user = User(user_name=test_email, email=test_email, name="Test User")
-            db.session.add(test_user)
-            db.session.commit()
-
-            # Verify database access
-            books = Book.query.all()
-            if len(books) > 0:
-                db.session.rollback()
-                return {
-                    "status": "error",
-                    "message": "Database reset failed - books still present",
-                }, 500
-
+            storage.books = []
+            storage.next_id = 1
+            return {"status": "ok"}
         except Exception as e:
-            db.session.rollback()
             return {"status": "error", "message": str(e)}, 500
 
-        return {"status": "ok"}
-
-    @app.route("/test/login", methods=["GET"])  # simple GET for convenience
+    @app.route("/test/login", methods=["GET"])
     def test_login():
-        """Log in as the seeded test user.
-
-        Only available when TEST_MODE=1.
-        This expects the test user to already exist from the /test/reset endpoint.
-        """
-        allowed_email = os.environ.get("TEST_ALLOWED_EMAIL", "test.user@example.com")
-        try:
-            user = User.query.filter_by(email=allowed_email).first()
-            if not user:
-                return {
-                    "status": "error",
-                    "message": "Test user not found. Call /test/reset first.",
-                }, 500
-            session["user_id"] = user.user_id
-            return redirect(url_for("home"))
-        except Exception as e:
-            return {"status": "error", "message": str(e)}, 500
+        """Log in as the test user."""
+        test_email = os.environ.get("TEST_ALLOWED_EMAIL", "user@example.com")
+        session["user_email"] = test_email
+        session["user_name"] = "Test User"
+        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
-    app.run(debug=debug_mode)
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)

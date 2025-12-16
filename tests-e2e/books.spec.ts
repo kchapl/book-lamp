@@ -10,14 +10,20 @@ test.beforeEach(async ({ page, request }, testInfo) => {
         throw new Error(`Failed to reset DB: ${res.status()}`);
     }
 
-    // Verify database is clean
+    // Authenticate via request context to get session cookie
+    const loginRes = await request.get('/test/login');
+    if (!loginRes.ok()) {
+        throw new Error(`Failed to login: ${loginRes.status()}`);
+    }
+
+    // Verify storage is clean (now authenticated)
     const verifyRes = await request.get('/books');
     const text = await verifyRes.text();
     if (!text.includes('No books yet')) {
         throw new Error('Database reset did not clear books');
     }
 
-    // Log in and wait for redirect and welcome message
+    // Log in via page context for the actual test
     await page.goto('/test/login');
     await Promise.all([
         page.waitForURL('/'),

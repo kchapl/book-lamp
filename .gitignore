@@ -144,6 +144,14 @@ ENV/
 env.bak/
 venv.bak/
 
+# Google Sheets credentials
+credentials.json
+token.json
+
+# SQLite database (legacy)
+*.db
+e2e_test.db
+
 # Spyder project settings
 .spyderproject
 .spyproject
