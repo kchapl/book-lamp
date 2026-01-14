@@ -60,6 +60,11 @@ def about():
     return "<h1>About</h1><p>This is a simple Flask web application that stores your book list in Google Sheets.</p>"
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return app.send_static_file("favicon.png")
+
+
 # Secret key for session management
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
