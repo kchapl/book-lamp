@@ -42,7 +42,7 @@ def _mock_open_library_response() -> Dict:
 
 
 @patch("book_lamp.services.book_lookup.requests.get")
-def test_add_book_success(mock_get, client):
+def test_add_book_success(mock_get, authenticated_client):
     class MockResp:
         def raise_for_status(self):
             return None
@@ -52,7 +52,9 @@ def test_add_book_success(mock_get, client):
 
     mock_get.return_value = MockResp()
 
-    resp = client.post("/books", data={"isbn": "9780306406157"}, follow_redirects=True)
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"Book added successfully" in resp.data
 
@@ -65,7 +67,7 @@ def test_add_book_success(mock_get, client):
 
 
 @patch("book_lamp.services.book_lookup.requests.get")
-def test_add_book_duplicate(mock_get, client):
+def test_add_book_duplicate(mock_get, authenticated_client):
     class MockResp:
         def raise_for_status(self):
             return None
@@ -76,15 +78,19 @@ def test_add_book_duplicate(mock_get, client):
     mock_get.return_value = MockResp()
 
     # First add
-    client.post("/books", data={"isbn": "9780306406157"})
+    authenticated_client.post("/books", data={"isbn": "9780306406157"})
     # Duplicate add
-    resp = client.post("/books", data={"isbn": "9780306406157"}, follow_redirects=True)
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"already been added" in resp.data
 
 
-def test_add_book_invalid_isbn(client):
-    resp = client.post("/books", data={"isbn": "1234567890123"}, follow_redirects=True)
+def test_add_book_invalid_isbn(authenticated_client):
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "1234567890123"}, follow_redirects=True
+    )
     assert resp.status_code == 200
     assert b"valid 13-digit ISBN" in resp.data
 
@@ -97,7 +103,7 @@ def test_delete_book_success(client):
     book_id = book["id"]
 
     # Delete it via endpoint
-    resp = client.post(f"/books/{book_id}/delete", follow_redirects=True)
+    resp = authenticated_client.post(f"/books/{book_id}/delete", follow_redirects=True)
     assert resp.status_code == 200
     assert b"Book deleted" in resp.data
 

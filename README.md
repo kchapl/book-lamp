@@ -11,6 +11,7 @@ A personal reading history tracker using Google Sheets for storage.
    FLASK_ENV=development
    GOOGLE_CLIENT_ID=your_oauth_client_id
    GOOGLE_CLIENT_SECRET=your_oauth_client_secret
+
    SECRET_KEY=your_secret_key
    ```
 4. Initialize sheets: `poetry run flask --app book_lamp.app init-sheets`

@@ -207,6 +207,7 @@ def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
 
 
 @app.route("/books/new", methods=["GET"])
+@login_required
 def new_book_form():
     if not TEST_MODE and not storage.is_authorized():
         return redirect(url_for("home"))
@@ -214,6 +215,7 @@ def new_book_form():
 
 
 @app.route("/books", methods=["GET"])
+@login_required
 def list_books():
     if not TEST_MODE and not storage.is_authorized():
         return redirect(url_for("home"))
@@ -224,6 +226,7 @@ def list_books():
 
 
 @app.route("/books", methods=["POST"])
+@login_required
 def create_book():
     if not TEST_MODE and not storage.is_authorized():
         return redirect(url_for("home"))
@@ -281,6 +284,7 @@ def create_book():
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
+@login_required
 def delete_book(book_id: int):
     if not TEST_MODE and not storage.is_authorized():
         return redirect(url_for("home"))
