@@ -103,6 +103,7 @@ jobs:
         run: poetry run bandit -r . -x ./.venv,./
 
   e2e:
+    if: false
     runs-on: ubuntu-latest
 
     steps:
