@@ -83,8 +83,9 @@ The `GoogleSheetsStorage` class in `book_lamp/services/sheets_storage.py` is the
 ## Debugging and Diagnostics
 
 ### Common Google Sheets Errors
-- **403 Forbidden**: Check if the Service Account or OAuth user has "Editor" access to the spreadsheet.
-- **404 Not Found**: Verify `GOOGLE_SPREADSHEET_ID` in `.env` matches the ID in the URL of your sheet.
+- **403 Forbidden**: Check if the OAuth user has given the app permission to access Google Drive and Sheets.
+- **401 Unauthorized**: Ensure the user has logged in via the web interface to generate `token.json`.
+- **Initialization Error**: If the app cannot create the folder hierarchy, check Drive permissions.
 - **Invalid Credentials**: Delete `token.json` and re-run the login flow.
 
 ### Logs
@@ -93,7 +94,7 @@ The `GoogleSheetsStorage` class in `book_lamp/services/sheets_storage.py` is the
 ## Environment Setup
 1.  **Dependencies**: Run `mise install` followed by `poetry install`.
 2.  **Configuration**: Copy `.env.example` to `.env` and fill in Google Cloud credentials.
-3.  **Initialization**: Run `poetry run flask --app book_lamp.app init-sheets` to prepare the spreadsheet.
+3.  **Initialization**: The app automatically creates the necessary folders and spreadsheets on first use. You can also run `poetry run flask --app book_lamp.app init-sheets` to prepare it manually.
 4.  **Local Run**: `poetry run flask --app book_lamp.app run --debug`.
 
 ## Commits and Change Discipline

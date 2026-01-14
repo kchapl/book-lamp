@@ -39,13 +39,14 @@ TEST_ISBN = "9780000000000"
 # Initialize Google Sheets storage
 storage: Any
 if TEST_MODE:
-    # In test mode, use a mock storage (we'll implement this)
+    # In test mode, use a mock storage
     storage = None
 else:
-    SPREADSHEET_ID = os.environ.get("GOOGLE_SPREADSHEET_ID")
-    if not SPREADSHEET_ID:
-        raise ValueError("GOOGLE_SPREADSHEET_ID environment variable is required")
-    storage = GoogleSheetsStorage(SPREADSHEET_ID)
+    # Use different sheet names for production and development
+    # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
+    is_prod = os.environ.get("FLASK_ENV") == "production"
+    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
+    storage = GoogleSheetsStorage(sheet_name=sheet_name)
 
 
 @app.route("/")
