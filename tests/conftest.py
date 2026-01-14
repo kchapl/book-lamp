@@ -8,7 +8,6 @@ os.environ.setdefault("TEST_MODE", "1")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("GOOGLE_CLIENT_ID", "dummy-client-id")
 os.environ.setdefault("GOOGLE_CLIENT_SECRET", "dummy-client-secret")
-os.environ.setdefault("TEST_ALLOWED_EMAIL", "user@example.com")
 
 # Ensure the project root is importable when pytest changes CWD
 from pathlib import Path

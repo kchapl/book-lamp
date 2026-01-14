@@ -18,7 +18,6 @@ from flask import (  # noqa: E402
     url_for,
 )
 
-# from book_lamp.config import verify_email  # noqa: E402
 from book_lamp.services.sheets_storage import GoogleSheetsStorage  # noqa: E402
 
 logging.basicConfig(
@@ -173,19 +172,6 @@ def init_sheets_command():
         return
     storage.initialize_sheets()
     click.echo("Google Sheets initialized successfully.")
-
-
-@app.cli.command("hash-email")
-@click.argument("email")
-def hash_email_command(email: str):
-    """Generate SHA-256 hash of an email address for ALLOWED_USER_EMAIL_HASH."""
-    import hashlib
-
-    email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()
-    click.echo(f"Email: {email}")
-    click.echo(f"Hash:  {email_hash}")
-    click.echo("\nAdd to .env file:")
-    click.echo(f"ALLOWED_USER_EMAIL_HASH={email_hash}")
 
 
 # -----------------------------
