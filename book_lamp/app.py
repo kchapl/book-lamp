@@ -3,12 +3,9 @@ import logging
 import os
 from typing import Any, Optional
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
+from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
     flash,
@@ -18,7 +15,10 @@ from flask import (  # noqa: E402
     url_for,
 )
 
-from book_lamp.services.sheets_storage import GoogleSheetsStorage  # noqa: E402
+from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.sheets_storage import GoogleSheetsStorage
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -91,7 +91,7 @@ if not TEST_MODE:
         client_id=app.config["GOOGLE_CLIENT_ID"],
         client_secret=app.config["GOOGLE_CLIENT_SECRET"],
         server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-        client_kwargs={"scope": "https://www.googleapis.com/auth/spreadsheets"},
+        client_kwargs={"scope": " ".join(from_sheets_storage.SCOPES)},
     )
 
 
@@ -139,7 +139,7 @@ def authorize():
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "client_id": app.config["GOOGLE_CLIENT_ID"],
                 "client_secret": app.config["GOOGLE_CLIENT_SECRET"],
-                "scopes": ["https://www.googleapis.com/auth/spreadsheets"],
+                "scopes": from_sheets_storage.SCOPES,
             }
             if token.get("expires_at"):
                 creds_data["expiry"] = (

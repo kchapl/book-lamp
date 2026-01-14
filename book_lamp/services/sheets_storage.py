@@ -1,7 +1,7 @@
 """Google Sheets storage adapter for book data."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from google.auth.transport.requests import Request  # type: ignore
@@ -249,7 +249,7 @@ class GoogleSheetsStorage:
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         book_id = self._get_next_id("Books")
-        created_at = datetime.now(datetime.timezone.utc).isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         row = [
             book_id,
