@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 
 from google.auth.transport.requests import Request  # type: ignore
 from google.oauth2.credentials import Credentials  # type: ignore
-from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
@@ -29,30 +28,39 @@ class GoogleSheetsStorage:
 
     def _connect(self) -> None:
         """Establish connection to Google Sheets API."""
-        creds = None
+        creds = self.load_credentials()
+        if creds and creds.valid:
+            self.service = build("sheets", "v4", credentials=creds)
+
+    def load_credentials(self) -> Optional[Credentials]:
+        """Load credentials from token.json or refresh them if expired."""
         token_path = "token.json"
+        if not os.path.exists(token_path):
+            return None
 
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                with open(token_path, "w") as token:
+                    token.write(creds.to_json())
+            except Exception:
+                return None
+        return creds if creds and creds.valid else None
 
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                except Exception:
-                    # Token is invalid or revoked, force re-authentication
-                    creds = None
+    def is_authorized(self) -> bool:
+        """Check if we have valid credentials."""
+        creds = self.load_credentials()
+        return creds is not None and creds.valid
 
-            if not creds:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path, SCOPES
-                )
-                creds = flow.run_local_server(port=8080)
+    def save_credentials(self, creds_dict: Dict[str, Any]) -> None:
+        """Save new credentials to token.json and reconnect."""
+        token_path = "token.json"
+        with open(token_path, "w") as token:
+            import json
 
-            with open(token_path, "w") as token:
-                token.write(creds.to_json())
-
-        self.service = build("sheets", "v4", credentials=creds)
+            token.write(json.dumps(creds_dict))
+        self._connect()
 
     def _get_next_id(self, tab_name: str) -> int:
         """Get the next available ID for a tab."""

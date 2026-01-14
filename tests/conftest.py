@@ -24,12 +24,3 @@ from book_lamp.app import app as flask_app  # noqa: E402
 def client():
     with flask_app.test_client() as client:
         yield client
-
-
-@pytest.fixture()
-def authenticated_client(client):
-    """Client with active session."""
-    with client.session_transaction() as sess:
-        sess["user_email"] = "user@example.com"
-        sess["user_name"] = "Test User"
-    return client
