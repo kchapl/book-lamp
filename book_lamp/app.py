@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+from functools import wraps
 from typing import Any, Optional
 
 import click  # noqa: E402
@@ -93,6 +94,17 @@ if not TEST_MODE:
         server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
         client_kwargs={"scope": " ".join(from_sheets_storage.SCOPES)},
     )
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not TEST_MODE and not storage.is_authorized():
+            flash("Please authorize Google Sheets access first.", "info")
+            return redirect(url_for("home"))
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 @app.route("/login")
@@ -209,16 +221,12 @@ def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
 @app.route("/books/new", methods=["GET"])
 @login_required
 def new_book_form():
-    if not TEST_MODE and not storage.is_authorized():
-        return redirect(url_for("home"))
     return render_template("add_book.html")
 
 
 @app.route("/books", methods=["GET"])
 @login_required
 def list_books():
-    if not TEST_MODE and not storage.is_authorized():
-        return redirect(url_for("home"))
     books = storage.get_all_books()
     # Sort by created_at descending
     books.sort(key=lambda b: b.get("created_at", ""), reverse=True)
@@ -228,8 +236,6 @@ def list_books():
 @app.route("/books", methods=["POST"])
 @login_required
 def create_book():
-    if not TEST_MODE and not storage.is_authorized():
-        return redirect(url_for("home"))
     isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
     if not is_valid_isbn13(isbn):
         flash("Please enter a valid 13-digit ISBN.", "error")
@@ -286,8 +292,6 @@ def create_book():
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
 @login_required
 def delete_book(book_id: int):
-    if not TEST_MODE and not storage.is_authorized():
-        return redirect(url_for("home"))
     success = storage.delete_book(book_id)
     if not success:
         flash("Book not found.", "error")

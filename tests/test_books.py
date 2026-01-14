@@ -95,7 +95,7 @@ def test_add_book_invalid_isbn(authenticated_client):
     assert b"valid 13-digit ISBN" in resp.data
 
 
-def test_delete_book_success(client):
+def test_delete_book_success(authenticated_client):
     # Add a book to storage
     book = storage.add_book(
         isbn13="9780306406157", title="Test Book", author="Test Author"
