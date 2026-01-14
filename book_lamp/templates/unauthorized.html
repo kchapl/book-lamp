@@ -1,10 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Unauthorized</title>
-</head>
-<body>
-    <h1>Unauthorized</h1>
+{% extends "base.html" %}
+
+{% block title %}Unauthorized - Book Lamp{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+    <h1 style="color: #fca5a5;">Unauthorized</h1>
     <p>You are not authorized to access this application.</p>
-</body>
-</html>
+    <div style="margin-top: 2rem;">
+        <a href="/" class="btn">Back to Home</a>
+    </div>
+</div>
+{% endblock %}
