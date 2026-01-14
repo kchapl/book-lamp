@@ -1,123 +1,162 @@
-<!doctype html>
-<html>
+{% extends "base.html" %}
 
-<head>
-    <meta charset="utf-8">
-    <title>Books</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 2rem;
-        }
+{% block title %}My Bookshelf - Book Lamp{% endblock %}
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 1rem;
-        }
+{% block head %}
+<style>
+    .books-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
 
-        .card {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 0.75rem;
-            display: flex;
-            gap: 0.75rem;
-        }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
 
-        .thumb {
-            width: 64px;
-            height: 96px;
-            object-fit: cover;
-            background: #f3f4f6;
-        }
+    .book-card {
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        padding: 1.25rem;
+        display: flex;
+        gap: 1.25rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
 
-        .meta {
-            display: flex;
-            flex-direction: column;
-        }
+    .book-card:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-4px);
+        border-color: var(--primary-light);
+    }
 
-        .title {
-            font-weight: 600;
-        }
+    .thumb-container {
+        flex-shrink: 0;
+        width: 100px;
+        height: 150px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #1e293b;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
 
-        .author,
-        .year {
-            color: #374151;
-            font-size: 0.95rem;
-        }
+    .thumb {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
+    .meta {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+    }
 
-        a.btn {
-            padding: 0.4rem 0.7rem;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            text-decoration: none;
-        }
+    .title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-        form.inline {
-            margin-top: 0.5rem;
-        }
+    .author {
+        color: var(--primary-light);
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
 
-        button.danger {
-            padding: 0.35rem 0.6rem;
-            border: 1px solid #ef4444;
-            background: #fee2e2;
-            color: #991b1b;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-    </style>
-</head>
+    .year,
+    .isbn {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-bottom: 0.25rem;
+    }
 
-<body>
-    <header>
-        <h1>Books</h1>
-        <a class="btn" href="{{ url_for('new_book_form') }}">Add another</a>
-    </header>
+    .actions {
+        margin-top: auto;
+        display: flex;
+        justify-content: flex-end;
+    }
 
-    <div class="messages">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        {% for category, message in messages %}
-        <div class="{{ category }}">{{ message }}</div>
-        {% endfor %}
-        {% endif %}
-        {% endwith %}
-    </div>
+    .btn-delete {
+        background: transparent;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: background 0.2s;
+        font-size: 0.9rem;
+    }
 
-    {% if books %}
-    <div class="grid">
-        {% for book in books %}
-        <div class="card">
+    .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: var(--glass);
+        border-radius: 24px;
+        border: 1px dashed var(--glass-border);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="books-header">
+    <h1>Your Library</h1>
+    <a href="{{ url_for('new_book_form') }}" class="btn">Add New Book</a>
+</div>
+
+{% if books %}
+<div class="grid">
+    {% for book in books %}
+    <div class="book-card">
+        <div class="thumb-container">
             {% if book.thumbnail_url %}
             <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
             {% else %}
-            <div class="thumb"></div>
+            <div
+                style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 2rem;">
+                📖</div>
             {% endif %}
-            <div class="meta">
-                <div class="title">{{ book.title }}</div>
-                <div class="author">{{ book.author }}</div>
-                {% if book.publication_year %}
-                <div class="year">{{ book.publication_year }}</div>
-                {% endif %}
-                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
-                <form class="inline" method="post" action="{{ url_for('delete_book', book_id=book.id) }}"
-                    onsubmit="return confirm('Delete this book?');">
-                    <button class="danger" type="submit">Delete</button>
+        </div>
+        <div class="meta">
+            <div class="title" title="{{ book.title }}">{{ book.title }}</div>
+            <div class="author">{{ book.author }}</div>
+            {% if book.publication_year %}
+            <div class="year">Published: {{ book.publication_year }}</div>
+            {% endif %}
+            <div class="isbn">ISBN: {{ book.isbn13 }}</div>
+
+            <div class="actions">
+                <form method="post" action="{{ url_for('delete_book', book_id=book.id) }}"
+                    onsubmit="return confirm('Remove this book from your library?');">
+                    <button class="btn-delete" type="submit">Delete</button>
                 </form>
             </div>
         </div>
-        {% endfor %}
     </div>
-    {% else %}
-    <p>No books yet. <a href="{{ url_for('new_book_form') }}">Add one</a>.</p>
-    {% endif %}
-</body>
-
-</html>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+    <h2>Your bookshelf is empty</h2>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">Start building your digital library by adding your first
+        book.</p>
+    <a href="{{ url_for('new_book_form') }}" class="btn">Add Your First Book</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -214,9 +214,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# VS Code
-.vscode
-
 # Node
 node_modules/
 

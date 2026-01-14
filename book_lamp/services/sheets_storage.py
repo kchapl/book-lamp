@@ -1,17 +1,19 @@
 """Google Sheets storage adapter for book data."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from google.auth.transport.requests import Request  # type: ignore
 from google.oauth2.credentials import Credentials  # type: ignore
-from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
 # If modifying these scopes, delete the token.json file.
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+]
 
 
 class GoogleSheetsStorage:
@@ -21,47 +23,155 @@ class GoogleSheetsStorage:
     - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at
     """
 
-    def __init__(self, spreadsheet_id: str, credentials_path: str = "credentials.json"):
-        self.spreadsheet_id = spreadsheet_id
+    def __init__(self, sheet_name: str, credentials_path: str = "credentials.json"):
+        """Initialise the storage adapter.
+
+        Args:
+            sheet_name: Name of the Google Sheet to use.
+            credentials_path: Path to the Google Cloud credentials file.
+        """
+        self.sheet_name = sheet_name
+        self.spreadsheet_id: Optional[str] = None
         self.credentials_path = credentials_path
         self.service = None
+        self.drive_service = None
         self._connect()
 
     def _connect(self) -> None:
-        """Establish connection to Google Sheets API."""
-        creds = None
+        """Establish connection to Google Sheets and Drive APIs."""
+        creds = self.load_credentials()
+        if creds and creds.valid:
+            self.service = build("sheets", "v4", credentials=creds)
+            self.drive_service = build("drive", "v3", credentials=creds)
+
+    def load_credentials(self) -> Optional[Credentials]:
+        """Load credentials from token.json or refresh them if expired."""
         token_path = "token.json"
+        if not os.path.exists(token_path):
+            return None
 
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                with open(token_path, "w") as token:
+                    token.write(creds.to_json())
+            except Exception:
+                return None
+        return creds if creds and creds.valid else None
 
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                except Exception:
-                    # Token is invalid or revoked, force re-authentication
-                    creds = None
+    def is_authorized(self) -> bool:
+        """Check if we have valid credentials."""
+        creds = self.load_credentials()
+        return creds is not None and creds.valid
 
-            if not creds:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path, SCOPES
+    def save_credentials(self, creds_dict: Dict[str, Any]) -> None:
+        """Save new credentials to token.json and reconnect."""
+        token_path = "token.json"
+        with open(token_path, "w") as token:
+            import json
+
+            token.write(json.dumps(creds_dict))
+        self.spreadsheet_id = None  # Reset ID to trigger rediscovery
+        self._connect()
+
+    def _get_or_create_folder_path(self, path: str) -> str:
+        """Get or create a folder hierarchy in Google Drive.
+
+        Args:
+            path: Forward-slash separated path, e.g. 'AppData/BookLamp'.
+
+        Returns:
+            The ID of the final folder in the path.
+        """
+        assert self.drive_service is not None
+        parts = path.split("/")
+        parent_id = "root"
+
+        for part in parts:
+            query = f"name = '{part}' and '{parent_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            results = (
+                self.drive_service.files()
+                .list(q=query, spaces="drive", fields="files(id, name)")
+                .execute()
+            )
+            files = results.get("files", [])
+
+            if files:
+                parent_id = files[0]["id"]
+            else:
+                # Create the folder
+                file_metadata = {
+                    "name": part,
+                    "mimeType": "application/vnd.google-apps.folder",
+                    "parents": [parent_id],
+                }
+                file = (
+                    self.drive_service.files()
+                    .create(body=file_metadata, fields="id")
+                    .execute()
                 )
-                creds = flow.run_local_server(port=8080)
+                parent_id = file.get("id")
 
-            with open(token_path, "w") as token:
-                token.write(creds.to_json())
+        return parent_id
 
-        self.service = build("sheets", "v4", credentials=creds)
+    def _ensure_spreadsheet_id(self) -> str:
+        """Ensure we have the spreadsheet ID, discovering or creating it if necessary.
+
+        Returns:
+            The ID of the spreadsheet.
+        """
+        if self.spreadsheet_id:
+            return self.spreadsheet_id
+
+        if not self.drive_service or not self.service:
+            raise Exception("Not authorised. Please log in via the web interface.")
+
+        # Find or create AppData/BookLamp folder
+        folder_id = self._get_or_create_folder_path("AppData/BookLamp")
+
+        # Find the sheet in that folder
+        query = (
+            f"name = '{self.sheet_name}' and '{folder_id}' in parents and "
+            f"mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+        )
+        results = (
+            self.drive_service.files()
+            .list(q=query, spaces="drive", fields="files(id, name)")
+            .execute()
+        )
+        files = results.get("files", [])
+
+        if files:
+            self.spreadsheet_id = files[0]["id"]
+        else:
+            # Create the sheet
+            file_metadata = {
+                "name": self.sheet_name,
+                "mimeType": "application/vnd.google-apps.spreadsheet",
+                "parents": [folder_id],
+            }
+            file = (
+                self.drive_service.files()
+                .create(body=file_metadata, fields="id")
+                .execute()
+            )
+            self.spreadsheet_id = file.get("id")
+
+            # Initialise it with headers
+            self.initialize_sheets()
+
+        return self.spreadsheet_id
 
     def _get_next_id(self, tab_name: str) -> int:
         """Get the next available ID for a tab."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=self.spreadsheet_id, range=f"{tab_name}!A:A")
+                .get(spreadsheetId=sid, range=f"{tab_name}!A:A")
                 .execute()
             )
             values = result.get("values", [])
@@ -75,12 +185,13 @@ class GoogleSheetsStorage:
 
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=self.spreadsheet_id, range="Books!A:G")
+                .get(spreadsheetId=sid, range="Books!A:G")
                 .execute()
             )
             values = result.get("values", [])
@@ -135,9 +246,10 @@ class GoogleSheetsStorage:
         thumbnail_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         book_id = self._get_next_id("Books")
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         row = [
             book_id,
@@ -151,7 +263,7 @@ class GoogleSheetsStorage:
 
         try:
             self.service.spreadsheets().values().append(
-                spreadsheetId=self.spreadsheet_id,
+                spreadsheetId=sid,
                 range="Books!A:G",
                 valueInputOption="RAW",
                 body={"values": [row]},
@@ -171,13 +283,14 @@ class GoogleSheetsStorage:
 
     def delete_book(self, book_id: int) -> bool:
         """Delete a book by ID."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
             # Get all data
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=self.spreadsheet_id, range="Books!A:G")
+                .get(spreadsheetId=sid, range="Books!A:G")
                 .execute()
             )
             values = result.get("values", [])
@@ -207,7 +320,7 @@ class GoogleSheetsStorage:
             }
 
             self.service.spreadsheets().batchUpdate(
-                spreadsheetId=self.spreadsheet_id, body={"requests": [request]}
+                spreadsheetId=sid, body={"requests": [request]}
             ).execute()
 
             return True
@@ -216,12 +329,11 @@ class GoogleSheetsStorage:
 
     def _get_sheet_id(self, tab_name: str) -> int:
         """Get the sheet ID for a given tab name."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
             sheet_metadata = (
-                self.service.spreadsheets()
-                .get(spreadsheetId=self.spreadsheet_id)
-                .execute()
+                self.service.spreadsheets().get(spreadsheetId=sid).execute()
             )
             for sheet in sheet_metadata.get("sheets", []):
                 if sheet["properties"]["title"] == tab_name:
@@ -231,14 +343,13 @@ class GoogleSheetsStorage:
             raise Exception(f"Failed to get sheet ID: {error}") from error
 
     def initialize_sheets(self) -> None:
-        """Initialize the spreadsheet with required tabs and headers."""
+        """Initialise the spreadsheet with required tabs and headers."""
+        sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
             # Check if Books tab exists
             sheet_metadata = (
-                self.service.spreadsheets()
-                .get(spreadsheetId=self.spreadsheet_id)
-                .execute()
+                self.service.spreadsheets().get(spreadsheetId=sid).execute()
             )
             sheets = sheet_metadata.get("sheets", [])
             books_exists = any(
@@ -249,14 +360,14 @@ class GoogleSheetsStorage:
                 # Create Books tab
                 request = {"addSheet": {"properties": {"title": "Books"}}}
                 self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=self.spreadsheet_id, body={"requests": [request]}
+                    spreadsheetId=sid, body={"requests": [request]}
                 ).execute()
 
             # Add headers if not present
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=self.spreadsheet_id, range="Books!A1:G1")
+                .get(spreadsheetId=sid, range="Books!A1:G1")
                 .execute()
             )
             values = result.get("values", [])
@@ -274,7 +385,7 @@ class GoogleSheetsStorage:
                     ]
                 ]
                 self.service.spreadsheets().values().update(
-                    spreadsheetId=self.spreadsheet_id,
+                    spreadsheetId=sid,
                     range="Books!A1:G1",
                     valueInputOption="RAW",
                     body={"values": headers},

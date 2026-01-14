@@ -1,26 +1,25 @@
+import datetime
 import logging
 import os
 from functools import wraps
-from typing import Any, Callable, Optional
-
-from dotenv import load_dotenv
-
-load_dotenv()
+from typing import Any, Optional
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
+from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
     flash,
     redirect,
     render_template,
     request,
-    session,
     url_for,
 )
 
-from book_lamp.config import verify_email  # noqa: E402
-from book_lamp.services.sheets_storage import GoogleSheetsStorage  # noqa: E402
+from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.sheets_storage import GoogleSheetsStorage
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,42 +39,25 @@ TEST_ISBN = "9780000000000"
 # Initialize Google Sheets storage
 storage: Any
 if TEST_MODE:
-    # In test mode, use a mock storage (we'll implement this)
+    # In test mode, use a mock storage
     storage = None
 else:
-    SPREADSHEET_ID = os.environ.get("GOOGLE_SPREADSHEET_ID")
-    if not SPREADSHEET_ID:
-        raise ValueError("GOOGLE_SPREADSHEET_ID environment variable is required")
-    storage = GoogleSheetsStorage(SPREADSHEET_ID)
-
-
-def login_required(f: Callable[..., Any]) -> Callable[..., Any]:
-    @wraps(f)
-    def decorated_function(*args: Any, **kwargs: Any) -> Any:
-        if "user_email" not in session:
-            return redirect(url_for("unauthorized"))
-        return f(*args, **kwargs)
-
-    return decorated_function
+    # Use different sheet names for production and development
+    # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
+    is_prod = os.environ.get("FLASK_ENV") == "production"
+    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
+    storage = GoogleSheetsStorage(sheet_name=sheet_name)
 
 
 @app.route("/")
 def home():
-    if "user_email" in session:
-        user_name = session.get("user_name", "User")
-        return f'<h1>Hello {user_name}!</h1><p>My simple Python web app is running!</p><a href="/logout">Logout</a>'
-    return '<h1>Hello World!</h1><p>You are not logged in.</p><a href="/login">Login with Google</a>'
+    is_authorized = TEST_MODE or storage.is_authorized()
+    return render_template("home.html", is_authorized=is_authorized)
 
 
 @app.route("/about")
-@login_required
 def about():
-    return "<h1>About</h1><p>This is a simple Flask web application.</p>"
-
-
-@app.route("/unauthorized")
-def unauthorized():
-    return render_template("unauthorized.html"), 401
+    return "<h1>About</h1><p>This is a simple Flask web application that stores your book list in Google Sheets.</p>"
 
 
 # Secret key for session management
@@ -110,8 +92,19 @@ if not TEST_MODE:
         client_id=app.config["GOOGLE_CLIENT_ID"],
         client_secret=app.config["GOOGLE_CLIENT_SECRET"],
         server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-        client_kwargs={"scope": "openid email profile"},
+        client_kwargs={"scope": " ".join(from_sheets_storage.SCOPES)},
     )
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not TEST_MODE and not storage.is_authorized():
+            flash("Please authorize Google Sheets access first.", "info")
+            return redirect(url_for("home"))
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 @app.route("/login")
@@ -148,43 +141,39 @@ def authorize():
     try:
         token = oauth.google.authorize_access_token()
         app.logger.info("OAuth token received successfully")
+
+        # Save the token for GoogleSheetsStorage
+        if not TEST_MODE:
+            # Bridging Authlib token to Google-auth format
+            creds_data = {
+                "token": token.get("access_token"),
+                "refresh_token": token.get("refresh_token"),
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "client_id": app.config["GOOGLE_CLIENT_ID"],
+                "client_secret": app.config["GOOGLE_CLIENT_SECRET"],
+                "scopes": from_sheets_storage.SCOPES,
+            }
+            if token.get("expires_at"):
+                creds_data["expiry"] = (
+                    datetime.datetime.fromtimestamp(
+                        token["expires_at"], tz=datetime.timezone.utc
+                    )
+                    .isoformat()
+                    .replace("+00:00", "Z")
+                )
+
+            storage.save_credentials(creds_data)
+
+        flash("Successfully authorized Google Sheets access!", "success")
+        return redirect(url_for("home"))
     except Exception as e:
         app.logger.error(f"Failed to authorize access token: {str(e)}")
         return (
             f"<h1>Authorization Error</h1>"
             f"<p>Failed to complete Google OAuth authorization.</p>"
             f"<p>Error: {str(e)}</p>"
-            f"<p>This might be due to:</p>"
-            f"<ul>"
-            f"<li>Invalid OAuth credentials</li>"
-            f"<li>Incorrect redirect URI configuration</li>"
-            f"<li>User cancelled the login</li>"
-            f"</ul>"
             f"<a href='/'>Go back</a>"
         ), 401
-
-    userinfo = token.get("userinfo")
-    if not userinfo or "email" not in userinfo:
-        app.logger.warning("No userinfo or email in OAuth response")
-        return redirect(url_for("unauthorized"))
-
-    # Check if email matches the allowed user hash
-    user_email = userinfo["email"]
-    if not verify_email(user_email):
-        app.logger.warning(f"Unauthorized login attempt from: {user_email}")
-        return redirect(url_for("unauthorized"))
-
-    app.logger.info(f"Successful login for: {user_email}")
-    session["user_email"] = user_email
-    session["user_name"] = userinfo.get("name", "User")
-    return redirect(url_for("home"))
-
-
-@app.route("/logout")
-def logout():
-    session.pop("user_email", None)
-    session.pop("user_name", None)
-    return redirect("/")
 
 
 @app.cli.command("init-sheets")
@@ -195,19 +184,6 @@ def init_sheets_command():
         return
     storage.initialize_sheets()
     click.echo("Google Sheets initialized successfully.")
-
-
-@app.cli.command("hash-email")
-@click.argument("email")
-def hash_email_command(email: str):
-    """Generate SHA-256 hash of an email address for ALLOWED_USER_EMAIL_HASH."""
-    import hashlib
-
-    email_hash = hashlib.sha256(email.strip().lower().encode()).hexdigest()
-    click.echo(f"Email: {email}")
-    click.echo(f"Hash:  {email_hash}")
-    click.echo("\nAdd to .env file:")
-    click.echo(f"ALLOWED_USER_EMAIL_HASH={email_hash}")
 
 
 # -----------------------------
@@ -384,14 +360,6 @@ if TEST_MODE:
             return {"status": "ok"}
         except Exception as e:
             return {"status": "error", "message": str(e)}, 500
-
-    @app.route("/test/login", methods=["GET"])
-    def test_login():
-        """Log in as the test user."""
-        test_email = os.environ.get("TEST_ALLOWED_EMAIL", "user@example.com")
-        session["user_email"] = test_email
-        session["user_name"] = "Test User"
-        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
