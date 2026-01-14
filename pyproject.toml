@@ -7,7 +7,7 @@ packages = [{include = "book_lamp"}]
 
 [tool.poetry.dependencies]
 python = "^3.13"
-authlib = "1.6.5"
+authlib = "1.6.6"
 click = "8.3.0"
 Flask = "3.1.2"
 python-dotenv = "1.1.1"
