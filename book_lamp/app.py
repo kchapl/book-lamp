@@ -17,6 +17,7 @@ from flask import (  # noqa: E402
 )
 
 from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 
 load_dotenv()
@@ -40,7 +41,7 @@ TEST_ISBN = "9780000000000"
 storage: Any
 if TEST_MODE:
     # In test mode, use a mock storage
-    storage = None
+    storage = MockStorage()
 else:
     # Use different sheet names for production and development
     # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
@@ -51,7 +52,7 @@ else:
 
 @app.route("/")
 def home():
-    is_authorized = TEST_MODE or storage.is_authorized()
+    is_authorized = storage.is_authorized()
     return render_template("home.html", is_authorized=is_authorized)
 
 
@@ -104,7 +105,7 @@ if not TEST_MODE:
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not TEST_MODE and not storage.is_authorized():
+        if not storage.is_authorized():
             flash("Please authorize Google Sheets access first.", "info")
             return redirect(url_for("home"))
         return f(*args, **kwargs)
@@ -351,74 +352,7 @@ def delete_book(book_id: int):
 # -----------------------------
 
 if TEST_MODE:
-    # Mock storage for tests
-    class MockStorage:
-        def __init__(self):
-            self.books = []
-            self.reading_records = []
-            self.next_book_id = 1
-            self.next_record_id = 1
-
-        def get_all_books(self):
-            return self.books
-
-        def get_reading_records(self, book_id=None):
-            if book_id is None:
-                return self.reading_records
-            return [r for r in self.reading_records if r["book_id"] == book_id]
-
-        def get_book_by_id(self, book_id):
-            for book in self.books:
-                if book["id"] == book_id:
-                    return book
-            return None
-
-        def get_book_by_isbn(self, isbn13):
-            for book in self.books:
-                if book["isbn13"] == isbn13:
-                    return book
-            return None
-
-        def add_book(
-            self, isbn13, title, author, publication_year=None, thumbnail_url=None
-        ):
-            book = {
-                "id": self.next_book_id,
-                "isbn13": isbn13,
-                "title": title,
-                "author": author,
-                "publication_year": publication_year,
-                "thumbnail_url": thumbnail_url,
-                "created_at": "2024-01-01T00:00:00",
-            }
-            self.books.append(book)
-            self.next_book_id += 1
-            return book
-
-        def add_reading_record(
-            self, book_id, status, start_date, end_date=None, rating=0
-        ):
-            record = {
-                "id": self.next_record_id,
-                "book_id": book_id,
-                "status": status,
-                "start_date": start_date,
-                "end_date": end_date,
-                "rating": rating,
-                "created_at": "2024-01-01T00:00:00",
-            }
-            self.reading_records.append(record)
-            self.next_record_id += 1
-            return record
-
-        def delete_book(self, book_id):
-            for i, book in enumerate(self.books):
-                if book["id"] == book_id:
-                    self.books.pop(i)
-                    return True
-            return False
-
-    storage = MockStorage()
+    # storage is already initialized above in the global scope if TEST_MODE is True
 
     @app.route("/test/reset", methods=["POST"])
     def test_reset():
