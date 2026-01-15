@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 from functools import wraps
-from typing import Any, Optional
+from typing import Any
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -19,6 +19,7 @@ from flask import (  # noqa: E402
 from book_lamp.services import sheets_storage as from_sheets_storage
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
+from book_lamp.utils import is_valid_isbn13, parse_publication_year
 
 load_dotenv()
 
@@ -197,33 +198,6 @@ def init_sheets_command():
 # -----------------------------
 
 
-def is_valid_isbn13(isbn: str) -> bool:
-    """Validate ISBN-13 using checksum algorithm and format constraints."""
-    if TEST_MODE and isbn == TEST_ISBN:
-        return True
-
-    if len(isbn) != 13 or not isbn.isdigit():
-        return False
-    checksum = 0
-    for index, char in enumerate(isbn[:12]):
-        digit = ord(char) - 48
-        weight = 1 if index % 2 == 0 else 3
-        checksum += digit * weight
-    check_digit = (10 - (checksum % 10)) % 10
-    return check_digit == (ord(isbn[12]) - 48)
-
-
-def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
-    if not publish_date:
-        return None
-    for token in (
-        publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split()
-    ):
-        if len(token) == 4 and token.isdigit():
-            return int(token)
-    return None
-
-
 @app.route("/books/new", methods=["GET"])
 @login_required
 def new_book_form():
@@ -284,7 +258,11 @@ def create_reading_record(book_id: int):
 @login_required
 def create_book():
     isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
-    if not is_valid_isbn13(isbn):
+
+    # Check if valid (allow special test ISBN in test mode)
+    is_valid = (TEST_MODE and isbn == TEST_ISBN) or is_valid_isbn13(isbn)
+
+    if not is_valid:
         flash("Please enter a valid 13-digit ISBN.", "error")
         return redirect(url_for("new_book_form"))
 
