@@ -241,8 +241,15 @@ def list_books():
         # Sort records by start_date ascending (chronological)
         book["reading_records"].sort(key=lambda r: r.get("start_date", ""))
 
-    # Sort books by created_at descending
-    books.sort(key=lambda b: b.get("created_at", ""), reverse=True)
+    # Sort books by the start date of their most recent reading record (reverse chronological)
+    # If never read, fall back to created_at
+    def get_sort_key(book):
+        if book["reading_records"]:
+            # records are already sorted ascending, so last one is most recent
+            return book["reading_records"][-1].get("start_date", "")
+        return book.get("created_at", "")
+
+    books.sort(key=get_sort_key, reverse=True)
     today = datetime.date.today().isoformat()
     return render_template("books.html", books=books, today=today)
 
