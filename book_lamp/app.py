@@ -233,9 +233,41 @@ def new_book_form():
 @login_required
 def list_books():
     books = storage.get_all_books()
-    # Sort by created_at descending
+    all_records = storage.get_reading_records()
+
+    # Attach records to books
+    for book in books:
+        book["reading_records"] = [r for r in all_records if r["book_id"] == book["id"]]
+        # Sort records by start_date ascending (chronological)
+        book["reading_records"].sort(key=lambda r: r.get("start_date", ""))
+
+    # Sort books by created_at descending
     books.sort(key=lambda b: b.get("created_at", ""), reverse=True)
-    return render_template("books.html", books=books)
+    today = datetime.date.today().isoformat()
+    return render_template("books.html", books=books, today=today)
+
+
+@app.route("/books/<int:book_id>/reading-records", methods=["POST"])
+@login_required
+def create_reading_record(book_id: int):
+    status = request.form.get("status")
+    start_date = request.form.get("start_date")
+    end_date = request.form.get("end_date")
+    rating = int(request.form.get("rating", 0))
+
+    if not status or not start_date:
+        flash("Status and start date are required.", "error")
+        return redirect(url_for("list_books"))
+
+    storage.add_reading_record(
+        book_id=book_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        rating=rating,
+    )
+    flash("Reading record added.", "success")
+    return redirect(url_for("list_books"))
 
 
 @app.route("/books", methods=["POST"])
@@ -314,10 +346,17 @@ if TEST_MODE:
     class MockStorage:
         def __init__(self):
             self.books = []
-            self.next_id = 1
+            self.reading_records = []
+            self.next_book_id = 1
+            self.next_record_id = 1
 
         def get_all_books(self):
             return self.books
+
+        def get_reading_records(self, book_id=None):
+            if book_id is None:
+                return self.reading_records
+            return [r for r in self.reading_records if r["book_id"] == book_id]
 
         def get_book_by_id(self, book_id):
             for book in self.books:
@@ -335,7 +374,7 @@ if TEST_MODE:
             self, isbn13, title, author, publication_year=None, thumbnail_url=None
         ):
             book = {
-                "id": self.next_id,
+                "id": self.next_book_id,
                 "isbn13": isbn13,
                 "title": title,
                 "author": author,
@@ -344,8 +383,24 @@ if TEST_MODE:
                 "created_at": "2024-01-01T00:00:00",
             }
             self.books.append(book)
-            self.next_id += 1
+            self.next_book_id += 1
             return book
+
+        def add_reading_record(
+            self, book_id, status, start_date, end_date=None, rating=0
+        ):
+            record = {
+                "id": self.next_record_id,
+                "book_id": book_id,
+                "status": status,
+                "start_date": start_date,
+                "end_date": end_date,
+                "rating": rating,
+                "created_at": "2024-01-01T00:00:00",
+            }
+            self.reading_records.append(record)
+            self.next_record_id += 1
+            return record
 
         def delete_book(self, book_id):
             for i, book in enumerate(self.books):
@@ -361,7 +416,9 @@ if TEST_MODE:
         """Reset test storage."""
         try:
             storage.books = []
-            storage.next_id = 1
+            storage.reading_records = []
+            storage.next_book_id = 1
+            storage.next_record_id = 1
             return {"status": "ok"}
         except Exception as e:
             return {"status": "error", "message": str(e)}, 500
