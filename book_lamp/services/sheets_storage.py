@@ -21,6 +21,7 @@ class GoogleSheetsStorage:
 
     Expected sheet structure:
     - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at
+    - 'ReadingRecords' tab: id, book_id, status, start_date, end_date, rating, created_at
     """
 
     def __init__(self, sheet_name: str, credentials_path: str = "credentials.json"):
@@ -221,6 +222,48 @@ class GoogleSheetsStorage:
         except HttpError as error:
             raise Exception(f"Failed to fetch books: {error}") from error
 
+    def get_reading_records(
+        self, book_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve reading records, optionally filtered by book ID."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingRecords!A:G")
+                .execute()
+            )
+            values = result.get("values", [])
+            if not values or len(values) < 2:
+                return []
+
+            headers = values[0]
+            records = []
+            for row in values[1:]:
+                if not row:
+                    continue
+                # Pad row to match header length
+                row = row + [""] * (len(headers) - len(row))
+                record = {
+                    "id": int(row[0]) if row[0] else 0,
+                    "book_id": int(row[1]) if row[1] else 0,
+                    "status": row[2],
+                    "start_date": row[3],
+                    "end_date": row[4] if row[4] else None,
+                    "rating": int(row[5]) if row[5] and row[5].isdigit() else 0,
+                    "created_at": row[6] if row[6] else None,
+                }
+                if book_id is None or record["book_id"] == book_id:
+                    records.append(record)
+            return records
+        except HttpError as error:
+            # If the tab doesn't exist yet, return empty list
+            if error.resp.status == 400:
+                return []
+            raise Exception(f"Failed to fetch reading records: {error}") from error
+
     def get_book_by_id(self, book_id: int) -> Optional[Dict[str, Any]]:
         """Get a single book by ID."""
         books = self.get_all_books()
@@ -279,7 +322,97 @@ class GoogleSheetsStorage:
                 "created_at": created_at,
             }
         except HttpError as error:
+            if error.resp.status == 400:
+                # Tab might not exist, try initializing and appending again
+                self.initialize_sheets()
+                try:
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="Books!A:G",
+                        valueInputOption="RAW",
+                        body={"values": [row]},
+                    ).execute()
+                    return {
+                        "id": book_id,
+                        "isbn13": isbn13,
+                        "title": title,
+                        "author": author,
+                        "publication_year": publication_year,
+                        "thumbnail_url": thumbnail_url,
+                        "created_at": created_at,
+                    }
+                except HttpError as retry_error:
+                    raise Exception(
+                        f"Failed to add book after initialization: {retry_error}"
+                    ) from retry_error
             raise Exception(f"Failed to add book: {error}") from error
+
+    def add_reading_record(
+        self,
+        book_id: int,
+        status: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        rating: int = 0,
+    ) -> Dict[str, Any]:
+        """Add a new reading record to the ReadingRecords tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        record_id = self._get_next_id("ReadingRecords")
+        created_at = datetime.now(timezone.utc).isoformat()
+
+        row = [
+            record_id,
+            book_id,
+            status,
+            start_date,
+            end_date if end_date else "",
+            rating,
+            created_at,
+        ]
+
+        try:
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="ReadingRecords!A:G",
+                valueInputOption="RAW",
+                body={"values": [row]},
+            ).execute()
+
+            return {
+                "id": record_id,
+                "book_id": book_id,
+                "status": status,
+                "start_date": start_date,
+                "end_date": end_date,
+                "rating": rating,
+                "created_at": created_at,
+            }
+        except HttpError as error:
+            if error.resp.status == 400:
+                # Tab might not exist, try initializing and appending again
+                self.initialize_sheets()
+                try:
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="ReadingRecords!A:G",
+                        valueInputOption="RAW",
+                        body={"values": [row]},
+                    ).execute()
+                    return {
+                        "id": record_id,
+                        "book_id": book_id,
+                        "status": status,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "rating": rating,
+                        "created_at": created_at,
+                    }
+                except HttpError as retry_error:
+                    raise Exception(
+                        f"Failed to add reading record after initialization: {retry_error}"
+                    ) from retry_error
+            raise Exception(f"Failed to add reading record: {error}") from error
 
     def delete_book(self, book_id: int) -> bool:
         """Delete a book by ID."""
@@ -363,7 +496,19 @@ class GoogleSheetsStorage:
                     spreadsheetId=sid, body={"requests": [request]}
                 ).execute()
 
-            # Add headers if not present
+            # Check if ReadingRecords tab exists
+            reading_records_exists = any(
+                sheet["properties"]["title"] == "ReadingRecords" for sheet in sheets
+            )
+
+            if not reading_records_exists:
+                # Create ReadingRecords tab
+                request = {"addSheet": {"properties": {"title": "ReadingRecords"}}}
+                self.service.spreadsheets().batchUpdate(
+                    spreadsheetId=sid, body={"requests": [request]}
+                ).execute()
+
+            # Add headers for Books if not present
             result = (
                 self.service.spreadsheets()
                 .values()
@@ -387,6 +532,34 @@ class GoogleSheetsStorage:
                 self.service.spreadsheets().values().update(
                     spreadsheetId=sid,
                     range="Books!A1:G1",
+                    valueInputOption="RAW",
+                    body={"values": headers},
+                ).execute()
+
+            # Add headers for ReadingRecords if not present
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingRecords!A1:G1")
+                .execute()
+            )
+            values = result.get("values", [])
+
+            if not values:
+                headers = [
+                    [
+                        "id",
+                        "book_id",
+                        "status",
+                        "start_date",
+                        "end_date",
+                        "rating",
+                        "created_at",
+                    ]
+                ]
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range="ReadingRecords!A1:G1",
                     valueInputOption="RAW",
                     body={"values": headers},
                 ).execute()
