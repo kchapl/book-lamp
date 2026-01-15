@@ -238,15 +238,17 @@ def list_books():
     # Attach records to books
     for book in books:
         book["reading_records"] = [r for r in all_records if r["book_id"] == book["id"]]
-        # Sort records by start_date ascending (chronological)
-        book["reading_records"].sort(key=lambda r: r.get("start_date", ""))
+        # Sort records by start_date descending (most recent first)
+        book["reading_records"].sort(
+            key=lambda r: r.get("start_date", ""), reverse=True
+        )
 
     # Sort books by the start date of their most recent reading record (reverse chronological)
     # If never read, fall back to created_at
     def get_sort_key(book):
         if book["reading_records"]:
-            # records are already sorted ascending, so last one is most recent
-            return book["reading_records"][-1].get("start_date", "")
+            # records are now sorted descending, so first one is most recent
+            return book["reading_records"][0].get("start_date", "")
         return book.get("created_at", "")
 
     books.sort(key=get_sort_key, reverse=True)
