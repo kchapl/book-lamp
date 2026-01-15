@@ -51,6 +51,21 @@ else:
     storage = GoogleSheetsStorage(sheet_name=sheet_name)
 
 
+def get_app_version():
+    """Get the application version based on environment."""
+    if os.environ.get("FLASK_ENV") == "production":
+        # Check for common deployment commit hash environment variables
+        for env_var in ["RENDER_GIT_COMMIT", "GIT_COMMIT", "HEROKU_SLUG_COMMIT"]:
+            val = os.environ.get(env_var)
+            if val:
+                return val[:7]
+        return "prod"
+    return "dev"
+
+
+APP_VERSION = get_app_version()
+
+
 @app.route("/")
 def home():
     is_authorized = storage.is_authorized()
@@ -59,7 +74,7 @@ def home():
 
 @app.route("/about")
 def about():
-    return "<h1>About</h1><p>This is a simple Flask web application that stores your book list in Google Sheets.</p>"
+    return render_template("about.html", version=APP_VERSION)
 
 
 @app.route("/favicon.ico")

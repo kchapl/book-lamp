@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}About - Book Lamp{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>About Book Lamp</h1>
+    <p>Book Lamp is a minimalist personal library manager that uses Google Sheets as a database. It's designed to be
+        lightweight, private, and easy to use.</p>
+
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--glass-border);">
+        <p style="color: var(--text-muted);">
+            <strong>Version:</strong> <span class="version-tag">{{ version }}</span>
+        </p>
+    </div>
+</div>
+
+<style>
+    .version-tag {
+        background: var(--glass);
+        padding: 0.2rem 0.6rem;
+        border-radius: 6px;
+        font-family: monospace;
+        color: var(--primary-light);
+        border: 1px solid var(--glass-border);
+    }
+</style>
+{% endblock %}
