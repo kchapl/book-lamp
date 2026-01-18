@@ -11,6 +11,8 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **Google Sheets storage**: All data stored in Google Sheets tabs (no database).
 - **Google OAuth**: Authentication via Google with allowlist-based access control.
 - **Effectful boundaries**: Google Sheets API access isolated in adapter layer.
+- **Environment variables**: Use environment variables for sensitive data (e.g., API keys, OAuth secrets).
+- Be consistent with the 12-factor app methodology.
 
 ### Engineering principles
 - **Single responsibility**: Each module/class/function should do one thing well.
