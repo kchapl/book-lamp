@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Import from Libib - Book Lamp{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+    <div style="margin-bottom: 2rem;">
+        <a href="{{ url_for('list_books') }}"
+            style="color: var(--primary-light); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+            ← Back to Library
+        </a>
+    </div>
+
+    <div class="card p-4">
+        <h1 style="margin-top: 0;">Import from Libib</h1>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+            Upload your Libib library export (CSV) to bulk-add books and their reading history.
+        </p>
+
+        <form method="post" enctype="multipart/form-data">
+            <div class="form-group mb-4">
+                <label for="csv_file" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Choose CSV
+                    File</label>
+                <input type="file" id="csv_file" name="file" accept=".csv" required
+                    style="width: 100%; padding: 1rem; background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--glass-border); border-radius: 12px; color: white; cursor: pointer;">
+            </div>
+
+            <div
+                style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="margin-top: 0; font-size: 1rem; color: #60a5fa;">💡 How to export from Libib:</h3>
+                <ol style="margin-bottom: 0; padding-left: 1.25rem; font-size: 0.9rem; color: var(--text-muted);">
+                    <li>Log in to your Libib account.</li>
+                    <li>Go to <strong>Settings</strong> → <strong>Export</strong>.</li>
+                    <li>Select the library you want to export.</li>
+                    <li>Download the CSV file and upload it here.</li>
+                </ol>
+            </div>
+
+            <div
+                style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
+                <p style="margin: 0; font-size: 0.9rem; color: #fbbf24;">
+                    <strong>Note:</strong> If a book already exists in your library (matched by ISBN), it will be
+                    updated with the data from the CSV.
+                </p>
+            </div>
+
+            <button type="submit" class="btn w-100">Start Import</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -33,3 +33,16 @@ def authenticated_client(client):
         sess["user_email"] = "user@example.com"
         sess["user_name"] = "Test User"
     return client
+
+
+@pytest.fixture(autouse=True)
+def _storage_reset():
+    """Reset mock storage before each test."""
+    from book_lamp.app import storage
+
+    if hasattr(storage, "books"):
+        storage.books = []
+        storage.reading_records = []
+        storage.next_book_id = 1
+        storage.next_record_id = 1
+    yield

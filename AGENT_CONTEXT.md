@@ -8,7 +8,6 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **User-centric**: Optimize for reliability and maintainability before micro-optimizations.
 
 ### Architecture
-- **Single-user application**: Only one user (identified by hashed email) can access the app.
 - **Google Sheets storage**: All data stored in Google Sheets tabs (no database).
 - **Google OAuth**: Authentication via Google with allowlist-based access control.
 - **Effectful boundaries**: Google Sheets API access isolated in adapter layer.
@@ -26,6 +25,8 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 ### Coding standards (Python)
 - **Language and tooling**:
   - Python 3.13.x
+  - Use `poetry` for dependency management.
+  - Call `poetry run` for all commands.
   - Format with `black` and sort imports with `isort` (keep default project configs if present).
   - Lint with `ruff` and type-check with `mypy` (be strict on public APIs; avoid `Any`).
 - **Style**:
@@ -56,7 +57,6 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - Validate and sanitize all external inputs (requests, env vars, web forms).
 - Never log secrets. Use structured, levelled logging.
 - Keep dependencies minimal; respect pinned versions managed by Poetry.
-- User email stored as SHA-256 hash in codebase for privacy.
 - Never commit credentials.json or token.json to version control.
 
 ### Change discipline
