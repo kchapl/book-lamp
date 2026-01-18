@@ -1,17 +1,7 @@
 from typing import Dict
 from unittest.mock import patch
 
-import pytest
-
 from book_lamp.app import is_valid_isbn13, parse_publication_year, storage
-
-
-@pytest.fixture(autouse=True)
-def _storage_reset():
-    """Reset mock storage before each test."""
-    storage.books = []
-    storage.next_id = 1
-    yield
 
 
 def test_isbn13_validation():
@@ -64,6 +54,34 @@ def test_add_book_success(mock_get, authenticated_client):
     assert book["author"] == "Jane Doe"
     assert book["publication_year"] == 2001
     assert book["thumbnail_url"] is not None
+
+
+@patch("book_lamp.services.book_lookup.requests.get")
+def test_add_book_multiple_authors(mock_get, authenticated_client):
+    class MockResp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "ISBN:9780306406157": {
+                    "title": "Collaborative Book",
+                    "authors": [{"name": "Author One"}, {"name": "Author Two"}],
+                    "publish_date": "2020",
+                }
+            }
+
+    mock_get.return_value = MockResp()
+
+    resp = authenticated_client.post(
+        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+    )
+    assert resp.status_code == 200
+    assert b"Book added successfully" in resp.data
+
+    book = storage.get_book_by_isbn("9780306406157")
+    assert book is not None
+    assert book["author"] == "Author One, Author Two"
 
 
 @patch("book_lamp.services.book_lookup.requests.get")

@@ -222,7 +222,12 @@
 {% block content %}
 <div class="books-header">
     <h1>Your Library</h1>
-    <a href="{{ url_for('new_book_form') }}" class="btn">Add New Book</a>
+    <div style="display: flex; gap: 1rem;">
+        <a href="{{ url_for('import_books_form') }}" class="btn"
+            style="background: transparent; border: 1px solid var(--primary-light); color: var(--primary-light);">Import
+            from Libib</a>
+        <a href="{{ url_for('new_book_form') }}" class="btn">Add New Book</a>
+    </div>
 </div>
 
 {% if books %}
@@ -241,10 +246,30 @@
         <div class="meta">
             <div class="title" title="{{ book.title }}">{{ book.title }}</div>
             <div class="author">{{ book.author }}</div>
-            {% if book.publication_year %}
-            <div class="year">Published: {{ book.publication_year }}</div>
+            {% if book.series %}
+            <div style="font-size: 0.85rem; color: #60a5fa; font-style: italic; margin-bottom: 0.25rem;">Series: {{
+                book.series }}</div>
             {% endif %}
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                {% if book.publication_year %}
+                <div class="year" style="margin-bottom: 0;">{{ book.publication_year }}</div>
+                {% endif %}
+                {% if book.publisher %}
+                <div class="year" style="margin-bottom: 0;">• {{ book.publisher }}</div>
+                {% endif %}
+                {% if book.dewey_decimal %}
+                <div
+                    style="font-size: 0.8rem; background: rgba(255, 255, 255, 0.1); padding: 0 4px; border-radius: 4px; color: var(--text-muted);">
+                    {{ book.dewey_decimal }}</div>
+                {% endif %}
+            </div>
             <div class="isbn">ISBN: {{ book.isbn13 }}</div>
+            {% if book.description %}
+            <div style="font-size: 0.8rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 0.5rem; line-height: 1.4;"
+                title="{{ book.description }}">
+                {{ book.description }}
+            </div>
+            {% endif %}
 
             <div class="reading-history">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">

@@ -20,7 +20,7 @@ class GoogleSheetsStorage:
     """Adapter for storing book data in Google Sheets.
 
     Expected sheet structure:
-    - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at
+    - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at, publisher, description, series, dewey_decimal
     - 'ReadingRecords' tab: id, book_id, status, start_date, end_date, rating, created_at
     """
 
@@ -192,7 +192,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:G")
+                .get(spreadsheetId=sid, range="Books!A:K")
                 .execute()
             )
             values = result.get("values", [])
@@ -216,6 +216,10 @@ class GoogleSheetsStorage:
                     ),
                     "thumbnail_url": row[5] if row[5] else None,
                     "created_at": row[6] if row[6] else None,
+                    "publisher": row[7] if len(row) > 7 else None,
+                    "description": row[8] if len(row) > 8 else None,
+                    "series": row[9] if len(row) > 9 else None,
+                    "dewey_decimal": row[10] if len(row) > 10 else None,
                 }
                 books.append(book)
             return books
@@ -287,6 +291,10 @@ class GoogleSheetsStorage:
         author: str,
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -302,12 +310,16 @@ class GoogleSheetsStorage:
             publication_year if publication_year else "",
             thumbnail_url if thumbnail_url else "",
             created_at,
+            publisher if publisher else "",
+            description if description else "",
+            series if series else "",
+            dewey_decimal if dewey_decimal else "",
         ]
 
         try:
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:G",
+                range="Books!A:K",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -320,6 +332,10 @@ class GoogleSheetsStorage:
                 "publication_year": publication_year,
                 "thumbnail_url": thumbnail_url,
                 "created_at": created_at,
+                "publisher": publisher,
+                "description": description,
+                "series": series,
+                "dewey_decimal": dewey_decimal,
             }
         except HttpError as error:
             if error.resp.status == 400:
@@ -328,7 +344,7 @@ class GoogleSheetsStorage:
                 try:
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Books!A:G",
+                        range="Books!A:K",
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
@@ -340,12 +356,355 @@ class GoogleSheetsStorage:
                         "publication_year": publication_year,
                         "thumbnail_url": thumbnail_url,
                         "created_at": created_at,
+                        "publisher": publisher,
+                        "description": description,
+                        "series": series,
+                        "dewey_decimal": dewey_decimal,
                     }
                 except HttpError as retry_error:
                     raise Exception(
                         f"Failed to add book after initialization: {retry_error}"
                     ) from retry_error
             raise Exception(f"Failed to add book: {error}") from error
+
+    def update_book(
+        self,
+        book_id: int,
+        isbn13: str,
+        title: str,
+        author: str,
+        publication_year: Optional[int] = None,
+        thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update an existing book in the Books tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # Get all data to find the row index
+        result = (
+            self.service.spreadsheets()
+            .values()
+            .get(spreadsheetId=sid, range="Books!A:K")
+            .execute()
+        )
+        values = result.get("values", [])
+        if len(values) <= 1:
+            raise Exception(f"Book with ID {book_id} not found")
+
+        # Find the row index (add 1 for header, add 1 for 1-based indexing)
+        row_index = None
+        created_at = None
+        existing_thumbnail = None
+        existing_publisher = None
+        existing_description = None
+        existing_series = None
+        existing_dewey = None
+        for idx, row in enumerate(values[1:], start=2):
+            if row and row[0] and int(row[0]) == book_id:
+                row_index = idx
+                existing_thumbnail = row[5] if len(row) > 5 else None
+                created_at = row[6] if len(row) > 6 else None
+                existing_publisher = row[7] if len(row) > 7 else None
+                existing_description = row[8] if len(row) > 8 else None
+                existing_series = row[9] if len(row) > 9 else None
+                existing_dewey = row[10] if len(row) > 10 else None
+                break
+
+        if row_index is None:
+            raise Exception(f"Book with ID {book_id} not found")
+
+        if not created_at:
+            created_at = datetime.now(timezone.utc).isoformat()
+
+        if not thumbnail_url and existing_thumbnail:
+            thumbnail_url = existing_thumbnail
+        if not publisher and existing_publisher:
+            publisher = existing_publisher
+        if not description and existing_description:
+            description = existing_description
+        if not series and existing_series:
+            series = existing_series
+        if not dewey_decimal and existing_dewey:
+            dewey_decimal = existing_dewey
+
+        row = [
+            book_id,
+            isbn13,
+            title,
+            author,
+            publication_year if publication_year else "",
+            thumbnail_url if thumbnail_url else "",
+            created_at,
+            publisher if publisher else "",
+            description if description else "",
+            series if series else "",
+            dewey_decimal if dewey_decimal else "",
+        ]
+
+        try:
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"Books!A{row_index}:K{row_index}",
+                valueInputOption="RAW",
+                body={"values": [row]},
+            ).execute()
+
+            return {
+                "id": book_id,
+                "isbn13": isbn13,
+                "title": title,
+                "author": author,
+                "publication_year": publication_year,
+                "thumbnail_url": thumbnail_url,
+                "created_at": created_at,
+                "publisher": publisher,
+                "description": description,
+                "series": series,
+                "dewey_decimal": dewey_decimal,
+            }
+        except HttpError as error:
+            raise Exception(f"Failed to update book: {error}") from error
+
+    def upsert_book(
+        self,
+        isbn13: str,
+        title: str,
+        author: str,
+        publication_year: Optional[int] = None,
+        thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add a new book or update an existing one if ISBN matches."""
+        existing = self.get_book_by_isbn(isbn13)
+        if existing:
+            return self.update_book(
+                book_id=existing["id"],
+                isbn13=isbn13,
+                title=title,
+                author=author,
+                publication_year=publication_year,
+                thumbnail_url=thumbnail_url,
+                publisher=publisher,
+                description=description,
+                series=series,
+                dewey_decimal=dewey_decimal,
+            )
+        else:
+            return self.add_book(
+                isbn13=isbn13,
+                title=title,
+                author=author,
+                publication_year=publication_year,
+                thumbnail_url=thumbnail_url,
+                publisher=publisher,
+                description=description,
+                series=series,
+                dewey_decimal=dewey_decimal,
+            )
+
+    def bulk_import(self, items: List[Dict[str, Any]]) -> int:
+        """Optimized bulk import to avoid Google Sheets API rate limits."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # 1. Fetch all existing data once
+        try:
+            books_result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Books!A:K")
+                .execute()
+            )
+        except HttpError as e:
+            if e.resp.status == 400:
+                self.initialize_sheets()
+                books_result = {"values": []}
+            else:
+                raise
+
+        try:
+            records_result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingRecords!A:G")
+                .execute()
+            )
+        except HttpError as e:
+            if e.resp.status == 400:
+                self.initialize_sheets()
+                records_result = {"values": []}
+            else:
+                raise
+
+        book_values = books_result.get("values", [])
+        existing_books = {}  # isbn -> (row_data, row_index)
+        next_book_id = 1
+        for idx, row in enumerate(book_values[1:], start=2):
+            if row and len(row) > 1:
+                existing_books[row[1]] = (row, idx)
+                if row[0].isdigit():
+                    next_book_id = max(next_book_id, int(row[0]) + 1)
+
+        record_values = records_result.get("values", [])
+        existing_record_keys = set()
+        next_record_id = 1
+        for row in record_values[1:]:
+            if row and len(row) > 4:
+                # Key: (book_id, status, start_date, end_date)
+                try:
+                    bid = int(row[1]) if row[1].isdigit() else 0
+                    key = (bid, row[2], row[3], row[4] if row[4] else None)
+                    existing_record_keys.add(key)
+                except (ValueError, IndexError):
+                    pass
+                if row[0].isdigit():
+                    next_record_id = max(next_record_id, int(row[0]) + 1)
+
+        # 2. Process items
+        books_to_update = []  # list of {"range": ..., "values": [[...]]}
+        books_to_append = []
+        records_to_append = []
+        import_count = 0
+
+        for item in items:
+            b = item["book"]
+            r = item["record"]
+            isbn = b["isbn13"]
+
+            created_at = datetime.now(timezone.utc).isoformat()
+            book_id = None
+
+            if isbn in existing_books:
+                # Update existing
+                row_data, row_idx = existing_books[isbn]
+                book_id = int(row_data[0])
+
+                # Preserve existing thumbnail and created_at if missing
+                thumb = b.get("thumbnail_url") or (
+                    row_data[5] if len(row_data) > 5 else ""
+                )
+                cat = row_data[6] if len(row_data) > 6 else created_at
+                pub = b.get("publisher") or (row_data[7] if len(row_data) > 7 else "")
+                desc = b.get("description") or (
+                    row_data[8] if len(row_data) > 8 else ""
+                )
+                ser = b.get("series") or (row_data[9] if len(row_data) > 9 else "")
+                ddc = b.get("dewey_decimal") or (
+                    row_data[10] if len(row_data) > 10 else ""
+                )
+
+                new_row = [
+                    book_id,
+                    isbn,
+                    b["title"],
+                    b["author"],
+                    b["publication_year"] if b["publication_year"] else "",
+                    thumb,
+                    cat,
+                    pub,
+                    desc,
+                    ser,
+                    ddc,
+                ]
+                books_to_update.append(
+                    {"range": f"Books!A{row_idx}:K{row_idx}", "values": [new_row]}
+                )
+            else:
+                # Append new
+                book_id = next_book_id
+                next_book_id += 1
+                new_row = [
+                    book_id,
+                    isbn,
+                    b["title"],
+                    b["author"],
+                    b["publication_year"] if b["publication_year"] else "",
+                    b.get("thumbnail_url") or "",
+                    created_at,
+                    b.get("publisher") or "",
+                    b.get("description") or "",
+                    b.get("series") or "",
+                    b.get("dewey_decimal") or "",
+                ]
+                books_to_append.append(new_row)
+
+            if r:
+                # Robust deduplication:
+                # If Completed, match on (book_id, status, end_date) - ignoring start_date
+                # because start_date can shift between 'added' and 'began' in different imports.
+                # If NOT Completed, match on (book_id, status, start_date).
+                is_duplicate = False
+                r_status = r["status"]
+                r_start = r["start_date"]
+                r_end = r.get("end_date")
+
+                for ek in existing_record_keys:
+                    # ek = (bid, status, start_date, end_date)
+                    if ek[0] == book_id and ek[1] == r_status:
+                        if r_status == "Completed":
+                            if ek[3] == r_end:
+                                is_duplicate = True
+                                break
+                        elif r_status == "In Progress":
+                            # For In Progress, any existing In Progress record for this book is a duplicate.
+                            # This handles start dates shifting between 'added' and 'began'.
+                            is_duplicate = True
+                            break
+                        else:
+                            if ek[2] == r_start:
+                                is_duplicate = True
+                                break
+
+                if not is_duplicate:
+                    new_rec_row = [
+                        next_record_id,
+                        book_id,
+                        r_status,
+                        r_start,
+                        r_end or "",
+                        r.get("rating") or 0,
+                        created_at,
+                    ]
+                    records_to_append.append(new_rec_row)
+                    next_record_id += 1
+                    # Add to existing to prevent internal duplicates
+                    existing_record_keys.add((book_id, r_status, r_start, r_end))
+
+            import_count += 1
+
+        # 3. Execute batch operations
+        if books_to_update:
+            self.service.spreadsheets().values().batchUpdate(
+                spreadsheetId=sid,
+                body={"valueInputOption": "RAW", "data": books_to_update},
+            ).execute()
+
+        if books_to_append:
+            # Batch append new books
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="Books!A:K",
+                valueInputOption="RAW",
+                body={"values": books_to_append},
+            ).execute()
+
+        if records_to_append:
+            # Batch append new records
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="ReadingRecords!A:G",
+                valueInputOption="RAW",
+                body={"values": records_to_append},
+            ).execute()
+
+        return import_count
 
     def add_reading_record(
         self,
@@ -423,7 +782,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:G")
+                .get(spreadsheetId=sid, range="Books!A:K")
                 .execute()
             )
             values = result.get("values", [])
@@ -512,7 +871,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A1:G1")
+                .get(spreadsheetId=sid, range="Books!A1:K1")
                 .execute()
             )
             values = result.get("values", [])
@@ -527,11 +886,15 @@ class GoogleSheetsStorage:
                         "publication_year",
                         "thumbnail_url",
                         "created_at",
+                        "publisher",
+                        "description",
+                        "series",
+                        "dewey_decimal",
                     ]
                 ]
                 self.service.spreadsheets().values().update(
                     spreadsheetId=sid,
-                    range="Books!A1:G1",
+                    range="Books!A1:K1",
                     valueInputOption="RAW",
                     body={"values": headers},
                 ).execute()

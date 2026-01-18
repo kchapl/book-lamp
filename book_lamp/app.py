@@ -20,6 +20,7 @@ from book_lamp.services import sheets_storage as from_sheets_storage
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import is_valid_isbn13, parse_publication_year
+from book_lamp.utils.libib_import import parse_libib_csv
 
 load_dotenv()
 
@@ -324,9 +325,46 @@ def create_book():
         author=author[:200],
         publication_year=year,
         thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
+        publisher=data.get("publisher"),
+        description=data.get("description"),
     )
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
+
+
+@app.route("/books/import", methods=["GET"])
+@login_required
+def import_books_form():
+    return render_template("import_books.html")
+
+
+@app.route("/books/import", methods=["POST"])
+@login_required
+def import_books():
+    if "file" not in request.files:
+        flash("No file part", "error")
+        return redirect(request.url)
+
+    file = request.files["file"]
+    if file.filename == "":
+        flash("No selected file", "error")
+        return redirect(request.url)
+
+    if file and file.filename.endswith(".csv"):
+        try:
+            content = file.read().decode("utf-8")
+            items = parse_libib_csv(content)
+
+            import_count = storage.bulk_import(items)
+            flash(f"Successfully imported {import_count} entries", "success")
+            return redirect(url_for("list_books"))
+        except Exception as e:
+            app.logger.error(f"Failed to import Libib CSV: {str(e)}")
+            flash(f"Error importing file: {str(e)}", "error")
+            return redirect(request.url)
+
+    flash("Please upload a valid CSV file.", "error")
+    return redirect(request.url)
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
