@@ -51,15 +51,19 @@ class GoogleSheetsStorage:
         if not os.path.exists(token_path):
             return None
 
-        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                with open(token_path, "w") as token:
-                    token.write(creds.to_json())
-            except Exception:
-                return None
-        return creds if creds and creds.valid else None
+        try:
+            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                    with open(token_path, "w") as token:
+                        token.write(creds.to_json())
+                except Exception:
+                    return None
+            return creds if creds and creds.valid else None
+        except ValueError:
+            # Token file is in old format or invalid, return None to trigger re-auth
+            return None
 
     def is_authorized(self) -> bool:
         """Check if we have valid credentials."""
