@@ -168,14 +168,11 @@ def authorize():
         # Save the token for GoogleSheetsStorage
         if not TEST_MODE:
             # Bridging Authlib token to Google-auth format.
-            # Include client_id and client_secret as required by Credentials.from_authorized_user_file()
-            # for token refresh functionality.
+            # Client ID and secret are NOT saved - they're read from env vars for security.
             creds_data = {
                 "token": token.get("access_token"),
                 "refresh_token": token.get("refresh_token"),
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "client_id": app.config["GOOGLE_CLIENT_ID"],
-                "client_secret": app.config["GOOGLE_CLIENT_SECRET"],
                 "scopes": from_sheets_storage.SCOPES,
             }
             if token.get("expires_at"):
