@@ -343,12 +343,12 @@ def import_books_form():
 def import_books():
     if "file" not in request.files:
         flash("No file part", "error")
-        return redirect(request.url)
+        return redirect(url_for("import_books_form"))
 
     file = request.files["file"]
     if file.filename == "":
         flash("No selected file", "error")
-        return redirect(request.url)
+        return redirect(url_for("import_books_form"))
 
     if file and file.filename.endswith(".csv"):
         try:
@@ -361,10 +361,10 @@ def import_books():
         except Exception as e:
             app.logger.error(f"Failed to import Libib CSV: {str(e)}")
             flash(f"Error importing file: {str(e)}", "error")
-            return redirect(request.url)
+            return redirect(url_for("import_books_form"))
 
     flash("Please upload a valid CSV file.", "error")
-    return redirect(request.url)
+    return redirect(url_for("import_books_form"))
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
