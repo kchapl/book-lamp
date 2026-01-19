@@ -117,8 +117,8 @@ def test_search_books_regex_treated_literallly():
     # I need to modify the data in the test to distinguish.
 
 
-def test_search_books_regex_safeguard():
-    """Test that regex capabilities are disabled/sanitized."""
+def test_search_books_regex_enabled():
+    """Test that regex capabilities are enabled when requested."""
     books = [
         {
             "id": 1,
@@ -130,9 +130,9 @@ def test_search_books_regex_safeguard():
     records = []
 
     # "The.Great" as regex would match "The Great"
-    # "The.Great" as literal should NOT match "The Great"
     results = search_books(books, records, "The.Great", is_regex=True)
-    assert len(results) == 0
+    assert len(results) == 1
+    assert results[0]["title"] == "The Great Gatsby"
 
 
 def test_search_books_by_reading_status():

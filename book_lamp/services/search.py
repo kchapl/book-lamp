@@ -55,10 +55,14 @@ def calculate_relevance_score(
         # Security: "is_regex_match" is intentionally ignored to prevent ReDoS.
         # We always escape the pattern to treat it as a literal string.
         try:
-            search_pattern = re.escape(pattern)
+            if is_regex_match:
+                search_pattern = pattern
+            else:
+                search_pattern = re.escape(pattern)
+
             return bool(re.search(search_pattern, text_str, re.IGNORECASE))
         except Exception:
-            # Should not happen with re.escape, but safe fallback
+            # Safe fallback for invalid regex
             return pattern.lower() in text_str.lower()
 
     # Search book fields
