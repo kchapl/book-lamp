@@ -71,13 +71,13 @@ def test_search_books_by_isbn():
     assert results[0]["isbn13"] == "9780000000001"
 
 
-def test_search_books_with_regex():
-    """Test searching books with regex pattern."""
+def test_search_books_regex_treated_literallly():
+    """Test that regex patterns are treated as literals for security."""
     books = [
         {
             "id": 1,
             "isbn13": "9780000000001",
-            "title": "The Great Gatsby",
+            "title": "The Great. Gatsby",
             "author": "F. Scott Fitzgerald",
             "publication_year": 1925,
         },
@@ -91,9 +91,48 @@ def test_search_books_with_regex():
     ]
     records = []
 
-    # Search for titles starting with "The"
-    results = search_books(books, records, r"^the", is_regex=True)
-    assert len(results) == 2
+    # Search for "Great." (literal dot)
+    # If regex was active, "Great." would match "Great " or "GreatX"
+    # But as literal, it should only match "The Great. Gatsby"
+
+    # Actually, simpler test: search for a char that is regex special
+    # case 1: "The." should match "The Great. Gatsby" if literal, or ANY "The<char>" if regex.
+    pass  # Let's write a clear test case
+
+    # Search for literal "."
+    results = search_books(books, records, ".", is_regex=True)
+    # If regex was active, "." matches everything, so count would be 2.
+    # If literal, it matches "The Great. Gatsby" (count 1) and arguably "J.D." (count 1) -> 2
+    # Wait, "The Catcher in the Rye" doesn't have a dot. "J.D." does.
+    # "The Great. Gatsby" has a dot.
+
+    # Let's search for "Great."
+    results = search_books(books, records, "Great.", is_regex=True)
+    assert len(results) == 1
+    assert results[0]["title"] == "The Great. Gatsby"
+
+    # Verify that wildcard behavior is gone
+    # "Great." should NOT match "Great Gatsby" (where dot matches space)
+    # But wait, original data "The Great Gatsby" doesn't have dot.
+    # I need to modify the data in the test to distinguish.
+
+
+def test_search_books_regex_safeguard():
+    """Test that regex capabilities are disabled/sanitized."""
+    books = [
+        {
+            "id": 1,
+            "isbn13": "9780000000001",
+            "title": "The Great Gatsby",
+            # No dot here
+        },
+    ]
+    records = []
+
+    # "The.Great" as regex would match "The Great"
+    # "The.Great" as literal should NOT match "The Great"
+    results = search_books(books, records, "The.Great", is_regex=True)
+    assert len(results) == 0
 
 
 def test_search_books_by_reading_status():

@@ -52,22 +52,13 @@ def calculate_relevance_score(
 
         text_str = str(text)
 
-        if not is_regex_match:
-            try:
-                # Escape the pattern so literal characters aren't interpreted as regex
-                search_pattern = re.escape(pattern)
-                return bool(re.search(search_pattern, text_str, re.IGNORECASE))
-            except Exception:
-                # Should not happen with re.escape, but safe fallback
-                return pattern.lower() in text_str.lower()
-
-        # Regex mode
+        # Security: "is_regex_match" is intentionally ignored to prevent ReDoS.
+        # We always escape the pattern to treat it as a literal string.
         try:
-            # We do NOT escape the pattern here because the user explicitly requested regex mode.
-            # This allows patterns like '.*' or '^Title' to work as expected.
-            return bool(re.search(pattern, text_str, re.IGNORECASE))
-        except re.error:
-            # Invalid regex, fall back to literal match
+            search_pattern = re.escape(pattern)
+            return bool(re.search(search_pattern, text_str, re.IGNORECASE))
+        except Exception:
+            # Should not happen with re.escape, but safe fallback
             return pattern.lower() in text_str.lower()
 
     # Search book fields
