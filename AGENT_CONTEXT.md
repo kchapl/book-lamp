@@ -23,6 +23,9 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **Explicit contracts**: Use clear function signatures, docstrings, and precise naming.
 - **Composition first**: Prefer composing small functions over inheritance-heavy designs.
 - **Fail fast with context**: Validate inputs early and raise actionable errors.
+- **Security**: Validate and sanitize all external inputs (requests, env vars, web forms).
+- Never log secrets. Use structured, levelled logging.
+- Keep dependencies minimal; respect pinned versions managed by Poetry.
 
 ### Coding standards (Python)
 - **Language and tooling**:
