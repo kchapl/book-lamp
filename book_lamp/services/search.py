@@ -61,11 +61,23 @@ def calculate_relevance_score(
                 # Should not happen with re.escape, but safe fallback
                 return pattern.lower() in text_str.lower()
 
-        # Regex mode
+        # Regex mode with restricted pattern to avoid ReDoS / regex injection
+        # Allow only a limited, safe subset of characters in user-provided patterns.
+        # Patterns containing other metacharacters are treated as literal searches.
+        safe_regex_validator = re.compile(r"^[\w\s\.\-,'\":;!?\+/]*$")
+
+        if not safe_regex_validator.fullmatch(pattern):
+            # Disallowed or potentially dangerous regex syntax: treat as literal search
+            try:
+                search_pattern = re.escape(pattern)
+                return bool(re.search(search_pattern, text_str, re.IGNORECASE))
+            except Exception:
+                return pattern.lower() in text_str.lower()
+
         try:
             return bool(re.search(pattern, text_str, re.IGNORECASE))
         except re.error:
-            # Invalid regex, fall back to literal match
+            # Invalid regex even after validation, fall back to literal match
             return pattern.lower() in text_str.lower()
 
     # Search book fields
