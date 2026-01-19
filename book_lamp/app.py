@@ -242,6 +242,32 @@ def list_books():
     return render_template("books.html", books=books, today=today)
 
 
+@app.route("/books/search", methods=["GET"])
+@login_required
+def search_books():
+    query = request.args.get("q", "").strip()
+    is_regex = request.args.get("regex", "0") == "1"
+
+    if not query:
+        flash("Please enter a search query.", "info")
+        return redirect(url_for("list_books"))
+
+    try:
+        books = storage.search(query, is_regex=is_regex)
+        today = datetime.date.today().isoformat()
+        return render_template(
+            "books.html",
+            books=books,
+            today=today,
+            search_query=query,
+            is_regex=is_regex,
+        )
+    except Exception as e:
+        app.logger.error(f"Search failed: {str(e)}")
+        flash(f"Search error: {str(e)}", "error")
+        return redirect(url_for("list_books"))
+
+
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
 @login_required
 def create_reading_record(book_id: int):
@@ -391,7 +417,10 @@ if TEST_MODE:
             return {"status": "ok"}
         except Exception as e:
             app.logger.exception("Failed to reset test storage: %s", e)
-            return {"status": "error", "message": "Internal error during test reset"}, 500
+            return {
+                "status": "error",
+                "message": "Internal error during test reset",
+            }, 500
 
 
 if __name__ == "__main__":

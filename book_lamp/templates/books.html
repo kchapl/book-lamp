@@ -230,6 +230,41 @@
     </div>
 </div>
 
+<!-- Search Form -->
+<div style="margin-bottom: 2rem;">
+    <form method="get" action="{{ url_for('search_books') }}"
+        style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px; position: relative;">
+            <input type="text" name="q" placeholder="Search books, authors, ISBN, series..."
+                value="{{ search_query if search_query else '' }}"
+                style="width: 100%; padding: 0.75rem 1rem; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; color: white; font-size: 0.95rem;"
+                onkeypress="if(event.key === 'Enter') { event.preventDefault(); this.form.submit(); }" required>
+            {% if search_query %}
+            <a href="{{ url_for('list_books') }}"
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 1.2rem; cursor: pointer;"
+                title="Clear search">✕</a>
+            {% endif %}
+        </div>
+        <label
+            style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; color: var(--text-muted);">
+            <input type="checkbox" name="regex" value="1" {% if is_regex %}checked{% endif %} style="cursor: pointer;">
+            <span>Regex mode</span>
+        </label>
+        <button type="submit" class="btn" style="padding: 0.75rem 1.5rem;">
+            🔍 Search
+        </button>
+    </form>
+    {% if search_query %}
+    <div
+        style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; font-size: 0.9rem;">
+        <strong>Search results for:</strong> "{{ search_query }}"
+        {% if is_regex %}<span style="color: var(--primary-light);">(regex mode)</span>{% endif %}
+        <span style="color: var(--text-muted); margin-left: 1rem;">{{ books|length }} result{% if books|length != 1
+            %}s{% endif %} found</span>
+    </div>
+    {% endif %}
+</div>
+
 {% if books %}
 <div class="grid">
     {% for book in books %}
@@ -353,13 +388,22 @@
     {% endfor %}
 </div>
 {% else %}
+{% if search_query %}
 <div class="empty-state">
-    <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+    <div style="font-size: 3rem; margin-bottom: 1rem;">�</div>
+    <h2>No matching books found</h2>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">Try adjusting your search terms.</p>
+    <a href="{{ url_for('list_books') }}" class="btn">Clear Search</a>
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">�📭</div>
     <h2>Your bookshelf is empty</h2>
     <p style="color: var(--text-muted); margin-bottom: 2rem;">Start building your digital library by adding your first
         book.</p>
     <a href="{{ url_for('new_book_form') }}" class="btn">Add Your First Book</a>
 </div>
+{% endif %}
 {% endif %}
 
 <script>
