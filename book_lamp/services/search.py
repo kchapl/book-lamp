@@ -49,15 +49,24 @@ def calculate_relevance_score(
         """Check if text matches the pattern."""
         if not text:
             return False
-        text_str = str(text).lower()
-        if is_regex_match:
+
+        text_str = str(text)
+
+        if not is_regex_match:
             try:
-                return bool(re.search(pattern, text_str, re.IGNORECASE))
-            except re.error:
-                # Invalid regex, fall back to literal match
-                return pattern.lower() in text_str
-        else:
-            return pattern.lower() in text_str
+                # Escape the pattern so literal characters aren't interpreted as regex
+                search_pattern = re.escape(pattern)
+                return bool(re.search(search_pattern, text_str, re.IGNORECASE))
+            except Exception:
+                # Should not happen with re.escape, but safe fallback
+                return pattern.lower() in text_str.lower()
+
+        # Regex mode
+        try:
+            return bool(re.search(pattern, text_str, re.IGNORECASE))
+        except re.error:
+            # Invalid regex, fall back to literal match
+            return pattern.lower() in text_str.lower()
 
     # Search book fields
     for field, weight in weights.items():
