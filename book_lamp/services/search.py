@@ -61,25 +61,13 @@ def calculate_relevance_score(
                 # Should not happen with re.escape, but safe fallback
                 return pattern.lower() in text_str.lower()
 
-        # Regex mode: previously allowed a restricted regex subset.
-        # To avoid regex injection / ReDoS entirely, always escape the user pattern
-        # before passing it to re.search, even when regex mode is requested.
-        safe_regex_validator = re.compile(r"^[\w\s\.\-,'\":;!?\+/]*$")
-
-        if not safe_regex_validator.fullmatch(pattern):
-            # Disallowed or potentially dangerous syntax: treat as literal search
-            try:
-                search_pattern = re.escape(pattern)
-                return bool(re.search(search_pattern, text_str, re.IGNORECASE))
-            except Exception:
-                return pattern.lower() in text_str.lower()
-
+        # Regex mode
         try:
-            # Pattern passed validation, but still escape to prevent regex injection.
-            search_pattern = re.escape(pattern)
-            return bool(re.search(search_pattern, text_str, re.IGNORECASE))
-        except Exception:
-            # Extremely unlikely with re.escape, but fall back to simple substring match
+            # We do NOT escape the pattern here because the user explicitly requested regex mode.
+            # This allows patterns like '.*' or '^Title' to work as expected.
+            return bool(re.search(pattern, text_str, re.IGNORECASE))
+        except re.error:
+            # Invalid regex, fall back to literal match
             return pattern.lower() in text_str.lower()
 
     # Search book fields
