@@ -148,14 +148,13 @@ def login():
 
         app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
         return oauth.google.authorize_redirect(redirect_uri)
-    except Exception as e:
-        app.logger.error(f"OAuth login failed: {str(e)}")
+    except Exception:
+        app.logger.exception("OAuth login failed")
         return (
-            f"<h1>Login Error</h1>"
-            f"<p>Failed to initiate Google OAuth login.</p>"
-            f"<p>Error: {str(e)}</p>"
-            f"<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
-            f"<a href='/'>Go back</a>"
+            "<h1>Login Error</h1>"
+            "<p>Failed to initiate Google OAuth login.</p>"
+            "<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
+            "<a href='/'>Go back</a>"
         ), 500
 
 
@@ -188,13 +187,10 @@ def authorize():
 
         flash("Successfully authorized Google Sheets access!", "success")
         return redirect(url_for("home"))
-    except Exception as e:
-        app.logger.error(f"Failed to authorize access token: {str(e)}")
+    except Exception:
+        app.logger.exception("Failed to authorize access token")
         return (
-            f"<h1>Authorization Error</h1>"
-            f"<p>Failed to complete Google OAuth authorization.</p>"
-            f"<p>Error: {str(e)}</p>"
-            f"<a href='/'>Go back</a>"
+            "<h1>Authorization Error</h1><p>Failed to complete Google OAuth authorization.</p><a href='/'>Go back</a>"
         ), 401
 
 
