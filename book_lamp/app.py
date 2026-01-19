@@ -390,7 +390,8 @@ if TEST_MODE:
             storage.next_record_id = 1
             return {"status": "ok"}
         except Exception as e:
-            return {"status": "error", "message": str(e)}, 500
+            app.logger.exception("Failed to reset test storage: %s", e)
+            return {"status": "error", "message": "Internal error during test reset"}, 500
 
 
 if __name__ == "__main__":
