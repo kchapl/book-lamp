@@ -351,6 +351,61 @@ def create_book():
     return redirect(url_for("list_books"))
 
 
+@app.route("/books/fetch-covers", methods=["POST"])
+@login_required
+def fetch_missing_covers():
+    """Bulk fetch missing covers for all books."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from book_lamp.services.book_lookup import lookup_book_by_isbn13
+
+    books = storage.get_all_books()
+    updated_count = 0
+
+    # Identify candidates
+    missing_covers = [
+        b for b in books if not b.get("thumbnail_url") and b.get("isbn13")
+    ]
+
+    items_to_update = []
+
+    def fetch_cover_for_book(book_item):
+        """Helper to fetch cover for a single book."""
+        try:
+            info = lookup_book_by_isbn13(book_item["isbn13"])
+            if info and info.get("thumbnail_url"):
+                return book_item, info["thumbnail_url"]
+        except Exception as e:
+            app.logger.warning(f"Failed to fetch cover for {book_item['isbn13']}: {e}")
+        return None, None
+
+    # Use a thread pool to fetch covers in parallel
+    # Limit max_workers to avoid hitting API rate limits too aggressively
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(fetch_cover_for_book, book): book for book in missing_covers
+        }
+
+        for future in as_completed(futures):
+            book, thumbnail_url = future.result()
+            if book and thumbnail_url:
+                # Create a copy with the new thumbnail, preserving other fields
+                updated_book = book.copy()
+                updated_book["thumbnail_url"] = thumbnail_url
+
+                # Add to batch
+                items_to_update.append({"book": updated_book, "record": None})
+                updated_count += 1
+
+    if items_to_update:
+        storage.bulk_import(items_to_update)
+        flash(f"Found and updated {updated_count} missing covers.", "success")
+    else:
+        flash("No new covers found.", "info")
+
+    return redirect(url_for("list_books"))
+
+
 @app.route("/books/import", methods=["GET"])
 @login_required
 def import_books_form():

@@ -28,6 +28,11 @@ The project is structured into distinct layers to separate business logic from e
 - **British English**: All comments, documentation, and naming (where possible) MUST use British English (e.g., `serialise`, `colour`, `optimise`).
 - **Standard Library**: Prefer modern Python standards (e.g., `datetime.now(timezone.utc)`, `pathlib`).
 
+### 4. Frontend Architecture
+- **Separation of Concerns**: CSS and JavaScript must be kept in dedicated files in `book_lamp/static/`.
+- **CSS**: Avoid inline styles or `<style>` blocks in HTML templates. Use descriptive filenames (e.g., `base.css`, `books.css`).
+- **HTML**: Keep templates focused on structure and Jinja2 logic.
+
 ## Documentation Standard
 - **Docstrings**: Use **Google Style** docstrings for all public functions and classes.
 - **Template**:
