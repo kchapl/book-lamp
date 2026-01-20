@@ -102,24 +102,66 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         return None
 
 
+def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
+    """Helper to lookup book details via iTunes Search API."""
+    url = "https://itunes.apple.com/search"
+    params = {"term": isbn13, "media": "ebook", "limit": "1"}
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if "results" not in data or not data["results"]:
+            return None
+
+        item = data["results"][0]
+
+        title = item.get("trackName")
+        author_name = item.get("artistName")
+        publish_date = item.get("releaseDate")
+        if publish_date:
+            publish_date = publish_date.split("T")[0]  # Extract date part
+        description = item.get("description")
+
+        # iTunes gives different sized artwork, "artworkUrl100" is usually available
+        thumbnail_url = item.get("artworkUrl100") or item.get("artworkUrl60")
+
+        # Get high-res artwork if possible by replacing dimension in URL
+        if thumbnail_url:
+            thumbnail_url = thumbnail_url.replace("100x100bb", "600x600bb")
+
+        return {
+            "title": html.unescape(title) if title else title,
+            "author": html.unescape(author_name) if author_name else author_name,
+            "publish_date": publish_date,
+            "thumbnail_url": thumbnail_url,
+            "publisher": None,  # iTunes often doesn't give publisher easily in this endpoint
+            "description": html.unescape(description) if description else description,
+        }
+    except Exception:
+        return None
+
+
 def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
-    """Lookup a book by ISBN-13 using Open Library first, then Google Books as fallback.
+    """Lookup a book by ISBN-13 using Open Library, then Google Books, then iTunes as fallback.
 
     Returns a dict with keys: title, author, publish_date, thumbnail_url, or None if not found.
     """
-    # Try Open Library first
+    # 1. Open Library
     ol_result = _lookup_open_library(isbn13)
     if ol_result and ol_result.get("thumbnail_url"):
         return ol_result
 
-    # If Open Library failed or had no cover, try Google Books
+    # 2. Google Books
     gb_result = _lookup_google_books(isbn13)
     if gb_result and gb_result.get("thumbnail_url"):
         return gb_result
 
-    # If Google Books failed (or had no cover), return Open Library result if it existed
-    if ol_result:
-        return ol_result
+    # 3. iTunes Store
+    itunes_result = _lookup_itunes(isbn13)
+    if itunes_result and itunes_result.get("thumbnail_url"):
+        return itunes_result
 
-    # Otherwise return Google Books result (might have data but no cover, or be None)
-    return gb_result
+    # If all failed (or had no covers), return the first non-None result in order of preference
+    # to at least give metadata if possible.
+    return ol_result or gb_result or itunes_result
