@@ -196,3 +196,16 @@ class MockStorage:
                     )
             import_count += 1
         return import_count
+
+    def search(self, query):
+        """Search across all book data fields.
+
+        Args:
+            query: Search query (free text).
+
+        Returns:
+            List of matching books with reading_records attached, sorted by relevance.
+        """
+        from book_lamp.services.search import search_books
+
+        return search_books(self.books, self.reading_records, query)

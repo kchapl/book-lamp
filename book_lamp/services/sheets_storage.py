@@ -967,3 +967,18 @@ class GoogleSheetsStorage:
 
         except HttpError as error:
             raise Exception(f"Failed to initialize sheets: {error}") from error
+
+    def search(self, query: str) -> List[Dict[str, Any]]:
+        """Search across all book data fields.
+
+        Args:
+            query: Search query (free text).
+
+        Returns:
+            List of matching books with reading_records attached, sorted by relevance.
+        """
+        from book_lamp.services.search import search_books
+
+        all_books = self.get_all_books()
+        all_records = self.get_reading_records()
+        return search_books(all_books, all_records, query)
