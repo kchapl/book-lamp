@@ -8,13 +8,13 @@
 
 {% block content %}
 <div class="books-header">
-    <h1>Your Library</h1>
+    <h1>Books</h1>
     <div style="display: flex; gap: 1rem;">
-        <form method="post" action="{{ url_for('fetch_missing_covers') }}" style="display: inline;"
-            onsubmit="return confirm('This will check for missing covers for all books. It might take a moment. Continue?');">
+        <form method="post" action="{{ url_for('fetch_missing_data') }}" style="display: inline;"
+            onsubmit="return confirm('This will look up and populate any missing data (covers, titles, authors, publication years, publishers, descriptions) for all books. It might take a moment. Continue?');">
             <button type="submit" class="btn"
                 style="background: transparent; border: 1px solid var(--primary-light); color: var(--primary-light);">
-                Fetch covers
+                Fetch missing data
             </button>
         </form>
         <a href="{{ url_for('import_books_form') }}" class="btn"
@@ -151,9 +151,9 @@
                     </span>
                     {% endif %}
                     <span class="record-dates">
-                        Started: {{ record.start_date }}
+                        Began: {{ record.start_date }}
                         {% if record.status == 'Completed' and record.end_date %}
-                        | Finished: {{ record.end_date }}
+                        | Completed: {{ record.end_date }}
                         {% elif record.status == 'Abandoned' and record.end_date %}
                         | Abandoned: {{ record.end_date }}
                         {% endif %}

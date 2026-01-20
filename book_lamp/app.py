@@ -353,55 +353,182 @@ def create_book():
 
 @app.route("/books/fetch-covers", methods=["POST"])
 @login_required
-def fetch_missing_covers():
-    """Bulk fetch missing covers for all books."""
+def fetch_missing_data():
+    """Bulk fetch missing data (covers, metadata) for all books."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
+    from book_lamp.utils.books import parse_publication_year
 
     books = storage.get_all_books()
     updated_count = 0
 
-    # Identify candidates
-    missing_covers = [
-        b for b in books if not b.get("thumbnail_url") and b.get("isbn13")
-    ]
+    # Identify candidates: all books with ISBN that have any missing data
+    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description
+    def is_empty(value):
+        """Check if a value is None or empty string."""
+        return value is None or (isinstance(value, str) and not value.strip())
+
+    candidates = []
+    for b in books:
+        if not b.get("isbn13"):
+            continue
+
+        # Identify missing fields for this book
+        missing_fields = []
+        if is_empty(b.get("thumbnail_url")):
+            missing_fields.append("thumbnail_url")
+        if is_empty(b.get("title")):
+            missing_fields.append("title")
+        if is_empty(b.get("author")):
+            missing_fields.append("author")
+        if is_empty(b.get("publication_year")):
+            missing_fields.append("publication_year")
+        if is_empty(b.get("publisher")):
+            missing_fields.append("publisher")
+        if is_empty(b.get("description")):
+            missing_fields.append("description")
+
+        if missing_fields:
+            candidates.append(b)
+            book_title = b.get("title") or b.get("isbn13", "Unknown")
+            app.logger.info(
+                f"Book '{book_title}' (ISBN: {b.get('isbn13')}) missing fields: {', '.join(missing_fields)}"
+            )
+
+    app.logger.info(f"Found {len(candidates)} book(s) with missing data to process")
 
     items_to_update = []
 
-    def fetch_cover_for_book(book_item):
-        """Helper to fetch cover for a single book."""
-        try:
-            info = lookup_book_by_isbn13(book_item["isbn13"])
-            if info and info.get("thumbnail_url"):
-                return book_item, info["thumbnail_url"]
-        except Exception as e:
-            app.logger.warning(f"Failed to fetch cover for {book_item['isbn13']}: {e}")
-        return None, None
+    def fetch_data_for_book(book_item):
+        """Helper to fetch missing data for a single book."""
+        isbn = book_item.get("isbn13", "unknown")
+        book_title = book_item.get("title") or isbn
 
-    # Use a thread pool to fetch covers in parallel
+        try:
+            app.logger.info(f"Looking up data for '{book_title}' (ISBN: {isbn})")
+            info = lookup_book_by_isbn13(isbn)
+            if not info:
+                app.logger.warning(f"No data found for '{book_title}' (ISBN: {isbn})")
+                return None
+
+            # Check if we have any updates to make
+            updated_book = book_item.copy()
+            has_updates = False
+            found_fields = []
+            populated_fields = []
+
+            # Populate missing fields only (don't overwrite existing data)
+            if is_empty(updated_book.get("thumbnail_url")) and info.get(
+                "thumbnail_url"
+            ):
+                updated_book["thumbnail_url"] = info["thumbnail_url"]
+                found_fields.append("thumbnail_url")
+                populated_fields.append("thumbnail_url")
+                has_updates = True
+
+            if is_empty(updated_book.get("title")) and info.get("title"):
+                updated_book["title"] = (
+                    info["title"][:300] if len(info["title"]) > 300 else info["title"]
+                )
+                found_fields.append("title")
+                populated_fields.append("title")
+                has_updates = True
+
+            if is_empty(updated_book.get("author")) and info.get("author"):
+                updated_book["author"] = (
+                    info["author"][:200]
+                    if len(info["author"]) > 200
+                    else info["author"]
+                )
+                found_fields.append("author")
+                populated_fields.append("author")
+                has_updates = True
+
+            if is_empty(updated_book.get("publication_year")) and info.get(
+                "publish_date"
+            ):
+                year = parse_publication_year(info["publish_date"])
+                if year:
+                    updated_book["publication_year"] = year
+                    found_fields.append("publication_year")
+                    populated_fields.append("publication_year")
+                    has_updates = True
+
+            if is_empty(updated_book.get("publisher")) and info.get("publisher"):
+                updated_book["publisher"] = info["publisher"]
+                found_fields.append("publisher")
+                populated_fields.append("publisher")
+                has_updates = True
+
+            if is_empty(updated_book.get("description")) and info.get("description"):
+                updated_book["description"] = info["description"]
+                found_fields.append("description")
+                populated_fields.append("description")
+                has_updates = True
+
+            # Log what was found in the lookup (even if we couldn't use it)
+            all_found = []
+            if info.get("thumbnail_url"):
+                all_found.append("thumbnail_url")
+            if info.get("title"):
+                all_found.append("title")
+            if info.get("author"):
+                all_found.append("author")
+            if info.get("publish_date"):
+                all_found.append("publish_date")
+            if info.get("publisher"):
+                all_found.append("publisher")
+            if info.get("description"):
+                all_found.append("description")
+
+            if all_found:
+                app.logger.info(
+                    f"Found data for '{book_title}' (ISBN: {isbn}): {', '.join(all_found)}"
+                )
+
+            if populated_fields:
+                app.logger.info(
+                    f"Populating fields for '{book_title}' (ISBN: {isbn}): {', '.join(populated_fields)}"
+                )
+            elif has_updates is False:
+                app.logger.info(
+                    f"No updates needed for '{book_title}' (ISBN: {isbn}) - all fields already populated"
+                )
+
+            if has_updates:
+                return updated_book
+        except Exception as e:
+            app.logger.warning(
+                f"Failed to fetch data for '{book_title}' (ISBN: {isbn}): {e}"
+            )
+        return None
+
+    # Use a thread pool to fetch data in parallel
     # Limit max_workers to avoid hitting API rate limits too aggressively
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
-            executor.submit(fetch_cover_for_book, book): book for book in missing_covers
+            executor.submit(fetch_data_for_book, book): book for book in candidates
         }
 
         for future in as_completed(futures):
-            book, thumbnail_url = future.result()
-            if book and thumbnail_url:
-                # Create a copy with the new thumbnail, preserving other fields
-                updated_book = book.copy()
-                updated_book["thumbnail_url"] = thumbnail_url
-
+            updated_book = future.result()
+            if updated_book:
                 # Add to batch
                 items_to_update.append({"book": updated_book, "record": None})
                 updated_count += 1
 
     if items_to_update:
         storage.bulk_import(items_to_update)
-        flash(f"Found and updated {updated_count} missing covers.", "success")
+        app.logger.info(
+            f"Bulk data enhancement complete: Updated {updated_count} out of {len(candidates)} candidate book(s)"
+        )
+        flash(f"Found and updated missing data for {updated_count} book(s).", "success")
     else:
-        flash("No new covers found.", "info")
+        app.logger.info(
+            f"Bulk data enhancement complete: No updates needed for {len(candidates)} candidate book(s)"
+        )
+        flash("No missing data found to update.", "info")
 
     return redirect(url_for("list_books"))
 
