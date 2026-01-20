@@ -245,11 +245,6 @@
                 title="Clear search">✕</a>
             {% endif %}
         </div>
-        <label
-            style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; color: var(--text-muted);">
-            <input type="checkbox" name="regex" value="1" {% if is_regex %}checked{% endif %} style="cursor: pointer;">
-            <span>Regex mode</span>
-        </label>
         <button type="submit" class="btn" style="padding: 0.75rem 1.5rem;">
             🔍 Search
         </button>
@@ -258,7 +253,6 @@
     <div
         style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; font-size: 0.9rem;">
         <strong>Search results for:</strong> "{{ search_query }}"
-        {% if is_regex %}<span style="color: var(--primary-light);">(regex mode)</span>{% endif %}
         <span style="color: var(--text-muted); margin-left: 1rem;">{{ books|length }} result{% if books|length != 1
             %}s{% endif %} found</span>
     </div>

@@ -246,21 +246,19 @@ def list_books():
 @login_required
 def search_books():
     query = request.args.get("q", "").strip()
-    is_regex = request.args.get("regex", "0") == "1"
 
     if not query:
         flash("Please enter a search query.", "info")
         return redirect(url_for("list_books"))
 
     try:
-        books = storage.search(query, is_regex=is_regex)
+        books = storage.search(query)
         today = datetime.date.today().isoformat()
         return render_template(
             "books.html",
             books=books,
             today=today,
             search_query=query,
-            is_regex=is_regex,
         )
     except Exception as e:
         app.logger.error(f"Search failed: {str(e)}")

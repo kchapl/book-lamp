@@ -23,7 +23,7 @@ def test_search_books_by_title():
     ]
     records = []
 
-    results = search_books(books, records, "gatsby", is_regex=False)
+    results = search_books(books, records, "gatsby")
     assert len(results) == 1
     assert results[0]["title"] == "The Great Gatsby"
 
@@ -48,7 +48,7 @@ def test_search_books_by_author():
     ]
     records = []
 
-    results = search_books(books, records, "harper", is_regex=False)
+    results = search_books(books, records, "harper")
     assert len(results) == 1
     assert results[0]["author"] == "Harper Lee"
 
@@ -66,13 +66,13 @@ def test_search_books_by_isbn():
     ]
     records = []
 
-    results = search_books(books, records, "9780000000001", is_regex=False)
+    results = search_books(books, records, "9780000000001")
     assert len(results) == 1
     assert results[0]["isbn13"] == "9780000000001"
 
 
-def test_search_books_regex_treated_literallly():
-    """Test that regex patterns are treated as literals for security."""
+def test_search_special_characters_treated_literally():
+    """Test that special regex characters are treated as literals."""
     books = [
         {
             "id": 1,
@@ -92,47 +92,18 @@ def test_search_books_regex_treated_literallly():
     records = []
 
     # Search for "Great." (literal dot)
-    # If regex was active, "Great." would match "Great " or "GreatX"
+    # If regex was active, "Great." might match "Great " or "GreatX" depending on engine/input
     # But as literal, it should only match "The Great. Gatsby"
 
-    # Actually, simpler test: search for a char that is regex special
-    # case 1: "The." should match "The Great. Gatsby" if literal, or ANY "The<char>" if regex.
-    pass  # Let's write a clear test case
-
-    # Search for literal "."
-    results = search_books(books, records, ".", is_regex=True)
-    # If regex was active, "." matches everything, so count would be 2.
-    # If literal, it matches "The Great. Gatsby" (count 1) and arguably "J.D." (count 1) -> 2
-    # Wait, "The Catcher in the Rye" doesn't have a dot. "J.D." does.
-    # "The Great. Gatsby" has a dot.
-
-    # Let's search for "Great."
-    results = search_books(books, records, "Great.", is_regex=True)
+    results = search_books(books, records, "Great.")
     assert len(results) == 1
     assert results[0]["title"] == "The Great. Gatsby"
 
-    # Verify that wildcard behavior is gone
-    # "Great." should NOT match "Great Gatsby" (where dot matches space)
-    # But wait, original data "The Great Gatsby" doesn't have dot.
-    # I need to modify the data in the test to distinguish.
-
-
-def test_search_books_regex_enabled():
-    """Test that regex capabilities are enabled when requested."""
-    books = [
-        {
-            "id": 1,
-            "isbn13": "9780000000001",
-            "title": "The Great Gatsby",
-            # No dot here
-        },
-    ]
-    records = []
-
-    # "The.Great" as regex would match "The Great"
-    results = search_books(books, records, "The.Great", is_regex=True)
-    assert len(results) == 1
-    assert results[0]["title"] == "The Great Gatsby"
+    # Search for literal "."
+    # "The Catcher in the Rye" doesn't have a dot. "J.D." does. "The Great. Gatsby" has a dot.
+    # Should find 2 books.
+    results = search_books(books, records, ".")
+    assert len(results) == 2
 
 
 def test_search_books_by_reading_status():
@@ -172,7 +143,7 @@ def test_search_books_by_reading_status():
         },
     ]
 
-    results = search_books(books, records, "completed", is_regex=False)
+    results = search_books(books, records, "completed")
     assert len(results) == 1
     assert results[0]["title"] == "The Great Gatsby"
 
@@ -199,7 +170,7 @@ def test_search_relevance_scoring():
     ]
     records = []
 
-    results = search_books(books, records, "python", is_regex=False)
+    results = search_books(books, records, "python")
     assert len(results) == 2
     # Title match should rank higher than description match
     assert results[0]["title"] == "Python Programming"
@@ -219,10 +190,10 @@ def test_search_empty_query():
     ]
     records = []
 
-    results = search_books(books, records, "", is_regex=False)
+    results = search_books(books, records, "")
     assert len(results) == 0
 
-    results = search_books(books, records, "   ", is_regex=False)
+    results = search_books(books, records, "   ")
     assert len(results) == 0
 
 
@@ -239,7 +210,7 @@ def test_search_no_matches():
     ]
     records = []
 
-    results = search_books(books, records, "nonexistent", is_regex=False)
+    results = search_books(books, records, "nonexistent")
     assert len(results) == 0
 
 
@@ -256,7 +227,7 @@ def test_search_case_insensitive():
     ]
     records = []
 
-    results = search_books(books, records, "GATSBY", is_regex=False)
+    results = search_books(books, records, "GATSBY")
     assert len(results) == 1
     assert results[0]["title"] == "The Great Gatsby"
 
@@ -271,7 +242,7 @@ def test_calculate_relevance_score_title_match():
     }
     records = []
 
-    score = calculate_relevance_score(book, records, "python", is_regex=False)
+    score = calculate_relevance_score(book, records, "python")
     assert score > 0
 
 
@@ -291,8 +262,8 @@ def test_calculate_relevance_score_exact_match_bonus():
     }
     records = []
 
-    score1 = calculate_relevance_score(book1, records, "python", is_regex=False)
-    score2 = calculate_relevance_score(book2, records, "python", is_regex=False)
+    score1 = calculate_relevance_score(book1, records, "python")
+    score2 = calculate_relevance_score(book2, records, "python")
 
     # Exact match should score higher
     assert score1 > score2
@@ -320,25 +291,6 @@ def test_search_with_series():
     ]
     records = []
 
-    results = search_books(books, records, "middle-earth", is_regex=False)
+    results = search_books(books, records, "middle-earth")
     assert len(results) == 1
     assert results[0]["series"] == "Middle-earth"
-
-
-def test_search_with_invalid_regex():
-    """Test that invalid regex falls back to literal search."""
-    books = [
-        {
-            "id": 1,
-            "isbn13": "9780000000001",
-            "title": "Test [Book]",
-            "author": "Author",
-            "publication_year": 2020,
-        },
-    ]
-    records = []
-
-    # Invalid regex pattern (unclosed bracket)
-    results = search_books(books, records, "[", is_regex=True)
-    # Should fall back to literal search and find the book
-    assert len(results) == 1
