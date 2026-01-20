@@ -142,8 +142,61 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         return None
 
 
+def _isbn13_to_isbn10(isbn13: str) -> Optional[str]:
+    """Convert ISBN-13 to ISBN-10 if possible."""
+    if not isbn13.startswith("978") or len(isbn13) != 13:
+        return None
+
+    # Use first 9 digits of the ISBN-13 (excluding 978 prefix)
+    core = isbn13[3:12]
+
+    # Calculate checksum
+    total = 0
+    for i, digit in enumerate(core):
+        total += int(digit) * (10 - i)
+
+    remainder = total % 11
+    check_digit = 11 - remainder
+    if check_digit == 10:
+        check_char = "X"
+    elif check_digit == 11:
+        check_char = "0"
+    else:
+        check_char = str(check_digit)
+
+    return core + check_char
+
+
+def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
+    """Helper to lookup cover via Amazon image system.
+
+    Amazon often has covers even if others don't, accessible via ISBN-10.
+    Returns: URL string or None.
+    """
+    isbn10 = _isbn13_to_isbn10(isbn13)
+    if not isbn10:
+        return None
+
+    # URL pattern for Amazon images
+    url = f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.01.LZZZZZZZ.jpg"
+
+    try:
+        response = requests.get(url, timeout=5)
+        # Amazon returns 200 OK even for missing images (usually a 1x1 pixel gif)
+        # A real cover should be at least a few hundred bytes.
+        # We'll use a conservative threshold of 100 bytes.
+        if response.status_code == 200 and len(response.content) > 100:
+            return url
+    except Exception:
+        pass
+
+    return None
+
+
 def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
-    """Lookup a book by ISBN-13 using Open Library, then Google Books, then iTunes as fallback.
+    """Lookup a book by ISBN-13 using Open Library, Google Books, then iTunes.
+
+    If metadata is found but no cover, attempts to fetch cover from Amazon.
 
     Returns a dict with keys: title, author, publish_date, thumbnail_url, or None if not found.
     """
@@ -162,6 +215,17 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
     if itunes_result and itunes_result.get("thumbnail_url"):
         return itunes_result
 
-    # If all failed (or had no covers), return the first non-None result in order of preference
-    # to at least give metadata if possible.
-    return ol_result or gb_result or itunes_result
+    # If we reached here, we have no result with a cover.
+    # Pick the best available metadata to augment.
+    best_result = ol_result or gb_result or itunes_result
+
+    if best_result:
+        # 4. Amazon (Cover only)
+        # If we have valid metadata types but missing cover, try Amazon
+        amazon_cover = _lookup_amazon_cover(isbn13)
+        if amazon_cover:
+            best_result["thumbnail_url"] = amazon_cover
+
+        return best_result
+
+    return None
