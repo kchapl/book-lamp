@@ -221,25 +221,41 @@ def list_books():
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
-    # Attach records to books
-    for book in books:
-        book["reading_records"] = [r for r in all_records if r["book_id"] == book["id"]]
-        # Sort records by start_date descending (most recent first)
-        book["reading_records"].sort(
+    # Create a dictionary mapping book_id to records for O(1) lookup
+    records_by_book = {}
+    for record in all_records:
+        book_id = record["book_id"]
+        if book_id not in records_by_book:
+            records_by_book[book_id] = []
+        records_by_book[book_id].append(record)
+
+    # Sort records for each book by start_date descending (most recent first)
+    for book_id in records_by_book:
+        records_by_book[book_id].sort(
             key=lambda r: r.get("start_date", ""), reverse=True
         )
+
+    # Attach records to books and prepare for sorting
+    # We only need the most recent record for sorting, so we don't attach all records
+    for book in books:
+        book_records = records_by_book.get(book["id"], [])
+        # Store only the most recent record for sorting (we don't display records in list view)
+        book["_most_recent_record"] = book_records[0] if book_records else None
 
     # Sort books by the start date of their most recent reading record (reverse chronological)
     # If never read, fall back to created_at
     def get_sort_key(book):
-        if book["reading_records"]:
-            # records are now sorted descending, so first one is most recent
-            return book["reading_records"][0].get("start_date", "")
+        if book.get("_most_recent_record"):
+            return book["_most_recent_record"].get("start_date", "")
         return book.get("created_at", "")
 
     books.sort(key=get_sort_key, reverse=True)
-    today = datetime.date.today().isoformat()
-    return render_template("books.html", books=books, today=today)
+
+    # Clean up temporary sorting data
+    for book in books:
+        book.pop("_most_recent_record", None)
+
+    return render_template("books.html", books=books)
 
 
 @app.route("/books/search", methods=["GET"])
@@ -253,17 +269,33 @@ def search_books():
 
     try:
         books = storage.search(query)
-        today = datetime.date.today().isoformat()
         return render_template(
             "books.html",
             books=books,
-            today=today,
             search_query=query,
         )
     except Exception as e:
         app.logger.error(f"Search failed: {str(e)}")
         flash(f"Search error: {str(e)}", "error")
         return redirect(url_for("list_books"))
+
+
+@app.route("/books/<int:book_id>", methods=["GET"])
+@login_required
+def book_detail(book_id: int):
+    book = storage.get_book_by_id(book_id)
+    if not book:
+        flash("Book not found.", "error")
+        return redirect(url_for("list_books"))
+
+    # Get reading records for this book
+    all_records = storage.get_reading_records()
+    book["reading_records"] = [r for r in all_records if r["book_id"] == book_id]
+    # Sort records by start_date descending (most recent first)
+    book["reading_records"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
+
+    today = datetime.date.today().isoformat()
+    return render_template("book_detail.html", book=book, today=today)
 
 
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
@@ -276,7 +308,7 @@ def create_reading_record(book_id: int):
 
     if not status or not start_date:
         flash("Status and start date are required.", "error")
-        return redirect(url_for("list_books"))
+        return redirect(url_for("book_detail", book_id=book_id))
 
     storage.add_reading_record(
         book_id=book_id,
@@ -286,7 +318,7 @@ def create_reading_record(book_id: int):
         rating=rating,
     )
     flash("Reading record added.", "success")
-    return redirect(url_for("list_books"))
+    return redirect(url_for("book_detail", book_id=book_id))
 
 
 @app.route("/books", methods=["POST"])
