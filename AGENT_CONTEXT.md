@@ -39,7 +39,10 @@ This file provides shared context and guardrails for Cursor and other AI agents 
   - Early returns; handle errors and edge cases first.
   - Keep functions small; prefer pure helpers for logic.
   - Do not add comments for the obvious; document "why" more than "how".
-  - css should be in a separate file to html
+- **Frontend standards**:
+  - **Separation of Concerns**: Keep CSS and JavaScript in dedicated files in `book_lamp/static/`. 
+  - **CSS**: Avoid inline styles and `<style>` blocks in HTML templates. Use `base.css` for global styles and specific files (e.g., `books.css`) for page-specific styles.
+  - **HTML**: Templates should focus on structure and Jinja2 logic only.
 - **Structure**:
   - Keep Flask routes thin; delegate to services/use-cases (pure where possible).
   - Use adapters/gateways for Google Sheets and external APIs; keep their interfaces narrow.
