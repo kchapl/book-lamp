@@ -57,7 +57,7 @@
 <div class="grid">
     {% for book in books %}
     <div class="book-card">
-        <div class="thumb-container">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container" style="text-decoration: none; color: inherit;">
             {% if book.thumbnail_url %}
             <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
             {% else %}
@@ -65,111 +65,19 @@
                 style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 2rem;">
                 📖</div>
             {% endif %}
-        </div>
+        </a>
         <div class="meta">
-            <div class="title" title="{{ book.title }}">{{ book.title }}</div>
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+                <div class="title" title="{{ book.title }}">{{ book.title }}</div>
+            </a>
             <div class="author">{{ book.author }}</div>
-            {% if book.series %}
-            <div style="font-size: 0.85rem; color: #60a5fa; font-style: italic; margin-bottom: 0.25rem;">Series: {{
-                book.series }}</div>
-            {% endif %}
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div class="book-meta-summary">
                 {% if book.publication_year %}
-                <div class="year" style="margin-bottom: 0;">{{ book.publication_year }}</div>
+                <div class="year">{{ book.publication_year }}</div>
                 {% endif %}
                 {% if book.publisher %}
-                <div class="year" style="margin-bottom: 0;">• {{ book.publisher }}</div>
+                <div class="year">{{ book.publisher }}</div>
                 {% endif %}
-                {% if book.dewey_decimal %}
-                <div
-                    style="font-size: 0.8rem; background: rgba(255, 255, 255, 0.1); padding: 0 4px; border-radius: 4px; color: var(--text-muted);">
-                    {{ book.dewey_decimal }}</div>
-                {% endif %}
-            </div>
-            <div class="isbn">ISBN: {{ book.isbn13 }}</div>
-            {% if book.description %}
-            <div style="font-size: 0.8rem; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 0.5rem; line-height: 1.4;"
-                title="{{ book.description }}">
-                {{ book.description }}
-            </div>
-            {% endif %}
-
-            <div class="reading-history">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-size: 0.85rem; font-weight: bold;">Reading History</span>
-                    <button class="add-record-toggle" onclick="toggleForm('{{ book.id }}')">Add Record</button>
-                </div>
-
-                <div id="form-{{ book.id }}" class="add-record-form">
-                    <form method="post" action="{{ url_for('create_reading_record', book_id=book.id) }}">
-                        <div class="form-group">
-                            <label>Status</label>
-                            <select name="status" onchange="updateDateLabels('{{ book.id }}', this.value)" required>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Completed">Completed</option>
-                                <option value="Abandoned">Abandoned</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Start Date</label>
-                            <input type="date" name="start_date" value="{{ today }}" required>
-                        </div>
-                        <div class="form-group" id="end-date-group-{{ book.id }}" style="display: none;">
-                            <label id="end-date-label-{{ book.id }}">End Date</label>
-                            <input type="date" name="end_date">
-                        </div>
-                        <div class="form-group">
-                            <label>Rating (1-5)</label>
-                            <select name="rating">
-                                <option value="0">No Rating</option>
-                                <option value="1">1 Star</option>
-                                <option value="2">2 Stars</option>
-                                <option value="3">3 Stars</option>
-                                <option value="4">4 Stars</option>
-                                <option value="5">5 Stars</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button type="submit" class="btn btn-small">Save</button>
-                            <button type="button" class="btn btn-small"
-                                style="background: transparent; border: 1px solid var(--glass-border);"
-                                onclick="toggleForm('{{ book.id }}')">Cancel</button>
-                        </div>
-                    </form>
-                </div>
-
-                {% if book.reading_records %}
-                {% for record in book.reading_records %}
-                <div class="record-item">
-                    <span class="status-badge status-{{ record.status.lower().replace(' ', '-') }}">
-                        {{ record.status }}
-                    </span>
-                    {% if record.rating > 0 %}
-                    <span class="stars">
-                        {% for _ in range(record.rating) %}★{% endfor %}
-                        {% for _ in range(5 - record.rating) %}☆{% endfor %}
-                    </span>
-                    {% endif %}
-                    <div class="record-dates">
-                        <span class="record-date-item">Began: {{ record.start_date }}</span>
-                        {% if record.status == 'Completed' and record.end_date %}
-                        <span class="record-date-item">Completed: {{ record.end_date }}</span>
-                        {% elif record.status == 'Abandoned' and record.end_date %}
-                        <span class="record-date-item">Abandoned: {{ record.end_date }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-                {% else %}
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">No reading history yet.</p>
-                {% endif %}
-            </div>
-
-            <div class="actions">
-                <form method="post" action="{{ url_for('delete_book', book_id=book.id) }}"
-                    onsubmit="return confirm('Remove this book from your library?');">
-                    <button class="btn-delete" type="submit">Delete</button>
-                </form>
             </div>
         </div>
     </div>
@@ -194,33 +102,4 @@
 {% endif %}
 {% endif %}
 
-<script>
-    function toggleForm(bookId) {
-        const form = document.getElementById(`form-${bookId}`);
-        if (form.style.display === 'block') {
-            form.style.display = 'none';
-        } else {
-            form.style.display = 'block';
-        }
-    }
-
-    function updateDateLabels(bookId, status) {
-        const endGroup = document.getElementById(`end-date-group-${bookId}`);
-        const endLabel = document.getElementById(`end-date-label-${bookId}`);
-        const endInput = endGroup.querySelector('input');
-
-        if (status === 'Completed') {
-            endGroup.style.display = 'block';
-            endLabel.textContent = 'Completion Date';
-            endInput.required = true;
-        } else if (status === 'Abandoned') {
-            endGroup.style.display = 'block';
-            endLabel.textContent = 'Abandoned Date';
-            endInput.required = true;
-        } else {
-            endGroup.style.display = 'none';
-            endInput.required = false;
-        }
-    }
-</script>
 {% endblock %}
