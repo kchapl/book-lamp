@@ -19,7 +19,12 @@ from flask import (  # noqa: E402
 from book_lamp.services import sheets_storage as from_sheets_storage
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
-from book_lamp.utils import is_valid_isbn13, parse_publication_year
+from book_lamp.utils import (
+    SORT_OPTIONS,
+    is_valid_isbn13,
+    parse_publication_year,
+    sort_books,
+)
 from book_lamp.utils.libib_import import parse_libib_csv
 
 load_dotenv()
@@ -221,41 +226,17 @@ def list_books():
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
-    # Create a dictionary mapping book_id to records for O(1) lookup
-    records_by_book = {}
-    for record in all_records:
-        book_id = record["book_id"]
-        if book_id not in records_by_book:
-            records_by_book[book_id] = []
-        records_by_book[book_id].append(record)
+    # Get sort parameter from query string (default to reading_date)
+    sort_by = request.args.get("sort", "reading_date")
+    if sort_by not in SORT_OPTIONS:
+        sort_by = "reading_date"
 
-    # Sort records for each book by start_date descending (most recent first)
-    for book_id in records_by_book:
-        records_by_book[book_id].sort(
-            key=lambda r: r.get("start_date", ""), reverse=True
-        )
+    # Sort books using the selected method
+    books = sort_books(books, sort_by=sort_by, reading_records=all_records)
 
-    # Attach records to books and prepare for sorting
-    # We only need the most recent record for sorting, so we don't attach all records
-    for book in books:
-        book_records = records_by_book.get(book["id"], [])
-        # Store only the most recent record for sorting (we don't display records in list view)
-        book["_most_recent_record"] = book_records[0] if book_records else None
-
-    # Sort books by the start date of their most recent reading record (reverse chronological)
-    # If never read, fall back to created_at
-    def get_sort_key(book):
-        if book.get("_most_recent_record"):
-            return book["_most_recent_record"].get("start_date", "")
-        return book.get("created_at", "")
-
-    books.sort(key=get_sort_key, reverse=True)
-
-    # Clean up temporary sorting data
-    for book in books:
-        book.pop("_most_recent_record", None)
-
-    return render_template("books.html", books=books)
+    return render_template(
+        "books.html", books=books, sort_by=sort_by, sort_options=SORT_OPTIONS
+    )
 
 
 @app.route("/books/search", methods=["GET"])
@@ -267,12 +248,25 @@ def search_books():
         flash("Please enter a search query.", "info")
         return redirect(url_for("list_books"))
 
+    # Get sort parameter from query string (default to relevance/score)
+    sort_by = request.args.get("sort", "relevance")
+    if sort_by not in SORT_OPTIONS and sort_by != "relevance":
+        sort_by = "relevance"
+
     try:
         books = storage.search(query)
+        all_records = storage.get_reading_records()
+
+        # If not sorting by relevance, apply the selected sort
+        if sort_by != "relevance":
+            books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+
         return render_template(
             "books.html",
             books=books,
             search_query=query,
+            sort_by=sort_by,
+            sort_options=SORT_OPTIONS,
         )
     except Exception as e:
         app.logger.error(f"Search failed: {str(e)}")

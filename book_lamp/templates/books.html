@@ -53,6 +53,26 @@
     {% endif %}
 </div>
 
+<!-- Sort Controls -->
+{% if sort_options %}
+<div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <label for="sort-select" style="color: var(--text-muted); font-size: 0.9rem; white-space: nowrap;">Sort by:</label>
+    <form method="get" action="{{ url_for('list_books' if not search_query else 'search_books') }}" style="display: inline-block;" id="sort-form">
+        {% if search_query %}
+        <input type="hidden" name="q" value="{{ search_query }}">
+        {% endif %}
+        <select name="sort" id="sort-select" onchange="this.form.submit()">
+            {% if search_query %}
+            <option value="relevance" {% if sort_by == 'relevance' %}selected{% endif %}>Relevance</option>
+            {% endif %}
+            {% for key, (label, _) in sort_options.items() %}
+            <option value="{{ key }}" {% if sort_by == key %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endif %}
+
 {% if books %}
 <div class="grid">
     {% for book in books %}

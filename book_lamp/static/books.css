@@ -221,6 +221,36 @@
     font-size: 0.8rem;
 }
 
+/* Sort dropdown styling */
+#sort-select {
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.2em;
+}
+
+#sort-select option {
+    background: #1e293b;
+    color: #f8fafc;
+    padding: 0.5rem;
+}
+
+#sort-select:focus {
+    outline: 2px solid var(--primary-light);
+    outline-offset: 2px;
+    border-color: var(--primary-light);
+}
+
 .btn-small {
     padding: 4px 12px;
     font-size: 0.75rem;
