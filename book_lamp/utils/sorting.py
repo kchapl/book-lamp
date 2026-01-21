@@ -243,8 +243,12 @@ def sort_by_reading_date(
     def sort_key(book: Dict[str, Any]) -> str:
         book_id = book.get("id")
         if book_id and book_id in records_by_book:
-            return records_by_book[book_id].get("start_date", "") or ""
-        return book.get("created_at", "") or ""
+            start_date = records_by_book[book_id].get("start_date", "")
+            # Only use start_date if it's non-empty, otherwise fall back to created_at
+            if start_date:
+                return str(start_date)
+        created_at = book.get("created_at", "")
+        return str(created_at) if created_at else ""
 
     return sorted(books, key=sort_key, reverse=reverse)
 
