@@ -9,8 +9,8 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import skill_logger
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add script's directory (.agent/) to path to import skill_logger
+sys.path.insert(0, str(Path(__file__).parent))
 
 # Import directly from the same directory
 from skill_logger import get_recent_skill_usage, get_skill_statistics
