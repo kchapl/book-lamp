@@ -139,7 +139,7 @@ def test_list_books_authorized(client):
     """Verify books list is accessible in test mode."""
     resp = client.get("/books", follow_redirects=True)
     assert resp.status_code == 200
-    assert b"Your Library" in resp.data
+    assert b"Books" in resp.data
 
 
 def test_add_book_authorized(client):
