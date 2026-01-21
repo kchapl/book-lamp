@@ -28,18 +28,18 @@
 <div style="margin-bottom: 2rem;">
     <form method="get" action="{{ url_for('search_books') }}"
         style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 300px; position: relative;">
+        <div style="flex: 1; min-width: 0; position: relative; width: 100%;">
             <input type="text" name="q" placeholder="Search books, authors, ISBN, series..."
                 value="{{ search_query if search_query else '' }}"
-                style="width: 100%; padding: 0.75rem 1rem; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; color: white; font-size: 0.95rem;"
+                style="width: 100%; padding: 0.75rem 1rem; {% if search_query %}padding-right: 2.5rem; {% endif %}background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; color: white; font-size: 0.95rem; box-sizing: border-box;"
                 onkeypress="if(event.key === 'Enter') { event.preventDefault(); this.form.submit(); }" required>
             {% if search_query %}
             <a href="{{ url_for('list_books') }}"
-                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 1.2rem; cursor: pointer;"
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 1.2rem; cursor: pointer; z-index: 1;"
                 title="Clear search">✕</a>
             {% endif %}
         </div>
-        <button type="submit" class="btn" style="padding: 0.75rem 1.5rem;">
+        <button type="submit" class="btn" style="padding: 0.75rem 1.5rem; flex-shrink: 0; min-width: fit-content; white-space: nowrap;">
             🔍 Search
         </button>
     </form>
@@ -150,14 +150,14 @@
                         {% for _ in range(5 - record.rating) %}☆{% endfor %}
                     </span>
                     {% endif %}
-                    <span class="record-dates">
-                        Began: {{ record.start_date }}
+                    <div class="record-dates">
+                        <span class="record-date-item">Began: {{ record.start_date }}</span>
                         {% if record.status == 'Completed' and record.end_date %}
-                        | Completed: {{ record.end_date }}
+                        <span class="record-date-item">Completed: {{ record.end_date }}</span>
                         {% elif record.status == 'Abandoned' and record.end_date %}
-                        | Abandoned: {{ record.end_date }}
+                        <span class="record-date-item">Abandoned: {{ record.end_date }}</span>
                         {% endif %}
-                    </span>
+                    </div>
                 </div>
                 {% endfor %}
                 {% else %}
