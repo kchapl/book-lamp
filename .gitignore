@@ -220,3 +220,7 @@ node_modules/
 # Playwright
 playwright-report/
 test-results/
+
+# Agent skill usage logs
+.agent/skill_usage.log
+.agent/skill_usage.json
