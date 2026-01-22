@@ -1,6 +1,9 @@
+import calendar
 import datetime
 import logging
 import os
+import re
+from collections import Counter
 from functools import wraps
 from typing import Any
 
@@ -272,6 +275,147 @@ def search_books():
         app.logger.error(f"Search failed: {str(e)}")
         flash(f"Search error: {str(e)}", "error")
         return redirect(url_for("list_books"))
+
+
+@app.route("/stats", methods=["GET"])
+@login_required
+def collection_stats():
+    books = storage.get_all_books()
+    all_records = storage.get_reading_records()
+
+    total_books = len(books)
+    total_records = len(all_records)
+
+    # Average rating - derived from all reading records with a rating > 0
+    valid_ratings = []
+    for r in all_records:
+        rating_val = r.get("rating")
+        try:
+            if rating_val and int(rating_val) > 0:
+                valid_ratings.append(int(rating_val))
+        except (ValueError, TypeError):
+            continue
+    avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
+
+    # Map book statuses from latest records
+    # Create mapping of book_id to its most recent reading record
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") > latest_records[
+                bid
+            ].get("start_date", ""):
+                latest_records[bid] = r
+
+    # Status counts - include a 'Not begun' category for books without records
+    statuses = []
+    for b in books:
+        bid = b.get("id")
+        if bid in latest_records:
+            statuses.append(latest_records[bid].get("status", "Unknown"))
+        else:
+            statuses.append("Not begun")
+    status_counts = Counter(statuses)
+
+    # Top authors
+    all_authors = []
+    for b in books:
+        if b.get("authors"):
+            all_authors.extend(b["authors"])
+        elif b.get("author"):
+            all_authors.append(b["author"])
+
+    total_authors = len(set(all_authors))
+    top_authors = Counter(all_authors).most_common(5)
+
+    # Completed Books by Year and Month
+    completed_records = [
+        r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
+    ]
+
+    # Yearly counts
+    yearly_counts = Counter()
+    for r in completed_records:
+        date_str = r.get("end_date", "")
+        if date_str and len(date_str) >= 4:
+            year = date_str[:4]
+            if year.isdigit():
+                yearly_counts[year] += 1
+
+    # Sort years numerically
+    sorted_years = sorted(yearly_counts.items())
+    max_year_count = max(yearly_counts.values()) if yearly_counts else 1
+    avg_year_count = (
+        sum(yearly_counts.values()) / len(yearly_counts) if yearly_counts else 0
+    )
+
+    # Monthly counts (seasonal distribution)
+    monthly_counts = Counter()
+    for r in completed_records:
+        date_str = r.get("end_date", "")
+        if date_str and len(date_str) >= 7:
+            month_idx = date_str[5:7]
+            if month_idx.isdigit():
+                monthly_counts[month_idx] += 1
+
+    # Map to month names
+    ordered_months = []
+    for i in range(1, 13):
+        idx = f"{i:02d}"
+        name = calendar.month_name[i][:3]
+        ordered_months.append((name, monthly_counts[idx]))
+
+    max_month_count = max(monthly_counts.values()) if monthly_counts else 1
+    avg_month_count = sum(monthly_counts.values()) / 12
+
+    # Dewey Distribution
+    DEWEY_LABELS = {
+        "0": "000 General",
+        "1": "100 Philo",
+        "2": "200 Rel",
+        "3": "300 Soc Sci",
+        "4": "400 Lang",
+        "5": "500 Sci",
+        "6": "600 Tech",
+        "7": "700 Arts",
+        "8": "800 Lit",
+        "9": "900 Hist",
+    }
+
+    dewey_bins = Counter()
+    for b in books:
+        ddc = b.get("dewey_decimal")
+        if ddc:
+            # Match first digit of a numeric DDC
+            match = re.search(r"\b(\d)", str(ddc))
+            if match:
+                digit = match.group(1)
+                dewey_bins[DEWEY_LABELS.get(digit, "Other")] += 1
+
+    # Ensure all labels present for chart
+    dewey_distribution = {label: dewey_bins[label] for label in DEWEY_LABELS.values()}
+    max_dewey_count = (
+        max(dewey_distribution.values()) if dewey_distribution.values() else 1
+    )
+
+    return render_template(
+        "stats.html",
+        total_books=total_books,
+        total_authors=total_authors,
+        total_records=total_records,
+        avg_rating=avg_rating,
+        status_counts=status_counts,
+        top_authors=top_authors,
+        dewey_distribution=dewey_distribution,
+        max_dewey_count=max_dewey_count,
+        yearly_counts=sorted_years,
+        max_year_count=max_year_count,
+        avg_year_count=avg_year_count,
+        monthly_counts=ordered_months,
+        max_month_count=max_month_count,
+        avg_month_count=avg_month_count,
+    )
 
 
 @app.route("/books/<int:book_id>", methods=["GET"])

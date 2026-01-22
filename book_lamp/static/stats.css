@@ -1,0 +1,338 @@
+.stats-header {
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-light);
+}
+
+.stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to bottom, #fff, #94a3b8);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+.chart-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 2rem;
+}
+
+.chart-card.wide {
+    grid-column: span 2;
+}
+
+.chart-card h3 {
+    margin-top: 0;
+    margin-bottom: 2rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Reading Progress Bars */
+.progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.progress-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.label-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 140px;
+    flex-shrink: 0;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-dot.completed {
+    background: #10b981;
+}
+
+.status-dot.in-progress {
+    background: #3b82f6;
+}
+
+.status-dot.abandoned {
+    background: #ef4444;
+}
+
+.status-dot.not-begun {
+    background: #6b7280;
+}
+
+.status-name {
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.bar-wrapper {
+    flex-grow: 1;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 1s ease-out;
+}
+
+.bar.completed {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.bar.in-progress {
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.bar.abandoned {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.bar.not-begun {
+    background: linear-gradient(90deg, #6b7280, #9ca3af);
+}
+
+.count {
+    font-weight: 600;
+    width: 30px;
+    text-align: right;
+}
+
+/* Top List */
+.top-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.list-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rank {
+    width: 30px;
+    height: 30px;
+    background: var(--primary);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-right: 1.25rem;
+}
+
+.item-name {
+    flex-grow: 1;
+    font-weight: 500;
+}
+
+.item-value {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Timeline & Dewey Grids */
+.timeline-grid,
+.dewey-grid {
+    display: flex;
+    justify-content: space-between;
+    height: 180px;
+    align-items: flex-end;
+    gap: 0.5rem;
+    padding-top: 2rem;
+    position: relative;
+}
+
+.marker-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-top: 2px dashed rgba(255, 255, 255, 0.2);
+    z-index: 5;
+    pointer-events: all;
+    transition: border-color 0.3s;
+}
+
+.marker-line:hover {
+    border-top-color: var(--primary-light);
+}
+
+.marker-tooltip {
+    position: absolute;
+    right: 0;
+    top: -25px;
+    background: var(--primary-light);
+    color: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.marker-line:hover .marker-tooltip {
+    opacity: 1;
+}
+
+.dewey-grid {
+    height: 250px;
+}
+
+.timeline-item,
+.dewey-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+
+.timeline-bar-container,
+.dewey-bar-container {
+    flex-grow: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+}
+
+.timeline-bar,
+.dewey-bar {
+    width: 80%;
+    background: linear-gradient(to top, var(--primary), var(--primary-light));
+    border-radius: 6px 6px 0 0;
+    position: relative;
+    transition: height 1s ease-out;
+}
+
+.timeline-bar.month {
+    background: linear-gradient(to top, #3b82f6, #60a5fa);
+}
+
+.timeline-bar:hover,
+.dewey-bar:hover {
+    filter: brightness(1.2);
+}
+
+.count-tooltip {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.timeline-bar:hover .count-tooltip,
+.dewey-bar:hover .count-tooltip {
+    opacity: 1;
+}
+
+.timeline-label,
+.dewey-label {
+    margin-top: 1rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+}
+
+.stats-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+@media (max-width: 900px) {
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card.wide {
+        grid-column: span 1;
+    }
+
+    .dewey-grid {
+        gap: 0.5rem;
+    }
+
+    .dewey-label {
+        font-size: 0.6rem;
+    }
+}
