@@ -311,12 +311,24 @@ class GoogleSheetsStorage:
                 name_to_id[name] = max_aid
 
         if new_authors:
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="Authors!A:B",
-                valueInputOption="RAW",
-                body={"values": new_authors},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="Authors!A:B",
+                    valueInputOption="RAW",
+                    body={"values": new_authors},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="Authors!A:B",
+                        valueInputOption="RAW",
+                        body={"values": new_authors},
+                    ).execute()
+                else:
+                    raise
 
         # 3. Update BookAuthors links
         all_links = self.get_book_authors()
@@ -328,12 +340,24 @@ class GoogleSheetsStorage:
         ]
 
         if links_to_add:
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="BookAuthors!A:B",
-                valueInputOption="RAW",
-                body={"values": links_to_add},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="BookAuthors!A:B",
+                    valueInputOption="RAW",
+                    body={"values": links_to_add},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="BookAuthors!A:B",
+                        valueInputOption="RAW",
+                        body={"values": links_to_add},
+                    ).execute()
+                else:
+                    raise
 
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
@@ -532,11 +556,16 @@ class GoogleSheetsStorage:
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
+                    # Sync authors
+                    self._sync_book_authors(sid, book_id, author)
+                    from book_lamp.utils.authors import split_authors
+
                     return {
                         "id": book_id,
                         "isbn13": isbn13,
                         "title": title,
                         "author": author,
+                        "authors": split_authors(author),
                         "publication_year": publication_year,
                         "thumbnail_url": thumbnail_url,
                         "created_at": created_at,

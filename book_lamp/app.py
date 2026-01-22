@@ -372,6 +372,7 @@ def create_book():
         thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
         publisher=data.get("publisher"),
         description=data.get("description"),
+        dewey_decimal=data.get("dewey_decimal"),
     )
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
@@ -414,6 +415,8 @@ def fetch_missing_data():
             missing_fields.append("publisher")
         if is_empty(b.get("description")):
             missing_fields.append("description")
+        if is_empty(b.get("dewey_decimal")):
+            missing_fields.append("dewey_decimal")
 
         if missing_fields:
             candidates.append(b)
@@ -493,6 +496,14 @@ def fetch_missing_data():
                 populated_fields.append("description")
                 has_updates = True
 
+            if is_empty(updated_book.get("dewey_decimal")) and info.get(
+                "dewey_decimal"
+            ):
+                updated_book["dewey_decimal"] = info["dewey_decimal"]
+                found_fields.append("dewey_decimal")
+                populated_fields.append("dewey_decimal")
+                has_updates = True
+
             # Log what was found in the lookup (even if we couldn't use it)
             all_found = []
             if info.get("thumbnail_url"):
@@ -507,6 +518,8 @@ def fetch_missing_data():
                 all_found.append("publisher")
             if info.get("description"):
                 all_found.append("description")
+            if info.get("dewey_decimal"):
+                all_found.append("dewey_decimal")
 
             if all_found:
                 app.logger.info(

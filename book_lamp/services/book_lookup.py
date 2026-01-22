@@ -41,6 +41,9 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         publisher_name = first_pub.get("name")
 
     description = data.get("notes")
+    classifications = data.get("classifications") or {}
+    dewey_list = classifications.get("dewey_decimal_class") or []
+    dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
 
     thumbnail_url = None
     cover = data.get("cover") or {}
@@ -56,6 +59,7 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
             html.unescape(publisher_name) if publisher_name else publisher_name
         ),
         "description": html.unescape(description) if description else description,
+        "dewey_decimal": dewey,
     }
 
 
@@ -97,6 +101,7 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
             "thumbnail_url": thumbnail_url,
             "publisher": (html.unescape(publisher) if publisher else publisher),
             "description": html.unescape(description) if description else description,
+            "dewey_decimal": None,  # Google Books doesn't reliably provide DDC in the public API
         }
     except Exception:
         return None
@@ -137,6 +142,7 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
             "thumbnail_url": thumbnail_url,
             "publisher": None,  # iTunes often doesn't give publisher easily in this endpoint
             "description": html.unescape(description) if description else description,
+            "dewey_decimal": None,
         }
     except Exception:
         return None

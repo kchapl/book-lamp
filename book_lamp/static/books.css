@@ -82,10 +82,25 @@
 }
 
 .year,
-.isbn {
+.isbn,
+.dewey {
     color: var(--text-muted);
     font-size: 0.85rem;
     margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dewey::before {
+    content: "DDC";
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--primary-light);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .book-meta-summary {
