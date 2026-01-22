@@ -60,7 +60,7 @@
             {% for author, count in top_authors %}
             <div class="list-item">
                 <span class="rank">{{ loop.index }}</span>
-                <span class="item-name">{{ author }}</span>
+                <span class="item-name"><a href="{{ url_for('search_books', q=author) }}">{{ author }}</a></span>
                 <span class="item-value">{{ count }} books</span>
             </div>
             {% endfor %}
