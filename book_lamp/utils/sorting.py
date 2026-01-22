@@ -91,7 +91,11 @@ def sort_by_author(
     """
 
     def sort_key(book: Dict[str, Any]) -> Tuple[str, str, str]:
-        author = book.get("author", "") or ""
+        authors = book.get("authors", [])
+        if authors:
+            author = authors[0]
+        else:
+            author = book.get("author", "") or ""
         last_name, first_name = _parse_author_name(author)
         title = _normalise_title_for_sort(book.get("title", "") or "")
         return (last_name, first_name, title)
@@ -260,11 +264,11 @@ SortFunction = Union[
 ]
 
 SORT_OPTIONS: Dict[str, Tuple[str, SortFunction]] = {
-    "reading_date": ("Most Recently Read", sort_by_reading_date),
-    "date_added": ("Date Added", sort_by_date_added),
+    "reading_date": ("Most recently read", sort_by_reading_date),
+    "date_added": ("Date added", sort_by_date_added),
     "author": ("Author (A-Z)", sort_by_author),
     "title": ("Title (A-Z)", sort_by_title),
-    "year": ("Publication Year", sort_by_year),
+    "year": ("Publication year", sort_by_year),
     "dewey": ("Dewey Decimal", sort_by_dewey_decimal),
 }
 

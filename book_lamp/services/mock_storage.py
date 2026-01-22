@@ -41,11 +41,14 @@ class MockStorage:
         series=None,
         dewey_decimal=None,
     ):
+        from book_lamp.utils.authors import split_authors
+
         book = {
             "id": self.next_book_id,
             "isbn13": isbn13,
             "title": title,
             "author": author,
+            "authors": split_authors(author),
             "publication_year": publication_year,
             "thumbnail_url": thumbnail_url,
             "created_at": "2024-01-01T00:00:00",
@@ -71,6 +74,8 @@ class MockStorage:
         series=None,
         dewey_decimal=None,
     ):
+        from book_lamp.utils.authors import split_authors
+
         for book in self.books:
             if book["id"] == book_id:
                 book.update(
@@ -78,6 +83,7 @@ class MockStorage:
                         "isbn13": isbn13,
                         "title": title,
                         "author": author,
+                        "authors": split_authors(author),
                         "publication_year": publication_year,
                         "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),
                         "publisher": publisher or book.get("publisher"),

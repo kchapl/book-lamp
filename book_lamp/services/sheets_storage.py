@@ -22,6 +22,8 @@ class GoogleSheetsStorage:
     Expected sheet structure:
     - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at, publisher, description, series, dewey_decimal
     - 'ReadingRecords' tab: id, book_id, status, start_date, end_date, rating, created_at
+    - 'Authors' tab: id, name
+    - 'BookAuthors' tab: book_id, author_id
     """
 
     def __init__(self, sheet_name: str, credentials_path: str = "credentials.json"):
@@ -222,6 +224,117 @@ class GoogleSheetsStorage:
         except HttpError:
             return 1
 
+    def get_authors(self) -> List[Dict[str, Any]]:
+        """Retrieve all authors from the Authors tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Authors!A:B")
+                .execute()
+            )
+            values = result.get("values", [])
+            if not values or len(values) < 2:
+                return []
+
+            authors = []
+            for row in values[1:]:
+                if not row or not row[0].isdigit():
+                    continue
+                authors.append(
+                    {"id": int(row[0]), "name": row[1] if len(row) > 1 else ""}
+                )
+            return authors
+        except HttpError as error:
+            if error.resp.status == 400:
+                return []
+            raise Exception(f"Failed to fetch authors: {error}") from error
+
+    def get_book_authors(self) -> List[Dict[str, Any]]:
+        """Retrieve all book-author relationships."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="BookAuthors!A:B")
+                .execute()
+            )
+            values = result.get("values", [])
+            if not values or len(values) < 2:
+                return []
+
+            links = []
+            for row in values[1:]:
+                if not row or len(row) < 2:
+                    continue
+                try:
+                    bid = int(row[0]) if str(row[0]).isdigit() else None
+                    aid = int(row[1]) if str(row[1]).isdigit() else None
+                    if bid is not None and aid is not None:
+                        links.append({"book_id": bid, "author_id": aid})
+                except (ValueError, TypeError):
+                    continue
+            return links
+        except HttpError as error:
+            if error.resp.status == 400:
+                return []
+            raise Exception(f"Failed to fetch book authors: {error}") from error
+
+    def _sync_book_authors(self, sid: str, book_id: int, author_str: str) -> None:
+        """Sync Authors and BookAuthors tabs based on an author string."""
+        assert self.service is not None
+        from book_lamp.utils.authors import split_authors
+
+        names = split_authors(author_str)
+        if not names:
+            return
+
+        # 1. Fetch existing authors
+        all_authors = self.get_authors()
+        name_to_id = {a["name"]: a["id"] for a in all_authors}
+        max_aid = max([a["id"] for a in all_authors] + [0])
+
+        # 2. Identify new authors
+        new_authors = []
+        author_ids = []
+        for name in names:
+            if name in name_to_id:
+                author_ids.append(name_to_id[name])
+            else:
+                max_aid += 1
+                new_authors.append([max_aid, name])
+                author_ids.append(max_aid)
+                name_to_id[name] = max_aid
+
+        if new_authors:
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="Authors!A:B",
+                valueInputOption="RAW",
+                body={"values": new_authors},
+            ).execute()
+
+        # 3. Update BookAuthors links
+        all_links = self.get_book_authors()
+        existing_aids = {
+            link["author_id"] for link in all_links if link["book_id"] == book_id
+        }
+        links_to_add = [
+            [book_id, aid] for aid in author_ids if aid not in existing_aids
+        ]
+
+        if links_to_add:
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="BookAuthors!A:B",
+                valueInputOption="RAW",
+                body={"values": links_to_add},
+            ).execute()
+
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -238,7 +351,7 @@ class GoogleSheetsStorage:
                 return []
 
             headers = values[0]
-            books = []
+            books_raw = []
             for row in values[1:]:
                 if not row:
                     continue
@@ -259,8 +372,36 @@ class GoogleSheetsStorage:
                     "series": row[9] if len(row) > 9 else None,
                     "dewey_decimal": row[10] if len(row) > 10 else None,
                 }
-                books.append(book)
-            return books
+                books_raw.append(book)
+
+            # Fetch authors and links to join
+            authors_list = self.get_authors()
+            author_map = {a["id"]: a["name"] for a in authors_list}
+            links = self.get_book_authors()
+
+            # Map book_id to list of author names
+            book_authors_map = {}
+            for link in links:
+                bid = link["book_id"]
+                aid = link["author_id"]
+                if aid in author_map:
+                    if bid not in book_authors_map:
+                        book_authors_map[bid] = []
+                    book_authors_map[bid].append(author_map[aid])
+
+            from book_lamp.utils.authors import split_authors
+
+            final_books = []
+            for b in books_raw:
+                # If we have individual authors in BookAuthors, use them.
+                # Otherwise, split the legacy 'author' string.
+                if b["id"] in book_authors_map:
+                    b["authors"] = book_authors_map[b["id"]]
+                else:
+                    b["authors"] = split_authors(b["author"])
+                final_books.append(b)
+
+            return final_books
         except HttpError as error:
             raise Exception(f"Failed to fetch books: {error}") from error
 
@@ -362,11 +503,16 @@ class GoogleSheetsStorage:
                 body={"values": [row]},
             ).execute()
 
+            # Sync authors
+            self._sync_book_authors(sid, book_id, author)
+            from book_lamp.utils.authors import split_authors
+
             return {
                 "id": book_id,
                 "isbn13": isbn13,
                 "title": title,
                 "author": author,
+                "authors": split_authors(author),
                 "publication_year": publication_year,
                 "thumbnail_url": thumbnail_url,
                 "created_at": created_at,
@@ -491,11 +637,16 @@ class GoogleSheetsStorage:
                 body={"values": [row]},
             ).execute()
 
+            # Sync authors
+            self._sync_book_authors(sid, book_id, author)
+            from book_lamp.utils.authors import split_authors
+
             return {
                 "id": book_id,
                 "isbn13": isbn13,
                 "title": title,
                 "author": author,
+                "authors": split_authors(author),
                 "publication_year": publication_year,
                 "thumbnail_url": thumbnail_url,
                 "created_at": created_at,
@@ -605,11 +756,30 @@ class GoogleSheetsStorage:
                 if row[0].isdigit():
                     next_record_id = max(next_record_id, int(row[0]) + 1)
 
+        # 1.5 Fetch and process authors
+        all_authors = self.get_authors()
+        name_to_id = {a["name"]: a["id"] for a in all_authors}
+        next_author_id = max([a["id"] for a in all_authors] + [0]) + 1
+
+        all_links = self.get_book_authors()
+        # book_id -> set of author_ids
+        existing_links = {}
+        for link in all_links:
+            bid = link["book_id"]
+            aid = link["author_id"]
+            if bid not in existing_links:
+                existing_links[bid] = set()
+            existing_links[bid].add(aid)
+
         # 2. Process items
         books_to_update = []  # list of {"range": ..., "values": [[...]]}
         books_to_append = []
         records_to_append = []
+        authors_to_append = []
+        links_to_append = []
         import_count = 0
+
+        from book_lamp.utils.authors import split_authors
 
         for item in items:
             b = item["book"]
@@ -672,6 +842,26 @@ class GoogleSheetsStorage:
                     b.get("dewey_decimal") or "",
                 ]
                 books_to_append.append(new_row)
+
+            # Process authors for this book
+            names = split_authors(b["author"])
+            current_book_aids = existing_links.get(book_id, set())
+
+            for name in names:
+                if name not in name_to_id:
+                    aid = next_author_id
+                    next_author_id += 1
+                    name_to_id[name] = aid
+                    authors_to_append.append([aid, name])
+
+                aid = name_to_id[name]
+                if aid not in current_book_aids:
+                    links_to_append.append([book_id, aid])
+                    # Add to existing to prevent internal duplicates
+                    current_book_aids.add(aid)
+                    if book_id not in existing_links:
+                        existing_links[book_id] = set()
+                    existing_links[book_id].add(aid)
 
             if r:
                 # Robust deduplication:
@@ -740,6 +930,24 @@ class GoogleSheetsStorage:
                 range="ReadingRecords!A:G",
                 valueInputOption="RAW",
                 body={"values": records_to_append},
+            ).execute()
+
+        if authors_to_append:
+            # Batch append new authors
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="Authors!A:B",
+                valueInputOption="RAW",
+                body={"values": authors_to_append},
+            ).execute()
+
+        if links_to_append:
+            # Batch append new links
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="BookAuthors!A:B",
+                valueInputOption="RAW",
+                body={"values": links_to_append},
             ).execute()
 
         return import_count
@@ -905,6 +1113,30 @@ class GoogleSheetsStorage:
                     spreadsheetId=sid, body={"requests": [request]}
                 ).execute()
 
+            # Check if Authors tab exists
+            authors_exists = any(
+                sheet["properties"]["title"] == "Authors" for sheet in sheets
+            )
+
+            if not authors_exists:
+                # Create Authors tab
+                request = {"addSheet": {"properties": {"title": "Authors"}}}
+                self.service.spreadsheets().batchUpdate(
+                    spreadsheetId=sid, body={"requests": [request]}
+                ).execute()
+
+            # Check if BookAuthors tab exists
+            book_authors_exists = any(
+                sheet["properties"]["title"] == "BookAuthors" for sheet in sheets
+            )
+
+            if not book_authors_exists:
+                # Create BookAuthors tab
+                request = {"addSheet": {"properties": {"title": "BookAuthors"}}}
+                self.service.spreadsheets().batchUpdate(
+                    spreadsheetId=sid, body={"requests": [request]}
+                ).execute()
+
             # Add headers for Books if not present
             result = (
                 self.service.spreadsheets()
@@ -961,6 +1193,42 @@ class GoogleSheetsStorage:
                 self.service.spreadsheets().values().update(
                     spreadsheetId=sid,
                     range="ReadingRecords!A1:G1",
+                    valueInputOption="RAW",
+                    body={"values": headers},
+                ).execute()
+
+            # Add headers for Authors if not present
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Authors!A1:B1")
+                .execute()
+            )
+            values = result.get("values", [])
+
+            if not values:
+                headers = [["id", "name"]]
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range="Authors!A1:B1",
+                    valueInputOption="RAW",
+                    body={"values": headers},
+                ).execute()
+
+            # Add headers for BookAuthors if not present
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="BookAuthors!A1:B1")
+                .execute()
+            )
+            values = result.get("values", [])
+
+            if not values:
+                headers = [["book_id", "author_id"]]
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range="BookAuthors!A1:B1",
                     valueInputOption="RAW",
                     body={"values": headers},
                 ).execute()

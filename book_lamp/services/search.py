@@ -59,6 +59,29 @@ def calculate_relevance_score(
         if field in ["status", "rating", "dates"]:
             continue  # These are in reading records
 
+        if field == "author":
+            # Search both the legacy field and individual authors
+            authors = book.get("authors", [])
+            legacy_author = book.get("author")
+
+            matches_found = False
+            if legacy_author and matches(str(legacy_author), query):
+                score += weight
+                matches_found = True
+
+            for author in authors:
+                if matches(str(author), query):
+                    score += weight
+                    matches_found = True
+
+            # Bonus for exact match on any author
+            if matches_found:
+                if any(str(a).lower() == query.lower() for a in authors) or (
+                    legacy_author and str(legacy_author).lower() == query.lower()
+                ):
+                    score += weight * 0.5
+            continue
+
         value = book.get(field)
         if value and matches(str(value), query):
             score += weight
