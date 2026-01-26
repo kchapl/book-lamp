@@ -521,6 +521,10 @@ def create_book():
         publisher=data.get("publisher"),
         description=data.get("description"),
         dewey_decimal=data.get("dewey_decimal"),
+        language=data.get("language"),
+        page_count=data.get("page_count"),
+        physical_format=data.get("physical_format"),
+        edition=data.get("edition"),
     )
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
@@ -565,6 +569,14 @@ def fetch_missing_data():
             missing_fields.append("description")
         if is_empty(b.get("dewey_decimal")):
             missing_fields.append("dewey_decimal")
+        if is_empty(b.get("language")):
+            missing_fields.append("language")
+        if is_empty(b.get("page_count")):
+            missing_fields.append("page_count")
+        if is_empty(b.get("physical_format")):
+            missing_fields.append("physical_format")
+        if is_empty(b.get("edition")):
+            missing_fields.append("edition")
 
         if missing_fields:
             candidates.append(b)
@@ -652,6 +664,32 @@ def fetch_missing_data():
                 populated_fields.append("dewey_decimal")
                 has_updates = True
 
+            if is_empty(updated_book.get("language")) and info.get("language"):
+                updated_book["language"] = info["language"]
+                found_fields.append("language")
+                populated_fields.append("language")
+                has_updates = True
+
+            if is_empty(updated_book.get("page_count")) and info.get("page_count"):
+                updated_book["page_count"] = info["page_count"]
+                found_fields.append("page_count")
+                populated_fields.append("page_count")
+                has_updates = True
+
+            if is_empty(updated_book.get("physical_format")) and info.get(
+                "physical_format"
+            ):
+                updated_book["physical_format"] = info["physical_format"]
+                found_fields.append("physical_format")
+                populated_fields.append("physical_format")
+                has_updates = True
+
+            if is_empty(updated_book.get("edition")) and info.get("edition"):
+                updated_book["edition"] = info["edition"]
+                found_fields.append("edition")
+                populated_fields.append("edition")
+                has_updates = True
+
             # Log what was found in the lookup (even if we couldn't use it)
             all_found = []
             if info.get("thumbnail_url"):
@@ -668,6 +706,14 @@ def fetch_missing_data():
                 all_found.append("description")
             if info.get("dewey_decimal"):
                 all_found.append("dewey_decimal")
+            if info.get("language"):
+                all_found.append("language")
+            if info.get("page_count"):
+                all_found.append("page_count")
+            if info.get("physical_format"):
+                all_found.append("physical_format")
+            if info.get("edition"):
+                all_found.append("edition")
 
             if all_found:
                 app.logger.info(
