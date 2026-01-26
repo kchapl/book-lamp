@@ -40,6 +40,10 @@ class MockStorage:
         description=None,
         series=None,
         dewey_decimal=None,
+        language=None,
+        page_count=None,
+        physical_format=None,
+        edition=None,
     ):
         from book_lamp.utils.authors import split_authors
 
@@ -56,6 +60,10 @@ class MockStorage:
             "description": description,
             "series": series,
             "dewey_decimal": dewey_decimal,
+            "language": language,
+            "page_count": page_count,
+            "physical_format": physical_format,
+            "edition": edition,
         }
         self.books.append(book)
         self.next_book_id += 1
@@ -73,6 +81,10 @@ class MockStorage:
         description=None,
         series=None,
         dewey_decimal=None,
+        language=None,
+        page_count=None,
+        physical_format=None,
+        edition=None,
     ):
         from book_lamp.utils.authors import split_authors
 
@@ -90,6 +102,11 @@ class MockStorage:
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
                         "dewey_decimal": dewey_decimal or book.get("dewey_decimal"),
+                        "language": language or book.get("language"),
+                        "page_count": page_count or book.get("page_count"),
+                        "physical_format": physical_format
+                        or book.get("physical_format"),
+                        "edition": edition or book.get("edition"),
                     }
                 )
                 return book
@@ -106,6 +123,10 @@ class MockStorage:
         description=None,
         series=None,
         dewey_decimal=None,
+        language=None,
+        page_count=None,
+        physical_format=None,
+        edition=None,
     ):
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -120,6 +141,10 @@ class MockStorage:
                 description=description,
                 series=series,
                 dewey_decimal=dewey_decimal,
+                language=language,
+                page_count=page_count,
+                physical_format=physical_format,
+                edition=edition,
             )
         else:
             return self.add_book(
@@ -132,6 +157,10 @@ class MockStorage:
                 description=description,
                 series=series,
                 dewey_decimal=dewey_decimal,
+                language=language,
+                page_count=page_count,
+                physical_format=physical_format,
+                edition=edition,
             )
 
     def add_reading_record(self, book_id, status, start_date, end_date=None, rating=0):
@@ -170,6 +199,10 @@ class MockStorage:
                 description=book_data.get("description"),
                 series=book_data.get("series"),
                 dewey_decimal=book_data.get("dewey_decimal"),
+                language=book_data.get("language"),
+                page_count=book_data.get("page_count"),
+                physical_format=book_data.get("physical_format"),
+                edition=book_data.get("edition"),
             )
 
             if record_data:

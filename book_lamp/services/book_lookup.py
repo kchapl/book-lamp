@@ -1,12 +1,12 @@
 import html
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import requests
 
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 
 
-def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
+def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via Open Library."""
     params = {
         "bibkeys": f"ISBN:{isbn13}",
@@ -45,6 +45,16 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
     dewey_list = classifications.get("dewey_decimal_class") or []
     dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
 
+    # Edition info
+    page_count = data.get("number_of_pages")
+    physical_format = data.get("physical_format")
+    edition_name = data.get("edition_name")
+
+    languages = data.get("languages") or []
+    language = None
+    if languages and isinstance(languages, list):
+        language = languages[0].get("name")
+
     thumbnail_url = None
     cover = data.get("cover") or {}
     if isinstance(cover, dict):
@@ -60,10 +70,14 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         ),
         "description": html.unescape(description) if description else description,
         "dewey_decimal": dewey,
+        "page_count": page_count,
+        "language": language,
+        "physical_format": physical_format,
+        "edition": edition_name,
     }
 
 
-def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
+def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via Google Books API."""
     url = "https://www.googleapis.com/books/v1/volumes"
     params = {"q": f"isbn:{isbn13}"}
@@ -85,6 +99,12 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
         description = info.get("description")
         publisher = info.get("publisher")
 
+        # Edition info
+        page_count = info.get("pageCount")
+        language = info.get("language")
+        # Map ISO language codes to names if needed, but for now just the code
+        physical_format = info.get("printType")
+
         image_links = info.get("imageLinks", {})
         thumbnail_url = image_links.get("thumbnail") or image_links.get(
             "smallThumbnail"
@@ -101,13 +121,17 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
             "thumbnail_url": thumbnail_url,
             "publisher": (html.unescape(publisher) if publisher else publisher),
             "description": html.unescape(description) if description else description,
-            "dewey_decimal": None,  # Google Books doesn't reliably provide DDC in the public API
+            "dewey_decimal": None,
+            "page_count": page_count,
+            "language": language,
+            "physical_format": physical_format,
+            "edition": None,
         }
     except Exception:
         return None
 
 
-def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
+def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via iTunes Search API."""
     url = "https://itunes.apple.com/search"
     params = {"term": isbn13, "media": "ebook", "limit": "1"}
@@ -140,9 +164,13 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,
-            "publisher": None,  # iTunes often doesn't give publisher easily in this endpoint
+            "publisher": None,
             "description": html.unescape(description) if description else description,
             "dewey_decimal": None,
+            "page_count": None,
+            "language": None,
+            "physical_format": "Ebook",
+            "edition": None,
         }
     except Exception:
         return None
@@ -199,7 +227,7 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
     return None
 
 
-def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[str]]]:
+def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Lookup a book by ISBN-13 using Open Library, Google Books, then iTunes.
 
     If metadata is found but no cover, attempts to fetch cover from Amazon.

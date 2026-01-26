@@ -75,6 +75,17 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         description = get_val(["Description", "Notes"])
         series = get_val(["Series"])
         dewey_decimal = get_val(["DDC"])
+        language = get_val(["Language"])
+        page_count_str = get_val(["Page Count", "Pages"])
+        physical_format = get_val(["Physical Format", "Item Type"])
+        edition = get_val(["Edition"])
+
+        page_count = None
+        if page_count_str:
+            try:
+                page_count = int(re.sub(r"\D", "", page_count_str))
+            except (ValueError, TypeError):
+                page_count = None
 
         if not title or not isbn:
             continue
@@ -160,6 +171,10 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                     "description": description,
                     "series": series,
                     "dewey_decimal": dewey_decimal,
+                    "language": language,
+                    "page_count": page_count,
+                    "physical_format": physical_format,
+                    "edition": edition,
                 },
                 "record": (
                     {

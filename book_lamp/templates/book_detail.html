@@ -218,6 +218,30 @@
                     <span class="meta-value">{{ book.dewey_decimal }}</span>
                 </div>
                 {% endif %}
+                {% if book.language %}
+                <div class="meta-item">
+                    <span class="meta-label">Language:</span>
+                    <span class="meta-value">{{ book.language }}</span>
+                </div>
+                {% endif %}
+                {% if book.page_count %}
+                <div class="meta-item">
+                    <span class="meta-label">Pages:</span>
+                    <span class="meta-value">{{ book.page_count }}</span>
+                </div>
+                {% endif %}
+                {% if book.physical_format %}
+                <div class="meta-item">
+                    <span class="meta-label">Format:</span>
+                    <span class="meta-value">{{ book.physical_format }}</span>
+                </div>
+                {% endif %}
+                {% if book.edition %}
+                <div class="meta-item">
+                    <span class="meta-label">Edition:</span>
+                    <span class="meta-value">{{ book.edition }}</span>
+                </div>
+                {% endif %}
             </div>
 
             {% if book.description %}
