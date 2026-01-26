@@ -367,7 +367,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:K")
+                .get(spreadsheetId=sid, range="Books!A:O")
                 .execute()
             )
             values = result.get("values", [])
@@ -379,7 +379,7 @@ class GoogleSheetsStorage:
             for row in values[1:]:
                 if not row:
                     continue
-                # Pad row to match header length
+                # Pad row to match header length (now 15 columns)
                 row = row + [""] * (len(headers) - len(row))
                 book = {
                     "id": int(row[0]) if row[0] else 0,
@@ -395,6 +395,14 @@ class GoogleSheetsStorage:
                     "description": row[8] if len(row) > 8 else None,
                     "series": row[9] if len(row) > 9 else None,
                     "dewey_decimal": row[10] if len(row) > 10 else None,
+                    "language": row[11] if len(row) > 11 else None,
+                    "page_count": (
+                        int(row[12])
+                        if len(row) > 12 and row[12] and str(row[12]).isdigit()
+                        else None
+                    ),
+                    "physical_format": row[13] if len(row) > 13 else None,
+                    "edition": row[14] if len(row) > 14 else None,
                 }
                 books_raw.append(book)
 
@@ -498,6 +506,10 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -517,12 +529,15 @@ class GoogleSheetsStorage:
             description if description else "",
             series if series else "",
             dewey_decimal if dewey_decimal else "",
+            language if language else "",
+            page_count if page_count else "",
+            physical_format if physical_format else "",
+            edition if edition else "",
         ]
-
         try:
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:K",
+                range="Books!A:O",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -544,6 +559,10 @@ class GoogleSheetsStorage:
                 "description": description,
                 "series": series,
                 "dewey_decimal": dewey_decimal,
+                "language": language,
+                "page_count": page_count,
+                "physical_format": physical_format,
+                "edition": edition,
             }
         except HttpError as error:
             if error.resp.status == 400:
@@ -552,7 +571,7 @@ class GoogleSheetsStorage:
                 try:
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Books!A:K",
+                        range="Books!A:O",
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
@@ -573,6 +592,10 @@ class GoogleSheetsStorage:
                         "description": description,
                         "series": series,
                         "dewey_decimal": dewey_decimal,
+                        "language": language,
+                        "page_count": page_count,
+                        "physical_format": physical_format,
+                        "edition": edition,
                     }
                 except HttpError as retry_error:
                     raise Exception(
@@ -592,6 +615,10 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update an existing book in the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -601,7 +628,7 @@ class GoogleSheetsStorage:
         result = (
             self.service.spreadsheets()
             .values()
-            .get(spreadsheetId=sid, range="Books!A:K")
+            .get(spreadsheetId=sid, range="Books!A:O")
             .execute()
         )
         values = result.get("values", [])
@@ -625,6 +652,10 @@ class GoogleSheetsStorage:
                 existing_description = row[8] if len(row) > 8 else None
                 existing_series = row[9] if len(row) > 9 else None
                 existing_dewey = row[10] if len(row) > 10 else None
+                existing_language = row[11] if len(row) > 11 else None
+                existing_page_count = row[12] if len(row) > 12 else None
+                existing_physical_format = row[13] if len(row) > 13 else None
+                existing_edition = row[14] if len(row) > 14 else None
                 break
 
         if row_index is None:
@@ -643,6 +674,14 @@ class GoogleSheetsStorage:
             series = existing_series
         if not dewey_decimal and existing_dewey:
             dewey_decimal = existing_dewey
+        if not language and existing_language:
+            language = existing_language
+        if not page_count and existing_page_count:
+            page_count = existing_page_count
+        if not physical_format and existing_physical_format:
+            physical_format = existing_physical_format
+        if not edition and existing_edition:
+            edition = existing_edition
 
         row = [
             book_id,
@@ -656,12 +695,16 @@ class GoogleSheetsStorage:
             description if description else "",
             series if series else "",
             dewey_decimal if dewey_decimal else "",
+            language if language else "",
+            page_count if page_count else "",
+            physical_format if physical_format else "",
+            edition if edition else "",
         ]
 
         try:
             self.service.spreadsheets().values().update(
                 spreadsheetId=sid,
-                range=f"Books!A{row_index}:K{row_index}",
+                range=f"Books!A{row_index}:O{row_index}",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -683,6 +726,10 @@ class GoogleSheetsStorage:
                 "description": description,
                 "series": series,
                 "dewey_decimal": dewey_decimal,
+                "language": language,
+                "page_count": page_count,
+                "physical_format": physical_format,
+                "edition": edition,
             }
         except HttpError as error:
             raise Exception(f"Failed to update book: {error}") from error
@@ -698,6 +745,10 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book or update an existing one if ISBN matches."""
         existing = self.get_book_by_isbn(isbn13)
@@ -713,6 +764,10 @@ class GoogleSheetsStorage:
                 description=description,
                 series=series,
                 dewey_decimal=dewey_decimal,
+                language=language,
+                page_count=page_count,
+                physical_format=physical_format,
+                edition=edition,
             )
         else:
             return self.add_book(
@@ -725,6 +780,10 @@ class GoogleSheetsStorage:
                 description=description,
                 series=series,
                 dewey_decimal=dewey_decimal,
+                language=language,
+                page_count=page_count,
+                physical_format=physical_format,
+                edition=edition,
             )
 
     def bulk_import(self, items: List[Dict[str, Any]]) -> int:
@@ -737,7 +796,7 @@ class GoogleSheetsStorage:
             books_result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:K")
+                .get(spreadsheetId=sid, range="Books!A:O")
                 .execute()
             )
         except HttpError as e:
@@ -836,6 +895,12 @@ class GoogleSheetsStorage:
                 ddc = b.get("dewey_decimal") or (
                     row_data[10] if len(row_data) > 10 else ""
                 )
+                lang = b.get("language") or (row_data[11] if len(row_data) > 11 else "")
+                pc = b.get("page_count") or (row_data[12] if len(row_data) > 12 else "")
+                pf = b.get("physical_format") or (
+                    row_data[13] if len(row_data) > 13 else ""
+                )
+                ed = b.get("edition") or (row_data[14] if len(row_data) > 14 else "")
 
                 new_row = [
                     book_id,
@@ -849,9 +914,13 @@ class GoogleSheetsStorage:
                     desc,
                     ser,
                     ddc,
+                    lang,
+                    pc,
+                    pf,
+                    ed,
                 ]
                 books_to_update.append(
-                    {"range": f"Books!A{row_idx}:K{row_idx}", "values": [new_row]}
+                    {"range": f"Books!A{row_idx}:O{row_idx}", "values": [new_row]}
                 )
             else:
                 # Append new
@@ -869,6 +938,10 @@ class GoogleSheetsStorage:
                     b.get("description") or "",
                     b.get("series") or "",
                     b.get("dewey_decimal") or "",
+                    b.get("language") or "",
+                    b.get("page_count") or "",
+                    b.get("physical_format") or "",
+                    b.get("edition") or "",
                 ]
                 books_to_append.append(new_row)
 
@@ -947,7 +1020,7 @@ class GoogleSheetsStorage:
             # Batch append new books
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:K",
+                range="Books!A:O",
                 valueInputOption="RAW",
                 body={"values": books_to_append},
             ).execute()
@@ -1057,7 +1130,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:K")
+                .get(spreadsheetId=sid, range="Books!A:O")
                 .execute()
             )
             values = result.get("values", [])
@@ -1114,117 +1187,82 @@ class GoogleSheetsStorage:
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         try:
-            # Check if Books tab exists
+            # Refresh sheet metadata to get current state
             sheet_metadata = (
                 self.service.spreadsheets().get(spreadsheetId=sid).execute()
             )
-            sheets = sheet_metadata.get("sheets", [])
-            books_exists = any(
-                sheet["properties"]["title"] == "Books" for sheet in sheets
-            )
+            sheets_in_doc = [
+                s["properties"]["title"] for s in sheet_metadata.get("sheets", [])
+            ]
 
-            if not books_exists:
-                # Create Books tab
-                request = {"addSheet": {"properties": {"title": "Books"}}}
+            # 1. Create missing tabs in one batch
+            required_tabs = ["Books", "ReadingRecords", "Authors", "BookAuthors"]
+            add_requests = []
+            for tab in required_tabs:
+                if tab not in sheets_in_doc:
+                    add_requests.append({"addSheet": {"properties": {"title": tab}}})
+
+            if add_requests:
                 self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=sid, body={"requests": [request]}
+                    spreadsheetId=sid, body={"requests": add_requests}
                 ).execute()
 
-            # Check if ReadingRecords tab exists
-            reading_records_exists = any(
-                sheet["properties"]["title"] == "ReadingRecords" for sheet in sheets
-            )
+            # 2. Setup headers for each tab
+            tab_headers = {
+                "Books": [
+                    "id",
+                    "isbn13",
+                    "title",
+                    "author",
+                    "publication_year",
+                    "thumbnail_url",
+                    "created_at",
+                    "publisher",
+                    "description",
+                    "series",
+                    "dewey_decimal",
+                    "language",
+                    "page_count",
+                    "physical_format",
+                    "edition",
+                ],
+                "ReadingRecords": [
+                    "id",
+                    "book_id",
+                    "status",
+                    "start_date",
+                    "end_date",
+                    "rating",
+                    "created_at",
+                ],
+                "Authors": ["id", "name"],
+                "BookAuthors": ["book_id", "author_id"],
+            }
 
-            if not reading_records_exists:
-                # Create ReadingRecords tab
-                request = {"addSheet": {"properties": {"title": "ReadingRecords"}}}
-                self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=sid, body={"requests": [request]}
-                ).execute()
-
-            # Check if Authors tab exists
-            authors_exists = any(
-                sheet["properties"]["title"] == "Authors" for sheet in sheets
-            )
-
-            if not authors_exists:
-                # Create Authors tab
-                request = {"addSheet": {"properties": {"title": "Authors"}}}
-                self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=sid, body={"requests": [request]}
-                ).execute()
-
-            # Check if BookAuthors tab exists
-            book_authors_exists = any(
-                sheet["properties"]["title"] == "BookAuthors" for sheet in sheets
-            )
-
-            if not book_authors_exists:
-                # Create BookAuthors tab
-                request = {"addSheet": {"properties": {"title": "BookAuthors"}}}
-                self.service.spreadsheets().batchUpdate(
-                    spreadsheetId=sid, body={"requests": [request]}
-                ).execute()
-
-            # Add headers for Books if not present
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="Books!A1:K1")
-                .execute()
-            )
-            values = result.get("values", [])
-
-            if not values:
-                headers = [
-                    [
-                        "id",
-                        "isbn13",
-                        "title",
-                        "author",
-                        "publication_year",
-                        "thumbnail_url",
-                        "created_at",
-                        "publisher",
-                        "description",
-                        "series",
-                        "dewey_decimal",
-                    ]
-                ]
-                self.service.spreadsheets().values().update(
-                    spreadsheetId=sid,
-                    range="Books!A1:K1",
-                    valueInputOption="RAW",
-                    body={"values": headers},
-                ).execute()
-
-            # Add headers for ReadingRecords if not present
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="ReadingRecords!A1:G1")
-                .execute()
-            )
-            values = result.get("values", [])
-
-            if not values:
-                headers = [
-                    [
-                        "id",
-                        "book_id",
-                        "status",
-                        "start_date",
-                        "end_date",
-                        "rating",
-                        "created_at",
-                    ]
-                ]
-                self.service.spreadsheets().values().update(
-                    spreadsheetId=sid,
-                    range="ReadingRecords!A1:G1",
-                    valueInputOption="RAW",
-                    body={"values": headers},
-                ).execute()
+            for tab, headers in tab_headers.items():
+                try:
+                    # Check if headers exist
+                    result = (
+                        self.service.spreadsheets()
+                        .values()
+                        .get(spreadsheetId=sid, range=f"{tab}!A1:Z1")
+                        .execute()
+                    )
+                    values = result.get("values", [])
+                    if not values or not values[0]:
+                        # Write headers
+                        self.service.spreadsheets().values().update(
+                            spreadsheetId=sid,
+                            range=f"{tab}!A1",
+                            valueInputOption="RAW",
+                            body={"values": [headers]},
+                        ).execute()
+                except HttpError as e:
+                    if e.resp.status == 400:
+                        # This should usually not happen if tab was created above,
+                        # but if it does, it confirms the tab is missing or range is invalid.
+                        continue
+                    raise
 
             # Add headers for Authors if not present
             result = (
