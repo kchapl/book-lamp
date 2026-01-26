@@ -82,10 +82,25 @@
 }
 
 .year,
-.isbn {
+.isbn,
+.dewey {
     color: var(--text-muted);
     font-size: 0.85rem;
     margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dewey::before {
+    content: "DDC";
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--primary-light);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .book-meta-summary {
@@ -271,50 +286,65 @@
     }
 }
 
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: white;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+
+.search-input.has-query {
+    padding-right: 2.5rem;
+}
+
 /* Search form responsive styles */
 @media (max-width: 640px) {
     form[action*="search_books"] {
         flex-direction: column;
     }
-    
-    form[action*="search_books"] > div {
+
+    form[action*="search_books"]>div {
         width: 100% !important;
     }
-    
+
     form[action*="search_books"] button {
         width: 100%;
     }
-    
+
     .books-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 1.5rem;
     }
-    
+
     .books-header h1 {
         margin-bottom: 0;
     }
-    
-    .books-header > div {
+
+    .books-header>div {
         width: 100%;
         flex-wrap: wrap;
         gap: 0.75rem;
     }
-    
-    .books-header > div > * {
+
+    .books-header>div>* {
         flex: 1;
         min-width: fit-content;
     }
-    
+
     .book-meta-summary .year {
         margin-bottom: 0;
     }
-    
+
     .record-dates {
         flex-direction: column;
         gap: 0.25rem;
     }
-    
+
     .record-date-item::after {
         content: "" !important;
         margin: 0 !important;
