@@ -1264,6 +1264,42 @@ class GoogleSheetsStorage:
                         continue
                     raise
 
+            # Add headers for Authors if not present
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Authors!A1:B1")
+                .execute()
+            )
+            values = result.get("values", [])
+
+            if not values:
+                headers = [["id", "name"]]
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range="Authors!A1:B1",
+                    valueInputOption="RAW",
+                    body={"values": headers},
+                ).execute()
+
+            # Add headers for BookAuthors if not present
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="BookAuthors!A1:B1")
+                .execute()
+            )
+            values = result.get("values", [])
+
+            if not values:
+                headers = [["book_id", "author_id"]]
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range="BookAuthors!A1:B1",
+                    valueInputOption="RAW",
+                    body={"values": headers},
+                ).execute()
+
         except HttpError as error:
             raise Exception(f"Failed to initialize sheets: {error}") from error
 
