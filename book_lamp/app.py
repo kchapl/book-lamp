@@ -751,6 +751,61 @@ def import_books():
     return redirect(url_for("import_books_form"))
 
 
+@app.route("/books/<int:book_id>/edit", methods=["POST"])
+@login_required
+def edit_book(book_id: int):
+    # Extract data from form
+    isbn13 = request.form.get("isbn13", "").strip().replace("-", "")
+    title = request.form.get("title", "").strip()
+    author = request.form.get("author", "").strip()
+    publication_year_str = request.form.get("publication_year", "").strip()
+    thumbnail_url = request.form.get("thumbnail_url", "").strip()
+    publisher = request.form.get("publisher", "").strip()
+    description = request.form.get("description", "").strip()
+    series = request.form.get("series", "").strip()
+    dewey_decimal = request.form.get("dewey_decimal", "").strip()
+
+    # Basic validation
+    if not title or not author:
+        flash("Title and author are required.", "error")
+        return redirect(url_for("book_detail", book_id=book_id))
+
+    if (
+        isbn13
+        and not is_valid_isbn13(isbn13)
+        and not (TEST_MODE and isbn13 == TEST_ISBN)
+    ):
+        flash("Please enter a valid 13-digit ISBN.", "error")
+        return redirect(url_for("book_detail", book_id=book_id))
+
+    publication_year = None
+    if publication_year_str:
+        try:
+            publication_year = int(publication_year_str)
+        except ValueError:
+            pass
+
+    try:
+        storage.update_book(
+            book_id=book_id,
+            isbn13=isbn13,
+            title=title[:300],
+            author=author[:200],
+            publication_year=publication_year,
+            thumbnail_url=(thumbnail_url if thumbnail_url else None),
+            publisher=(publisher if publisher else None),
+            description=(description if description else None),
+            series=(series if series else None),
+            dewey_decimal=(dewey_decimal if dewey_decimal else None),
+        )
+        flash("Book updated successfully.", "success")
+    except Exception as e:
+        app.logger.error(f"Failed to update book: {str(e)}")
+        flash(f"Error updating book: {str(e)}", "error")
+
+    return redirect(url_for("book_detail", book_id=book_id))
+
+
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
 @login_required
 def delete_book(book_id: int):

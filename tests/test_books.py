@@ -147,3 +147,40 @@ def test_add_book_authorized(client):
     resp = client.get("/books/new", follow_redirects=True)
     assert resp.status_code == 200
     assert b"Add a Book" in resp.data
+
+
+def test_edit_book_success(authenticated_client):
+    # Add a book to storage
+    book = storage.add_book(
+        isbn13="9780306406157", title="Original Title", author="Original Author"
+    )
+    book_id = book["id"]
+
+    # Update it via endpoint
+    updated_data = {
+        "isbn13": "9780306406157",
+        "title": "Updated Title",
+        "author": "Updated Author",
+        "publication_year": "2022",
+        "publisher": "Updated Publisher",
+        "description": "Updated Description",
+        "series": "Updated Series",
+        "dewey_decimal": "123.456",
+        "thumbnail_url": "https://example.com/cover.jpg",
+    }
+    resp = authenticated_client.post(
+        f"/books/{book_id}/edit", data=updated_data, follow_redirects=True
+    )
+    assert resp.status_code == 200
+    assert b"Book updated successfully" in resp.data
+
+    # Verify storage has updated info
+    updated_book = storage.get_book_by_id(book_id)
+    assert updated_book["title"] == "Updated Title"
+    assert updated_book["author"] == "Updated Author"
+    assert updated_book["publication_year"] == 2022
+    assert updated_book["publisher"] == "Updated Publisher"
+    assert updated_book["description"] == "Updated Description"
+    assert updated_book["series"] == "Updated Series"
+    assert updated_book["dewey_decimal"] == "123.456"
+    assert updated_book["thumbnail_url"] == "https://example.com/cover.jpg"
