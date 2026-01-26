@@ -29,6 +29,10 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.libib_import import parse_libib_csv
+from book_lamp.utils.protobuf_patch import apply_patch
+
+# Apply security patch for CVE-2026-0994
+apply_patch()
 
 load_dotenv()
 
