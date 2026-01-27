@@ -236,6 +236,21 @@ class MockStorage:
             import_count += 1
         return import_count
 
+    def get_reading_history(self):
+        """Retrieve all reading records joined with book metadata."""
+        history = []
+        book_map = {b["id"]: b for b in self.books}
+        for record in self.reading_records:
+            book = book_map.get(record["book_id"])
+            if book:
+                # Create a copy of the record and enrich it
+                enriched_record = record.copy()
+                enriched_record["book_title"] = book["title"]
+                enriched_record["book_author"] = book["author"]
+                enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")
+                history.append(enriched_record)
+        return history
+
     def search(self, query):
         """Search across all book data fields.
 

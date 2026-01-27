@@ -1317,3 +1317,22 @@ class GoogleSheetsStorage:
         all_books = self.get_all_books()
         all_records = self.get_reading_records()
         return search_books(all_books, all_records, query)
+
+    def get_reading_history(self) -> List[Dict[str, Any]]:
+        """Retrieve all reading records joined with book metadata."""
+        # Fetch both books and records to join in memory
+        books = self.get_all_books()
+        records = self.get_reading_records()
+
+        book_map = {b["id"]: b for b in books}
+        history = []
+        for record in records:
+            book = book_map.get(record["book_id"])
+            if book:
+                enriched_record = record.copy()
+                enriched_record["book_title"] = book["title"]
+                enriched_record["book_author"] = book["author"]
+                enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")
+                history.append(enriched_record)
+
+        return history
