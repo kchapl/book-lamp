@@ -1121,6 +1121,125 @@ class GoogleSheetsStorage:
                     ) from retry_error
             raise Exception(f"Failed to add reading record: {error}") from error
 
+    def update_reading_record(
+        self,
+        record_id: int,
+        status: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        rating: int = 0,
+    ) -> Dict[str, Any]:
+        """Update an existing reading record in the ReadingRecords tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # Get all data to find the row index
+        result = (
+            self.service.spreadsheets()
+            .values()
+            .get(spreadsheetId=sid, range="ReadingRecords!A:G")
+            .execute()
+        )
+        values = result.get("values", [])
+        if len(values) <= 1:
+            raise Exception(f"Reading record with ID {record_id} not found")
+
+        # Find the row index (add 1 for header, add 1 for 1-based indexing)
+        row_index = None
+        book_id = None
+        created_at = None
+        for idx, row in enumerate(values[1:], start=2):
+            if row and row[0] and int(row[0]) == record_id:
+                row_index = idx
+                book_id = int(row[1])
+                created_at = row[6] if len(row) > 6 else None
+                break
+
+        if row_index is None:
+            raise Exception(f"Reading record with ID {record_id} not found")
+
+        if not created_at:
+            created_at = datetime.now(timezone.utc).isoformat()
+
+        row = [
+            record_id,
+            book_id,
+            status,
+            start_date,
+            end_date if end_date else "",
+            rating,
+            created_at,
+        ]
+
+        try:
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"ReadingRecords!A{row_index}:G{row_index}",
+                valueInputOption="RAW",
+                body={"values": [row]},
+            ).execute()
+
+            return {
+                "id": record_id,
+                "book_id": book_id,
+                "status": status,
+                "start_date": start_date,
+                "end_date": end_date,
+                "rating": rating,
+                "created_at": created_at,
+            }
+        except HttpError as error:
+            raise Exception(f"Failed to update reading record: {error}") from error
+
+    def delete_reading_record(self, record_id: int) -> bool:
+        """Delete a reading record by ID."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # Get all data to find the row index
+        result = (
+            self.service.spreadsheets()
+            .values()
+            .get(spreadsheetId=sid, range="ReadingRecords!A:A")
+            .execute()
+        )
+        values = result.get("values", [])
+        if len(values) <= 1:
+            return False
+
+        # Find the row index
+        row_index = None
+        for idx, row in enumerate(values[1:], start=2):
+            if row and row[0] and int(row[0]) == record_id:
+                row_index = idx
+                break
+
+        if row_index is None:
+            return False
+
+        sheet_id = self._get_sheet_id("ReadingRecords")
+        body = {
+            "requests": [
+                {
+                    "deleteDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": row_index - 1,
+                            "endIndex": row_index,
+                        }
+                    }
+                }
+            ]
+        }
+        try:
+            self.service.spreadsheets().batchUpdate(
+                spreadsheetId=sid, body=body
+            ).execute()
+            return True
+        except HttpError as error:
+            raise Exception(f"Failed to delete reading record: {error}") from error
+
     def delete_book(self, book_id: int) -> bool:
         """Delete a book by ID."""
         sid = self._ensure_spreadsheet_id()
