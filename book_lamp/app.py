@@ -513,6 +513,50 @@ def create_reading_record(book_id: int):
     return redirect(url_for("book_detail", book_id=book_id))
 
 
+@app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
+@login_required
+def update_reading_record(record_id: int):
+    status = request.form.get("status")
+    start_date = request.form.get("start_date")
+    end_date = request.form.get("end_date")
+    rating = int(request.form.get("rating", 0))
+
+    if not status or not start_date:
+        flash("Status and start date are required.", "error")
+        return redirect(request.referrer or url_for("reading_history"))
+
+    try:
+        storage.update_reading_record(
+            record_id=record_id,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            rating=rating,
+        )
+        flash("Reading record updated.", "success")
+    except Exception as e:
+        app.logger.error(f"Failed to update reading record: {str(e)}")
+        flash(f"Error updating record: {str(e)}", "error")
+
+    return redirect(request.referrer or url_for("reading_history"))
+
+
+@app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
+@login_required
+def delete_reading_record(record_id: int):
+    try:
+        success = storage.delete_reading_record(record_id)
+        if success:
+            flash("Reading record deleted.", "success")
+        else:
+            flash("Reading record not found.", "error")
+    except Exception as e:
+        app.logger.error(f"Failed to delete reading record: {str(e)}")
+        flash(f"Error deleting record: {str(e)}", "error")
+
+    return redirect(request.referrer or url_for("reading_history"))
+
+
 @app.route("/books", methods=["POST"])
 @login_required
 def create_book():

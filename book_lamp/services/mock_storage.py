@@ -177,6 +177,29 @@ class MockStorage:
         self.next_record_id += 1
         return record
 
+    def update_reading_record(
+        self, record_id, status, start_date, end_date=None, rating=0
+    ):
+        for record in self.reading_records:
+            if record["id"] == record_id:
+                record.update(
+                    {
+                        "status": status,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "rating": rating,
+                    }
+                )
+                return record
+        raise Exception(f"Reading record with ID {record_id} not found")
+
+    def delete_reading_record(self, record_id):
+        for i, record in enumerate(self.reading_records):
+            if record["id"] == record_id:
+                self.reading_records.pop(i)
+                return True
+        return False
+
     def delete_book(self, book_id):
         for i, book in enumerate(self.books):
             if book["id"] == book_id:
