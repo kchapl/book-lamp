@@ -203,14 +203,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="book-detail-container" id="book-container" data-edit-mode="false">
+<div class="book-detail-container" id="book-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
         <a href="{{ url_for('list_books') }}" class="back-link" style="margin-bottom: 0;">← Back to Books</a>
     </div>
 
     <form id="edit-form" method="post" action="{{ url_for('edit_book', book_id=book.id) }}">
 
-        <div class="book-detail-header">
+        <div class="book-detail-header" id="book-header" data-edit-mode="false">
             <div style="flex-shrink: 0; width: 300px;">
                 <div class="book-cover">
                     {% if book.thumbnail_url %}
@@ -287,12 +287,23 @@
                     </div>
                 </div>
 
-                <div class="actions-section view-only">
-                    <button class="btn-delete" type="button"
+                <!-- Book action buttons (view mode only) -->
+                <div class="view-only"
+                    style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    <button type="button" class="btn-icon" onclick="setEditMode(true)" title="Edit Book">✏️</button>
+                    <button type="button" class="btn-icon btn-icon-delete" data-book-id="{{ book.id }}"
                         data-delete-url="{{ url_for('delete_book', book_id=book.id) }}"
-                        onclick="deleteBook('{{ book.id }}', this.getAttribute('data-delete-url'))">
-                        Delete Book
-                    </button>
+                        onclick="deleteBook(this.dataset.bookId, this.dataset.deleteUrl)"
+                        title="Delete Book">🗑️</button>
+                </div>
+
+                <!-- Edit mode controls -->
+                <div class="edit-only"
+                    style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                        <button type="submit" class="btn-save">Save Changes</button>
+                        <button type="button" class="btn-cancel" onclick="setEditMode(false)">Cancel</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -439,22 +450,11 @@
         <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">No reading history yet.</p>
         {% endif %}
     </div>
-
-    <div class="footer-actions"
-        style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 4rem;">
-        <div class="view-only">
-            <button class="btn-edit" onclick="setEditMode(true)">Edit Book</button>
-        </div>
-        <div class="edit-only">
-            <button type="submit" form="edit-form" class="btn-save">Save Changes</button>
-            <button type="button" class="btn-cancel" onclick="setEditMode(false)">Cancel</button>
-        </div>
-    </div>
 </div>
 
 <script>
     function setEditMode(isEdit) {
-        document.getElementById('book-container').setAttribute('data-edit-mode', isEdit);
+        document.getElementById('book-header').setAttribute('data-edit-mode', isEdit);
     }
 
     function setRecordEditMode(recordId, isEdit) {
