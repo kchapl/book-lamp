@@ -428,12 +428,26 @@
     }
 
     function deleteBook(bookId, deleteUrl) {
-        if (confirm('Remove this book from your library?')) {
-            var f = document.createElement('form');
-            f.method = 'POST';
-            f.action = deleteUrl;
-            document.body.appendChild(f);
-            f.submit();
+        if (!confirm('Remove this book from your library?')) {
+            return;
+        }
+
+        try {
+            // Normalize and validate the target URL to avoid using arbitrary DOM text as an action.
+            var url = new URL(deleteUrl, window.location.origin);
+
+            // Only allow same-origin HTTP(S) URLs.
+            if ((url.protocol === 'http:' || url.protocol === 'https:') &&
+                url.origin === window.location.origin) {
+
+                var f = document.createElement('form');
+                f.method = 'POST';
+                f.action = url.toString();
+                document.body.appendChild(f);
+                f.submit();
+            }
+        } catch (e) {
+            // If the URL is invalid, do nothing.
         }
     }
 
