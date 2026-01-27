@@ -48,13 +48,13 @@
     {% if history %}
     {% for book in history %}
     <div class="history-book-card">
-        <div class="history-thumb">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="history-thumb">
             {% if book.thumbnail_url %}
             <img src="{{ book.thumbnail_url }}" alt="{{ book.title }}">
             {% else %}
             <div class="no-cover">📖</div>
             {% endif %}
-        </div>
+        </a>
         <div class="history-content">
             <h2 class="history-book-title">
                 <a href="{{ url_for('book_detail', book_id=book.id) }}">{{ book.title }}</a>
