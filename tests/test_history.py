@@ -43,7 +43,7 @@ def test_get_reading_history_populated(client):
     response = client.get("/history", follow_redirects=True)
     assert response.status_code == 200
     assert b"Pride and Prejudice" in response.data
-    assert b"Finished: 2023-01-15" in response.data
+    assert b"Completed: 2023-01-15" in response.data
     assert b"Completed" in response.data
 
 
