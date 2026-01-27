@@ -64,6 +64,7 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 ### Security and reliability
 - Validate and sanitize all external inputs (requests, env vars, web forms).
 - **No Regex Search**: Do not allow unsanitized user input in regular expressions. To prevent ReDoS (Regular Expression Denial of Service), user search inputs must be escaped or regex capabilities disabled entirely for end-users.
+- **Protobuf Security Patch**: A monkeypatch is applied in `app.py` (via `book_lamp/utils/protobuf_patch.py`) to fix CVE-2026-0994 (recursion depth bypass in `google.protobuf.json_format.ParseDict`). Ensure this patch remains at the application entrypoint until the upstream library is updated to a non-vulnerable version (>6.33.4).
 - Never log secrets. Use structured, levelled logging.
 - Keep dependencies minimal; respect pinned versions managed by Poetry.
 - Never commit credentials.json or token.json to version control.

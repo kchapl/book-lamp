@@ -139,6 +139,83 @@
         border-top: 1px solid var(--glass-border);
     }
 
+    .edit-only {
+        display: none;
+    }
+
+    [data-edit-mode="true"] .edit-only {
+        display: block;
+    }
+
+    [data-edit-mode="true"] .view-only {
+        display: none;
+    }
+
+    .edit-input {
+        width: 100%;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+
+    .edit-textarea {
+        width: 100%;
+        min-height: 150px;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        color: white;
+        font-size: 1rem;
+        font-family: inherit;
+        resize: vertical;
+    }
+
+    .edit-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .btn-edit {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: opacity 0.2s;
+    }
+
+    .btn-edit:hover {
+        opacity: 0.9;
+    }
+
+    .btn-save {
+        background: #10b981;
+        color: white;
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .btn-cancel {
+        background: transparent;
+        color: white;
+        border: 1px solid var(--glass-border);
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
     @media (max-width: 768px) {
         .book-detail-header {
             flex-direction: column;
@@ -162,103 +239,100 @@
 {% endblock %}
 
 {% block content %}
-<div class="book-detail-container">
-    <a href="{{ url_for('list_books') }}" class="back-link">← Back to Books</a>
-
-    <div class="book-detail-header">
-        <div class="book-cover">
-            {% if book.thumbnail_url %}
-            <img src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
-            {% else %}
-            <div class="book-cover-placeholder">📖</div>
-            {% endif %}
-        </div>
-        <div class="book-info">
-            <h1 class="book-title">{{ book.title }}</h1>
-            <div class="book-author">
-                {% if book.authors %}
-                {% for author in book.authors %}
-                <a href="{{ url_for('search_books', q=author) }}"
-                    style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light);">{{
-                    author }}</a>{% if not loop.last %}, {% endif %}
-                {% endfor %}
-                {% else %}
-                {{ book.author }}
-                {% endif %}
-            </div>
-
-            <div class="book-meta">
-                {% if book.publication_year %}
-                <div class="meta-item">
-                    <span class="meta-label">Year:</span>
-                    <span class="meta-value">{{ book.publication_year }}</span>
-                </div>
-                {% endif %}
-                {% if book.publisher %}
-                <div class="meta-item">
-                    <span class="meta-label">Publisher:</span>
-                    <span class="meta-value">{{ book.publisher }}</span>
-                </div>
-                {% endif %}
-                {% if book.isbn13 %}
-                <div class="meta-item">
-                    <span class="meta-label">ISBN:</span>
-                    <span class="meta-value">{{ book.isbn13 }}</span>
-                </div>
-                {% endif %}
-                {% if book.series %}
-                <div class="meta-item">
-                    <span class="meta-label">Series:</span>
-                    <span class="meta-value">{{ book.series }}</span>
-                </div>
-                {% endif %}
-                {% if book.dewey_decimal %}
-                <div class="meta-item">
-                    <span class="meta-label">Dewey Decimal:</span>
-                    <span class="meta-value">{{ book.dewey_decimal }}</span>
-                </div>
-                {% endif %}
-                {% if book.language %}
-                <div class="meta-item">
-                    <span class="meta-label">Language:</span>
-                    <span class="meta-value">{{ book.language }}</span>
-                </div>
-                {% endif %}
-                {% if book.page_count %}
-                <div class="meta-item">
-                    <span class="meta-label">Pages:</span>
-                    <span class="meta-value">{{ book.page_count }}</span>
-                </div>
-                {% endif %}
-                {% if book.physical_format %}
-                <div class="meta-item">
-                    <span class="meta-label">Format:</span>
-                    <span class="meta-value">{{ book.physical_format }}</span>
-                </div>
-                {% endif %}
-                {% if book.edition %}
-                <div class="meta-item">
-                    <span class="meta-label">Edition:</span>
-                    <span class="meta-value">{{ book.edition }}</span>
-                </div>
-                {% endif %}
-            </div>
-
-            {% if book.description %}
-            <div class="book-description">
-                <h3>Description</h3>
-                <p>{{ book.description }}</p>
-            </div>
-            {% endif %}
-
-            <div class="actions-section">
-                <form method="post" action="{{ url_for('delete_book', book_id=book.id) }}"
-                    onsubmit="return confirm('Remove this book from your library?');">
-                    <button class="btn-delete" type="submit">Delete Book</button>
-                </form>
-            </div>
-        </div>
+<div class="book-detail-container" id="book-container" data-edit-mode="false">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <a href="{{ url_for('list_books') }}" class="back-link" style="margin-bottom: 0;">← Back to Books</a>
     </div>
+
+    <form id="edit-form" method="post" action="{{ url_for('edit_book', book_id=book.id) }}">
+
+        <div class="book-detail-header">
+            <div style="flex-shrink: 0; width: 300px;">
+                <div class="book-cover">
+                    {% if book.thumbnail_url %}
+                    <img src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
+                    {% else %}
+                    <div class="book-cover-placeholder">📖</div>
+                    {% endif %}
+                </div>
+                <div class="edit-only" style="margin-top: 1rem;">
+                    <label class="meta-label">Thumbnail URL</label>
+                    <input type="text" name="thumbnail_url" class="edit-input" value="{{ book.thumbnail_url or '' }}">
+                </div>
+            </div>
+            <div class="book-info">
+                <h1 class="book-title view-only">{{ book.title }}</h1>
+                <div class="edit-only" style="margin-bottom: 1rem;">
+                    <label class="meta-label">Title</label>
+                    <input type="text" name="title" class="edit-input" value="{{ book.title }}" required>
+                </div>
+
+                <div class="book-author view-only">
+                    {% if book.authors %}
+                    {% for author in book.authors %}
+                    <a href="{{ url_for('search_books', q=author) }}"
+                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light);">{{
+                        author }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                    {% else %}
+                    {{ book.author }}
+                    {% endif %}
+                </div>
+                <div class="edit-only" style="margin-bottom: 1.5rem;">
+                    <label class="meta-label">Author(s) (comma separated)</label>
+                    <input type="text" name="author" class="edit-input" value="{{ book.author }}" required>
+                </div>
+
+                <div class="book-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Year:</span>
+                        <span class="meta-value view-only">{{ book.publication_year or '' }}</span>
+                        <input type="number" name="publication_year" class="edit-input edit-only"
+                            value="{{ book.publication_year or '' }}">
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Publisher:</span>
+                        <span class="meta-value view-only">{{ book.publisher or '' }}</span>
+                        <input type="text" name="publisher" class="edit-input edit-only"
+                            value="{{ book.publisher or '' }}">
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">ISBN:</span>
+                        <span class="meta-value view-only">{{ book.isbn13 or '' }}</span>
+                        <input type="text" name="isbn13" class="edit-input edit-only" value="{{ book.isbn13 or '' }}">
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Series:</span>
+                        <span class="meta-value view-only">{{ book.series or '' }}</span>
+                        <input type="text" name="series" class="edit-input edit-only" value="{{ book.series or '' }}">
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Dewey Decimal:</span>
+                        <span class="meta-value view-only">{{ book.dewey_decimal or '' }}</span>
+                        <input type="text" name="dewey_decimal" class="edit-input edit-only"
+                            value="{{ book.dewey_decimal or '' }}">
+                    </div>
+                </div>
+
+                <div class="book-description">
+                    <h3 class="view-only">Description</h3>
+                    <p class="view-only">{{ book.description or '' }}</p>
+                    <div class="edit-only">
+                        <label class="meta-label">Description</label>
+                        <textarea name="description" class="edit-textarea">{{ book.description or '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="actions-section view-only">
+                    <button class="btn-delete" type="button"
+                        data-delete-url="{{ url_for('delete_book', book_id=book.id) }}"
+                        onclick="deleteBook('{{ book.id }}', this.getAttribute('data-delete-url'))">
+                        Delete Book
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
 
     <div class="reading-history-section">
         <h2>Reading History</h2>
@@ -335,9 +409,48 @@
         <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0;">No reading history yet.</p>
         {% endif %}
     </div>
+
+    <div class="footer-actions"
+        style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 4rem;">
+        <div class="view-only">
+            <button class="btn-edit" onclick="setEditMode(true)">Edit Book</button>
+        </div>
+        <div class="edit-only">
+            <button type="submit" form="edit-form" class="btn-save">Save Changes</button>
+            <button type="button" class="btn-cancel" onclick="setEditMode(false)">Cancel</button>
+        </div>
+    </div>
 </div>
 
 <script>
+    function setEditMode(isEdit) {
+        document.getElementById('book-container').setAttribute('data-edit-mode', isEdit);
+    }
+
+    function deleteBook(bookId, deleteUrl) {
+        if (!confirm('Remove this book from your library?')) {
+            return;
+        }
+
+        try {
+            // Normalize and validate the target URL to avoid using arbitrary DOM text as an action.
+            var url = new URL(deleteUrl, window.location.origin);
+
+            // Only allow same-origin HTTP(S) URLs.
+            if ((url.protocol === 'http:' || url.protocol === 'https:') &&
+                url.origin === window.location.origin) {
+
+                var f = document.createElement('form');
+                f.method = 'POST';
+                f.action = url.toString();
+                document.body.appendChild(f);
+                f.submit();
+            }
+        } catch (e) {
+            // If the URL is invalid, do nothing.
+        }
+    }
+
     function toggleForm(bookId) {
         const form = document.getElementById(`form-${bookId}`);
         if (form.style.display === 'block') {
