@@ -217,6 +217,56 @@ def init_sheets_command():
 
 
 # -----------------------------
+# Reading History feature
+# -----------------------------
+
+
+@app.route("/history", methods=["GET"])
+@login_required
+def reading_history():
+    """Show detailed reading history as a chronological list of individual events."""
+    history = storage.get_reading_history()
+
+    # Filtering
+    status_filter = request.args.get("status")
+    if status_filter:
+        history = [r for r in history if r.get("status") == status_filter]
+
+    min_rating = request.args.get("min_rating")
+    if min_rating and min_rating.isdigit():
+        min_rating = int(min_rating)
+        history = [r for r in history if r.get("rating", 0) >= min_rating]
+
+    # Sorting
+    sort_by = request.args.get("sort", "date_desc")
+
+    if sort_by == "date_desc":
+        history.sort(
+            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
+        )
+    elif sort_by == "date_asc":
+        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
+    elif sort_by == "rating_desc":
+        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
+    elif sort_by == "title":
+        history.sort(key=lambda r: (r.get("book_title") or "").lower())
+
+    # Get status list for filter dropdown (from all records)
+    all_statuses = sorted(
+        list(set(r.get("status") for r in history if r.get("status")))
+    )
+
+    return render_template(
+        "history.html",
+        history=history,
+        statuses=all_statuses,
+        current_status=status_filter,
+        current_rating=min_rating,
+        current_sort=sort_by,
+    )
+
+
+# -----------------------------
 # Books feature
 # -----------------------------
 
