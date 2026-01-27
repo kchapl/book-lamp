@@ -1332,6 +1332,7 @@ class GoogleSheetsStorage:
                 enriched_record = record.copy()
                 enriched_record["book_title"] = book["title"]
                 enriched_record["book_author"] = book["author"]
+                enriched_record["book_authors"] = book.get("authors", [])
                 enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")
                 history.append(enriched_record)
 

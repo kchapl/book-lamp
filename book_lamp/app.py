@@ -246,6 +246,7 @@ def reading_history():
                 "id": bid,
                 "title": record["book_title"],
                 "author": record["book_author"],
+                "authors": record.get("book_authors", []),
                 "thumbnail_url": record["book_thumbnail_url"],
                 "records": [],
             }
