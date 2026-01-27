@@ -237,48 +237,19 @@ def reading_history():
         min_rating = int(min_rating)
         history = [r for r in history if r.get("rating", 0) >= min_rating]
 
-    # Group by book_id to show one card per book with multiple reading events
-    grouped_history = {}
-    for record in history:
-        bid = record["book_id"]
-        if bid not in grouped_history:
-            grouped_history[bid] = {
-                "id": bid,
-                "title": record["book_title"],
-                "author": record["book_author"],
-                "authors": record.get("book_authors", []),
-                "thumbnail_url": record["book_thumbnail_url"],
-                "records": [],
-            }
-        grouped_history[bid]["records"].append(record)
-
-    # Convert to list
-    history_list = list(grouped_history.values())
-
     # Sorting
     sort_by = request.args.get("sort", "date_desc")
 
-    def get_latest_date(book_item):
-        dates = []
-        for r in book_item["records"]:
-            if r.get("end_date"):
-                dates.append(r["end_date"])
-            if r.get("start_date"):
-                dates.append(r["start_date"])
-        return max(dates) if dates else ""
-
-    def get_max_rating(book_item):
-        ratings = [r.get("rating", 0) for r in book_item["records"]]
-        return max(ratings) if ratings else 0
-
     if sort_by == "date_desc":
-        history_list.sort(key=get_latest_date, reverse=True)
+        history.sort(
+            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
+        )
     elif sort_by == "date_asc":
-        history_list.sort(key=get_latest_date)
+        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
     elif sort_by == "rating_desc":
-        history_list.sort(key=get_max_rating, reverse=True)
+        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
     elif sort_by == "title":
-        history_list.sort(key=lambda b: (b.get("title") or "").lower())
+        history.sort(key=lambda r: (r.get("book_title") or "").lower())
 
     # Get status list for filter dropdown (from all records)
     all_statuses = sorted(
@@ -287,7 +258,7 @@ def reading_history():
 
     return render_template(
         "history.html",
-        history=history_list,
+        history=history,
         statuses=all_statuses,
         current_status=status_filter,
         current_rating=min_rating,
