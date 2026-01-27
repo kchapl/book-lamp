@@ -224,7 +224,7 @@ def init_sheets_command():
 @app.route("/history", methods=["GET"])
 @login_required
 def reading_history():
-    """Show detailed reading history grouped by book."""
+    """Show detailed reading history as a chronological list of individual events."""
     history = storage.get_reading_history()
 
     # Filtering
