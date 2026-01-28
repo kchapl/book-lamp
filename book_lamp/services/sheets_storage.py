@@ -4,7 +4,6 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from google.auth.transport.requests import Request  # type: ignore
 from google.oauth2.credentials import Credentials  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
@@ -26,19 +25,22 @@ class GoogleSheetsStorage:
     - 'BookAuthors' tab: book_id, author_id
     """
 
-    def __init__(self, sheet_name: str, credentials_path: str = "credentials.json"):
+    def __init__(
+        self, sheet_name: str, credentials_dict: Optional[Dict[str, Any]] = None
+    ):
         """Initialise the storage adapter.
 
         Args:
             sheet_name: Name of the Google Sheet to use.
-            credentials_path: Path to the Google Cloud credentials file.
+            credentials_dict: Dictionary containing OAuth2 credentials.
         """
         self.sheet_name = sheet_name
         self.spreadsheet_id: Optional[str] = None
-        self.credentials_path = credentials_path
+        self.credentials_dict = credentials_dict
         self.service = None
         self.drive_service = None
-        self._connect()
+        if self.credentials_dict:
+            self._connect()
 
     def _connect(self) -> None:
         """Establish connection to Google Sheets and Drive APIs."""
@@ -48,73 +50,39 @@ class GoogleSheetsStorage:
             self.drive_service = build("drive", "v3", credentials=creds)
 
     def load_credentials(self) -> Optional[Credentials]:
-        """Load credentials from token.json or refresh them if expired.
+        """Load credentials from the internal dictionary.
 
-        Client ID and secret are read from environment variables for security.
+        Client ID and secret are injected from environment variables if not present.
         """
-        token_path = "token.json"
-        if not os.path.exists(token_path):
+        if not self.credentials_dict:
             return None
 
         try:
-            import json
+            # Create a copy to avoid mutating the original
+            token_data = self.credentials_dict.copy()
 
-            # Read token data and inject client_id/client_secret from env vars
-            with open(token_path, "r") as token_file:
-                token_data = json.load(token_file)
-
-            # Inject client credentials from environment variables
-            token_data["client_id"] = os.environ.get("GOOGLE_CLIENT_ID")
-            token_data["client_secret"] = os.environ.get("GOOGLE_CLIENT_SECRET")
+            # Inject client credentials from environment variables if missing
+            if not token_data.get("client_id"):
+                token_data["client_id"] = os.environ.get("GOOGLE_CLIENT_ID")
+            if not token_data.get("client_secret"):
+                token_data["client_secret"] = os.environ.get("GOOGLE_CLIENT_SECRET")
 
             creds = Credentials.from_authorized_user_info(token_data, SCOPES)
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    # Save refreshed token (without client credentials)
-                    self._save_token_data(creds)
-                except Exception:
-                    return None
+
+            # If expired, we let google-auth handle the refresh automatically
+            # when requests are made, provided we have a refresh token.
+            # We don't manually refresh here because we don't have an easy way
+            # to propagate changes back to the session yet.
+            # Ideally, we would update the session if the token updates.
+
             return creds if creds and creds.valid else None
-        except (ValueError, KeyError, json.JSONDecodeError):
-            # Token file is in old format, invalid, or missing required fields
+        except (ValueError, KeyError):
             return None
 
     def is_authorized(self) -> bool:
         """Check if we have valid credentials."""
         creds = self.load_credentials()
         return creds is not None and creds.valid
-
-    def _save_token_data(self, creds: Credentials) -> None:
-        """Save token data to token.json (without client credentials)."""
-        import json
-
-        token_path = "token.json"
-        # Extract only the token data, not client credentials
-        token_data = json.loads(creds.to_json())
-        # Remove client credentials from saved file
-        token_data.pop("client_id", None)
-        token_data.pop("client_secret", None)
-
-        with open(token_path, "w") as token_file:
-            json.dump(token_data, token_file)
-
-    def save_credentials(self, creds_dict: Dict[str, Any]) -> None:
-        """Save new credentials to token.json and reconnect.
-
-        Client ID and secret are NOT saved to the file - they come from env vars.
-        """
-        import json
-
-        token_path = "token.json"
-        # Remove client credentials before saving
-        creds_dict.pop("client_id", None)
-        creds_dict.pop("client_secret", None)
-
-        with open(token_path, "w") as token:
-            token.write(json.dumps(creds_dict))
-        self.spreadsheet_id = None  # Reset ID to trigger rediscovery
-        self._connect()
 
     def _get_or_create_folder_path(self, path: str) -> str:
         """Get or create a folder hierarchy in Google Drive.

@@ -5,7 +5,6 @@ import os
 import re
 from collections import Counter
 from functools import wraps
-from typing import Any
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -16,6 +15,7 @@ from flask import (  # noqa: E402
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
@@ -51,17 +51,23 @@ app = Flask(__name__)
 TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
 TEST_ISBN = "9780000000000"
 
-# Initialize Google Sheets storage
-storage: Any
-if TEST_MODE:
-    # In test mode, use a mock storage
-    storage = MockStorage()
-else:
+# Global singleton for test mode only
+_mock_storage_singleton = MockStorage() if TEST_MODE else None
+
+
+def get_storage():
+    """Get the appropriate storage backend for the current request context."""
+    if TEST_MODE:
+        return _mock_storage_singleton
+
     # Use different sheet names for production and development
     # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
     is_prod = os.environ.get("FLASK_ENV") == "production"
     sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-    storage = GoogleSheetsStorage(sheet_name=sheet_name)
+
+    # Initialize implementation with credentials from session
+    credentials = session.get("credentials")
+    return GoogleSheetsStorage(sheet_name=sheet_name, credentials_dict=credentials)
 
 
 def get_app_version():
@@ -81,7 +87,7 @@ APP_VERSION = get_app_version()
 
 @app.route("/")
 def home():
-    is_authorized = storage.is_authorized()
+    is_authorized = get_storage().is_authorized()
     return render_template("home.html", is_authorized=is_authorized)
 
 
@@ -134,7 +140,7 @@ if not TEST_MODE:
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not storage.is_authorized():
+        if not get_storage().is_authorized():
             flash("Please authorize Google Sheets access first.", "info")
             return redirect(url_for("home"))
         return f(*args, **kwargs)
@@ -195,7 +201,8 @@ def authorize():
                     .replace("+00:00", "Z")
                 )
 
-            storage.save_credentials(creds_data)
+            # Save credentials to session for this user
+            session["credentials"] = creds_data
 
         flash("Successfully authorized Google Sheets access!", "success")
         return redirect(url_for("home"))
@@ -212,7 +219,10 @@ def init_sheets_command():
     if TEST_MODE:
         click.echo("Not available in test mode.")
         return
-    storage.initialize_sheets()
+
+    # Note: This will likely fail in CLI since there is no session
+    # A robust CLI would need a way to input a token manually
+    get_storage().initialize_sheets()
     click.echo("Google Sheets initialized successfully.")
 
 
@@ -225,6 +235,7 @@ def init_sheets_command():
 @login_required
 def reading_history():
     """Show detailed reading history as a chronological list of individual events."""
+    storage = get_storage()
     history = storage.get_reading_history()
 
     # Filtering
@@ -280,6 +291,7 @@ def new_book_form():
 @app.route("/books", methods=["GET"])
 @login_required
 def list_books():
+    storage = get_storage()
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
@@ -299,6 +311,7 @@ def list_books():
 @app.route("/books/search", methods=["GET"])
 @login_required
 def search_books():
+    storage = get_storage()
     query = request.args.get("q", "").strip()
 
     if not query:
@@ -334,6 +347,7 @@ def search_books():
 @app.route("/stats", methods=["GET"])
 @login_required
 def collection_stats():
+    storage = get_storage()
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
@@ -475,6 +489,7 @@ def collection_stats():
 @app.route("/books/<int:book_id>", methods=["GET"])
 @login_required
 def book_detail(book_id: int):
+    storage = get_storage()
     book = storage.get_book_by_id(book_id)
     if not book:
         flash("Book not found.", "error")
@@ -493,6 +508,7 @@ def book_detail(book_id: int):
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
 @login_required
 def create_reading_record(book_id: int):
+    storage = get_storage()
     status = request.form.get("status")
     start_date = request.form.get("start_date")
     end_date = request.form.get("end_date")
@@ -516,6 +532,7 @@ def create_reading_record(book_id: int):
 @app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
 @login_required
 def update_reading_record(record_id: int):
+    storage = get_storage()
     status = request.form.get("status")
     start_date = request.form.get("start_date")
     end_date = request.form.get("end_date")
@@ -544,6 +561,7 @@ def update_reading_record(record_id: int):
 @app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
 @login_required
 def delete_reading_record(record_id: int):
+    storage = get_storage()
     try:
         success = storage.delete_reading_record(record_id)
         if success:
@@ -560,6 +578,7 @@ def delete_reading_record(record_id: int):
 @app.route("/books", methods=["POST"])
 @login_required
 def create_book():
+    storage = get_storage()
     isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
 
     # Check if valid (allow special test ISBN in test mode)
@@ -628,6 +647,7 @@ def create_book():
 @login_required
 def fetch_missing_data():
     """Bulk fetch missing data (covers, metadata) for all books."""
+    storage = get_storage()
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
@@ -869,6 +889,7 @@ def import_books_form():
 @app.route("/books/import", methods=["POST"])
 @login_required
 def import_books():
+    storage = get_storage()
     if "file" not in request.files:
         flash("No file part", "error")
         return redirect(url_for("import_books_form"))
@@ -898,6 +919,7 @@ def import_books():
 @app.route("/books/<int:book_id>/edit", methods=["POST"])
 @login_required
 def edit_book(book_id: int):
+    storage = get_storage()
     # Extract data from form
     isbn13 = request.form.get("isbn13", "").strip().replace("-", "")
     title = request.form.get("title", "").strip()
@@ -953,6 +975,7 @@ def edit_book(book_id: int):
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
 @login_required
 def delete_book(book_id: int):
+    storage = get_storage()
     success = storage.delete_book(book_id)
     if not success:
         flash("Book not found.", "error")
@@ -971,6 +994,7 @@ if TEST_MODE:
     @app.route("/test/reset", methods=["POST"])
     def test_reset():
         """Reset test storage."""
+        storage = get_storage()
         try:
             storage.books = []
             storage.reading_records = []
