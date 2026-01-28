@@ -2,23 +2,23 @@
 
 {% block title %}Welcome - Book Lamp{% endblock %}
 
-{% block content %}
-<div class="card" style="text-align: center; max-width: 600px; margin-left: auto; margin-right: auto;">
-    <h1>Illuminate Your Library</h1>
-    <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 2.5rem;">
-        Keep track of your reading journey with a simple, elegant interface backed by Google Sheets.
-    </p>
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+{% endblock %}
 
+{% block content %}
+<h1 class="sr-only">Book Lamp Dashboard</h1>
+
+<div class="card dashboard-card">
     {% if is_authorized %}
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
+    <div class="action-buttons">
         <a href="/books" class="btn">View Your Bookshelf</a>
         <a href="/books/new" class="btn btn-outline">Add New Book</a>
     </div>
     {% else %}
-    <div
-        style="padding: 1.5rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 16px; margin-bottom: 2rem;">
-        <p style="color: #fcd34d; margin-top: 0;"><strong>Action Required</strong></p>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">
+    <div class="auth-warning">
+        <p class="auth-warning-title">Action Required</p>
+        <p class="auth-warning-text">
             The application needs permission to save data to your Google Spreadsheet.
         </p>
     </div>
@@ -26,22 +26,21 @@
     {% endif %}
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2rem; margin-top: 4rem;">
-    <div style="text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 1rem;">📚</div>
-        <h3 style="margin-bottom: 0.5rem;">Total Sync</h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Your books are stored in a familiar Google Sheet format.
-        </p>
+<div class="features-grid">
+    <div class="feature-item">
+        <div class="feature-icon" role="img" aria-label="Books icon">📚</div>
+        <h3 class="feature-title">Total Sync</h3>
+        <p class="feature-desc">Your books are stored in a familiar Google Sheet format.</p>
     </div>
-    <div style="text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 1rem;">🔍</div>
-        <h3 style="margin-bottom: 0.5rem;">Fast Lookup</h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Scan an ISBN and let us do the metadata fetching.</p>
+    <div class="feature-item">
+        <div class="feature-icon" role="img" aria-label="Search icon">🔍</div>
+        <h3 class="feature-title">Fast Lookup</h3>
+        <p class="feature-desc">Scan an ISBN and let us do the metadata fetching.</p>
     </div>
-    <div style="text-align: center;">
-        <div style="font-size: 2rem; margin-bottom: 1rem;">✨</div>
-        <h3 style="margin-bottom: 0.5rem;">Zero Bloat</h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Just the features you need, none you don't.</p>
+    <div class="feature-item">
+        <div class="feature-icon" role="img" aria-label="Sparkle icon">✨</div>
+        <h3 class="feature-title">Zero Bloat</h3>
+        <p class="feature-desc">Just the features you need, none you don't.</p>
     </div>
 </div>
 {% endblock %}
