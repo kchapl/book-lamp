@@ -1,7 +1,7 @@
 from typing import Dict
 from unittest.mock import patch
 
-from book_lamp.app import is_valid_isbn13, parse_publication_year, storage
+from book_lamp.app import get_storage, is_valid_isbn13, parse_publication_year
 
 
 def test_isbn13_validation():
@@ -33,6 +33,8 @@ def _mock_open_library_response() -> Dict:
 
 @patch("book_lamp.services.book_lookup.requests.get")
 def test_add_book_success(mock_get, authenticated_client):
+    storage = get_storage()
+
     class MockResp:
         def raise_for_status(self):
             return None
@@ -58,6 +60,8 @@ def test_add_book_success(mock_get, authenticated_client):
 
 @patch("book_lamp.services.book_lookup.requests.get")
 def test_add_book_multiple_authors(mock_get, authenticated_client):
+    storage = get_storage()
+
     class MockResp:
         def raise_for_status(self):
             return None
@@ -115,6 +119,7 @@ def test_add_book_invalid_isbn(authenticated_client):
 
 def test_delete_book_success(authenticated_client):
     # Add a book to storage
+    storage = get_storage()
     book = storage.add_book(
         isbn13="9780306406157", title="Test Book", author="Test Author"
     )
@@ -151,6 +156,7 @@ def test_add_book_authorized(client):
 
 def test_edit_book_success(authenticated_client):
     # Add a book to storage
+    storage = get_storage()
     book = storage.add_book(
         isbn13="9780306406157", title="Original Title", author="Original Author"
     )

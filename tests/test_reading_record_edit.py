@@ -1,6 +1,6 @@
 import pytest
 
-from book_lamp.app import app, storage
+from book_lamp.app import app, get_storage
 
 
 @pytest.fixture
@@ -13,6 +13,7 @@ def client():
 
     with app.test_client() as client:
         # Manually reset mock storage
+        storage = get_storage()
         storage.books = []
         storage.reading_records = []
         storage.next_book_id = 1
@@ -22,6 +23,7 @@ def client():
 
 def test_update_reading_record(client):
     """Test updating an existing reading record."""
+    storage = get_storage()
     book = storage.add_book(isbn13="1234567890123", title="Test Book", author="Author")
     record = storage.add_reading_record(
         book_id=book["id"], status="In Progress", start_date="2024-01-01"
@@ -48,6 +50,7 @@ def test_update_reading_record(client):
 
 def test_delete_reading_record(client):
     """Test deleting a reading record."""
+    storage = get_storage()
     book = storage.add_book(isbn13="1234567890123", title="Test Book", author="Author")
     record = storage.add_reading_record(
         book_id=book["id"], status="In Progress", start_date="2024-01-01"
@@ -66,6 +69,7 @@ def test_delete_reading_record(client):
 
 def test_delete_book_consistent_behavior(client):
     """Test that deleting a book still works after UI changes."""
+    storage = get_storage()
     book = storage.add_book(isbn13="1234567890123", title="Test Book", author="Author")
     book_id = book["id"]
 

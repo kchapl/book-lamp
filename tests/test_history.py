@@ -1,6 +1,6 @@
 import pytest
 
-from book_lamp.app import app, storage
+from book_lamp.app import app, get_storage
 
 
 @pytest.fixture
@@ -12,6 +12,7 @@ def client():
 
 def test_get_reading_history_empty(client):
     """Test reading history when no records exist."""
+    storage = get_storage()
     # Reset storage
     storage.books = []
     storage.reading_records = []
@@ -24,6 +25,7 @@ def test_get_reading_history_empty(client):
 
 def test_get_reading_history_populated(client):
     """Test reading history with records."""
+    storage = get_storage()
     # Setup mock data
     storage.books = []
     storage.reading_records = []
@@ -49,6 +51,7 @@ def test_get_reading_history_populated(client):
 
 def test_reading_history_filtering(client):
     """Test filtering by status and rating."""
+    storage = get_storage()
     storage.books = []
     storage.reading_records = []
 
@@ -73,6 +76,7 @@ def test_reading_history_filtering(client):
 
 def test_reading_history_sorting(client):
     """Test sorting by title and date."""
+    storage = get_storage()
     storage.books = []
     storage.reading_records = []
 
