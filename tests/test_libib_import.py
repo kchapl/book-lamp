@@ -1,9 +1,10 @@
 import io
 
-from book_lamp.app import storage
+from book_lamp.app import get_storage
 
 
 def test_libib_import_success(authenticated_client):
+    storage = get_storage()
     csv_content = (
         "Title,Author,ISBN,Publish Date,Date Added,Date Completed,Rating\n"
         "Test Book,Test Author,9780000000001,2020,2023-01-01,2023-01-10,5\n"
@@ -42,6 +43,7 @@ def test_libib_import_success(authenticated_client):
 
 def test_libib_import_overwrite_existing(authenticated_client):
     # Pre-add a book
+    storage = get_storage()
     storage.add_book(
         isbn13="9780000000001",
         title="Old Title",
@@ -79,6 +81,7 @@ def test_libib_import_overwrite_existing(authenticated_client):
 
 
 def test_libib_import_complex(authenticated_client):
+    storage = get_storage()
     csv_content = (
         "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating,Description\n"
         "In Progress Book,Author A,9781111111111,In progress,01/05/2023,,0,Great start\n"
@@ -122,6 +125,7 @@ def test_libib_import_complex(authenticated_client):
 
 
 def test_libib_import_deduplication(authenticated_client):
+    storage = get_storage()
     csv_content = (
         "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating\n"
         "Duplicate Book,Author D,9784444444444,Completed,2023-01-01,2023-01-02,5\n"

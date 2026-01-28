@@ -38,7 +38,9 @@ def authenticated_client(client):
 @pytest.fixture(autouse=True)
 def _storage_reset():
     """Reset mock storage before each test."""
-    from book_lamp.app import storage
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
 
     if hasattr(storage, "books"):
         storage.books = []
