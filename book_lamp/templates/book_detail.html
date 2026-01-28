@@ -213,15 +213,21 @@
         <div class="book-detail-header" id="book-header" data-edit-mode="false">
             <div style="flex-shrink: 0; width: 300px;">
                 <div class="book-cover">
-                    {% if book.thumbnail_url %}
+                    {% if book.cover_url %}
+                    <img src="{{ book.cover_url }}" alt="{{ book.title }} cover">
+                    {% elif book.thumbnail_url %}
                     <img src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover">
                     {% else %}
                     <div class="book-cover-placeholder">📖</div>
                     {% endif %}
                 </div>
                 <div class="edit-only" style="margin-top: 1rem;">
-                    <label class="meta-label">Thumbnail URL</label>
+                    <label class="meta-label">Thumbnail URL (Small)</label>
                     <input type="text" name="thumbnail_url" class="edit-input" value="{{ book.thumbnail_url or '' }}">
+                </div>
+                <div class="edit-only" style="margin-top: 1rem;">
+                    <label class="meta-label">Cover URL (Large)</label>
+                    <input type="text" name="cover_url" class="edit-input" value="{{ book.cover_url or '' }}">
                 </div>
             </div>
             <div class="book-info">

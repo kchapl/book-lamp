@@ -165,7 +165,10 @@ def login():
             redirect_uri = url_for("authorize", _external=True)
 
         app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
-        return oauth.google.authorize_redirect(redirect_uri)
+        # Request offline access to get a refresh token
+        return oauth.google.authorize_redirect(
+            redirect_uri, access_type="offline", prompt="consent"
+        )
     except Exception:
         app.logger.exception("OAuth login failed")
         return (
@@ -638,6 +641,7 @@ def create_book():
         page_count=data.get("page_count"),
         physical_format=data.get("physical_format"),
         edition=data.get("edition"),
+        cover_url=data.get("cover_url"),
     )
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
@@ -657,7 +661,7 @@ def fetch_missing_data():
     updated_count = 0
 
     # Identify candidates: all books with ISBN that have any missing data
-    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description
+    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description, cover_url
     def is_empty(value):
         """Check if a value is None or empty string."""
         return value is None or (isinstance(value, str) and not value.strip())
@@ -691,6 +695,8 @@ def fetch_missing_data():
             missing_fields.append("physical_format")
         if is_empty(b.get("edition")):
             missing_fields.append("edition")
+        if is_empty(b.get("cover_url")):
+            missing_fields.append("cover_url")
 
         if missing_fields:
             candidates.append(b)
@@ -729,6 +735,15 @@ def fetch_missing_data():
                 found_fields.append("thumbnail_url")
                 populated_fields.append("thumbnail_url")
                 has_updates = True
+
+            if is_empty(updated_book.get("cover_url")) and info.get("cover_url"):
+                updated_book["cover_url"] = info["cover_url"]
+                found_fields.append("cover_url")
+                populated_fields.append("cover_url")
+                has_updates = True
+
+            # If thumbnail is present but cover is missing, use thumbnail as cover if it's large enough?
+            # No, let's keep them distinct. If cover_url is missing, template uses thumbnail.
 
             if is_empty(updated_book.get("title")) and info.get("title"):
                 updated_book["title"] = (
@@ -926,6 +941,7 @@ def edit_book(book_id: int):
     author = request.form.get("author", "").strip()
     publication_year_str = request.form.get("publication_year", "").strip()
     thumbnail_url = request.form.get("thumbnail_url", "").strip()
+    cover_url = request.form.get("cover_url", "").strip()
     publisher = request.form.get("publisher", "").strip()
     description = request.form.get("description", "").strip()
     series = request.form.get("series", "").strip()
@@ -963,6 +979,7 @@ def edit_book(book_id: int):
             description=(description if description else None),
             series=(series if series else None),
             dewey_decimal=(dewey_decimal if dewey_decimal else None),
+            cover_url=(cover_url if cover_url else None),
         )
         flash("Book updated successfully.", "success")
     except Exception as e:

@@ -56,15 +56,18 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         language = languages[0].get("name")
 
     thumbnail_url = None
+    cover_url = None
     cover = data.get("cover") or {}
     if isinstance(cover, dict):
-        thumbnail_url = cover.get("medium") or cover.get("small") or cover.get("large")
+        thumbnail_url = cover.get("medium") or cover.get("small")
+        cover_url = cover.get("large") or cover.get("medium")
 
     return {
         "title": html.unescape(title) if title else title,
         "author": html.unescape(author_name) if author_name else author_name,
         "publish_date": publish_date,
         "thumbnail_url": thumbnail_url,
+        "cover_url": cover_url,
         "publisher": (
             html.unescape(publisher_name) if publisher_name else publisher_name
         ),
@@ -109,16 +112,26 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         thumbnail_url = image_links.get("thumbnail") or image_links.get(
             "smallThumbnail"
         )
+        # Try to get larger images
+        cover_url = (
+            image_links.get("extraLarge")
+            or image_links.get("large")
+            or image_links.get("medium")
+            or thumbnail_url
+        )
 
         # Ensure HTTPS
         if thumbnail_url and thumbnail_url.startswith("http://"):
             thumbnail_url = thumbnail_url.replace("http://", "https://", 1)
+        if cover_url and cover_url.startswith("http://"):
+            cover_url = cover_url.replace("http://", "https://", 1)
 
         return {
             "title": html.unescape(title) if title else title,
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,
+            "cover_url": cover_url,
             "publisher": (html.unescape(publisher) if publisher else publisher),
             "description": html.unescape(description) if description else description,
             "dewey_decimal": None,
@@ -153,17 +166,21 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         description = item.get("description")
 
         # iTunes gives different sized artwork, "artworkUrl100" is usually available
-        thumbnail_url = item.get("artworkUrl100") or item.get("artworkUrl60")
+        base_url = item.get("artworkUrl100") or item.get("artworkUrl60")
+        thumbnail_url = base_url
+        cover_url = None
 
         # Get high-res artwork if possible by replacing dimension in URL
-        if thumbnail_url:
-            thumbnail_url = thumbnail_url.replace("100x100bb", "600x600bb")
+        if base_url:
+            thumbnail_url = base_url.replace("100x100bb", "200x200bb")
+            cover_url = base_url.replace("100x100bb", "600x600bb")
 
         return {
             "title": html.unescape(title) if title else title,
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,
+            "cover_url": cover_url,
             "publisher": None,
             "description": html.unescape(description) if description else description,
             "dewey_decimal": None,
@@ -232,7 +249,7 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
 
     If metadata is found but no cover, attempts to fetch cover from Amazon.
 
-    Returns a dict with keys: title, author, publish_date, thumbnail_url, or None if not found.
+    Returns a dict with keys: title, author, publish_date, thumbnail_url, cover_url, or None if not found.
     """
     # 1. Open Library
     ol_result = _lookup_open_library(isbn13)
@@ -259,6 +276,7 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         amazon_cover = _lookup_amazon_cover(isbn13)
         if amazon_cover:
             best_result["thumbnail_url"] = amazon_cover
+            best_result["cover_url"] = amazon_cover
 
         return best_result
 

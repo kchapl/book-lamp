@@ -282,7 +282,7 @@ class GoogleSheetsStorage:
             try:
                 self.service.spreadsheets().values().append(
                     spreadsheetId=sid,
-                    range="Authors!A:B",
+                    range="Authors!A1",
                     valueInputOption="RAW",
                     body={"values": new_authors},
                 ).execute()
@@ -291,7 +291,7 @@ class GoogleSheetsStorage:
                     self.initialize_sheets()
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Authors!A:B",
+                        range="Authors!A1",
                         valueInputOption="RAW",
                         body={"values": new_authors},
                     ).execute()
@@ -311,7 +311,7 @@ class GoogleSheetsStorage:
             try:
                 self.service.spreadsheets().values().append(
                     spreadsheetId=sid,
-                    range="BookAuthors!A:B",
+                    range="BookAuthors!A1",
                     valueInputOption="RAW",
                     body={"values": links_to_add},
                 ).execute()
@@ -320,7 +320,7 @@ class GoogleSheetsStorage:
                     self.initialize_sheets()
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="BookAuthors!A:B",
+                        range="BookAuthors!A1",
                         valueInputOption="RAW",
                         body={"values": links_to_add},
                     ).execute()
@@ -335,7 +335,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:O")
+                .get(spreadsheetId=sid, range="Books!A:P")
                 .execute()
             )
             values = result.get("values", [])
@@ -347,7 +347,7 @@ class GoogleSheetsStorage:
             for row in values[1:]:
                 if not row:
                     continue
-                # Pad row to match header length (now 15 columns)
+                # Pad row to match header length (now 16 columns)
                 row = row + [""] * (len(headers) - len(row))
                 book = {
                     "id": int(row[0]) if row[0] else 0,
@@ -371,6 +371,7 @@ class GoogleSheetsStorage:
                     ),
                     "physical_format": row[13] if len(row) > 13 else None,
                     "edition": row[14] if len(row) > 14 else None,
+                    "cover_url": row[15] if len(row) > 15 and row[15] else None,
                 }
                 books_raw.append(book)
 
@@ -478,6 +479,7 @@ class GoogleSheetsStorage:
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -501,11 +503,12 @@ class GoogleSheetsStorage:
             page_count if page_count else "",
             physical_format if physical_format else "",
             edition if edition else "",
+            cover_url if cover_url else "",
         ]
         try:
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:O",
+                range="Books!A:P",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -531,6 +534,7 @@ class GoogleSheetsStorage:
                 "page_count": page_count,
                 "physical_format": physical_format,
                 "edition": edition,
+                "cover_url": cover_url,
             }
         except HttpError as error:
             if error.resp.status == 400:
@@ -539,7 +543,7 @@ class GoogleSheetsStorage:
                 try:
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Books!A:O",
+                        range="Books!A:P",
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
@@ -564,6 +568,7 @@ class GoogleSheetsStorage:
                         "page_count": page_count,
                         "physical_format": physical_format,
                         "edition": edition,
+                        "cover_url": cover_url,
                     }
                 except HttpError as retry_error:
                     raise Exception(
@@ -587,6 +592,7 @@ class GoogleSheetsStorage:
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update an existing book in the Books tab."""
         sid = self._ensure_spreadsheet_id()
@@ -596,7 +602,7 @@ class GoogleSheetsStorage:
         result = (
             self.service.spreadsheets()
             .values()
-            .get(spreadsheetId=sid, range="Books!A:O")
+            .get(spreadsheetId=sid, range="Books!A:P")
             .execute()
         )
         values = result.get("values", [])
@@ -611,6 +617,12 @@ class GoogleSheetsStorage:
         existing_description = None
         existing_series = None
         existing_dewey = None
+        existing_cover_url = None
+        existing_language = None
+        existing_page_count = None
+        existing_physical_format = None
+        existing_edition = None
+
         for idx, row in enumerate(values[1:], start=2):
             if row and row[0] and int(row[0]) == book_id:
                 row_index = idx
@@ -624,6 +636,7 @@ class GoogleSheetsStorage:
                 existing_page_count = row[12] if len(row) > 12 else None
                 existing_physical_format = row[13] if len(row) > 13 else None
                 existing_edition = row[14] if len(row) > 14 else None
+                existing_cover_url = row[15] if len(row) > 15 else None
                 break
 
         if row_index is None:
@@ -650,6 +663,8 @@ class GoogleSheetsStorage:
             physical_format = existing_physical_format
         if not edition and existing_edition:
             edition = existing_edition
+        if not cover_url and existing_cover_url:
+            cover_url = existing_cover_url
 
         row = [
             book_id,
@@ -667,12 +682,13 @@ class GoogleSheetsStorage:
             page_count if page_count else "",
             physical_format if physical_format else "",
             edition if edition else "",
+            cover_url if cover_url else "",
         ]
 
         try:
             self.service.spreadsheets().values().update(
                 spreadsheetId=sid,
-                range=f"Books!A{row_index}:O{row_index}",
+                range=f"Books!A{row_index}:P{row_index}",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -698,6 +714,7 @@ class GoogleSheetsStorage:
                 "page_count": page_count,
                 "physical_format": physical_format,
                 "edition": edition,
+                "cover_url": cover_url,
             }
         except HttpError as error:
             raise Exception(f"Failed to update book: {error}") from error
@@ -717,6 +734,7 @@ class GoogleSheetsStorage:
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book or update an existing one if ISBN matches."""
         existing = self.get_book_by_isbn(isbn13)
@@ -736,6 +754,7 @@ class GoogleSheetsStorage:
                 page_count=page_count,
                 physical_format=physical_format,
                 edition=edition,
+                cover_url=cover_url,
             )
         else:
             return self.add_book(
@@ -752,6 +771,7 @@ class GoogleSheetsStorage:
                 page_count=page_count,
                 physical_format=physical_format,
                 edition=edition,
+                cover_url=cover_url,
             )
 
     def bulk_import(self, items: List[Dict[str, Any]]) -> int:
@@ -764,7 +784,7 @@ class GoogleSheetsStorage:
             books_result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:O")
+                .get(spreadsheetId=sid, range="Books!A:P")
                 .execute()
             )
         except HttpError as e:
@@ -850,7 +870,7 @@ class GoogleSheetsStorage:
                 row_data, row_idx = existing_books[isbn]
                 book_id = int(row_data[0])
 
-                # Preserve existing thumbnail and created_at if missing
+                # Preserve existing fields if missing in new data
                 thumb = b.get("thumbnail_url") or (
                     row_data[5] if len(row_data) > 5 else ""
                 )
@@ -869,6 +889,7 @@ class GoogleSheetsStorage:
                     row_data[13] if len(row_data) > 13 else ""
                 )
                 ed = b.get("edition") or (row_data[14] if len(row_data) > 14 else "")
+                cu = b.get("cover_url") or (row_data[15] if len(row_data) > 15 else "")
 
                 new_row = [
                     book_id,
@@ -886,9 +907,10 @@ class GoogleSheetsStorage:
                     pc,
                     pf,
                     ed,
+                    cu,
                 ]
                 books_to_update.append(
-                    {"range": f"Books!A{row_idx}:O{row_idx}", "values": [new_row]}
+                    {"range": f"Books!A{row_idx}:P{row_idx}", "values": [new_row]}
                 )
             else:
                 # Append new
@@ -910,6 +932,7 @@ class GoogleSheetsStorage:
                     b.get("page_count") or "",
                     b.get("physical_format") or "",
                     b.get("edition") or "",
+                    b.get("cover_url") or "",
                 ]
                 books_to_append.append(new_row)
 
@@ -988,7 +1011,7 @@ class GoogleSheetsStorage:
             # Batch append new books
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:O",
+                range="Books",
                 valueInputOption="RAW",
                 body={"values": books_to_append},
             ).execute()
@@ -997,7 +1020,7 @@ class GoogleSheetsStorage:
             # Batch append new records
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="ReadingRecords!A:G",
+                range="ReadingRecords",
                 valueInputOption="RAW",
                 body={"values": records_to_append},
             ).execute()
@@ -1006,7 +1029,7 @@ class GoogleSheetsStorage:
             # Batch append new authors
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Authors!A:B",
+                range="Authors",
                 valueInputOption="RAW",
                 body={"values": authors_to_append},
             ).execute()
@@ -1015,79 +1038,12 @@ class GoogleSheetsStorage:
             # Batch append new links
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="BookAuthors!A:B",
+                range="BookAuthors",
                 valueInputOption="RAW",
                 body={"values": links_to_append},
             ).execute()
 
         return import_count
-
-    def add_reading_record(
-        self,
-        book_id: int,
-        status: str,
-        start_date: str,
-        end_date: Optional[str] = None,
-        rating: int = 0,
-    ) -> Dict[str, Any]:
-        """Add a new reading record to the ReadingRecords tab."""
-        sid = self._ensure_spreadsheet_id()
-        assert self.service is not None
-        record_id = self._get_next_id("ReadingRecords")
-        created_at = datetime.now(timezone.utc).isoformat()
-
-        row = [
-            record_id,
-            book_id,
-            status,
-            start_date,
-            end_date if end_date else "",
-            rating,
-            created_at,
-        ]
-
-        try:
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="ReadingRecords!A:G",
-                valueInputOption="RAW",
-                body={"values": [row]},
-            ).execute()
-
-            return {
-                "id": record_id,
-                "book_id": book_id,
-                "status": status,
-                "start_date": start_date,
-                "end_date": end_date,
-                "rating": rating,
-                "created_at": created_at,
-            }
-        except HttpError as error:
-            if error.resp.status == 400:
-                # Tab might not exist, try initializing and appending again
-                self.initialize_sheets()
-                try:
-                    self.service.spreadsheets().values().append(
-                        spreadsheetId=sid,
-                        range="ReadingRecords!A:G",
-                        valueInputOption="RAW",
-                        body={"values": [row]},
-                    ).execute()
-                    return {
-                        "id": record_id,
-                        "book_id": book_id,
-                        "status": status,
-                        "start_date": start_date,
-                        "end_date": end_date,
-                        "rating": rating,
-                        "created_at": created_at,
-                    }
-                except HttpError as retry_error:
-                    raise Exception(
-                        f"Failed to add reading record after initialization: {retry_error}"
-                    ) from retry_error
-            raise Exception(f"Failed to add reading record: {error}") from error
 
     def update_reading_record(
         self,
@@ -1312,6 +1268,7 @@ class GoogleSheetsStorage:
                     "page_count",
                     "physical_format",
                     "edition",
+                    "cover_url",
                 ],
                 "ReadingRecords": [
                     "id",
