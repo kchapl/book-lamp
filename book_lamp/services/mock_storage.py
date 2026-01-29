@@ -4,7 +4,7 @@ class MockStorage:
         self.reading_records = []
         self.next_book_id = 1
         self.next_record_id = 1
-        self._authorised = True  # Default to True for backward compatibility
+        self._authorised = False  # Default to False for security and testing
 
     def is_authorised(self):
         """Authorisation state can be toggled in mock mode for testing."""

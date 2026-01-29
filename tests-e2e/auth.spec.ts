@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ request }) => {
+    await request.post('/test/reset');
+});
+
 test('auth guard redirects to unauthorised when not logged in', async ({ page }) => {
     await page.goto('/about');
     await expect(page).toHaveURL(/.*unauthorised/);

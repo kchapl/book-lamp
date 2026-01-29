@@ -20,13 +20,17 @@ test('can add and view reading records', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Test Driven Development' })).toBeVisible();
 
     // 3. Add a reading record
-    await page.getByRole('button', { name: 'Add Record' }).click();
-    await expect(page.locator('select[name="status"]')).toBeVisible();
-    await page.selectOption('select[name="status"]', 'Completed');
-    await page.fill('input[name="start_date"]', '2024-01-01');
-    await page.fill('input[name="end_date"]', '2024-01-10');
-    await page.selectOption('select[name="rating"]', '5');
-    await page.getByRole('button', { name: 'Save' }).click();
+    const addRecordBtn = page.locator('.add-record-toggle');
+    await addRecordBtn.click();
+
+    const form = page.locator('.add-record-form');
+    await expect(form).toBeVisible();
+
+    await form.locator('select[name="status"]').selectOption('Completed');
+    await form.locator('input[name="start_date"]').fill('2024-01-01');
+    await form.locator('input[name="end_date"]').fill('2024-01-10');
+    await form.locator('select[name="rating"]').selectOption('5');
+    await form.getByRole('button', { name: 'Save' }).click();
 
     // 4. Verify record on detail page
     await expect(page.locator('.status-badge')).toHaveText('Completed');

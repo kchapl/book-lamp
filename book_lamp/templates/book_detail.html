@@ -322,7 +322,7 @@
             <button class="add-record-toggle" onclick="toggleForm('{{ book.id }}')">Add Record</button>
         </div>
 
-        <div id="form-{{ book.id }}" class="add-record-form">
+        <div id="form-{{ book.id }}" class="add-record-form hidden">
             <form method="post" action="{{ url_for('create_reading_record', book_id=book.id) }}">
                 <div class="form-group">
                     <label>Status</label>
@@ -336,7 +336,7 @@
                     <label>Start Date</label>
                     <input type="date" name="start_date" value="{{ today }}" required>
                 </div>
-                <div class="form-group" id="end-date-group-{{ book.id }}" style="display: none;">
+                <div class="form-group hidden" id="end-date-group-{{ book.id }}">
                     <label id="end-date-label-{{ book.id }}">End Date</label>
                     <input type="date" name="end_date">
                 </div>
