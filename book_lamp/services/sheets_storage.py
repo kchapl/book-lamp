@@ -189,7 +189,9 @@ class GoogleSheetsStorage:
             # Find max ID (skip header)
             ids = [int(row[0]) for row in values[1:] if row and row[0].isdigit()]
             return max(ids) + 1 if ids else 1
-        except HttpError:
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
             return 1
 
     def get_authors(self) -> List[Dict[str, Any]]:
@@ -217,6 +219,7 @@ class GoogleSheetsStorage:
             return authors
         except HttpError as error:
             if error.resp.status == 400:
+                self.initialize_sheets()
                 return []
             raise Exception(f"Failed to fetch authors: {error}") from error
 
@@ -249,6 +252,7 @@ class GoogleSheetsStorage:
             return links
         except HttpError as error:
             if error.resp.status == 400:
+                self.initialize_sheets()
                 return []
             raise Exception(f"Failed to fetch book authors: {error}") from error
 
@@ -404,6 +408,9 @@ class GoogleSheetsStorage:
 
             return final_books
         except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return []
             raise Exception(f"Failed to fetch books: {error}") from error
 
     def get_reading_records(
@@ -443,8 +450,9 @@ class GoogleSheetsStorage:
                     records.append(record)
             return records
         except HttpError as error:
-            # If the tab doesn't exist yet, return empty list
+            # If the tab doesn't exist yet, try initializing and return empty list
             if error.resp.status == 400:
+                self.initialize_sheets()
                 return []
             raise Exception(f"Failed to fetch reading records: {error}") from error
 
@@ -599,12 +607,18 @@ class GoogleSheetsStorage:
         assert self.service is not None
 
         # Get all data to find the row index
-        result = (
-            self.service.spreadsheets()
-            .values()
-            .get(spreadsheetId=sid, range="Books!A:P")
-            .execute()
-        )
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Books!A:P")
+                .execute()
+            )
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                raise Exception(f"Book with ID {book_id} not found")
+            raise
         values = result.get("values", [])
         if len(values) <= 1:
             raise Exception(f"Book with ID {book_id} not found")
@@ -717,6 +731,9 @@ class GoogleSheetsStorage:
                 "cover_url": cover_url,
             }
         except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                raise Exception("Failed to update book: tab was missing") from error
             raise Exception(f"Failed to update book: {error}") from error
 
     def upsert_book(
@@ -1009,39 +1026,87 @@ class GoogleSheetsStorage:
 
         if books_to_append:
             # Batch append new books
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="Books",
-                valueInputOption="RAW",
-                body={"values": books_to_append},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="Books",
+                    valueInputOption="RAW",
+                    body={"values": books_to_append},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="Books",
+                        valueInputOption="RAW",
+                        body={"values": books_to_append},
+                    ).execute()
+                else:
+                    raise
 
         if records_to_append:
             # Batch append new records
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="ReadingRecords",
-                valueInputOption="RAW",
-                body={"values": records_to_append},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="ReadingRecords",
+                    valueInputOption="RAW",
+                    body={"values": records_to_append},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="ReadingRecords",
+                        valueInputOption="RAW",
+                        body={"values": records_to_append},
+                    ).execute()
+                else:
+                    raise
 
         if authors_to_append:
             # Batch append new authors
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="Authors",
-                valueInputOption="RAW",
-                body={"values": authors_to_append},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="Authors",
+                    valueInputOption="RAW",
+                    body={"values": authors_to_append},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="Authors",
+                        valueInputOption="RAW",
+                        body={"values": authors_to_append},
+                    ).execute()
+                else:
+                    raise
 
         if links_to_append:
             # Batch append new links
-            self.service.spreadsheets().values().append(
-                spreadsheetId=sid,
-                range="BookAuthors",
-                valueInputOption="RAW",
-                body={"values": links_to_append},
-            ).execute()
+            try:
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="BookAuthors",
+                    valueInputOption="RAW",
+                    body={"values": links_to_append},
+                ).execute()
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="BookAuthors",
+                        valueInputOption="RAW",
+                        body={"values": links_to_append},
+                    ).execute()
+                else:
+                    raise
 
         return import_count
 
@@ -1058,12 +1123,19 @@ class GoogleSheetsStorage:
         assert self.service is not None
 
         # Get all data to find the row index
-        result = (
-            self.service.spreadsheets()
-            .values()
-            .get(spreadsheetId=sid, range="ReadingRecords!A:G")
-            .execute()
-        )
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingRecords!A:G")
+                .execute()
+            )
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                raise Exception(f"Reading record with ID {record_id} not found")
+            raise
+
         values = result.get("values", [])
         if len(values) <= 1:
             raise Exception(f"Reading record with ID {record_id} not found")
@@ -1113,6 +1185,12 @@ class GoogleSheetsStorage:
                 "created_at": created_at,
             }
         except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                # If we're here, the row_index we had is likely invalid now anyway
+                raise Exception(
+                    "Failed to update reading record: tab was missing"
+                ) from error
             raise Exception(f"Failed to update reading record: {error}") from error
 
     def delete_reading_record(self, record_id: int) -> bool:
@@ -1121,12 +1199,19 @@ class GoogleSheetsStorage:
         assert self.service is not None
 
         # Get all data to find the row index
-        result = (
-            self.service.spreadsheets()
-            .values()
-            .get(spreadsheetId=sid, range="ReadingRecords!A:A")
-            .execute()
-        )
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingRecords!A:A")
+                .execute()
+            )
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return False
+            raise
+
         values = result.get("values", [])
         if len(values) <= 1:
             return False
@@ -1170,12 +1255,19 @@ class GoogleSheetsStorage:
         assert self.service is not None
         try:
             # Get all data
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="Books!A:O")
-                .execute()
-            )
+            try:
+                result = (
+                    self.service.spreadsheets()
+                    .values()
+                    .get(spreadsheetId=sid, range="Books!A:P")
+                    .execute()
+                )
+            except HttpError as error:
+                if error.resp.status == 400:
+                    self.initialize_sheets()
+                    return False
+                raise
+
             values = result.get("values", [])
             if len(values) <= 1:
                 return False
@@ -1221,7 +1313,17 @@ class GoogleSheetsStorage:
             for sheet in sheet_metadata.get("sheets", []):
                 if sheet["properties"]["title"] == tab_name:
                     return int(sheet["properties"]["sheetId"])
-            raise Exception(f"Tab '{tab_name}' not found")
+
+            # Not found, try initializing
+            self.initialize_sheets()
+            sheet_metadata = (
+                self.service.spreadsheets().get(spreadsheetId=sid).execute()
+            )
+            for sheet in sheet_metadata.get("sheets", []):
+                if sheet["properties"]["title"] == tab_name:
+                    return int(sheet["properties"]["sheetId"])
+
+            raise Exception(f"Tab '{tab_name}' not found after initialization")
         except HttpError as error:
             raise Exception(f"Failed to get sheet ID: {error}") from error
 
