@@ -1,30 +1,13 @@
 import html
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 
 
-def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
-    """Helper to lookup book details via Open Library."""
-    params = {
-        "bibkeys": f"ISBN:{isbn13}",
-        "format": "json",
-        "jscmd": "data",
-    }
-    try:
-        response = requests.get(OPEN_LIBRARY_API, params=params, timeout=10)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception:
-        return None
-
-    key = f"ISBN:{isbn13}"
-    if key not in payload:
-        return None
-
-    data = payload[key]
+def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper to parse a single book's data from Open Library."""
     title = data.get("title")
     authors = data.get("authors") or []
     author_name = None
@@ -78,6 +61,77 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         "physical_format": physical_format,
         "edition": edition_name,
     }
+
+
+def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
+    """Helper to lookup book details via Open Library."""
+    params = {
+        "bibkeys": f"ISBN:{isbn13}",
+        "format": "json",
+        "jscmd": "data",
+    }
+    try:
+        response = requests.get(OPEN_LIBRARY_API, params=params, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+    except Exception:
+        return None
+
+    key = f"ISBN:{isbn13}"
+    if key not in payload:
+        return None
+
+    return _parse_open_library_data(payload[key])
+
+
+def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    """Lookup metadata for multiple books via Open Library in batches.
+
+    Args:
+        isbn13_list: List of ISBN-13 strings.
+
+    Returns:
+        Dict mapping ISBN13 -> metadata dict (or None if not found).
+    """
+    results: Dict[str, Optional[Dict[str, Any]]] = {}
+    if not isbn13_list:
+        return results
+
+    # Deduplicate
+    unique_isbns = list(set(isbn13_list))
+
+    # Process in chunks of 50
+    chunk_size = 50
+    for i in range(0, len(unique_isbns), chunk_size):
+        chunk = unique_isbns[i : i + chunk_size]
+        bibkeys = ",".join([f"ISBN:{isbn}" for isbn in chunk])
+
+        params = {
+            "bibkeys": bibkeys,
+            "format": "json",
+            "jscmd": "data",
+        }
+
+        try:
+            response = requests.get(OPEN_LIBRARY_API, params=params, timeout=20)
+            if response.status_code != 200:
+                continue
+
+            payload = response.json()
+
+            for isbn in chunk:
+                key = f"ISBN:{isbn}"
+                if key in payload:
+                    results[isbn] = _parse_open_library_data(payload[key])
+                else:
+                    results[isbn] = None
+
+        except Exception:
+            # If a batch fails, we just skip it (or could define retry logic)
+            for isbn in chunk:
+                results[isbn] = None
+
+    return results
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
