@@ -1,4 +1,4 @@
 [tools]
-node = "latest"
+node = "22"
 poetry = "latest"
 python = "latest"
