@@ -122,6 +122,8 @@ def unauthorised():
 
 @app.route("/logout")
 def logout():
+    if TEST_MODE:
+        return redirect(url_for("test_disconnect"))
     session.clear()
     flash("Google Sheets disconnected.", "info")
     return redirect(url_for("home"))
@@ -1032,8 +1034,9 @@ if TEST_MODE:
             storage.reading_records = []
             storage.next_book_id = 1
             storage.next_record_id = 1
-            # Clear session but keep test mode markers if any?
-            # session.clear() is safer to ensure clean state
+            # Default to unauthorised for testing the connect flow
+            if hasattr(storage, "set_authorised"):
+                storage.set_authorised(False)
             return {"status": "ok"}
         except Exception as e:
             app.logger.exception("Failed to reset test storage: %s", e)
@@ -1048,20 +1051,25 @@ if TEST_MODE:
         if not TEST_MODE:
             return "Not available", 404
 
-        # Mock credentials/session for test user
-        session["credentials"] = {
-            "token": "test-token",
-            "refresh_token": "test-refresh-token",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "scopes": from_sheets_storage.SCOPES,
-            "expiry": (
-                datetime.datetime.now(datetime.timezone.utc)
-                + datetime.timedelta(hours=1)
-            )
-            .isoformat()
-            .replace("+00:00", "Z"),
-        }
+        # Toggle authorised state in MockStorage
+        storage = get_storage()
+        if hasattr(storage, "set_authorised"):
+            storage.set_authorised(True)
+
         flash("Google Sheets Connected (Test Mode)", "success")
+        return redirect(url_for("home"))
+
+    @app.route("/test/disconnect")
+    def test_disconnect():
+        """Disconnect as a test user automatically."""
+        if not TEST_MODE:
+            return "Not available", 404
+
+        storage = get_storage()
+        if hasattr(storage, "set_authorised"):
+            storage.set_authorised(False)
+
+        flash("Google Sheets Disconnected (Test Mode)", "info")
         return redirect(url_for("home"))
 
 

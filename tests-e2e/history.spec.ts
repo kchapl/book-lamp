@@ -21,6 +21,7 @@ test('can add and view reading records', async ({ page }) => {
 
     // 3. Add a reading record
     await page.getByRole('button', { name: 'Add Record' }).click();
+    await expect(page.locator('select[name="status"]')).toBeVisible();
     await page.selectOption('select[name="status"]', 'Completed');
     await page.fill('input[name="start_date"]', '2024-01-01');
     await page.fill('input[name="end_date"]', '2024-01-10');
@@ -29,7 +30,7 @@ test('can add and view reading records', async ({ page }) => {
 
     // 4. Verify record on detail page
     await expect(page.locator('.status-badge')).toHaveText('Completed');
-    await expect(page.locator('.stars')).toHaveText('★★★★★☆☆☆☆☆'); // Wait, the stars logic in HTML is 5 full + 5 empty stars?
+    await expect(page.locator('.stars')).toHaveText('★★★★★');
     // Let's check book_detail.html: {% for _ in range(record.rating) %}★{% endfor %} {% for _ in range(5 - record.rating) %}☆{% endfor %}
     // So for 5 stars, it's 5 full stars. The test above had 10 stars total?
     // Ah, line 378 in book_detail.html: range(record.rating) + range(5 - record.rating) = 5 stars.

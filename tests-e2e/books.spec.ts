@@ -10,7 +10,7 @@ test.beforeEach(async ({ page, request }) => {
 
 test('books list initially empty and link to add', async ({ page }) => {
     await page.goto('/books');
-    await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Books', exact: true })).toBeVisible();
     await expect(page.locator('text=Your bookshelf is empty')).toBeVisible();
     await page.getByRole('link', { name: 'Add Your First Book' }).click();
     await expect(page).toHaveURL(/.*\/books\/new/);
