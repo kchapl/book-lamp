@@ -30,7 +30,7 @@
             "problemMatcher": []
         },
         {
-            "label": "Run E2E Tests (Playwright)",
+            "label": "Playwright: Run E2E Tests",
             "type": "shell",
             "command": "npm test",
             "group": "test",
@@ -41,7 +41,7 @@
             "problemMatcher": []
         },
         {
-            "label": "Run E2E Tests UI (Playwright)",
+            "label": "Playwright: Run E2E Tests (UI)",
             "type": "shell",
             "command": "npm run test:ui",
             "group": "test",
@@ -52,7 +52,18 @@
             "problemMatcher": []
         },
         {
-            "label": "Show Playwright Report",
+            "label": "Playwright: Install Browsers",
+            "type": "shell",
+            "command": "npx playwright install --with-deps",
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Playwright: Show Report",
             "type": "shell",
             "command": "npx playwright show-report",
             "group": "none",
@@ -76,6 +87,16 @@
             "type": "shell",
             "command": "poetry run mypy .",
             "group": "build",
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Dependencies (Node/Playwright)",
+            "type": "shell",
+            "command": "npm install && npx playwright install --with-deps",
+            "group": "none",
             "presentation": {
                 "reveal": "always"
             },
