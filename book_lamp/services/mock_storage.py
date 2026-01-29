@@ -44,6 +44,7 @@ class MockStorage:
         page_count=None,
         physical_format=None,
         edition=None,
+        cover_url=None,
     ):
         from book_lamp.utils.authors import split_authors
 
@@ -64,6 +65,7 @@ class MockStorage:
             "page_count": page_count,
             "physical_format": physical_format,
             "edition": edition,
+            "cover_url": cover_url,
         }
         self.books.append(book)
         self.next_book_id += 1
@@ -85,6 +87,7 @@ class MockStorage:
         page_count=None,
         physical_format=None,
         edition=None,
+        cover_url=None,
     ):
         from book_lamp.utils.authors import split_authors
 
@@ -107,6 +110,7 @@ class MockStorage:
                         "physical_format": physical_format
                         or book.get("physical_format"),
                         "edition": edition or book.get("edition"),
+                        "cover_url": cover_url or book.get("cover_url"),
                     }
                 )
                 return book
@@ -127,6 +131,7 @@ class MockStorage:
         page_count=None,
         physical_format=None,
         edition=None,
+        cover_url=None,
     ):
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -145,6 +150,7 @@ class MockStorage:
                 page_count=page_count,
                 physical_format=physical_format,
                 edition=edition,
+                cover_url=cover_url,
             )
         else:
             return self.add_book(
@@ -161,6 +167,7 @@ class MockStorage:
                 page_count=page_count,
                 physical_format=physical_format,
                 edition=edition,
+                cover_url=cover_url,
             )
 
     def add_reading_record(self, book_id, status, start_date, end_date=None, rating=0):

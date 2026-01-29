@@ -173,6 +173,7 @@ def test_edit_book_success(authenticated_client):
         "series": "Updated Series",
         "dewey_decimal": "123.456",
         "thumbnail_url": "https://example.com/cover.jpg",
+        "cover_url": "https://example.com/large_cover.jpg",
     }
     resp = authenticated_client.post(
         f"/books/{book_id}/edit", data=updated_data, follow_redirects=True
@@ -190,3 +191,4 @@ def test_edit_book_success(authenticated_client):
     assert updated_book["series"] == "Updated Series"
     assert updated_book["dewey_decimal"] == "123.456"
     assert updated_book["thumbnail_url"] == "https://example.com/cover.jpg"
+    assert updated_book["cover_url"] == "https://example.com/large_cover.jpg"

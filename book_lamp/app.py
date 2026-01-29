@@ -165,7 +165,10 @@ def login():
             redirect_uri = url_for("authorize", _external=True)
 
         app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
-        return oauth.google.authorize_redirect(redirect_uri)
+        # Request offline access to get a refresh token
+        return oauth.google.authorize_redirect(
+            redirect_uri, access_type="offline", prompt="consent"
+        )
     except Exception:
         app.logger.exception("OAuth login failed")
         return (
@@ -638,6 +641,7 @@ def create_book():
         page_count=data.get("page_count"),
         physical_format=data.get("physical_format"),
         edition=data.get("edition"),
+        cover_url=data.get("cover_url"),
     )
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
@@ -650,14 +654,17 @@ def fetch_missing_data():
     storage = get_storage()
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    from book_lamp.services.book_lookup import lookup_book_by_isbn13
+    from book_lamp.services.book_lookup import (
+        lookup_book_by_isbn13,
+        lookup_books_batch,
+    )
     from book_lamp.utils.books import parse_publication_year
 
     books = storage.get_all_books()
     updated_count = 0
 
     # Identify candidates: all books with ISBN that have any missing data
-    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description
+    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description, cover_url
     def is_empty(value):
         """Check if a value is None or empty string."""
         return value is None or (isinstance(value, str) and not value.strip())
@@ -691,6 +698,8 @@ def fetch_missing_data():
             missing_fields.append("physical_format")
         if is_empty(b.get("edition")):
             missing_fields.append("edition")
+        if is_empty(b.get("cover_url")):
+            missing_fields.append("cover_url")
 
         if missing_fields:
             candidates.append(b)
@@ -703,14 +712,29 @@ def fetch_missing_data():
 
     items_to_update = []
 
+    # 1. Perform efficient batch lookup for all candidates via Open Library
+    all_isbns = [b["isbn13"] for b in candidates if b.get("isbn13")]
+    app.logger.info(f"Performing batch lookup for {len(all_isbns)} ISBNs...")
+    batch_results = lookup_books_batch(all_isbns)
+
     def fetch_data_for_book(book_item):
         """Helper to fetch missing data for a single book."""
         isbn = book_item.get("isbn13", "unknown")
         book_title = book_item.get("title") or isbn
 
         try:
-            app.logger.info(f"Looking up data for '{book_title}' (ISBN: {isbn})")
-            info = lookup_book_by_isbn13(isbn)
+            # Try batch result first
+            info = batch_results.get(isbn)
+            source = "OpenLibrary Batch"
+
+            # If not in batch results (or empty), fall back to individual deep lookup (Google, iTunes, Amazon)
+            if not info:
+                app.logger.info(
+                    f"Batch lookup miss for '{book_title}' (ISBN: {isbn}). Trying deep lookup..."
+                )
+                info = lookup_book_by_isbn13(isbn)
+                source = "Deep Lookup"
+
             if not info:
                 app.logger.warning(f"No data found for '{book_title}' (ISBN: {isbn})")
                 return None
@@ -729,6 +753,15 @@ def fetch_missing_data():
                 found_fields.append("thumbnail_url")
                 populated_fields.append("thumbnail_url")
                 has_updates = True
+
+            if is_empty(updated_book.get("cover_url")) and info.get("cover_url"):
+                updated_book["cover_url"] = info["cover_url"]
+                found_fields.append("cover_url")
+                populated_fields.append("cover_url")
+                has_updates = True
+
+            # If thumbnail is present but cover is missing, use thumbnail as cover if it's large enough?
+            # No, let's keep them distinct. If cover_url is missing, template uses thumbnail.
 
             if is_empty(updated_book.get("title")) and info.get("title"):
                 updated_book["title"] = (
@@ -805,33 +838,9 @@ def fetch_missing_data():
                 has_updates = True
 
             # Log what was found in the lookup (even if we couldn't use it)
-            all_found = []
-            if info.get("thumbnail_url"):
-                all_found.append("thumbnail_url")
-            if info.get("title"):
-                all_found.append("title")
-            if info.get("author"):
-                all_found.append("author")
-            if info.get("publish_date"):
-                all_found.append("publish_date")
-            if info.get("publisher"):
-                all_found.append("publisher")
-            if info.get("description"):
-                all_found.append("description")
-            if info.get("dewey_decimal"):
-                all_found.append("dewey_decimal")
-            if info.get("language"):
-                all_found.append("language")
-            if info.get("page_count"):
-                all_found.append("page_count")
-            if info.get("physical_format"):
-                all_found.append("physical_format")
-            if info.get("edition"):
-                all_found.append("edition")
-
-            if all_found:
+            if found_fields:
                 app.logger.info(
-                    f"Found data for '{book_title}' (ISBN: {isbn}): {', '.join(all_found)}"
+                    f"[{source}] Found data for '{book_title}' (ISBN: {isbn}): {', '.join(found_fields)}"
                 )
 
             if populated_fields:
@@ -840,7 +849,7 @@ def fetch_missing_data():
                 )
             elif has_updates is False:
                 app.logger.info(
-                    f"No updates needed for '{book_title}' (ISBN: {isbn}) - all fields already populated"
+                    f"No updates needed for '{book_title}' (ISBN: {isbn}) - all fields already populated or not found"
                 )
 
             if has_updates:
@@ -853,6 +862,7 @@ def fetch_missing_data():
 
     # Use a thread pool to fetch data in parallel
     # Limit max_workers to avoid hitting API rate limits too aggressively
+    # (Though now most work is done in batch open library call, these workers handle the fallbacks)
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(fetch_data_for_book, book): book for book in candidates
@@ -926,6 +936,7 @@ def edit_book(book_id: int):
     author = request.form.get("author", "").strip()
     publication_year_str = request.form.get("publication_year", "").strip()
     thumbnail_url = request.form.get("thumbnail_url", "").strip()
+    cover_url = request.form.get("cover_url", "").strip()
     publisher = request.form.get("publisher", "").strip()
     description = request.form.get("description", "").strip()
     series = request.form.get("series", "").strip()
@@ -963,6 +974,7 @@ def edit_book(book_id: int):
             description=(description if description else None),
             series=(series if series else None),
             dewey_decimal=(dewey_decimal if dewey_decimal else None),
+            cover_url=(cover_url if cover_url else None),
         )
         flash("Book updated successfully.", "success")
     except Exception as e:

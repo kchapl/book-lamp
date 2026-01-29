@@ -1,30 +1,13 @@
 import html
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 
 
-def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
-    """Helper to lookup book details via Open Library."""
-    params = {
-        "bibkeys": f"ISBN:{isbn13}",
-        "format": "json",
-        "jscmd": "data",
-    }
-    try:
-        response = requests.get(OPEN_LIBRARY_API, params=params, timeout=10)
-        response.raise_for_status()
-        payload = response.json()
-    except Exception:
-        return None
-
-    key = f"ISBN:{isbn13}"
-    if key not in payload:
-        return None
-
-    data = payload[key]
+def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper to parse a single book's data from Open Library."""
     title = data.get("title")
     authors = data.get("authors") or []
     author_name = None
@@ -56,15 +39,18 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         language = languages[0].get("name")
 
     thumbnail_url = None
+    cover_url = None
     cover = data.get("cover") or {}
     if isinstance(cover, dict):
-        thumbnail_url = cover.get("medium") or cover.get("small") or cover.get("large")
+        thumbnail_url = cover.get("medium") or cover.get("small")
+        cover_url = cover.get("large") or cover.get("medium")
 
     return {
         "title": html.unescape(title) if title else title,
         "author": html.unescape(author_name) if author_name else author_name,
         "publish_date": publish_date,
         "thumbnail_url": thumbnail_url,
+        "cover_url": cover_url,
         "publisher": (
             html.unescape(publisher_name) if publisher_name else publisher_name
         ),
@@ -75,6 +61,77 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         "physical_format": physical_format,
         "edition": edition_name,
     }
+
+
+def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
+    """Helper to lookup book details via Open Library."""
+    params = {
+        "bibkeys": f"ISBN:{isbn13}",
+        "format": "json",
+        "jscmd": "data",
+    }
+    try:
+        response = requests.get(OPEN_LIBRARY_API, params=params, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+    except Exception:
+        return None
+
+    key = f"ISBN:{isbn13}"
+    if key not in payload:
+        return None
+
+    return _parse_open_library_data(payload[key])
+
+
+def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+    """Lookup metadata for multiple books via Open Library in batches.
+
+    Args:
+        isbn13_list: List of ISBN-13 strings.
+
+    Returns:
+        Dict mapping ISBN13 -> metadata dict (or None if not found).
+    """
+    results: Dict[str, Optional[Dict[str, Any]]] = {}
+    if not isbn13_list:
+        return results
+
+    # Deduplicate
+    unique_isbns = list(set(isbn13_list))
+
+    # Process in chunks of 50
+    chunk_size = 50
+    for i in range(0, len(unique_isbns), chunk_size):
+        chunk = unique_isbns[i : i + chunk_size]
+        bibkeys = ",".join([f"ISBN:{isbn}" for isbn in chunk])
+
+        params = {
+            "bibkeys": bibkeys,
+            "format": "json",
+            "jscmd": "data",
+        }
+
+        try:
+            response = requests.get(OPEN_LIBRARY_API, params=params, timeout=20)
+            if response.status_code != 200:
+                continue
+
+            payload = response.json()
+
+            for isbn in chunk:
+                key = f"ISBN:{isbn}"
+                if key in payload:
+                    results[isbn] = _parse_open_library_data(payload[key])
+                else:
+                    results[isbn] = None
+
+        except Exception:
+            # If a batch fails, we just skip it (or could define retry logic)
+            for isbn in chunk:
+                results[isbn] = None
+
+    return results
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
@@ -109,16 +166,26 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         thumbnail_url = image_links.get("thumbnail") or image_links.get(
             "smallThumbnail"
         )
+        # Try to get larger images
+        cover_url = (
+            image_links.get("extraLarge")
+            or image_links.get("large")
+            or image_links.get("medium")
+            or thumbnail_url
+        )
 
         # Ensure HTTPS
         if thumbnail_url and thumbnail_url.startswith("http://"):
             thumbnail_url = thumbnail_url.replace("http://", "https://", 1)
+        if cover_url and cover_url.startswith("http://"):
+            cover_url = cover_url.replace("http://", "https://", 1)
 
         return {
             "title": html.unescape(title) if title else title,
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,
+            "cover_url": cover_url,
             "publisher": (html.unescape(publisher) if publisher else publisher),
             "description": html.unescape(description) if description else description,
             "dewey_decimal": None,
@@ -153,17 +220,21 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         description = item.get("description")
 
         # iTunes gives different sized artwork, "artworkUrl100" is usually available
-        thumbnail_url = item.get("artworkUrl100") or item.get("artworkUrl60")
+        base_url = item.get("artworkUrl100") or item.get("artworkUrl60")
+        thumbnail_url = base_url
+        cover_url = None
 
         # Get high-res artwork if possible by replacing dimension in URL
-        if thumbnail_url:
-            thumbnail_url = thumbnail_url.replace("100x100bb", "600x600bb")
+        if base_url:
+            thumbnail_url = base_url.replace("100x100bb", "200x200bb")
+            cover_url = base_url.replace("100x100bb", "600x600bb")
 
         return {
             "title": html.unescape(title) if title else title,
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,
+            "cover_url": cover_url,
             "publisher": None,
             "description": html.unescape(description) if description else description,
             "dewey_decimal": None,
@@ -232,7 +303,7 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
 
     If metadata is found but no cover, attempts to fetch cover from Amazon.
 
-    Returns a dict with keys: title, author, publish_date, thumbnail_url, or None if not found.
+    Returns a dict with keys: title, author, publish_date, thumbnail_url, cover_url, or None if not found.
     """
     # 1. Open Library
     ol_result = _lookup_open_library(isbn13)
@@ -259,6 +330,7 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         amazon_cover = _lookup_amazon_cover(isbn13)
         if amazon_cover:
             best_result["thumbnail_url"] = amazon_cover
+            best_result["cover_url"] = amazon_cover
 
         return best_result
 
