@@ -5,7 +5,7 @@ class MockStorage:
         self.next_book_id = 1
         self.next_record_id = 1
 
-    def is_authorized(self):
+    def is_authorised(self):
         """Always authorized in mock mode."""
         return True
 

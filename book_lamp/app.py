@@ -70,6 +70,16 @@ def get_storage():
     return GoogleSheetsStorage(sheet_name=sheet_name, credentials_dict=credentials)
 
 
+def authorisation_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not get_storage().is_authorised():
+            return redirect(url_for("unauthorised"))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 def get_app_version():
     """Get the application version based on environment."""
     if os.environ.get("FLASK_ENV") == "production":
@@ -85,15 +95,36 @@ def get_app_version():
 APP_VERSION = get_app_version()
 
 
+@app.context_processor
+def inject_global_vars():
+    return {
+        "is_authorised": get_storage().is_authorised(),
+        "version": APP_VERSION,
+    }
+
+
 @app.route("/")
 def home():
-    is_authorized = get_storage().is_authorized()
-    return render_template("home.html", is_authorized=is_authorized)
+    is_authorised = get_storage().is_authorised()
+    return render_template("home.html", is_authorised=is_authorised)
 
 
 @app.route("/about")
+@authorisation_required
 def about():
     return render_template("about.html", version=APP_VERSION)
+
+
+@app.route("/unauthorised")
+def unauthorised():
+    return render_template("unauthorised.html"), 401
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Google Sheets disconnected.", "info")
+    return redirect(url_for("home"))
 
 
 @app.route("/favicon.ico")
@@ -137,21 +168,10 @@ if not TEST_MODE:
     )
 
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not get_storage().is_authorized():
-            flash("Please authorize Google Sheets access first.", "info")
-            return redirect(url_for("home"))
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-@app.route("/login")
-def login():
+@app.route("/connect")
+def connect():
     if TEST_MODE:
-        return redirect(url_for("test_login"))
+        return redirect(url_for("test_connect"))
 
     try:
         if (
@@ -170,10 +190,10 @@ def login():
             redirect_uri, access_type="offline", prompt="consent"
         )
     except Exception:
-        app.logger.exception("OAuth login failed")
+        app.logger.exception("OAuth authorisation initiation failed")
         return (
-            "<h1>Login Error</h1>"
-            "<p>Failed to initiate Google OAuth login.</p>"
+            "<h1>Authorisation Error</h1>"
+            "<p>Failed to initiate Google authorisation.</p>"
             "<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
             "<a href='/'>Go back</a>"
         ), 500
@@ -207,12 +227,12 @@ def authorize():
             # Save credentials to session for this user
             session["credentials"] = creds_data
 
-        flash("Successfully authorized Google Sheets access!", "success")
+        flash("Google Sheets access authorised!", "success")
         return redirect(url_for("home"))
     except Exception:
-        app.logger.exception("Failed to authorize access token")
+        app.logger.exception("Failed to authorise access token")
         return (
-            "<h1>Authorization Error</h1><p>Failed to complete Google OAuth authorization.</p><a href='/'>Go back</a>"
+            "<h1>Authorisation Error</h1><p>Failed to complete Google authorisation.</p><a href='/'>Go back</a>"
         ), 401
 
 
@@ -235,7 +255,7 @@ def init_sheets_command():
 
 
 @app.route("/history", methods=["GET"])
-@login_required
+@authorisation_required
 def reading_history():
     """Show detailed reading history as a chronological list of individual events."""
     storage = get_storage()
@@ -286,13 +306,13 @@ def reading_history():
 
 
 @app.route("/books/new", methods=["GET"])
-@login_required
+@authorisation_required
 def new_book_form():
     return render_template("add_book.html")
 
 
 @app.route("/books", methods=["GET"])
-@login_required
+@authorisation_required
 def list_books():
     storage = get_storage()
     books = storage.get_all_books()
@@ -312,7 +332,7 @@ def list_books():
 
 
 @app.route("/books/search", methods=["GET"])
-@login_required
+@authorisation_required
 def search_books():
     storage = get_storage()
     query = request.args.get("q", "").strip()
@@ -348,7 +368,7 @@ def search_books():
 
 
 @app.route("/stats", methods=["GET"])
-@login_required
+@authorisation_required
 def collection_stats():
     storage = get_storage()
     books = storage.get_all_books()
@@ -490,7 +510,7 @@ def collection_stats():
 
 
 @app.route("/books/<int:book_id>", methods=["GET"])
-@login_required
+@authorisation_required
 def book_detail(book_id: int):
     storage = get_storage()
     book = storage.get_book_by_id(book_id)
@@ -509,7 +529,7 @@ def book_detail(book_id: int):
 
 
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
-@login_required
+@authorisation_required
 def create_reading_record(book_id: int):
     storage = get_storage()
     status = request.form.get("status")
@@ -533,7 +553,7 @@ def create_reading_record(book_id: int):
 
 
 @app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
-@login_required
+@authorisation_required
 def update_reading_record(record_id: int):
     storage = get_storage()
     status = request.form.get("status")
@@ -562,7 +582,7 @@ def update_reading_record(record_id: int):
 
 
 @app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
-@login_required
+@authorisation_required
 def delete_reading_record(record_id: int):
     storage = get_storage()
     try:
@@ -579,7 +599,7 @@ def delete_reading_record(record_id: int):
 
 
 @app.route("/books", methods=["POST"])
-@login_required
+@authorisation_required
 def create_book():
     storage = get_storage()
     isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
@@ -648,7 +668,7 @@ def create_book():
 
 
 @app.route("/books/fetch-covers", methods=["POST"])
-@login_required
+@authorisation_required
 def fetch_missing_data():
     """Bulk fetch missing data (covers, metadata) for all books."""
     storage = get_storage()
@@ -891,13 +911,13 @@ def fetch_missing_data():
 
 
 @app.route("/books/import", methods=["GET"])
-@login_required
+@authorisation_required
 def import_books_form():
     return render_template("import_books.html")
 
 
 @app.route("/books/import", methods=["POST"])
-@login_required
+@authorisation_required
 def import_books():
     storage = get_storage()
     if "file" not in request.files:
@@ -927,7 +947,7 @@ def import_books():
 
 
 @app.route("/books/<int:book_id>/edit", methods=["POST"])
-@login_required
+@authorisation_required
 def edit_book(book_id: int):
     storage = get_storage()
     # Extract data from form
@@ -985,7 +1005,7 @@ def edit_book(book_id: int):
 
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
-@login_required
+@authorisation_required
 def delete_book(book_id: int):
     storage = get_storage()
     success = storage.delete_book(book_id)
@@ -1012,6 +1032,8 @@ if TEST_MODE:
             storage.reading_records = []
             storage.next_book_id = 1
             storage.next_record_id = 1
+            # Clear session but keep test mode markers if any?
+            # session.clear() is safer to ensure clean state
             return {"status": "ok"}
         except Exception as e:
             app.logger.exception("Failed to reset test storage: %s", e)
@@ -1019,6 +1041,28 @@ if TEST_MODE:
                 "status": "error",
                 "message": "Internal error during test reset",
             }, 500
+
+    @app.route("/test/connect")
+    def test_connect():
+        """Authorise as a test user automatically."""
+        if not TEST_MODE:
+            return "Not available", 404
+
+        # Mock credentials/session for test user
+        session["credentials"] = {
+            "token": "test-token",
+            "refresh_token": "test-refresh-token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "scopes": from_sheets_storage.SCOPES,
+            "expiry": (
+                datetime.datetime.now(datetime.timezone.utc)
+                + datetime.timedelta(hours=1)
+            )
+            .isoformat()
+            .replace("+00:00", "Z"),
+        }
+        flash("Google Sheets Connected (Test Mode)", "success")
+        return redirect(url_for("home"))
 
 
 if __name__ == "__main__":

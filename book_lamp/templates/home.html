@@ -10,7 +10,7 @@
 <h1 class="sr-only">Book Lamp Dashboard</h1>
 
 <div class="card dashboard-card">
-    {% if is_authorized %}
+    {% if is_authorised %}
     <div class="action-buttons">
         <a href="/books" class="btn">View Your Bookshelf</a>
         <a href="/books/new" class="btn btn-outline">Add New Book</a>
@@ -22,7 +22,7 @@
             The application needs permission to save data to your Google Spreadsheet.
         </p>
     </div>
-    <a href="/login" class="btn">Authorize Google Sheets</a>
+    <a href="/connect" class="btn">Connect Google Sheets</a>
     {% endif %}
 </div>
 

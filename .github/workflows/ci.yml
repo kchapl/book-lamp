@@ -105,7 +105,6 @@ jobs:
         run: poetry run bandit -r . -x ./.venv,./
 
   e2e:
-    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -170,13 +169,6 @@ jobs:
           npx playwright install chromium
           npx playwright install-deps chromium
 
-      - name: Initialize test database
-        env:
-          TEST_MODE: 1
-          FLASK_DEBUG: true
-          FLASK_APP: book_lamp.app
-        run: |
-          poetry run flask init-sheets
 
       - name: Run Playwright tests
         env:

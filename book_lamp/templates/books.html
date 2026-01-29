@@ -107,6 +107,9 @@
                 {% if book.publication_year %}
                 <div class="year">{{ book.publication_year }}</div>
                 {% endif %}
+                {% if book.isbn13 %}
+                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                {% endif %}
                 {% if book.publisher %}
                 <div class="year">{{ book.publisher }}</div>
                 {% endif %}
