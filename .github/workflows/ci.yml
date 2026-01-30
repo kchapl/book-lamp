@@ -176,7 +176,7 @@ jobs:
           TEST_MODE: 1
           FLASK_DEBUG: false
           DB_URL: sqlite:///e2e_test.db
-        run: npx playwright test --reporter=github
+        run: npx playwright test
 
       - name: Upload Playwright report
         if: always()
