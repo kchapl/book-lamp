@@ -83,7 +83,9 @@ The `GoogleSheetsStorage` class in `book_lamp/services/sheets_storage.py` is the
 
 ### E2E Tests (Playwright)
 - E2E tests are located in `tests-e2e/`.
+- Every new feature MUST have a corresponding **E2E test** in the `tests-e2e/` directory.
 - Use `npm test` to run the suite.
+- The app and all new features must meet **Lighthouse standards** for Performance, Accessibility, Best Practices, and SEO (target score 90+).
 - The app should automatically handle `TEST_MODE` to avoid hitting real Google APIs during testing.
 
 ## Security and Configuration

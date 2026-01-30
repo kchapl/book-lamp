@@ -79,7 +79,7 @@ class GoogleSheetsStorage:
         except (ValueError, KeyError):
             return None
 
-    def is_authorized(self) -> bool:
+    def is_authorised(self) -> bool:
         """Check if we have valid credentials."""
         creds = self.load_credentials()
         return creds is not None and creds.valid

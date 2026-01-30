@@ -318,11 +318,13 @@ When working with Book Lamp's data model:
 - **Temporal Tracking**: `start_date`, `end_date` for reading timeline
 
 ### Best Practices for Book Lamp
-- **British English**: Use British spelling in UI text (e.g., "Organise", "Colour")
-- **Data Sanitisation**: Always strip and normalise user input (ISBNs, titles)
-- **Field Length Limits**: Respect system constraints (title: 300 chars, author: 200 chars)
-- **Date Handling**: Use ISO 8601 format for dates, extract years from various date formats
-- **Missing Data**: Gracefully handle missing optional fields (thumbnails, descriptions, classifications)
+- **British English**: Use British spelling in UI text (e.g., "Organise", "Colour", "Catalogue").
+- **Testing**: Every new feature MUST have a corresponding **E2E test** in the `tests-e2e/` directory.
+- **Lighthouse Compliance**: The application and all tests must meet **Lighthouse standards** (Performance, Accessibility, SEO, Best Practices score 90+).
+- **Data Sanitisation**: Always strip and normalise user input (ISBNs, titles).
+- **Field Length Limits**: Respect system constraints (title: 300 chars, author: 200 chars).
+- **Date Handling**: Use ISO 8601 format for dates, extract years from various date formats.
+- **Missing Data**: Gracefully handle missing optional fields (thumbnails, descriptions, classifications).
 
 ## Resources and Standards
 

@@ -3,47 +3,23 @@ import { test, expect } from '@playwright/test';
 // Increase timeout for setup since CI can be slower
 test.setTimeout(120000);
 
-test.beforeEach(async ({ page, request }, testInfo) => {
-    // Reset database
-    const res = await request.post('/test/reset');
-    if (!res.ok()) {
-        throw new Error(`Failed to reset DB: ${res.status()}`);
-    }
-
-    // Authenticate via request context to get session cookie
-    const loginRes = await request.get('/test/login');
-    if (!loginRes.ok()) {
-        throw new Error(`Failed to login: ${loginRes.status()}`);
-    }
-
-    // Verify storage is clean (now authenticated)
-    const verifyRes = await request.get('/books');
-    const text = await verifyRes.text();
-    if (!text.includes('No books yet')) {
-        throw new Error('Database reset did not clear books');
-    }
-
-    // Log in via page context for the actual test
-    await page.goto('/test/login');
-    await Promise.all([
-        page.waitForURL('/'),
-        page.waitForLoadState('networkidle'),
-        page.waitForSelector('text=Hello Test User!')
-    ]);
+test.beforeEach(async ({ page, request }) => {
+    await request.post('/test/reset');
+    await page.goto('/test/connect');
 });
 
 test('books list initially empty and link to add', async ({ page }) => {
     await page.goto('/books');
-    await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible();
-    await expect(page.locator('text=No books yet.')).toBeVisible();
-    await page.getByRole('link', { name: 'Add one' }).click();
+    await expect(page.getByRole('heading', { name: 'Books', exact: true })).toBeVisible();
+    await expect(page.locator('text=Your bookshelf is empty')).toBeVisible();
+    await page.getByRole('link', { name: 'Add Your First Book' }).click();
     await expect(page).toHaveURL(/.*\/books\/new/);
 });
 
 test('adding invalid ISBN shows error', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '123');
-    await page.getByRole('button', { name: 'Add' }).click();
+    await page.getByRole('button', { name: 'Find & Add Book' }).click();
     await expect(page.locator('.messages .error', { hasText: 'valid 13-digit ISBN' })).toBeVisible();
 });
 
@@ -53,7 +29,7 @@ test('adding duplicate shows info message', async ({ page }) => {
     await page.fill('#isbn', '9780000000000');
     await Promise.all([
         page.waitForURL('/books'),
-        page.getByRole('button', { name: 'Add' }).click()
+        page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
     await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
 
@@ -62,7 +38,7 @@ test('adding duplicate shows info message', async ({ page }) => {
     await page.fill('#isbn', '9780000000000');
     await Promise.all([
         page.waitForURL('/books'),
-        page.getByRole('button', { name: 'Add' }).click()
+        page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
     await expect(page.locator('.messages .info')).toHaveText('This book has already been added.');
 });
@@ -74,13 +50,13 @@ test('successful add shows on list with metadata', async ({ page }) => {
     // Click add and wait for redirect
     await Promise.all([
         page.waitForURL('/books'),
-        page.getByRole('button', { name: 'Add' }).click()
+        page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
 
     // Check for success message and book details
     await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
-    await expect(page.locator('.card .title')).toHaveText('Test Driven Development');
-    await expect(page.locator('.card .author')).toHaveText('Test Author');
-    await expect(page.locator('.card .year')).toHaveText('2019');
-    await expect(page.locator('.card .isbn')).toHaveText('ISBN-13: 9780000000000');
+    await expect(page.locator('.book-card .title')).toHaveText('Test Driven Development');
+    await expect(page.locator('.book-card .author')).toHaveText('Test Author');
+    await expect(page.locator('.book-card .year')).toHaveText('2019');
+    await expect(page.locator('.book-card .isbn')).toHaveText('ISBN-13: 9780000000000');
 });

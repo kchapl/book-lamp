@@ -9,9 +9,11 @@ export default defineConfig({
     // Run tests serially to prevent database conflicts
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
-    retries: 0,
+    retries: process.env.CI ? 2 : 0,
     workers: 1,
-    reporter: [['html', { open: 'never' }], ['list']],
+    reporter: process.env.CI
+        ? [['github'], ['html', { open: 'never' }], ['list']]
+        : [['html', { open: 'never' }], ['list']],
     use: {
         baseURL: BASE_URL,
         trace: 'on-first-retry',

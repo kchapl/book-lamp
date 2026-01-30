@@ -26,10 +26,10 @@ export default async function globalSetup() {
             }
         }
 
-        // Log in as the test user to seed the user data
-        const loginRes = await req.get('/test/login');
+        // Authorize as the test user
+        const loginRes = await req.get('/test/connect');
         if (!loginRes.ok()) {
-            throw new Error(`Failed to login as test user: ${loginRes.status()}`);
+            throw new Error(`Failed to authorize as test user: ${loginRes.status()}`);
         }
     } finally {
         await req.dispose();

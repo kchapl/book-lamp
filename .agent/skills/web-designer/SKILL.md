@@ -661,8 +661,10 @@ When designing pages for Book Lamp:
 - **Consistency**: Follow existing design patterns in `book_lamp/static/base.css` and `books.css`.
 - **Separation**: Keep CSS in dedicated files in `book_lamp/static/`.
 - **Templates**: Work with Jinja2 templates in `book_lamp/templates/`.
-- **British English**: Use British English in UI text (e.g., "Colour", "Organise").
-- **Accessibility**: Ensure all new pages meet accessibility standards.
+- **British English**: All language shown in the UI MUST be in **British English** (e.g., "Colour", "Organise", "Authorise", "Catalogue").
+- **Testing**: Every new feature MUST have a corresponding **E2E test** in the `tests-e2e/` directory using Playwright.
+- **Lighthouse Standards**: The application and all new features must meet **Lighthouse standards** for Performance, Accessibility, Best Practices, and SEO (target score 90+ for all categories).
+- **Accessibility**: Ensure all new pages meet accessibility standards as part of the Lighthouse compliance.
 
 ### Book Lamp Visual Language
 

@@ -47,4 +47,6 @@ def _storage_reset():
         storage.reading_records = []
         storage.next_book_id = 1
         storage.next_record_id = 1
+    if hasattr(storage, "set_authorised"):
+        storage.set_authorised(True)
     yield
