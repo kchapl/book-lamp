@@ -187,7 +187,16 @@ class GoogleSheetsStorage:
             if len(values) <= 1:  # Only header or empty
                 return 1
             # Find max ID (skip header)
-            ids = [int(row[0]) for row in values[1:] if row and row[0].isdigit()]
+            ids = []
+            for row in values[1:]:
+                if not row or not row[0]:
+                    continue
+                try:
+                    # Handle "1" or "1.0"
+                    val = float(row[0])
+                    ids.append(int(val))
+                except (ValueError, TypeError):
+                    continue
             return max(ids) + 1 if ids else 1
         except HttpError as error:
             if error.resp.status == 400:
@@ -349,18 +358,35 @@ class GoogleSheetsStorage:
             headers = values[0]
             books_raw = []
             for row in values[1:]:
-                if not row:
+                if not row or len(row) < 3 or not row[0] or not row[2]:
+                    # Skip empty rows or rows without ID or Title
                     continue
                 # Pad row to match header length (now 16 columns)
                 row = row + [""] * (len(headers) - len(row))
+                try:
+                    # Handle potential float IDs like "1.0"
+                    book_id = int(float(row[0]))
+                    pub_year = (
+                        int(float(row[4]))
+                        if row[4] and str(row[4]).replace(".", "").isdigit()
+                        else None
+                    )
+                    page_count = (
+                        int(float(row[12]))
+                        if len(row) > 12
+                        and row[12]
+                        and str(row[12]).replace(".", "").isdigit()
+                        else None
+                    )
+                except (ValueError, TypeError):
+                    continue
+
                 book = {
-                    "id": int(row[0]) if row[0] else 0,
+                    "id": book_id,
                     "isbn13": row[1],
                     "title": row[2],
                     "author": row[3],
-                    "publication_year": (
-                        int(row[4]) if row[4] and row[4].isdigit() else None
-                    ),
+                    "publication_year": pub_year,
                     "thumbnail_url": row[5] if row[5] else None,
                     "created_at": row[6] if row[6] else None,
                     "publisher": row[7] if len(row) > 7 else None,
@@ -368,11 +394,7 @@ class GoogleSheetsStorage:
                     "series": row[9] if len(row) > 9 else None,
                     "dewey_decimal": row[10] if len(row) > 10 else None,
                     "language": row[11] if len(row) > 11 else None,
-                    "page_count": (
-                        int(row[12])
-                        if len(row) > 12 and row[12] and str(row[12]).isdigit()
-                        else None
-                    ),
+                    "page_count": page_count,
                     "physical_format": row[13] if len(row) > 13 else None,
                     "edition": row[14] if len(row) > 14 else None,
                     "cover_url": row[15] if len(row) > 15 and row[15] else None,
@@ -433,17 +455,29 @@ class GoogleSheetsStorage:
             headers = values[0]
             records = []
             for row in values[1:]:
-                if not row:
+                if not row or len(row) < 3 or not row[0] or not row[1]:
+                    # Skip empty rows or rows without ID or Book ID
                     continue
                 # Pad row to match header length
                 row = row + [""] * (len(headers) - len(row))
+                try:
+                    record_id = int(float(row[0]))
+                    book_id_val = int(float(row[1]))
+                    rating = (
+                        int(float(row[5]))
+                        if row[5] and str(row[5]).replace(".", "").isdigit()
+                        else 0
+                    )
+                except (ValueError, TypeError):
+                    continue
+
                 record = {
-                    "id": int(row[0]) if row[0] else 0,
-                    "book_id": int(row[1]) if row[1] else 0,
+                    "id": record_id,
+                    "book_id": book_id_val,
                     "status": row[2],
                     "start_date": row[3],
                     "end_date": row[4] if row[4] else None,
-                    "rating": int(row[5]) if row[5] and row[5].isdigit() else 0,
+                    "rating": rating,
                     "created_at": row[6] if row[6] else None,
                 }
                 if book_id is None or record["book_id"] == book_id:
@@ -797,6 +831,10 @@ class GoogleSheetsStorage:
         assert self.service is not None
 
         # 1. Fetch all existing data once
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting bulk import of {len(items)} items")
         try:
             books_result = (
                 self.service.spreadsheets()
@@ -826,13 +864,21 @@ class GoogleSheetsStorage:
                 raise
 
         book_values = books_result.get("values", [])
-        existing_books = {}  # isbn -> (row_data, row_index)
+        existing_books = {}  # normalized_isbn -> (row_data, row_index)
         next_book_id = 1
+        from book_lamp.utils.libib_import import clean_isbn
+
         for idx, row in enumerate(book_values[1:], start=2):
             if row and len(row) > 1:
-                existing_books[row[1]] = (row, idx)
-                if row[0].isdigit():
-                    next_book_id = max(next_book_id, int(row[0]) + 1)
+                # Normalize ISBN for lookup
+                norm_isbn = clean_isbn(row[1])
+                if norm_isbn:
+                    existing_books[norm_isbn] = (row, idx)
+                try:
+                    if row[0]:
+                        next_book_id = max(next_book_id, int(float(row[0])) + 1)
+                except (ValueError, TypeError):
+                    pass
 
         record_values = records_result.get("values", [])
         existing_record_keys = set()
@@ -841,13 +887,14 @@ class GoogleSheetsStorage:
             if row and len(row) > 4:
                 # Key: (book_id, status, start_date, end_date)
                 try:
-                    bid = int(row[1]) if row[1].isdigit() else 0
-                    key = (bid, row[2], row[3], row[4] if row[4] else None)
-                    existing_record_keys.add(key)
-                except (ValueError, IndexError):
+                    if row[0]:
+                        next_record_id = max(next_record_id, int(float(row[0])) + 1)
+                    if row[1]:
+                        bid = int(float(row[1]))
+                        key = (bid, row[2], row[3], row[4] if row[4] else None)
+                        existing_record_keys.add(key)
+                except (ValueError, IndexError, TypeError):
                     pass
-                if row[0].isdigit():
-                    next_record_id = max(next_record_id, int(row[0]) + 1)
 
         # 1.5 Fetch and process authors
         all_authors = self.get_authors()
@@ -1108,6 +1155,9 @@ class GoogleSheetsStorage:
                 else:
                     raise
 
+        logger.info(
+            f"Executed batch operations: {len(books_to_update)} updates, {len(books_to_append)} appends, {len(records_to_append)} records"
+        )
         return import_count
 
     def update_reading_record(
