@@ -36,12 +36,20 @@
                 </ol>
             </div>
 
-            <div
-                style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
-                <p style="margin: 0; font-size: 0.9rem; color: #fbbf24;">
-                    <strong>Note:</strong> If a book already exists in your library (matched by ISBN), it will be
-                    updated with the data from the CSV.
-                </p>
+            <div class="form-group mb-4"
+                style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; margin: 0;">
+                    <input type="checkbox" name="fetch_metadata" checked
+                        style="width: 1.25rem; height: 1.25rem; accent-color: var(--primary);">
+                    <div style="flex: 1;">
+                        <span style="display: block; font-weight: 600; margin-bottom: 0.25rem;">Automatically fetch
+                            missing covers & metadata</span>
+                        <span style="display: block; font-size: 0.85rem; color: var(--text-muted);">
+                            This will search external databases for covers, page counts, and more.
+                            May take a few extra moments for large imports.
+                        </span>
+                    </div>
+                </label>
             </div>
 
             <button type="submit" class="btn w-100">Start Import</button>

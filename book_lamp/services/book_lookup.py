@@ -335,3 +335,103 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         return best_result
 
     return None
+
+
+def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> int:
+    """Enhance a list of books with missing metadata/covers in parallel.
+
+    Updates the books list in-place.
+    Returns the number of books successfully updated.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def is_empty(value):
+        return value is None or (isinstance(value, str) and not value.strip())
+
+    candidates = []
+    for b in books:
+        if not b.get("isbn13"):
+            continue
+        # Check if missing any key field
+        if any(
+            is_empty(b.get(f))
+            for f in [
+                "thumbnail_url",
+                "title",
+                "author",
+                "publication_year",
+                "publisher",
+                "description",
+                "cover_url",
+            ]
+        ):
+            candidates.append(b)
+
+    if not candidates:
+        return 0
+
+    # 1. Batch lookup via Open Library
+    all_isbns = [b["isbn13"] for b in candidates]
+    batch_results = lookup_books_batch(all_isbns)
+
+    updated_count = 0
+
+    def process_book(book_item):
+        isbn = book_item["isbn13"]
+        try:
+            # Try batch first
+            info = batch_results.get(isbn)
+            # Fallback to deep lookup
+            if not info:
+                info = lookup_book_by_isbn13(isbn)
+
+            if not info:
+                return False
+
+            has_updates = False
+            # Map fields safely
+            field_map = {
+                "thumbnail_url": "thumbnail_url",
+                "cover_url": "cover_url",
+                "title": "title",
+                "author": "author",
+                "publisher": "publisher",
+                "description": "description",
+                "dewey_decimal": "dewey_decimal",
+                "language": "language",
+                "page_count": "page_count",
+                "physical_format": "physical_format",
+                "edition": "edition",
+            }
+
+            for target, source in field_map.items():
+                if is_empty(book_item.get(target)) and info.get(source):
+                    val = info[source]
+                    # Specific handling for strings/lengths
+                    if target == "title" and len(val) > 300:
+                        val = val[:300]
+                    if target == "author" and len(val) > 200:
+                        val = val[:200]
+                    book_item[target] = val
+                    has_updates = True
+
+            # Special handling for publication_year
+            if is_empty(book_item.get("publication_year")) and info.get("publish_date"):
+                from book_lamp.utils.books import parse_publication_year
+
+                year = parse_publication_year(info["publish_date"])
+                if year:
+                    book_item["publication_year"] = year
+                    has_updates = True
+
+            return has_updates
+        except Exception:
+            return False
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(process_book, b): b for b in candidates}
+        for future in as_completed(futures):
+            if future.result():
+                updated_count += 1
+
+    return updated_count

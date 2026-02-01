@@ -95,6 +95,11 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         physical_format = get_val(["Physical Format", "Item Type"])
         edition = get_val(["Edition"])
 
+        thumbnail_url = get_val(
+            ["Thumbnail", "Image", "Image URL", "Cover", "Cover URL"]
+        )
+        cover_url = get_val(["Large Image", "High Res Cover"])
+
         page_count = None
         if page_count_str:
             try:
@@ -191,6 +196,8 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                     "page_count": page_count,
                     "physical_format": physical_format,
                     "edition": edition,
+                    "thumbnail_url": thumbnail_url,
+                    "cover_url": cover_url,
                 },
                 "record": (
                     {
