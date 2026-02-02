@@ -4,19 +4,7 @@ import io
 import re
 from typing import Any, Dict, List, Optional
 
-
-def clean_isbn(isbn: str) -> str:
-    """Remove hyphens and other non-digit characters from ISBN, preserving final 'X'."""
-    if not isbn:
-        return ""
-    # Remove hyphens and spaces
-    clean = re.sub(r"[\s-]", "", str(isbn))
-    # Preserve final X/x, remove all other non-digits
-    has_x = clean.lower().endswith("x")
-    digits = re.sub(r"\D", "", clean)
-    if has_x:
-        return digits + "X"
-    return digits
+from book_lamp.utils.books import normalize_isbn
 
 
 def normalize_date(date_str: str) -> str:
@@ -79,7 +67,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         isbn_val = get_val(
             ["ISBN", "ISBN 13", "ISBN 10", "ean_isbn13", "upc_isbn10", "ean", "upc"]
         )
-        isbn = clean_isbn(isbn_val)
+        isbn = normalize_isbn(isbn_val)
         publish_date = get_val(["Publish Date"])
         rating_str = get_val(["Rating"])
         date_added = normalize_date(get_val(["Date Added", "added"]))

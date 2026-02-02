@@ -65,6 +65,10 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via Open Library."""
+    import logging
+
+    logger = logging.getLogger("book_lamp")
+
     params = {
         "bibkeys": f"ISBN:{isbn13}",
         "format": "json",
@@ -74,14 +78,20 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         response = requests.get(OPEN_LIBRARY_API, params=params, timeout=10)
         response.raise_for_status()
         payload = response.json()
-    except Exception:
+    except Exception as e:
+        logger.debug(f"Open Library lookup failed for {isbn13}: {e}")
         return None
 
     key = f"ISBN:{isbn13}"
     if key not in payload:
+        logger.debug(f"Open Library has no data for {isbn13}")
         return None
 
-    return _parse_open_library_data(payload[key])
+    result = _parse_open_library_data(payload[key])
+    logger.debug(
+        f"Open Library returned data for {isbn13}: has_cover={bool(result.get('thumbnail_url'))}"
+    )
+    return result
 
 
 def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
@@ -93,12 +103,19 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
     Returns:
         Dict mapping ISBN13 -> metadata dict (or None if not found).
     """
+    import logging
+
+    from book_lamp.utils.books import normalize_isbn
+
+    logger = logging.getLogger("book_lamp")
     results: Dict[str, Optional[Dict[str, Any]]] = {}
     if not isbn13_list:
         return results
 
-    # Deduplicate
-    unique_isbns = list(set(isbn13_list))
+    # Deduplicate and normalize
+    unique_isbns = list(set(normalize_isbn(isbn) for isbn in isbn13_list))
+
+    logger.debug(f"Batch lookup for {len(unique_isbns)} unique ISBNs")
 
     # Process in chunks of 50
     chunk_size = 50
@@ -113,20 +130,28 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
         }
 
         try:
+            logger.debug(f"Making Open Library API request for {len(chunk)} ISBNs")
             response = requests.get(OPEN_LIBRARY_API, params=params, timeout=20)
             if response.status_code != 200:
+                logger.warning(
+                    f"Open Library API returned status {response.status_code}"
+                )
                 continue
 
             payload = response.json()
+            logger.debug(f"Open Library API returned {len(payload)} results")
 
             for isbn in chunk:
                 key = f"ISBN:{isbn}"
                 if key in payload:
                     results[isbn] = _parse_open_library_data(payload[key])
+                    logger.debug(f"  Found data for ISBN {isbn}")
                 else:
                     results[isbn] = None
+                    logger.debug(f"  No data for ISBN {isbn}")
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Batch lookup failed: {e}")
             # If a batch fails, we just skip it (or could define retry logic)
             for isbn in chunk:
                 results[isbn] = None
@@ -136,6 +161,10 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via Google Books API."""
+    import logging
+
+    logger = logging.getLogger("book_lamp")
+
     url = "https://www.googleapis.com/books/v1/volumes"
     params = {"q": f"isbn:{isbn13}"}
     try:
@@ -144,6 +173,7 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         data = response.json()
 
         if "items" not in data or not data["items"]:
+            logger.debug(f"Google Books has no results for {isbn13}")
             return None
 
         item = data["items"][0]
@@ -180,7 +210,7 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         if cover_url and cover_url.startswith("http://"):
             cover_url = cover_url.replace("http://", "https://", 1)
 
-        return {
+        result = {
             "title": html.unescape(title) if title else title,
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
@@ -194,7 +224,12 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             "physical_format": physical_format,
             "edition": None,
         }
-    except Exception:
+        logger.debug(
+            f"Google Books returned data for {isbn13}: has_cover={bool(thumbnail_url)}"
+        )
+        return result
+    except Exception as e:
+        logger.debug(f"Google Books lookup failed for {isbn13}: {e}")
         return None
 
 
@@ -248,28 +283,52 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
 
 
 def _isbn13_to_isbn10(isbn13: str) -> Optional[str]:
-    """Convert ISBN-13 to ISBN-10 if possible."""
-    if not isbn13.startswith("978") or len(isbn13) != 13:
+    """Convert ISBN-13 to ISBN-10 if possible.
+
+    Handles both 978 and 9798 prefixes.
+    """
+    import logging
+
+    logger = logging.getLogger("book_lamp")
+
+    if len(isbn13) != 13 or not isbn13.isdigit():
         return None
 
-    # Use first 9 digits of the ISBN-13 (excluding 978 prefix)
-    core = isbn13[3:12]
+    # 978 prefix: standard conversion
+    if isbn13.startswith("978"):
+        # Use first 9 digits of the ISBN-13 (excluding 978 prefix)
+        core = isbn13[3:12]
 
-    # Calculate checksum
-    total = 0
-    for i, digit in enumerate(core):
-        total += int(digit) * (10 - i)
+        # Calculate checksum
+        total = 0
+        for i, digit in enumerate(core):
+            total += int(digit) * (10 - i)
 
-    remainder = total % 11
-    check_digit = 11 - remainder
-    if check_digit == 10:
-        check_char = "X"
-    elif check_digit == 11:
-        check_char = "0"
-    else:
-        check_char = str(check_digit)
+        remainder = total % 11
+        check_digit = 11 - remainder
+        if check_digit == 10:
+            check_char = "X"
+        elif check_digit == 11:
+            check_char = "0"
+        else:
+            check_char = str(check_digit)
 
-    return core + check_char
+        isbn10 = core + check_char
+        logger.debug(f"Converted ISBN-13 {isbn13} to ISBN-10 {isbn10} (978 prefix)")
+        return isbn10
+
+    # 9798 prefix: self-published books
+    # For these, we can use the last 10 digits (9798 + 6 digit identifier + check digit)
+    # This is a simplified approach - Amazon may recognize these
+    elif isbn13.startswith("9798"):
+        # Use 10 digits after the 979 prefix
+        isbn10_candidate = isbn13[3:13]  # Skip "979", take next 10 digits
+        logger.debug(
+            f"Converted ISBN-13 {isbn13} to ISBN-10-like {isbn10_candidate} (9798 prefix)"
+        )
+        return isbn10_candidate
+
+    return None
 
 
 def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
@@ -278,22 +337,35 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
     Amazon often has covers even if others don't, accessible via ISBN-10.
     Returns: URL string or None.
     """
+    import logging
+
+    logger = logging.getLogger("book_lamp")
+
     isbn10 = _isbn13_to_isbn10(isbn13)
     if not isbn10:
+        logger.debug(f"Could not convert {isbn13} to ISBN-10, skipping Amazon lookup")
         return None
 
     # URL pattern for Amazon images
     url = f"https://images-na.ssl-images-amazon.com/images/P/{isbn10}.01.LZZZZZZZ.jpg"
 
     try:
+        logger.debug(f"Checking Amazon for {isbn13} (ISBN-10: {isbn10}): {url}")
         response = requests.get(url, timeout=5)
         # Amazon returns 200 OK even for missing images (usually a 1x1 pixel gif)
         # A real cover should be at least a few hundred bytes.
         # We'll use a conservative threshold of 100 bytes.
         if response.status_code == 200 and len(response.content) > 100:
+            logger.debug(
+                f"Found Amazon cover for {isbn13}: {len(response.content)} bytes"
+            )
             return url
-    except Exception:
-        pass
+        else:
+            logger.debug(
+                f"No valid cover on Amazon for {isbn13}: status={response.status_code}, size={len(response.content)}"
+            )
+    except Exception as e:
+        logger.debug(f"Amazon lookup failed for {isbn13}: {e}")
 
     return None
 
@@ -302,38 +374,74 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Lookup a book by ISBN-13 using Open Library, Google Books, then iTunes.
 
     If metadata is found but no cover, attempts to fetch cover from Amazon.
+    For self-published books without metadata, still tries Amazon cover.
 
     Returns a dict with keys: title, author, publish_date, thumbnail_url, cover_url, or None if not found.
     """
+    import logging
+
+    from book_lamp.utils.books import normalize_isbn
+
+    logger = logging.getLogger("book_lamp")
+    clean_isbn = normalize_isbn(isbn13)
+    logger.debug(f"Deep lookup for ISBN {clean_isbn}")
+
     # 1. Open Library
-    ol_result = _lookup_open_library(isbn13)
+    logger.debug("  Trying Open Library...")
+    ol_result = _lookup_open_library(clean_isbn)
     if ol_result and ol_result.get("thumbnail_url"):
+        logger.debug("  Found cover in Open Library")
         return ol_result
 
     # 2. Google Books
-    gb_result = _lookup_google_books(isbn13)
+    logger.debug("  Trying Google Books...")
+    gb_result = _lookup_google_books(clean_isbn)
     if gb_result and gb_result.get("thumbnail_url"):
+        logger.debug("  Found cover in Google Books")
         return gb_result
 
     # 3. iTunes Store
-    itunes_result = _lookup_itunes(isbn13)
+    logger.debug("  Trying iTunes...")
+    itunes_result = _lookup_itunes(clean_isbn)
     if itunes_result and itunes_result.get("thumbnail_url"):
+        logger.debug("  Found cover in iTunes")
         return itunes_result
 
     # If we reached here, we have no result with a cover.
     # Pick the best available metadata to augment.
     best_result = ol_result or gb_result or itunes_result
 
-    if best_result:
-        # 4. Amazon (Cover only)
-        # If we have valid metadata types but missing cover, try Amazon
-        amazon_cover = _lookup_amazon_cover(isbn13)
-        if amazon_cover:
+    # 4. Amazon (Cover only) - Try even for books with no metadata
+    logger.debug("  Trying Amazon cover lookup...")
+    amazon_cover = _lookup_amazon_cover(clean_isbn)
+    if amazon_cover:
+        logger.debug("  Found cover on Amazon")
+        if best_result:
             best_result["thumbnail_url"] = amazon_cover
             best_result["cover_url"] = amazon_cover
+            return best_result
+        else:
+            # Return a minimal result with just the Amazon cover
+            return {
+                "title": None,
+                "author": None,
+                "publish_date": None,
+                "thumbnail_url": amazon_cover,
+                "cover_url": amazon_cover,
+                "publisher": None,
+                "description": None,
+                "dewey_decimal": None,
+                "page_count": None,
+                "language": None,
+                "physical_format": None,
+                "edition": None,
+            }
 
+    if best_result:
+        logger.debug(f"  Found metadata but no cover for {clean_isbn}")
         return best_result
 
+    logger.debug(f"  No data found for ISBN {clean_isbn}")
     return None
 
 
@@ -343,7 +451,10 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
     Updates the books list in-place.
     Returns the number of books successfully updated.
     """
+    import logging
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    logger = logging.getLogger("book_lamp")
 
     def is_empty(value):
         return value is None or (isinstance(value, str) and not value.strip())
@@ -351,10 +462,15 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
     candidates = []
     for b in books:
         if not b.get("isbn13"):
+            logger.debug(f"Skipping book (no ISBN): {b.get('title', 'Unknown')}")
             continue
-        # Check if missing any key field
-        if any(
-            is_empty(b.get(f))
+
+        # Consider a book a candidate if it has an ISBN and is missing cover/thumbnail
+        # OR if it's missing any other key metadata
+        has_cover = b.get("cover_url") or b.get("thumbnail_url")
+
+        missing_fields = [
+            f
             for f in [
                 "thumbnail_url",
                 "title",
@@ -364,29 +480,63 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "description",
                 "cover_url",
             ]
-        ):
+            if is_empty(b.get(f))
+        ]
+
+        if missing_fields or not has_cover:
             candidates.append(b)
+            if not has_cover:
+                logger.debug(f"Candidate book (no cover): {b.get('title', 'Unknown')}")
+            else:
+                logger.debug(
+                    f"Candidate book (missing: {missing_fields}): {b.get('title', 'Unknown')}"
+                )
+        else:
+            logger.debug(f"Skipping book (complete): {b.get('title', 'Unknown')}")
 
     if not candidates:
+        logger.info(f"No candidates found for enhancement out of {len(books)} books")
         return 0
+
+    logger.info(f"Found {len(candidates)} candidate(s) for enhancement")
 
     # 1. Batch lookup via Open Library
     all_isbns = [b["isbn13"] for b in candidates]
+    logger.info(
+        f"Performing batch lookup for ISBNs: {all_isbns[:5]}..."
+        if len(all_isbns) > 5
+        else f"Performing batch lookup for ISBNs: {all_isbns}"
+    )
     batch_results = lookup_books_batch(all_isbns)
+
+    found_count = sum(1 for v in batch_results.values() if v is not None)
+    logger.info(f"Batch lookup returned data for {found_count}/{len(all_isbns)} books")
 
     updated_count = 0
 
     def process_book(book_item):
-        isbn = book_item["isbn13"]
+        from book_lamp.utils.books import normalize_isbn
+
+        isbn = normalize_isbn(book_item.get("isbn13", ""))
+        title = book_item.get("title", "Unknown")
         try:
-            # Try batch first
+            # Try batch result first (normalized ISBN lookup)
             info = batch_results.get(isbn)
+            source = "batch"
+
             # Fallback to deep lookup
             if not info:
+                logger.debug(
+                    f"Batch lookup miss for {title} (ISBN: {isbn}), trying deep lookup..."
+                )
                 info = lookup_book_by_isbn13(isbn)
+                source = "deep"
 
             if not info:
+                logger.warning(f"No lookup result for {title} (ISBN: {isbn})")
                 return False
+
+            logger.debug(f"Found data from {source} for {title}: {info}")
 
             has_updates = False
             # Map fields safely
@@ -404,16 +554,18 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "edition": "edition",
             }
 
-            for target, source in field_map.items():
-                if is_empty(book_item.get(target)) and info.get(source):
-                    val = info[source]
+            for target, source_field in field_map.items():
+                if is_empty(book_item.get(target)) and info.get(source_field):
+                    val = info[source_field]
                     # Specific handling for strings/lengths
-                    if target == "title" and len(val) > 300:
-                        val = val[:300]
-                    if target == "author" and len(val) > 200:
-                        val = val[:200]
+                    if isinstance(val, str):
+                        if target == "title" and len(val) > 300:
+                            val = val[:300]
+                        if target == "author" and len(val) > 200:
+                            val = val[:200]
                     book_item[target] = val
                     has_updates = True
+                    logger.debug(f"Updated {target} for {title}: {val}")
 
             # Special handling for publication_year
             if is_empty(book_item.get("publication_year")) and info.get("publish_date"):
@@ -423,9 +575,16 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 if year:
                     book_item["publication_year"] = year
                     has_updates = True
+                    logger.debug(f"Updated publication_year for {title}: {year}")
+
+            if not has_updates:
+                logger.debug(
+                    f"No updates made for {title} - all fields already present in result"
+                )
 
             return has_updates
         except Exception:
+            logger.exception(f"Error processing book {title}")
             return False
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -434,4 +593,5 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
             if future.result():
                 updated_count += 1
 
+    logger.info(f"Successfully updated {updated_count} books")
     return updated_count

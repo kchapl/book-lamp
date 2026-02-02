@@ -55,3 +55,30 @@ test('importing Libib CSV creates books and reading records', async ({ page }) =
     await expect(page.locator('.stat-card', { has: page.locator('.stat-label', { hasText: 'Unique Authors' }) }).locator('.stat-value')).toHaveText('2');
     await expect(page.locator('.stat-card', { has: page.locator('.stat-label', { hasText: 'Reading Events' }) }).locator('.stat-value')).toHaveText('2');
 });
+
+test('importing Libib CSV with covers displays images', async ({ page }) => {
+    // Navigate to the import page
+    await page.goto('/books/import');
+    await expect(page.getByRole('heading', { name: 'Import from Libib', exact: true })).toBeVisible();
+
+    // Set the file input to our sample CSV with covers
+    const filePath = path.resolve(__dirname, 'assets/libib_import_with_covers.csv');
+    await page.setInputFiles('#csv_file', filePath);
+
+    // Submit the import form
+    await Promise.all([
+        page.waitForURL('/books'),
+        page.getByRole('button', { name: 'Start Import' }).click()
+    ]);
+
+    // Verify success message
+    await expect(page.locator('.messages .success')).toContainText('Successfully imported 2 entries');
+
+    // Verify Gatsby cover
+    const gatsbyCard = page.locator('.book-card', { hasText: 'The Great Gatsby' });
+    await expect(gatsbyCard.locator('img.thumb')).toHaveAttribute('src', 'https://example.com/gatsby_thumb.jpg');
+
+    // Verify Thinking cover
+    const thinkingCard = page.locator('.book-card', { hasText: 'Thinking, Fast and Slow' });
+    await expect(thinkingCard.locator('img.thumb')).toHaveAttribute('src', 'https://example.com/thinking_thumb.jpg');
+});

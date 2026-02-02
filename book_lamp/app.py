@@ -52,12 +52,12 @@ TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
 TEST_ISBN = "9780000000000"
 
 # Global singleton for test mode only
-_mock_storage_singleton = MockStorage() if TEST_MODE else None
+_mock_storage_singleton = MockStorage()
 
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
-    if TEST_MODE:
+    if os.environ.get("TEST_MODE", "0") == "1":
         return _mock_storage_singleton
 
     # Use different sheet names for production and development
@@ -604,7 +604,9 @@ def delete_reading_record(record_id: int):
 @authorisation_required
 def create_book():
     storage = get_storage()
-    isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
+    from book_lamp.utils.books import normalize_isbn
+
+    isbn = normalize_isbn(request.form.get("isbn", "") or "")
 
     # Check if valid (allow special test ISBN in test mode)
     is_valid = (TEST_MODE and isbn == TEST_ISBN) or is_valid_isbn13(isbn)
@@ -679,15 +681,23 @@ def fetch_missing_data():
     books = storage.get_all_books()
     app.logger.info(f"Checking {len(books)} books for missing data...")
 
+    # Log which books have ISBNs
+    for b in books:
+        isbn = b.get("isbn13")
+        title = b.get("title", "Unknown")
+        has_cover = bool(b.get("cover_url") or b.get("thumbnail_url"))
+        app.logger.info(f"  Book: {title}, ISBN: {isbn}, Has cover: {has_cover}")
+
     # enhance_books_batch updates in-place and returns count
     updated_count = enhance_books_batch(books)
 
+    # Always save books back to storage to preserve any existing metadata
+    # bulk_import has logic to preserve existing cover_url/thumbnail_url values
+    # for books that weren't successfully enhanced
+    items_to_update = [{"book": b, "record": None} for b in books]
+    storage.bulk_import(items_to_update)
+
     if updated_count > 0:
-        # We need to save the updated books back to storage.
-        # enhance_books_batch modified the 'books' objects in the list.
-        # We'll use bulk_import to save them (it handles updates based on ISBN/ID).
-        items_to_update = [{"book": b, "record": None} for b in books]
-        storage.bulk_import(items_to_update)
         flash(f"Found and updated missing data for {updated_count} book(s).", "success")
     else:
         flash("No missing data found to update.", "info")

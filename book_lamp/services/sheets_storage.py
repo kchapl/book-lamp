@@ -500,9 +500,12 @@ class GoogleSheetsStorage:
 
     def get_book_by_isbn(self, isbn13: str) -> Optional[Dict[str, Any]]:
         """Get a single book by ISBN-13."""
+        from book_lamp.utils.books import normalize_isbn
+
+        target_isbn = normalize_isbn(isbn13)
         books = self.get_all_books()
         for book in books:
-            if book["isbn13"] == isbn13:
+            if normalize_isbn(book["isbn13"]) == target_isbn:
                 return book
         return None
 
@@ -524,14 +527,17 @@ class GoogleSheetsStorage:
         cover_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
+        from book_lamp.utils.books import normalize_isbn
+
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         book_id = self._get_next_id("Books")
         created_at = datetime.now(timezone.utc).isoformat()
+        clean_isbn_val = normalize_isbn(isbn13)
 
         row = [
             book_id,
-            isbn13,
+            clean_isbn_val,
             title,
             author,
             publication_year if publication_year else "",
@@ -637,8 +643,12 @@ class GoogleSheetsStorage:
         cover_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update an existing book in the Books tab."""
+        from book_lamp.utils.books import normalize_isbn
+
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
+        clean_isbn_val = normalize_isbn(isbn13)
+        # ... (rest of the logic)
 
         # Get all data to find the row index
         try:
@@ -716,7 +726,7 @@ class GoogleSheetsStorage:
 
         row = [
             book_id,
-            isbn13,
+            clean_isbn_val,
             title,
             author,
             publication_year if publication_year else "",
@@ -866,12 +876,12 @@ class GoogleSheetsStorage:
         book_values = books_result.get("values", [])
         existing_books = {}  # normalized_isbn -> (row_data, row_index)
         next_book_id = 1
-        from book_lamp.utils.libib_import import clean_isbn
+        from book_lamp.utils.books import normalize_isbn
 
         for idx, row in enumerate(book_values[1:], start=2):
             if row and len(row) > 1:
                 # Normalize ISBN for lookup
-                norm_isbn = clean_isbn(row[1])
+                norm_isbn = normalize_isbn(row[1])
                 if norm_isbn:
                     existing_books[norm_isbn] = (row, idx)
                 try:
@@ -924,7 +934,7 @@ class GoogleSheetsStorage:
         for item in items:
             b = item["book"]
             r = item["record"]
-            isbn = b["isbn13"]
+            isbn = normalize_isbn(b["isbn13"])
 
             created_at = datetime.now(timezone.utc).isoformat()
             book_id = None
