@@ -116,14 +116,11 @@
                         </div>
 
                         <!-- Edit Mode -->
-                        <div class="edit-only"
-                            style="background: rgba(0, 0, 0, 0.2); padding: 1rem; border-radius: 12px;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label class="meta-label"
-                                        style="display: block; font-size: 0.75rem; margin-bottom: 0.25rem;">Status</label>
+                        <div class="edit-only edit-form-container">
+                            <div class="edit-form-grid">
+                                <div class="form-group edit-form-field">
+                                    <label class="meta-label">Status</label>
                                     <select name="status" class="edit-input"
-                                        style="width: 100%; padding: 0.4rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: white;"
                                         onchange="updateRecordDateLabels('{{ record.id }}', this.value)" required>
                                         <option value="In Progress" {% if record.status=='In Progress' %}selected{%
                                             endif %}>In Progress</option>
@@ -133,11 +130,9 @@
                                             %}>Abandoned</option>
                                     </select>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label class="meta-label"
-                                        style="display: block; font-size: 0.75rem; margin-bottom: 0.25rem;">Rating</label>
-                                    <select name="rating" class="edit-input"
-                                        style="width: 100%; padding: 0.4rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: white;">
+                                <div class="form-group edit-form-field">
+                                    <label class="meta-label">Rating</label>
+                                    <select name="rating" class="edit-input">
                                         <option value="0" {% if record.rating==0 %}selected{% endif %}>No Rating
                                         </option>
                                         <option value="1" {% if record.rating==1 %}selected{% endif %}>1 Star</option>
@@ -147,32 +142,25 @@
                                         <option value="5" {% if record.rating==5 %}selected{% endif %}>5 Stars</option>
                                     </select>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label class="meta-label"
-                                        style="display: block; font-size: 0.75rem; margin-bottom: 0.25rem;">Start
-                                        Date</label>
+                                <div class="form-group edit-form-field">
+                                    <label class="meta-label">Start Date</label>
                                     <input type="date" name="start_date" class="edit-input"
-                                        style="width: 100%; padding: 0.4rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: white;"
                                         value="{{ record.start_date }}" required>
                                 </div>
-                                <div class="form-group {{ 'hidden' if record.status == 'In Progress' else '' }}"
-                                    id="record-end-date-group-{{ record.id }}" style="margin-bottom: 0;">
-                                    <label id="record-end-date-label-{{ record.id }}" class="meta-label"
-                                        style="display: block; font-size: 0.75rem; margin-bottom: 0.25rem;">
+                                <div class="form-group edit-form-field {{ 'hidden' if record.status == 'In Progress' else '' }}"
+                                    id="record-end-date-group-{{ record.id }}">
+                                    <label id="record-end-date-label-{{ record.id }}" class="meta-label">
                                         {% if record.status == 'Completed' %}Completion Date{% elif record.status ==
                                         'Abandoned' %}Abandoned Date{% else %}End Date{% endif %}
                                     </label>
                                     <input type="date" name="end_date" class="edit-input"
-                                        style="width: 100%; padding: 0.4rem; font-size: 0.85rem; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 4px; color: white;"
                                         value="{{ record.end_date or '' }}" {% if record.status !='In Progress'
                                         %}required{% endif %}>
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                                <button type="submit" class="btn-save"
-                                    style="padding: 0.3rem 0.8rem; font-size: 0.85rem;">Save</button>
+                            <div class="edit-form-actions">
+                                <button type="submit" class="btn-save">Save</button>
                                 <button type="button" class="btn-cancel"
-                                    style="padding: 0.3rem 0.8rem; font-size: 0.85rem;"
                                     onclick="setRecordEditMode('{{ record.id }}', false)">Cancel</button>
                             </div>
                         </div>
