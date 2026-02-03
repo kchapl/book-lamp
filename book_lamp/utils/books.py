@@ -1,4 +1,19 @@
+import re
 from typing import Optional
+
+
+def normalize_isbn(isbn: str) -> str:
+    """Remove hyphens and other non-digit characters from ISBN, preserving final 'X'."""
+    if not isbn:
+        return ""
+    # Remove hyphens and spaces
+    clean = re.sub(r"[\s-]", "", str(isbn))
+    # Preserve final X/x, remove all other non-digits
+    has_x = clean.lower().endswith("x")
+    digits = re.sub(r"\D", "", clean)
+    if has_x:
+        return digits + "X"
+    return digits
 
 
 def is_valid_isbn13(isbn: str) -> bool:

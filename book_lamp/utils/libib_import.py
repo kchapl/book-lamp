@@ -4,12 +4,7 @@ import io
 import re
 from typing import Any, Dict, List, Optional
 
-
-def clean_isbn(isbn: str) -> str:
-    """Remove hyphens and other non-digit characters from ISBN."""
-    if not isbn:
-        return ""
-    return re.sub(r"\D", "", str(isbn))
+from book_lamp.utils.books import normalize_isbn
 
 
 def normalize_date(date_str: str) -> str:
@@ -55,39 +50,53 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         # Map headers (case-insensitive and handling potential spaces)
         def get_val(keys: List[str]) -> str:
             for k in row.keys():
-                clean_k = k.strip().lower().replace("_", " ")
-                if clean_k in [key.lower().replace("_", " ") for key in keys]:
-                    return html.unescape(row[k].strip())
+                if k is None:
+                    continue
+                clean_k = k.strip().lower().replace("_", " ").replace("-", " ")
+                if clean_k in [
+                    key.lower().replace("_", " ").replace("-", " ") for key in keys
+                ]:
+                    val = row[k]
+                    if val is None:
+                        return ""
+                    return html.unescape(str(val).strip())
             return ""
 
-        title = get_val(["Title"])
-        author = get_val(["Author", "Creators"])
-        isbn = clean_isbn(
-            get_val(["ISBN", "ISBN 13", "ISBN 10", "ean_isbn13", "upc_isbn10"])
+        title = get_val(["Title", "Item Title"])
+        author = get_val(["Author", "Creators", "Author(s)", "Item Author"])
+        isbn_val = get_val(
+            ["ISBN", "ISBN 13", "ISBN 10", "ean_isbn13", "upc_isbn10", "ean", "upc"]
         )
+        isbn = normalize_isbn(isbn_val)
         publish_date = get_val(["Publish Date"])
         rating_str = get_val(["Rating"])
         date_added = normalize_date(get_val(["Date Added", "added"]))
         date_completed = normalize_date(get_val(["Date Completed", "completed"]))
         date_began = normalize_date(get_val(["began"]))
         libib_status = get_val(["Reading Status", "Status"])
-        publisher = get_val(["Publisher"])
-        description = get_val(["Description", "Notes"])
+        publisher = get_val(["Publisher", "Published By"])
+        description = get_val(["Description", "Notes", "Item Description"])
         series = get_val(["Series"])
-        dewey_decimal = get_val(["DDC"])
+        dewey_decimal = get_val(["DDC", "Dewey", "Classification"])
         language = get_val(["Language"])
         page_count_str = get_val(["Page Count", "Pages"])
         physical_format = get_val(["Physical Format", "Item Type"])
         edition = get_val(["Edition"])
 
+        thumbnail_url = get_val(
+            ["Thumbnail", "Image", "Image URL", "Cover", "Cover URL"]
+        )
+        cover_url = get_val(["Large Image", "High Res Cover"])
+
         page_count = None
         if page_count_str:
             try:
-                page_count = int(re.sub(r"\D", "", page_count_str))
+                # Handle floats and weird chars
+                page_count = int(float(re.sub(r"[^\d.]", "", page_count_str)))
             except (ValueError, TypeError):
                 page_count = None
 
-        if not title or not isbn:
+        if not title.strip() or not isbn.strip():
             continue
 
         # Basic year extraction from publish_date
@@ -175,6 +184,8 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                     "page_count": page_count,
                     "physical_format": physical_format,
                     "edition": edition,
+                    "thumbnail_url": thumbnail_url,
+                    "cover_url": cover_url,
                 },
                 "record": (
                     {

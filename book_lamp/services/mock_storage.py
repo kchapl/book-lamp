@@ -29,8 +29,11 @@ class MockStorage:
         return None
 
     def get_book_by_isbn(self, isbn13):
+        from book_lamp.utils.books import normalize_isbn
+
+        target_isbn = normalize_isbn(isbn13)
         for book in self.books:
-            if book["isbn13"] == isbn13:
+            if normalize_isbn(book["isbn13"]) == target_isbn:
                 return book
         return None
 
@@ -52,10 +55,11 @@ class MockStorage:
         cover_url=None,
     ):
         from book_lamp.utils.authors import split_authors
+        from book_lamp.utils.books import normalize_isbn
 
         book = {
             "id": self.next_book_id,
-            "isbn13": isbn13,
+            "isbn13": normalize_isbn(isbn13),
             "title": title,
             "author": author,
             "authors": split_authors(author),
@@ -238,6 +242,8 @@ class MockStorage:
                 page_count=book_data.get("page_count"),
                 physical_format=book_data.get("physical_format"),
                 edition=book_data.get("edition"),
+                thumbnail_url=book_data.get("thumbnail_url"),
+                cover_url=book_data.get("cover_url"),
             )
 
             if record_data:

@@ -154,3 +154,26 @@ def test_libib_import_deduplication(authenticated_client):
 
     # Should only have 1 record despite 2 imports
     assert len(recs) == 1
+
+
+def test_libib_import_with_images(authenticated_client):
+    storage = get_storage()
+    csv_content = (
+        "Title,Author,ISBN,Thumbnail,Large Image\n"
+        "Image Book,Image Author,9789999999999,http://example.com/t.jpg,http://example.com/c.jpg\n"
+    )
+
+    data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "libib.csv")}
+
+    resp = authenticated_client.post(
+        "/books/import",
+        data=data,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+
+    assert resp.status_code == 200
+
+    book = storage.get_book_by_isbn("9789999999999")
+    assert book["thumbnail_url"] == "http://example.com/t.jpg"
+    assert book["cover_url"] == "http://example.com/c.jpg"

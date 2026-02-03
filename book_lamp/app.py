@@ -52,12 +52,12 @@ TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
 TEST_ISBN = "9780000000000"
 
 # Global singleton for test mode only
-_mock_storage_singleton = MockStorage() if TEST_MODE else None
+_mock_storage_singleton = MockStorage()
 
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
-    if TEST_MODE:
+    if os.environ.get("TEST_MODE", "0") == "1":
         return _mock_storage_singleton
 
     # Use different sheet names for production and development
@@ -604,7 +604,9 @@ def delete_reading_record(record_id: int):
 @authorisation_required
 def create_book():
     storage = get_storage()
-    isbn = (request.form.get("isbn", "") or "").strip().replace("-", "")
+    from book_lamp.utils.books import normalize_isbn
+
+    isbn = normalize_isbn(request.form.get("isbn", "") or "")
 
     # Check if valid (allow special test ISBN in test mode)
     is_valid = (TEST_MODE and isbn == TEST_ISBN) or is_valid_isbn13(isbn)
@@ -674,239 +676,30 @@ def create_book():
 def fetch_missing_data():
     """Bulk fetch missing data (covers, metadata) for all books."""
     storage = get_storage()
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    from book_lamp.services.book_lookup import (
-        lookup_book_by_isbn13,
-        lookup_books_batch,
-    )
-    from book_lamp.utils.books import parse_publication_year
+    from book_lamp.services.book_lookup import enhance_books_batch
 
     books = storage.get_all_books()
-    updated_count = 0
+    app.logger.info(f"Checking {len(books)} books for missing data...")
 
-    # Identify candidates: all books with ISBN that have any missing data
-    # Check for missing: thumbnail_url, title, author, publication_year, publisher, description, cover_url
-    def is_empty(value):
-        """Check if a value is None or empty string."""
-        return value is None or (isinstance(value, str) and not value.strip())
-
-    candidates = []
+    # Log which books have ISBNs
     for b in books:
-        if not b.get("isbn13"):
-            continue
+        isbn = b.get("isbn13")
+        title = b.get("title", "Unknown")
+        has_cover = bool(b.get("cover_url") or b.get("thumbnail_url"))
+        app.logger.info(f"  Book: {title}, ISBN: {isbn}, Has cover: {has_cover}")
 
-        # Identify missing fields for this book
-        missing_fields = []
-        if is_empty(b.get("thumbnail_url")):
-            missing_fields.append("thumbnail_url")
-        if is_empty(b.get("title")):
-            missing_fields.append("title")
-        if is_empty(b.get("author")):
-            missing_fields.append("author")
-        if is_empty(b.get("publication_year")):
-            missing_fields.append("publication_year")
-        if is_empty(b.get("publisher")):
-            missing_fields.append("publisher")
-        if is_empty(b.get("description")):
-            missing_fields.append("description")
-        if is_empty(b.get("dewey_decimal")):
-            missing_fields.append("dewey_decimal")
-        if is_empty(b.get("language")):
-            missing_fields.append("language")
-        if is_empty(b.get("page_count")):
-            missing_fields.append("page_count")
-        if is_empty(b.get("physical_format")):
-            missing_fields.append("physical_format")
-        if is_empty(b.get("edition")):
-            missing_fields.append("edition")
-        if is_empty(b.get("cover_url")):
-            missing_fields.append("cover_url")
+    # enhance_books_batch updates in-place and returns count
+    updated_count = enhance_books_batch(books)
 
-        if missing_fields:
-            candidates.append(b)
-            book_title = b.get("title") or b.get("isbn13", "Unknown")
-            app.logger.info(
-                f"Book '{book_title}' (ISBN: {b.get('isbn13')}) missing fields: {', '.join(missing_fields)}"
-            )
+    # Always save books back to storage to preserve any existing metadata
+    # bulk_import has logic to preserve existing cover_url/thumbnail_url values
+    # for books that weren't successfully enhanced
+    items_to_update = [{"book": b, "record": None} for b in books]
+    storage.bulk_import(items_to_update)
 
-    app.logger.info(f"Found {len(candidates)} book(s) with missing data to process")
-
-    items_to_update = []
-
-    # 1. Perform efficient batch lookup for all candidates via Open Library
-    all_isbns = [b["isbn13"] for b in candidates if b.get("isbn13")]
-    app.logger.info(f"Performing batch lookup for {len(all_isbns)} ISBNs...")
-    batch_results = lookup_books_batch(all_isbns)
-
-    def fetch_data_for_book(book_item):
-        """Helper to fetch missing data for a single book."""
-        isbn = book_item.get("isbn13", "unknown")
-        book_title = book_item.get("title") or isbn
-
-        try:
-            # Try batch result first
-            info = batch_results.get(isbn)
-            source = "OpenLibrary Batch"
-
-            # If not in batch results (or empty), fall back to individual deep lookup (Google, iTunes, Amazon)
-            if not info:
-                app.logger.info(
-                    f"Batch lookup miss for '{book_title}' (ISBN: {isbn}). Trying deep lookup..."
-                )
-                info = lookup_book_by_isbn13(isbn)
-                source = "Deep Lookup"
-
-            if not info:
-                app.logger.warning(f"No data found for '{book_title}' (ISBN: {isbn})")
-                return None
-
-            # Check if we have any updates to make
-            updated_book = book_item.copy()
-            has_updates = False
-            found_fields = []
-            populated_fields = []
-
-            # Populate missing fields only (don't overwrite existing data)
-            if is_empty(updated_book.get("thumbnail_url")) and info.get(
-                "thumbnail_url"
-            ):
-                updated_book["thumbnail_url"] = info["thumbnail_url"]
-                found_fields.append("thumbnail_url")
-                populated_fields.append("thumbnail_url")
-                has_updates = True
-
-            if is_empty(updated_book.get("cover_url")) and info.get("cover_url"):
-                updated_book["cover_url"] = info["cover_url"]
-                found_fields.append("cover_url")
-                populated_fields.append("cover_url")
-                has_updates = True
-
-            # If thumbnail is present but cover is missing, use thumbnail as cover if it's large enough?
-            # No, let's keep them distinct. If cover_url is missing, template uses thumbnail.
-
-            if is_empty(updated_book.get("title")) and info.get("title"):
-                updated_book["title"] = (
-                    info["title"][:300] if len(info["title"]) > 300 else info["title"]
-                )
-                found_fields.append("title")
-                populated_fields.append("title")
-                has_updates = True
-
-            if is_empty(updated_book.get("author")) and info.get("author"):
-                updated_book["author"] = (
-                    info["author"][:200]
-                    if len(info["author"]) > 200
-                    else info["author"]
-                )
-                found_fields.append("author")
-                populated_fields.append("author")
-                has_updates = True
-
-            if is_empty(updated_book.get("publication_year")) and info.get(
-                "publish_date"
-            ):
-                year = parse_publication_year(info["publish_date"])
-                if year:
-                    updated_book["publication_year"] = year
-                    found_fields.append("publication_year")
-                    populated_fields.append("publication_year")
-                    has_updates = True
-
-            if is_empty(updated_book.get("publisher")) and info.get("publisher"):
-                updated_book["publisher"] = info["publisher"]
-                found_fields.append("publisher")
-                populated_fields.append("publisher")
-                has_updates = True
-
-            if is_empty(updated_book.get("description")) and info.get("description"):
-                updated_book["description"] = info["description"]
-                found_fields.append("description")
-                populated_fields.append("description")
-                has_updates = True
-
-            if is_empty(updated_book.get("dewey_decimal")) and info.get(
-                "dewey_decimal"
-            ):
-                updated_book["dewey_decimal"] = info["dewey_decimal"]
-                found_fields.append("dewey_decimal")
-                populated_fields.append("dewey_decimal")
-                has_updates = True
-
-            if is_empty(updated_book.get("language")) and info.get("language"):
-                updated_book["language"] = info["language"]
-                found_fields.append("language")
-                populated_fields.append("language")
-                has_updates = True
-
-            if is_empty(updated_book.get("page_count")) and info.get("page_count"):
-                updated_book["page_count"] = info["page_count"]
-                found_fields.append("page_count")
-                populated_fields.append("page_count")
-                has_updates = True
-
-            if is_empty(updated_book.get("physical_format")) and info.get(
-                "physical_format"
-            ):
-                updated_book["physical_format"] = info["physical_format"]
-                found_fields.append("physical_format")
-                populated_fields.append("physical_format")
-                has_updates = True
-
-            if is_empty(updated_book.get("edition")) and info.get("edition"):
-                updated_book["edition"] = info["edition"]
-                found_fields.append("edition")
-                populated_fields.append("edition")
-                has_updates = True
-
-            # Log what was found in the lookup (even if we couldn't use it)
-            if found_fields:
-                app.logger.info(
-                    f"[{source}] Found data for '{book_title}' (ISBN: {isbn}): {', '.join(found_fields)}"
-                )
-
-            if populated_fields:
-                app.logger.info(
-                    f"Populating fields for '{book_title}' (ISBN: {isbn}): {', '.join(populated_fields)}"
-                )
-            elif has_updates is False:
-                app.logger.info(
-                    f"No updates needed for '{book_title}' (ISBN: {isbn}) - all fields already populated or not found"
-                )
-
-            if has_updates:
-                return updated_book
-        except Exception as e:
-            app.logger.warning(
-                f"Failed to fetch data for '{book_title}' (ISBN: {isbn}): {e}"
-            )
-        return None
-
-    # Use a thread pool to fetch data in parallel
-    # Limit max_workers to avoid hitting API rate limits too aggressively
-    # (Though now most work is done in batch open library call, these workers handle the fallbacks)
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {
-            executor.submit(fetch_data_for_book, book): book for book in candidates
-        }
-
-        for future in as_completed(futures):
-            updated_book = future.result()
-            if updated_book:
-                # Add to batch
-                items_to_update.append({"book": updated_book, "record": None})
-                updated_count += 1
-
-    if items_to_update:
-        storage.bulk_import(items_to_update)
-        app.logger.info(
-            f"Bulk data enhancement complete: Updated {updated_count} out of {len(candidates)} candidate book(s)"
-        )
+    if updated_count > 0:
         flash(f"Found and updated missing data for {updated_count} book(s).", "success")
     else:
-        app.logger.info(
-            f"Bulk data enhancement complete: No updates needed for {len(candidates)} candidate book(s)"
-        )
         flash("No missing data found to update.", "info")
 
     return redirect(url_for("list_books"))
@@ -936,8 +729,27 @@ def import_books():
             content = file.read().decode("utf-8")
             items = parse_libib_csv(content)
 
+            # Optional data enhancement
+            fetch_metadata = request.form.get("fetch_metadata") == "on"
+            enhanced_count = 0
+            if fetch_metadata and items:
+                from book_lamp.services.book_lookup import enhance_books_batch
+
+                app.logger.info(
+                    f"Enhancing {len(items)} imported items with metadata..."
+                )
+                # items is a list of {"book": ..., "record": ...}
+                # enhance_books_batch expects a list of books
+                books = [item["book"] for item in items]
+                enhanced_count = enhance_books_batch(books)
+
             import_count = storage.bulk_import(items)
-            flash(f"Successfully imported {import_count} entries", "success")
+
+            msg = f"Successfully imported {import_count} entries"
+            if enhanced_count > 0:
+                msg += f" and found missing data/covers for {enhanced_count} books"
+            flash(msg, "success")
+
             return redirect(url_for("list_books"))
         except Exception as e:
             app.logger.error(f"Failed to import Libib CSV: {str(e)}")
