@@ -235,6 +235,42 @@
     font-size: 0.95rem;
 }
 
+/* Edit form styles */
+.edit-form-container {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+.edit-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.edit-form-field {
+    margin-bottom: 0;
+}
+
+.edit-form-field .meta-label {
+    display: block;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.edit-form-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.btn-save,
+.btn-cancel {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.85rem;
+}
+
 /* Sort dropdown styling */
 #sort-select {
     padding: 0.5rem 2.5rem 0.5rem 0.75rem;
@@ -270,6 +306,28 @@
     font-size: 0.75rem;
 }
 
+/* Primary-outline button used for secondary actions */
+.btn-outline-primary {
+    background: transparent;
+    border: 1px solid var(--primary-light);
+    color: var(--primary-light);
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.btn-outline-primary:hover {
+    background: rgba(129, 140, 248, 0.08);
+}
+
+/* Search button modifier */
+.btn-search {
+    padding: 0.6rem 1rem;
+    flex-shrink: 0;
+    min-width: fit-content;
+    white-space: nowrap;
+}
+
 .empty-state {
     text-align: center;
     padding: 4rem 2rem;
@@ -301,16 +359,24 @@
 }
 
 /* Search form responsive styles */
+@media (max-width: 768px) {
+    .edit-form-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+}
+
 @media (max-width: 640px) {
     form[action*="search_books"] {
         flex-direction: column;
+        gap: 0.75rem;
     }
 
     form[action*="search_books"]>div {
-        width: 100% !important;
+        width: 100%;
     }
 
-    form[action*="search_books"] button {
+    form[action*="search_books"] .btn-search {
         width: 100%;
     }
 
@@ -347,5 +413,23 @@
     .record-date-item::after {
         content: "" !important;
         margin: 0 !important;
+    }
+    
+    /* Mobile form styling */
+    .edit-form-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .edit-form-actions {
+        gap: 0.5rem;
+        flex-direction: row-reverse;
+    }
+    
+    .btn-save, .btn-cancel {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+        flex: 1;
     }
 }

@@ -10,39 +10,32 @@
 <div class="books-header">
     <h1>Books</h1>
     <div style="display: flex; gap: 1rem;">
-        <form method="post" action="{{ url_for('fetch_missing_data') }}" style="display: inline;"
+        <form method="post" action="{{ url_for('fetch_missing_data') }}"
             onsubmit="return confirm('This will look up and populate any missing data (covers, titles, authors, publication years, publishers, descriptions) for all books. It might take a moment. Continue?');">
-            <button type="submit" class="btn"
-                style="background: transparent; border: 1px solid var(--primary-light); color: var(--primary-light);">
-                Fetch missing data
-            </button>
+            <button type="submit" class="btn btn-outline-primary">Fetch missing data</button>
         </form>
-        <a href="{{ url_for('import_books_form') }}" class="btn"
-            style="background: transparent; border: 1px solid var(--primary-light); color: var(--primary-light);">Import
-            from Libib</a>
-        <a href="{{ url_for('new_book_form') }}" class="btn">Add new book</a>
+        <form method="get" action="{{ url_for('import_books_form') }}" style="display:inline;">
+            <button type="submit" class="btn btn-outline-primary">Import from Libib</button>
+        </form>
+        <form method="get" action="{{ url_for('new_book_form') }}" style="display:inline;">
+            <button type="submit" class="btn">Add new book</button>
+        </form>
     </div>
 </div>
 
 <!-- Search Form -->
-<div style="margin-bottom: 2rem;">
-    <form method="get" action="{{ url_for('search_books') }}"
-        style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 0; position: relative; width: 100%;">
+    <div style="margin-bottom: 1.5rem;">
+    <form method="get" action="{{ url_for('search_books') }}" style="display: flex; gap: 1rem; align-items: flex-start;">
+        <div style="flex: 1;">
             <input type="text" name="q" placeholder="Search books, authors, ISBN, series..."
                 value="{{ search_query if search_query else '' }}"
                 class="search-input {% if search_query %}has-query{% endif %}"
                 onkeypress="if(event.key === 'Enter') { event.preventDefault(); this.form.submit(); }" required>
             {% if search_query %}
-            <a href="{{ url_for('list_books') }}"
-                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 1.2rem; cursor: pointer; z-index: 1;"
-                title="Clear search">✕</a>
+            <a href="{{ url_for('list_books') }}" title="Clear search">✕</a>
             {% endif %}
         </div>
-        <button type="submit" class="btn"
-            style="padding: 0.75rem 1.5rem; flex-shrink: 0; min-width: fit-content; white-space: nowrap;">
-            🔍 Search
-        </button>
+        <button type="submit" class="btn btn-search">🔍 Search</button>
     </form>
     {% if search_query %}
     <div
