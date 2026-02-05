@@ -173,6 +173,15 @@
 
                 const onComplete = (job) => {
                     console.log(`[EnhancedJobMonitor] Job completed:`, job);
+                    if (job.result) {
+                        const messagesContainer = document.querySelector('.messages');
+                        if (messagesContainer) {
+                            const alert = document.createElement('div');
+                            alert.className = 'alert success';
+                            alert.textContent = job.result;
+                            messagesContainer.appendChild(alert);
+                        }
+                    }
                 };
 
                 const onError = (error) => {
