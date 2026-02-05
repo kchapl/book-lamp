@@ -24,15 +24,16 @@
 </div>
 
 <!-- Search Form -->
-    <div style="margin-bottom: 1.5rem;">
-    <form method="get" action="{{ url_for('search_books') }}" style="display: flex; gap: 1rem; align-items: flex-start;">
-        <div style="flex: 1;">
+<div style="margin-bottom: 1.5rem;">
+    <form method="get" action="{{ url_for('search_books') }}"
+        style="display: flex; gap: 1rem; align-items: flex-start;">
+        <div style="flex: 1; position: relative;">
             <input type="text" name="q" placeholder="Search books, authors, ISBN, series..."
                 value="{{ search_query if search_query else '' }}"
                 class="search-input {% if search_query %}has-query{% endif %}"
                 onkeypress="if(event.key === 'Enter') { event.preventDefault(); this.form.submit(); }" required>
             {% if search_query %}
-            <a href="{{ url_for('list_books') }}" title="Clear search">✕</a>
+            <a href="{{ url_for('list_books') }}" class="clear-search-btn" title="Clear search">✕</a>
             {% endif %}
         </div>
         <button type="submit" class="btn btn-search">🔍 Search</button>
