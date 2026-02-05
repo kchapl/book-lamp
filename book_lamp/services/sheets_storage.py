@@ -1170,6 +1170,73 @@ class GoogleSheetsStorage:
         )
         return import_count
 
+    def add_reading_record(
+        self,
+        book_id: int,
+        status: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        rating: int = 0,
+    ) -> Dict[str, Any]:
+        """Add a new reading record to the ReadingRecords tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        record_id = self._get_next_id("ReadingRecords")
+        created_at = datetime.now(timezone.utc).isoformat()
+
+        row = [
+            record_id,
+            book_id,
+            status,
+            start_date,
+            end_date if end_date else "",
+            rating,
+            created_at,
+        ]
+
+        try:
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="ReadingRecords!A:G",
+                valueInputOption="RAW",
+                body={"values": [row]},
+            ).execute()
+
+            return {
+                "id": record_id,
+                "book_id": book_id,
+                "status": status,
+                "start_date": start_date,
+                "end_date": end_date,
+                "rating": rating,
+                "created_at": created_at,
+            }
+        except HttpError as error:
+            if error.resp.status == 400:
+                # Tab might not exist, try initializing and appending again
+                self.initialize_sheets()
+                try:
+                    self.service.spreadsheets().values().append(
+                        spreadsheetId=sid,
+                        range="ReadingRecords!A:G",
+                        valueInputOption="RAW",
+                        body={"values": [row]},
+                    ).execute()
+                    return {
+                        "id": record_id,
+                        "book_id": book_id,
+                        "status": status,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                        "rating": rating,
+                        "created_at": created_at,
+                    }
+                except HttpError as retry_error:
+                    raise Exception(
+                        f"Failed to add reading record after initialization: {retry_error}"
+                    ) from retry_error
+            raise Exception(f"Failed to add reading record: {error}") from error
+
     def update_reading_record(
         self,
         record_id: int,

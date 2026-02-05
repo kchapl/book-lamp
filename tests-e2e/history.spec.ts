@@ -20,7 +20,7 @@ test('can add and view reading records', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Test Driven Development' })).toBeVisible();
 
     // 3. Add a reading record
-    const addRecordBtn = page.locator('.add-record-toggle');
+    const addRecordBtn = page.getByRole('button', { name: 'Add Reading' });
     await addRecordBtn.click();
 
     const form = page.locator('.add-record-form');

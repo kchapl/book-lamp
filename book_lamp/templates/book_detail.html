@@ -319,7 +319,7 @@
         <h2>Reading History</h2>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <button class="add-record-toggle" onclick="toggleForm('{{ book.id }}')">Add Record</button>
+            <button class="btn" onclick="toggleForm('{{ book.id }}')">Add Reading</button>
         </div>
 
         <div id="form-{{ book.id }}" class="add-record-form hidden">
@@ -340,7 +340,7 @@
                     <label id="end-date-label-{{ book.id }}">End Date</label>
                     <input type="date" name="end_date">
                 </div>
-                <div class="form-group">
+                <div class="form-group hidden" id="rating-group-{{ book.id }}">
                     <label>Rating (1-5)</label>
                     <select name="rating">
                         <option value="0">No Rating</option>
@@ -415,7 +415,8 @@
                                         Abandoned</option>
                                 </select>
                             </div>
-                            <div class="form-group edit-form-field">
+                            <div class="form-group edit-form-field {{ 'hidden' if record.status != 'Completed' else '' }}"
+                                id="record-rating-group-{{ record.id }}">
                                 <label class="meta-label">Rating</label>
                                 <select name="rating" class="edit-input">
                                     <option value="0" {% if record.rating==0 %}selected{% endif %}>No Rating</option>
@@ -492,18 +493,22 @@
         const endGroup = document.getElementById(`end-date-group-${bookId}`);
         const endLabel = document.getElementById(`end-date-label-${bookId}`);
         const endInput = endGroup.querySelector('input');
+        const ratingGroup = document.getElementById(`rating-group-${bookId}`);
 
         if (status === 'Completed') {
             endGroup.classList.remove('hidden');
             endLabel.textContent = 'Completion Date';
             endInput.required = true;
+            ratingGroup.classList.remove('hidden');
         } else if (status === 'Abandoned') {
             endGroup.classList.remove('hidden');
             endLabel.textContent = 'Abandoned Date';
             endInput.required = true;
+            ratingGroup.classList.add('hidden');
         } else {
             endGroup.classList.add('hidden');
             endInput.required = false;
+            ratingGroup.classList.add('hidden');
         }
     }
 
@@ -511,18 +516,22 @@
         const endGroup = document.getElementById(`record-end-date-group-${recordId}`);
         const endLabel = document.getElementById(`record-end-date-label-${recordId}`);
         const endInput = endGroup.querySelector('input');
+        const ratingGroup = document.getElementById(`record-rating-group-${recordId}`);
 
         if (status === 'Completed') {
             endGroup.classList.remove('hidden');
             endLabel.textContent = 'Completion Date';
             endInput.required = true;
+            ratingGroup.classList.remove('hidden');
         } else if (status === 'Abandoned') {
             endGroup.classList.remove('hidden');
             endLabel.textContent = 'Abandoned Date';
             endInput.required = true;
+            ratingGroup.classList.add('hidden');
         } else {
             endGroup.classList.add('hidden');
             endInput.required = false;
+            ratingGroup.classList.add('hidden');
         }
     }
 </script>

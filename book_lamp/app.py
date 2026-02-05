@@ -44,6 +44,7 @@ logging.basicConfig(
 )
 logging.getLogger("book_lamp").setLevel(logging.INFO)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
+logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.WARNING)
 
 app = Flask(__name__)
 
