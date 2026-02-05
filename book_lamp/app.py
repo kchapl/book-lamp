@@ -5,6 +5,7 @@ import os
 import re
 from collections import Counter
 from functools import wraps
+from typing import Union
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -20,6 +22,7 @@ from flask import (  # noqa: E402
 )
 
 from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
@@ -103,6 +106,18 @@ def inject_global_vars():
         "version": APP_VERSION,
         "current_year": datetime.date.today().year,
     }
+
+
+@app.route("/api/jobs/<job_id>", methods=["GET"])
+def get_job_status(job_id: str):
+    """Get the status of a background job."""
+    job_queue = get_job_queue()
+    job = job_queue.get_job(job_id)
+
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    return jsonify(job.to_dict())
 
 
 @app.route("/")
@@ -673,38 +688,67 @@ def create_book():
     return redirect(url_for("list_books"))
 
 
+def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: str):
+    """Background task: bulk fetch missing data (covers, metadata) for all books."""
+    from book_lamp.services.book_lookup import enhance_books_batch
+
+    try:
+        # Create storage with passed credentials (outside request context)
+        storage: Union[MockStorage, GoogleSheetsStorage]
+        if os.environ.get("TEST_MODE", "0") == "1":
+            storage = _mock_storage_singleton
+        else:
+            storage = GoogleSheetsStorage(
+                sheet_name=sheet_name, credentials_dict=credentials_dict
+            )
+
+        books = storage.get_all_books()
+        app.logger.info(
+            f"Background job {job_id}: checking {len(books)} books for missing data..."
+        )
+
+        # enhance_books_batch updates in-place and returns count
+        updated_count = enhance_books_batch(books)
+
+        # Always save books back to storage to preserve any existing metadata
+        items_to_update = [{"book": b, "record": None} for b in books]
+        storage.bulk_import(items_to_update)
+
+        result_msg = (
+            f"Found and updated missing data for {updated_count} book(s)."
+            if updated_count > 0
+            else "No missing data found to update."
+        )
+        app.logger.info(f"Background job {job_id}: completed - {result_msg}")
+        return result_msg
+    except Exception:
+        app.logger.exception(f"Background job {job_id} failed")
+        raise
+
+
 @app.route("/books/fetch-covers", methods=["POST"])
 @authorisation_required
 def fetch_missing_data():
-    """Bulk fetch missing data (covers, metadata) for all books."""
-    storage = get_storage()
-    from book_lamp.services.book_lookup import enhance_books_batch
+    """Queue background job to fetch missing data (covers, metadata) for all books."""
+    job_queue = get_job_queue()
 
-    books = storage.get_all_books()
-    app.logger.info(f"Checking {len(books)} books for missing data...")
+    # Capture request-context data before submitting to background thread
+    credentials_dict = session.get("credentials")
+    is_prod = os.environ.get("FLASK_ENV") == "production"
+    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
 
-    # Log which books have ISBNs
-    for b in books:
-        isbn = b.get("isbn13")
-        title = b.get("title", "Unknown")
-        has_cover = bool(b.get("cover_url") or b.get("thumbnail_url"))
-        app.logger.info(f"  Book: {title}, ISBN: {isbn}, Has cover: {has_cover}")
+    job_id = job_queue.submit_job(
+        "fetch_missing_data",
+        _background_fetch_missing_data,
+        credentials_dict,
+        sheet_name,
+    )
 
-    # enhance_books_batch updates in-place and returns count
-    updated_count = enhance_books_batch(books)
-
-    # Always save books back to storage to preserve any existing metadata
-    # bulk_import has logic to preserve existing cover_url/thumbnail_url values
-    # for books that weren't successfully enhanced
-    items_to_update = [{"book": b, "record": None} for b in books]
-    storage.bulk_import(items_to_update)
-
-    if updated_count > 0:
-        flash(f"Found and updated missing data for {updated_count} book(s).", "success")
-    else:
-        flash("No missing data found to update.", "info")
-
-    return redirect(url_for("list_books"))
+    flash(
+        "Data retrieval started in the background. You can continue using the app.",
+        "info",
+    )
+    return redirect(url_for("list_books", job_id=job_id))
 
 
 @app.route("/books/import", methods=["GET"])
@@ -713,10 +757,53 @@ def import_books_form():
     return render_template("import_books.html")
 
 
+def _background_import_books(
+    job_id: str, content: str, fetch_metadata: bool, credentials_dict, sheet_name: str
+):
+    """Background task: import books from Libib CSV."""
+    app.logger.info(f"Background job {job_id}: parsing CSV content...")
+
+    try:
+        # Create storage with passed credentials (outside request context)
+        storage: Union[MockStorage, GoogleSheetsStorage]
+        if os.environ.get("TEST_MODE", "0") == "1":
+            storage = _mock_storage_singleton
+        else:
+            storage = GoogleSheetsStorage(
+                sheet_name=sheet_name, credentials_dict=credentials_dict
+            )
+
+        items = parse_libib_csv(content)
+        app.logger.info(f"Background job {job_id}: parsed {len(items)} items from CSV")
+
+        # Optional data enhancement
+        enhanced_count = 0
+        if fetch_metadata and items:
+            from book_lamp.services.book_lookup import enhance_books_batch
+
+            app.logger.info(
+                f"Background job {job_id}: enhancing {len(items)} items with metadata..."
+            )
+            books = [item["book"] for item in items]
+            enhanced_count = enhance_books_batch(books)
+
+        import_count = storage.bulk_import(items)
+        msg = f"Successfully imported {import_count} entries"
+        if enhanced_count > 0:
+            msg += f" and found missing data/covers for {enhanced_count} books"
+        app.logger.info(f"Background job {job_id}: completed - {msg}")
+        return msg
+    except Exception:
+        app.logger.exception(f"Background job {job_id} failed")
+        raise
+
+
 @app.route("/books/import", methods=["POST"])
 @authorisation_required
 def import_books():
-    storage = get_storage()
+    """Queue background job to import books from Libib CSV."""
+    job_queue = get_job_queue()
+
     if "file" not in request.files:
         flash("No file part", "error")
         return redirect(url_for("import_books_form"))
@@ -726,40 +813,38 @@ def import_books():
         flash("No selected file", "error")
         return redirect(url_for("import_books_form"))
 
-    if file and file.filename.endswith(".csv"):
-        try:
-            content = file.read().decode("utf-8")
-            items = parse_libib_csv(content)
+    if not file or not file.filename.endswith(".csv"):
+        flash("Please upload a valid CSV file.", "error")
+        return redirect(url_for("import_books_form"))
 
-            # Optional data enhancement
-            fetch_metadata = request.form.get("fetch_metadata") == "on"
-            enhanced_count = 0
-            if fetch_metadata and items:
-                from book_lamp.services.book_lookup import enhance_books_batch
+    try:
+        content = file.read().decode("utf-8")
+        fetch_metadata = request.form.get("fetch_metadata") == "on"
 
-                app.logger.info(
-                    f"Enhancing {len(items)} imported items with metadata..."
-                )
-                # items is a list of {"book": ..., "record": ...}
-                # enhance_books_batch expects a list of books
-                books = [item["book"] for item in items]
-                enhanced_count = enhance_books_batch(books)
+        # Capture request-context data before submitting to background thread
+        credentials_dict = session.get("credentials")
+        is_prod = os.environ.get("FLASK_ENV") == "production"
+        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
 
-            import_count = storage.bulk_import(items)
+        # Queue the import job
+        job_id = job_queue.submit_job(
+            "import_books",
+            _background_import_books,
+            content,
+            fetch_metadata,
+            credentials_dict,
+            sheet_name,
+        )
 
-            msg = f"Successfully imported {import_count} entries"
-            if enhanced_count > 0:
-                msg += f" and found missing data/covers for {enhanced_count} books"
-            flash(msg, "success")
-
-            return redirect(url_for("list_books"))
-        except Exception as e:
-            app.logger.error(f"Failed to import Libib CSV: {str(e)}")
-            flash(f"Error importing file: {str(e)}", "error")
-            return redirect(url_for("import_books_form"))
-
-    flash("Please upload a valid CSV file.", "error")
-    return redirect(url_for("import_books_form"))
+        flash(
+            "Import started in the background. You can continue using the app while we process your file.",
+            "info",
+        )
+        return redirect(url_for("list_books", job_id=job_id))
+    except Exception as e:
+        app.logger.error(f"Failed to queue import job: {str(e)}")
+        flash(f"Error starting import: {str(e)}", "error")
+        return redirect(url_for("import_books_form"))
 
 
 @app.route("/books/<int:book_id>/edit", methods=["POST"])

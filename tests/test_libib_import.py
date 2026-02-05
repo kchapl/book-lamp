@@ -1,6 +1,25 @@
 import io
+import time
 
 from book_lamp.app import get_storage
+from book_lamp.services.job_queue import get_job_queue
+
+
+def _wait_for_latest_job(timeout=30):
+    """Wait for the most recent job in the queue to complete."""
+    queue = get_job_queue()
+    start = time.time()
+
+    # Get the most recent job (by creation time)
+    while time.time() - start < timeout:
+        jobs = list(queue.jobs.values())
+        if jobs:
+            latest_job = max(jobs, key=lambda j: j.created_at)
+            if latest_job.status.value in ("completed", "failed"):
+                return True
+        time.sleep(0.1)
+
+    return False
 
 
 def test_libib_import_success(authenticated_client):
@@ -20,8 +39,10 @@ def test_libib_import_success(authenticated_client):
         follow_redirects=True,
     )
 
+    # Wait for background job to complete
+    _wait_for_latest_job()
+
     assert resp.status_code == 200
-    assert b"Successfully imported 2 entries" in resp.data
 
     # Verify books
     book1 = storage.get_book_by_isbn("9780000000001")
@@ -65,6 +86,9 @@ def test_libib_import_overwrite_existing(authenticated_client):
         follow_redirects=True,
     )
 
+    # Wait for background job to complete
+    _wait_for_latest_job()
+
     assert resp.status_code == 200
 
     # Verify book updated
@@ -98,8 +122,10 @@ def test_libib_import_complex(authenticated_client):
         follow_redirects=True,
     )
 
+    # Wait for background job to complete
+    _wait_for_latest_job()
+
     assert resp.status_code == 200
-    assert b"Successfully imported 3 entries" in resp.data
 
     # Check In Progress
     book1 = storage.get_book_by_isbn("9781111111111")
@@ -137,17 +163,19 @@ def test_libib_import_deduplication(authenticated_client):
     authenticated_client.post(
         "/books/import", data=data, content_type="multipart/form-data"
     )
+    _wait_for_latest_job()
 
     # Second import with same file
     data["file"] = (io.BytesIO(csv_content.encode("utf-8")), "libib.csv")
-    resp = authenticated_client.post(
+    resp2 = authenticated_client.post(
         "/books/import",
         data=data,
         content_type="multipart/form-data",
         follow_redirects=True,
     )
+    _wait_for_latest_job()
 
-    assert resp.status_code == 200
+    assert resp2.status_code == 200
 
     book = storage.get_book_by_isbn("9784444444444")
     recs = storage.get_reading_records(book_id=book["id"])
@@ -172,8 +200,12 @@ def test_libib_import_with_images(authenticated_client):
         follow_redirects=True,
     )
 
+    # Wait for background job to complete
+    _wait_for_latest_job()
+
     assert resp.status_code == 200
 
     book = storage.get_book_by_isbn("9789999999999")
+    assert book is not None
     assert book["thumbnail_url"] == "http://example.com/t.jpg"
     assert book["cover_url"] == "http://example.com/c.jpg"
