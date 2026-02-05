@@ -10,8 +10,7 @@
 <div class="books-header">
     <h1>Books</h1>
     <div style="display: flex; gap: 1rem;">
-        <form method="post" action="{{ url_for('fetch_missing_data') }}"
-            onsubmit="return confirm('This will look up and populate any missing data (covers, titles, authors, publication years, publishers, descriptions) for all books. It might take a moment. Continue?');">
+        <form method="post" action="{{ url_for('fetch_missing_data') }}">
             <button type="submit" class="btn btn-outline-primary">Fetch missing data</button>
         </form>
         <form method="get" action="{{ url_for('import_books_form') }}" style="display:inline;">
