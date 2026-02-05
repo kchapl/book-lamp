@@ -101,6 +101,7 @@ def inject_global_vars():
     return {
         "is_authorised": get_storage().is_authorised(),
         "version": APP_VERSION,
+        "current_year": datetime.date.today().year,
     }
 
 
