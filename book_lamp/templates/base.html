@@ -37,20 +37,32 @@
     <!-- Background Job Progress Indicator -->
     <div id="job-indicator" style="display: none; position: relative; width: 100%; margin: 0; padding: 0;">
         <!-- Subtle progress bar -->
-        <div id="job-progress-bar" style="width: 100%; height: 3px; background-color: rgba(59, 130, 246, 0.1); overflow: hidden; position: relative;">
-            <div id="job-progress-fill" style="height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);"></div>
+        <div id="job-progress-bar"
+            style="width: 100%; height: 3px; background-color: rgba(59, 130, 246, 0.1); overflow: hidden; position: relative;">
+            <div id="job-progress-fill"
+                style="height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);">
+            </div>
         </div>
         <!-- Status message below progress bar -->
-        <div style="padding: 0.75rem 1.5rem; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid rgba(59, 130, 246, 0.1); display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
-            <span style="display: inline-block; width: 6px; height: 6px; background: #3b82f6; border-radius: 50%; animation: pulse 2s infinite;"></span>
+        <div
+            style="padding: 0.75rem 1.5rem; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid rgba(59, 130, 246, 0.1); display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+            <span
+                style="display: inline-block; width: 6px; height: 6px; background: #3b82f6; border-radius: 50%; animation: pulse 2s infinite;"></span>
             <span id="job-status-text">Processing...</span>
         </div>
     </div>
-    
+
     <style>
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
     </style>
 
@@ -145,9 +157,9 @@
             }
         }
     </script>
-    <script src="{{ url_for('static', filename='button-feedback.js') }}"></script>
+    <script src="{{ url_for('static', filename='button-feedback.js') }}" defer></script>
 
-    <script src="{{ url_for('static', filename='job-monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='job-monitor.js') }}" defer></script>
     <script>
         // Enhance JobMonitor to show progress bar and persist across navigation
         class EnhancedJobMonitor extends JobMonitor {
@@ -156,11 +168,11 @@
                 const onStatusChange = (job) => {
                     const progressFill = document.getElementById('job-progress-fill');
                     const statusText = document.getElementById('job-status-text');
-                    
+
                     if (progressFill) {
                         progressFill.style.width = job.progress + '%';
                     }
-                    
+
                     // Update status text based on function name
                     if (statusText) {
                         const jobLabels = {
@@ -207,7 +219,7 @@
                     indicator.style.display = 'block';
                     indicator.style.marginTop = '0px';
                 }
-                
+
                 super.start();
             }
 
@@ -234,7 +246,7 @@
                 console.log(`[JobMonitor] Found job_id in URL: ${jobIdFromUrl}`);
                 monitor = new EnhancedJobMonitor(jobIdFromUrl);
                 monitor.start();
-                
+
                 // Clean up URL by removing job_id parameter
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, document.title, newUrl);

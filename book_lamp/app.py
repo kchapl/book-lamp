@@ -646,7 +646,7 @@ def create_book():
             "title": "Test Driven Development",
             "author": "Test Author",
             "publish_date": "2019-05-02",
-            "thumbnail_url": None,
+            "thumbnail_url": "http://example.com/thumb.jpg",
         }
     else:
         try:

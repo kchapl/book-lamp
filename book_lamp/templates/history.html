@@ -50,7 +50,8 @@
     <div class="history-book-card">
         <a href="{{ url_for('book_detail', book_id=record.book_id) }}" class="history-thumb">
             {% if record.book_thumbnail_url %}
-            <img src="{{ record.book_thumbnail_url }}" alt="{{ record.book_title }}">
+            <img src="{{ record.book_thumbnail_url }}" alt="{{ record.book_title }}" loading="lazy" width="60"
+                height="90">
             {% else %}
             <div class="no-cover">📖</div>
             {% endif %}
