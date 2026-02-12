@@ -395,6 +395,36 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
     return None
 
 
+def _lookup_penguin_cover(isbn13: str) -> Optional[str]:
+    """Helper to lookup cover via Penguin Random House image system.
+
+    Works for most Penguin, Vintage, and Random House editions.
+    Returns: URL string or None.
+    """
+    import logging
+
+    logger = logging.getLogger("book_lamp")
+    url = f"https://images.penguinrandomhouse.com/cover/{isbn13}"
+
+    try:
+        logger.debug(f"Checking Penguin Random House for {isbn13}: {url}")
+        # Need to allow redirects as it might redirect to a specific size
+        response = requests.head(url, timeout=5, allow_redirects=True)
+        # Check if it's actually an image and not a 404/placeholder
+        if (
+            response.status_code == 200
+            and "image" in response.headers.get("Content-Type", "").lower()
+        ):
+            # Basic sanity check on size if available
+            size = int(response.headers.get("Content-Length", 0))
+            if size > 1000 or size == 0:  # Allow 0 if server doesn't provide length
+                return url
+    except Exception as e:
+        logger.debug(f"Penguin lookup failed for {isbn13}: {e}")
+
+    return None
+
+
 def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Lookup a book by ISBN-13 using cached data or fallback APIs.
 
@@ -467,6 +497,7 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
                 "language": None,
                 "physical_format": None,
                 "edition": None,
+                "isbn13": clean_isbn,
             }
         else:
             ol_result["thumbnail_url"] = ol_cover
@@ -475,11 +506,41 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         cache.set(f"isbn:{clean_isbn}", ol_result)
         return ol_result
 
+    # 6. Penguin Random House Cover (Vintage, etc.)
+    logger.debug("  Trying Penguin Random House cover...")
+    prh_cover = _lookup_penguin_cover(clean_isbn)
+    if prh_cover:
+        logger.debug("  Found cover in Penguin Random House")
+        # Reuse best available metadata
+        final_result = ol_result or gb_result or tb_result or itunes_result
+        if not final_result:
+            final_result = {
+                "title": None,
+                "author": None,
+                "publish_date": None,
+                "thumbnail_url": prh_cover,
+                "cover_url": prh_cover,
+                "publisher": None,
+                "description": None,
+                "dewey_decimal": None,
+                "page_count": None,
+                "language": None,
+                "physical_format": None,
+                "edition": None,
+                "isbn13": clean_isbn,
+            }
+        else:
+            final_result["thumbnail_url"] = prh_cover
+            final_result["cover_url"] = prh_cover
+
+        cache.set(f"isbn:{clean_isbn}", final_result)
+        return final_result
+
     # If we reached here, we have no result with a cover.
     # Pick the best available metadata to augment.
     best_result = ol_result or gb_result or tb_result or itunes_result
 
-    # 6. Amazon (Cover only) - Try even for books with no metadata
+    # 7. Amazon (Cover only) - Try even for books with no metadata
     logger.debug("  Trying Amazon cover lookup...")
     amazon_cover = _lookup_amazon_cover(clean_isbn)
     if amazon_cover:
