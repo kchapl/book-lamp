@@ -166,8 +166,8 @@
             }
         }
     </script>
-    <script src="{{ url_for('static', filename='button-feedback.js') }}"></script>
-    <script src="{{ url_for('static', filename='job-monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='button-feedback.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='job-monitor.js') }}" defer></script>
     <script>
         // Auto-hide alert messages after 10 seconds
         document.addEventListener('DOMContentLoaded', function () {
