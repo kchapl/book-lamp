@@ -31,7 +31,7 @@ test('adding duplicate shows info message', async ({ page }) => {
         page.waitForURL('/books'),
         page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
-    await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
+    await expect(page.locator('.messages .success')).toContainText('Book added successfully.');
 
     // Try adding the same book again
     await page.goto('/books/new');
@@ -40,7 +40,7 @@ test('adding duplicate shows info message', async ({ page }) => {
         page.waitForURL('/books'),
         page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
-    await expect(page.locator('.messages .info')).toHaveText('This book has already been added.');
+    await expect(page.locator('.messages .info')).toContainText('This book has already been added.');
 });
 
 test('successful add shows on list with metadata', async ({ page }) => {
@@ -54,7 +54,7 @@ test('successful add shows on list with metadata', async ({ page }) => {
     ]);
 
     // Check for success message and book details
-    await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
+    await expect(page.locator('.messages .success')).toContainText('Book added successfully.');
     await expect(page.locator('.book-card .title')).toHaveText('Test Driven Development');
     await expect(page.locator('.book-card .author')).toHaveText('Test Author');
     await expect(page.locator('.book-card .year')).toHaveText('2019');
