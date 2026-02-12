@@ -762,7 +762,7 @@ def fetch_missing_data():
     )
 
     flash(
-        "Data retrieval started in the background. You can continue using the app.",
+        "Refreshing library catalog: Fetching metadata and covers in the background.",
         "info",
     )
     return redirect(url_for("list_books", job_id=job_id))
@@ -854,7 +854,7 @@ def import_books():
         )
 
         flash(
-            "Import started in the background. You can continue using the app while we process your file.",
+            "Library import in progress: Processing and enriching your reading history.",
             "info",
         )
         return redirect(url_for("list_books", job_id=job_id))

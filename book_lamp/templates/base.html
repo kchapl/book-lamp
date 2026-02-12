@@ -71,7 +71,16 @@
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
             {% for category, message in messages %}
-            <div class="alert {{ category }}">{{ message }}</div>
+            <div class="alert {{ category }}">
+                {% if category == 'success' %}
+                <span>✨</span>
+                {% elif category == 'error' %}
+                <span>⚠️</span>
+                {% elif category == 'info' %}
+                <span>ℹ️</span>
+                {% endif %}
+                <span>{{ message }}</span>
+            </div>
             {% endfor %}
             {% endif %}
             {% endwith %}
@@ -160,6 +169,22 @@
     <script src="{{ url_for('static', filename='button-feedback.js') }}"></script>
     <script src="{{ url_for('static', filename='job-monitor.js') }}"></script>
     <script>
+        // Auto-hide alert messages after 5 seconds
+        document.addEventListener('DOMContentLoaded', function () {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function (alert) {
+                setTimeout(function () {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    alert.style.transition = 'all 0.5s ease';
+                    setTimeout(function () {
+                        alert.remove();
+                    }, 500);
+                }, 5000);
+            });
+        });
+    </script>
+    <script>
         // Enhance JobMonitor to show progress bar and persist across navigation
         class EnhancedJobMonitor extends JobMonitor {
             constructor(jobId, options = {}) {
@@ -190,8 +215,18 @@
                         if (messagesContainer) {
                             const alert = document.createElement('div');
                             alert.className = 'alert success';
-                            alert.textContent = job.result;
+                            alert.innerHTML = `<span>✨</span><span>${job.result}</span>`;
                             messagesContainer.appendChild(alert);
+
+                            // Auto-hide after 5 seconds
+                            setTimeout(function () {
+                                alert.style.opacity = '0';
+                                alert.style.transform = 'translateY(-10px)';
+                                alert.style.transition = 'all 0.5s ease';
+                                setTimeout(function () {
+                                    alert.remove();
+                                }, 500);
+                            }, 5000);
                         }
                     }
                 };
