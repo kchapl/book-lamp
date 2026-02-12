@@ -157,9 +157,8 @@
             }
         }
     </script>
-    <script src="{{ url_for('static', filename='button-feedback.js') }}" defer></script>
-
-    <script src="{{ url_for('static', filename='job-monitor.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='button-feedback.js') }}"></script>
+    <script src="{{ url_for('static', filename='job-monitor.js') }}"></script>
     <script>
         // Enhance JobMonitor to show progress bar and persist across navigation
         class EnhancedJobMonitor extends JobMonitor {

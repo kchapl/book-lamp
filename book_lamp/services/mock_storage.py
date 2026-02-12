@@ -1,10 +1,24 @@
+from typing import Any, Optional
+
+
 class MockStorage:
-    def __init__(self):
-        self.books = []
-        self.reading_records = []
+    def __init__(
+        self,
+        sheet_name: str = "MockData",
+        credentials_dict: Optional[dict] = None,
+        spreadsheet_id: Optional[str] = None,
+    ) -> None:
+        self.sheet_name = sheet_name
+        self.spreadsheet_id = spreadsheet_id
+        self.books: list[dict[str, Any]] = []
+        self.reading_records: list[dict[str, Any]] = []
         self.next_book_id = 1
         self.next_record_id = 1
         self._authorised = False  # Default to False for security and testing
+
+    def prefetch(self):
+        """Mock implementation of prefetch - does nothing as data is already in memory."""
+        pass
 
     def is_authorised(self):
         """Authorisation state can be toggled in mock mode for testing."""

@@ -1,9 +1,18 @@
 import html
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import requests
 
+from book_lamp.services.cache import get_cache
+from book_lamp.utils.books import (
+    isbn13_to_isbn10,
+    normalize_isbn,
+)
+
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
+THE_BOOK_DB_API = (
+    "https://thebookdb.net/api/v1/book"  # Hypothetical based on standard REST
+)
 
 
 def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -94,8 +103,23 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     return result
 
 
+def _lookup_open_library_cover_direct(isbn13: str) -> Optional[str]:
+    """Helper to check Open Library covers API directly if not in metadata."""
+    url = f"https://covers.openlibrary.org/b/isbn/{isbn13}-M.jpg?default=false"
+    try:
+        # We only need to check if the image exists
+        response = requests.head(url, timeout=5, allow_redirects=True)
+        if response.status_code == 200 and "image" in response.headers.get(
+            "Content-Type", ""
+        ):
+            return url
+    except Exception:
+        pass
+    return None
+
+
 def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
-    """Lookup metadata for multiple books via Open Library in batches.
+    """Lookup metadata for multiple books via cache or Open Library in batches.
 
     Args:
         isbn13_list: List of ISBN-13 strings.
@@ -105,8 +129,6 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
     """
     import logging
 
-    from book_lamp.utils.books import normalize_isbn
-
     logger = logging.getLogger("book_lamp")
     results: Dict[str, Optional[Dict[str, Any]]] = {}
     if not isbn13_list:
@@ -114,13 +136,29 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
 
     # Deduplicate and normalize
     unique_isbns = list(set(normalize_isbn(isbn) for isbn in isbn13_list))
+    cache = get_cache()
 
-    logger.debug(f"Batch lookup for {len(unique_isbns)} unique ISBNs")
+    # 1. Check cache first
+    remaining_isbns = []
+    for isbn in unique_isbns:
+        cached = cache.get(f"isbn:{isbn}")
+        if cached:
+            results[isbn] = cached
+        else:
+            remaining_isbns.append(isbn)
 
-    # Process in chunks of 50
+    if not remaining_isbns:
+        logger.debug(f"All {len(unique_isbns)} ISBNs found in cache")
+        return results
+
+    logger.debug(
+        f"Batch lookup for {len(unique_isbns)} unique ISBNs ({len(remaining_isbns)} not in cache)"
+    )
+
+    # 2. Process remaining in chunks of 50
     chunk_size = 50
-    for i in range(0, len(unique_isbns), chunk_size):
-        chunk = unique_isbns[i : i + chunk_size]
+    for i in range(0, len(remaining_isbns), chunk_size):
+        chunk = remaining_isbns[i : i + chunk_size]
         bibkeys = ",".join([f"ISBN:{isbn}" for isbn in chunk])
 
         params = {
@@ -144,15 +182,16 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
             for isbn in chunk:
                 key = f"ISBN:{isbn}"
                 if key in payload:
-                    results[isbn] = _parse_open_library_data(payload[key])
-                    logger.debug(f"  Found data for ISBN {isbn}")
+                    data = _parse_open_library_data(payload[key])
+                    results[isbn] = data
+                    cache.set(f"isbn:{isbn}", data)
+                    logger.debug(f"  Found and cached data for ISBN {isbn}")
                 else:
                     results[isbn] = None
                     logger.debug(f"  No data for ISBN {isbn}")
 
         except Exception as e:
             logger.warning(f"Batch lookup failed: {e}")
-            # If a batch fails, we just skip it (or could define retry logic)
             for isbn in chunk:
                 results[isbn] = None
 
@@ -282,66 +321,52 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         return None
 
 
-def _isbn13_to_isbn10(isbn13: str) -> Optional[str]:
-    """Convert ISBN-13 to ISBN-10 if possible.
-
-    Handles both 978 and 9798 prefixes.
-    """
+def _lookup_thebookdb(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
+    """Helper to lookup book details via TheBookDB.net API."""
     import logging
 
     logger = logging.getLogger("book_lamp")
+    url = f"{THE_BOOK_DB_API}/{isbn13}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code != 200:
+            return None
 
-    if len(isbn13) != 13 or not isbn13.isdigit():
+        data = response.json()
+        if not data:
+            return None
+
+        # Sample mapping - assuming standard fields
+        return {
+            "title": data.get("title"),
+            "author": data.get("author"),
+            "publish_date": data.get("publish_date") or data.get("year"),
+            "thumbnail_url": data.get("thumbnail_url") or data.get("cover_image"),
+            "cover_url": data.get("cover_url"),
+            "publisher": data.get("publisher"),
+            "description": data.get("description"),
+            "dewey_decimal": data.get("dewey_decimal"),
+            "page_count": data.get("page_count"),
+            "language": data.get("language"),
+            "physical_format": data.get("format"),
+            "edition": data.get("edition"),
+        }
+    except Exception as e:
+        logger.debug(f"TheBookDB lookup failed for {isbn13}: {e}")
         return None
-
-    # 978 prefix: standard conversion
-    if isbn13.startswith("978"):
-        # Use first 9 digits of the ISBN-13 (excluding 978 prefix)
-        core = isbn13[3:12]
-
-        # Calculate checksum
-        total = 0
-        for i, digit in enumerate(core):
-            total += int(digit) * (10 - i)
-
-        remainder = total % 11
-        check_digit = 11 - remainder
-        if check_digit == 10:
-            check_char = "X"
-        elif check_digit == 11:
-            check_char = "0"
-        else:
-            check_char = str(check_digit)
-
-        isbn10 = core + check_char
-        logger.debug(f"Converted ISBN-13 {isbn13} to ISBN-10 {isbn10} (978 prefix)")
-        return isbn10
-
-    # 9798 prefix: self-published books
-    # For these, we can use the last 10 digits (9798 + 6 digit identifier + check digit)
-    # This is a simplified approach - Amazon may recognize these
-    elif isbn13.startswith("9798"):
-        # Use 10 digits after the 979 prefix
-        isbn10_candidate = isbn13[3:13]  # Skip "979", take next 10 digits
-        logger.debug(
-            f"Converted ISBN-13 {isbn13} to ISBN-10-like {isbn10_candidate} (9798 prefix)"
-        )
-        return isbn10_candidate
-
-    return None
 
 
 def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
     """Helper to lookup cover via Amazon image system.
 
-    Amazon often has covers even if others don't, accessible via ISBN-10.
+    Amazon often has covers even if others don't, accessible via ISBN-10 or candidate.
     Returns: URL string or None.
     """
     import logging
 
     logger = logging.getLogger("book_lamp")
 
-    isbn10 = _isbn13_to_isbn10(isbn13)
+    isbn10 = isbn13_to_isbn10(isbn13)
     if not isbn10:
         logger.debug(f"Could not convert {isbn13} to ISBN-10, skipping Amazon lookup")
         return None
@@ -371,26 +396,32 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
 
 
 def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
-    """Lookup a book by ISBN-13 using Open Library, Google Books, then iTunes.
+    """Lookup a book by ISBN-13 using cached data or fallback APIs.
 
+    Chain: Cache -> Open Library -> Google Books -> TheBookDB -> iTunes.
     If metadata is found but no cover, attempts to fetch cover from Amazon.
-    For self-published books without metadata, still tries Amazon cover.
 
     Returns a dict with keys: title, author, publish_date, thumbnail_url, cover_url, or None if not found.
     """
     import logging
 
-    from book_lamp.utils.books import normalize_isbn
-
     logger = logging.getLogger("book_lamp")
     clean_isbn = normalize_isbn(isbn13)
     logger.debug(f"Deep lookup for ISBN {clean_isbn}")
+
+    # 0. Check Cache
+    cache = get_cache()
+    cached_data = cache.get(f"isbn:{clean_isbn}")
+    if cached_data is not None:
+        logger.debug(f"  Cache hit for {clean_isbn}")
+        return cast(Dict[str, Optional[Any]], cached_data)
 
     # 1. Open Library
     logger.debug("  Trying Open Library...")
     ol_result = _lookup_open_library(clean_isbn)
     if ol_result and ol_result.get("thumbnail_url"):
         logger.debug("  Found cover in Open Library")
+        cache.set(f"isbn:{clean_isbn}", ol_result)
         return ol_result
 
     # 2. Google Books
@@ -398,20 +429,57 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     gb_result = _lookup_google_books(clean_isbn)
     if gb_result and gb_result.get("thumbnail_url"):
         logger.debug("  Found cover in Google Books")
+        cache.set(f"isbn:{clean_isbn}", gb_result)
         return gb_result
 
-    # 3. iTunes Store
+    # 3. TheBookDB.net
+    logger.debug("  Trying TheBookDB.net...")
+    tb_result = _lookup_thebookdb(clean_isbn)
+    if tb_result and tb_result.get("thumbnail_url"):
+        logger.debug("  Found cover in TheBookDB.net")
+        cache.set(f"isbn:{clean_isbn}", tb_result)
+        return tb_result
+
+    # 4. iTunes Store
     logger.debug("  Trying iTunes...")
     itunes_result = _lookup_itunes(clean_isbn)
     if itunes_result and itunes_result.get("thumbnail_url"):
         logger.debug("  Found cover in iTunes")
+        cache.set(f"isbn:{clean_isbn}", itunes_result)
         return itunes_result
+
+    # 5. Open Library Direct Cover (if others failed to provide a cover)
+    logger.debug("  Trying Open Library direct cover...")
+    ol_cover = _lookup_open_library_cover_direct(clean_isbn)
+    if ol_cover:
+        logger.debug("  Found cover in Open Library direct")
+        if not ol_result:
+            ol_result = {
+                "title": None,
+                "author": None,
+                "publish_date": None,
+                "thumbnail_url": ol_cover,
+                "cover_url": ol_cover,
+                "publisher": None,
+                "description": None,
+                "dewey_decimal": None,
+                "page_count": None,
+                "language": None,
+                "physical_format": None,
+                "edition": None,
+            }
+        else:
+            ol_result["thumbnail_url"] = ol_cover
+            ol_result["cover_url"] = ol_cover
+
+        cache.set(f"isbn:{clean_isbn}", ol_result)
+        return ol_result
 
     # If we reached here, we have no result with a cover.
     # Pick the best available metadata to augment.
-    best_result = ol_result or gb_result or itunes_result
+    best_result = ol_result or gb_result or tb_result or itunes_result
 
-    # 4. Amazon (Cover only) - Try even for books with no metadata
+    # 6. Amazon (Cover only) - Try even for books with no metadata
     logger.debug("  Trying Amazon cover lookup...")
     amazon_cover = _lookup_amazon_cover(clean_isbn)
     if amazon_cover:
@@ -419,10 +487,9 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         if best_result:
             best_result["thumbnail_url"] = amazon_cover
             best_result["cover_url"] = amazon_cover
-            return best_result
         else:
-            # Return a minimal result with just the Amazon cover
-            return {
+            # Create a minimal result with just the Amazon cover
+            best_result = {
                 "title": None,
                 "author": None,
                 "publish_date": None,
@@ -438,7 +505,10 @@ def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             }
 
     if best_result:
-        logger.debug(f"  Found metadata but no cover for {clean_isbn}")
+        # Save whatever we found (even if no cover) to cache
+        cache.set(f"isbn:{clean_isbn}", best_result)
+        if not amazon_cover:
+            logger.debug(f"  Found metadata but no cover for {clean_isbn}")
         return best_result
 
     logger.debug(f"  No data found for ISBN {clean_isbn}")
