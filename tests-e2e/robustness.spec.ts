@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.setTimeout(120000);
+test.setTimeout(30000);
 
 test.beforeEach(async ({ page, request }) => {
     await request.post('/test/reset');
