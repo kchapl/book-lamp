@@ -1,6 +1,7 @@
 import html
 import logging
-from typing import Any, Dict, List, Optional, Union, cast
+import re
+from typing import Any, Dict, List, Optional, cast
 
 import requests
 
@@ -14,6 +15,8 @@ logger = logging.getLogger("book_lamp")
 
 OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 OPEN_LIBRARY_SEARCH_API = "https://openlibrary.org/search.json"
+GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes"
+ITUNES_API = "https://itunes.apple.com/search"
 
 # Shared session for connection pooling and consistent headers.
 _session: Optional[requests.Session] = None
@@ -35,6 +38,51 @@ def _get_session() -> requests.Session:
             }
         )
     return _session
+
+
+def _clean_title_for_search(title: str) -> str:
+    """Clean a book title for better search results.
+
+    Removes subtitles, series info in brackets, and common fluff that can
+    trip up API search algorithms.
+    """
+    if not title:
+        return ""
+
+    # 1. Strip HTML entities just in case
+    clean = html.unescape(title)
+
+    # 2. Remove anything in brackets or parentheses (often series/edition info)
+    clean = re.sub(r"[\(\[\{].*?[\)\]\}]", "", clean)
+
+    # 3. Take the main title before a colon or dash if it's substantial
+    for separator in [":", " - "]:
+        if separator in clean:
+            parts = clean.split(separator)
+            # If the part before the separator is long enough to be a title
+            if len(parts[0].strip()) > 3:
+                clean = parts[0]
+                break
+
+    # 4. Final trim and remove trailing punctuation
+    return clean.strip().rstrip(".,;:-")
+
+
+def _upgrade_google_books_image(url: Optional[str]) -> Optional[str]:
+    """Upgrade Google Books thumbnail URL to higher resolution and HTTPS."""
+    if not url:
+        return None
+
+    # Use HTTPS
+    url = url.replace("http://", "https://")
+
+    # Remove edge curl and set zoom to a higher value if present
+    # zoom=1 is often tiny; zoom=0 or omitting it often gives a larger image
+    url = url.replace("&edge=curl", "")
+    if "zoom=1" in url:
+        url = url.replace("zoom=1", "zoom=0")
+
+    return url
 
 
 def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,7 +145,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via Open Library."""
     session = _get_session()
-    params = {
+    params: Dict[str, str] = {
         "bibkeys": f"ISBN:{isbn13}",
         "format": "json",
         "jscmd": "data",
@@ -123,14 +171,14 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
 
 
 def _lookup_open_library_cover_direct(isbn13: str) -> Optional[str]:
-    """Helper to check Open Library covers API directly if not in metadata."""
+    """Helper to check Open Library covers API directly."""
     session = _get_session()
     url = f"https://covers.openlibrary.org/b/isbn/{isbn13}-M.jpg?default=false"
     try:
-        # We only need to check if the image exists
         response = session.head(url, timeout=5, allow_redirects=True)
-        if response.status_code == 200 and "image" in response.headers.get(
-            "Content-Type", ""
+        if (
+            response.status_code == 200
+            and "image" in response.headers.get("Content-Type", "").lower()
         ):
             return url
     except Exception:
@@ -141,72 +189,54 @@ def _lookup_open_library_cover_direct(isbn13: str) -> Optional[str]:
 def _lookup_open_library_search(
     title: str, author: Optional[str] = None
 ) -> Optional[Dict[str, Optional[Any]]]:
-    """Search Open Library by title (and optionally author) to find a cover.
-
-    This is the key fallback for ISBN editions that lack cover images.
-    Many books have covers on Open Library under a different edition
-    (ISBN) of the same work. The search API lets us find those editions.
-
-    Only used when ISBN-based lookups have failed to locate a cover.
-    """
+    """Search Open Library by title and author to find a cover from a related edition."""
     session = _get_session()
-    params: Dict[str, Union[str, int]] = {
-        "title": title,
-        "limit": 5,
-        "fields": "key,title,author_name,cover_i,first_publish_year,publisher,isbn",
+    clean_title = _clean_title_for_search(title)
+
+    # Try structured search first
+    params: Dict[str, str] = {
+        "title": clean_title,
+        "limit": "10",
+        "fields": "key,title,author_name,cover_i,first_publish_year,publisher",
     }
     if author:
         params["author"] = author
 
     try:
         response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
-        response.raise_for_status()
         data = response.json()
+        docs = data.get("docs") or []
+
+        # Fallback to general query if no structured results
+        if not docs:
+            q = f"{clean_title} {author}" if author else clean_title
+            params = {
+                "q": q,
+                "limit": "10",
+                "fields": "key,title,author_name,cover_i,first_publish_year,publisher",
+            }
+            response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
+            docs = response.json().get("docs") or []
+
+        for doc in docs:
+            cover_id = doc.get("cover_i")
+            if cover_id:
+                authors = doc.get("author_name") or []
+                publishers = doc.get("publisher") or []
+                return {
+                    "title": doc.get("title"),
+                    "author": ", ".join(authors) if authors else None,
+                    "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
+                    "cover_url": f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg",
+                    "publish_date": (
+                        str(doc.get("first_publish_year"))
+                        if doc.get("first_publish_year")
+                        else None
+                    ),
+                    "publisher": publishers[0] if publishers else None,
+                }
     except Exception as e:
-        logger.debug(f"Open Library search failed for '{title}': {e}")
-        return None
-
-    docs = data.get("docs") or []
-    if not docs:
-        logger.debug(f"Open Library search returned no results for '{title}'")
-        return None
-
-    # Find the first result that has a cover_i (cover ID)
-    for doc in docs:
-        cover_id = doc.get("cover_i")
-        if not cover_id:
-            continue
-
-        thumbnail_url = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
-        cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
-
-        authors = doc.get("author_name") or []
-        author_name = ", ".join(authors) if authors else None
-        publish_year = doc.get("first_publish_year")
-        publishers = doc.get("publisher") or []
-
-        result: Dict[str, Optional[Any]] = {
-            "title": doc.get("title"),
-            "author": author_name,
-            "publish_date": str(publish_year) if publish_year else None,
-            "thumbnail_url": thumbnail_url,
-            "cover_url": cover_url,
-            "publisher": publishers[0] if publishers else None,
-            "description": None,
-            "dewey_decimal": None,
-            "page_count": None,
-            "language": None,
-            "physical_format": None,
-            "edition": None,
-        }
-        logger.debug(
-            f"Open Library search found cover for '{title}' via cover_id={cover_id}"
-        )
-        return result
-
-    logger.debug(
-        f"Open Library search: results found for '{title}' but none had covers"
-    )
+        logger.debug(f"Open Library search failed: {e}")
     return None
 
 
@@ -251,7 +281,7 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
         chunk = remaining_isbns[i : i + chunk_size]
         bibkeys = ",".join([f"ISBN:{isbn}" for isbn in chunk])
 
-        params = {
+        params: Dict[str, str] = {
             "bibkeys": bibkeys,
             "format": "json",
             "jscmd": "data",
@@ -289,80 +319,99 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
-    """Helper to lookup book details via Google Books API."""
+    """Lookup book details via Google Books API (ISBN)."""
     session = _get_session()
-    url = "https://www.googleapis.com/books/v1/volumes"
-    params = {"q": f"isbn:{isbn13}"}
+    params: Dict[str, str] = {"q": f"isbn:{isbn13}"}
     try:
-        response = session.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        response = session.get(GOOGLE_BOOKS_API, params=params, timeout=10)
         data = response.json()
-
-        if "items" not in data or not data["items"]:
-            logger.debug(f"Google Books has no results for {isbn13}")
-            return None
-
-        item = data["items"][0]
-        info = item.get("volumeInfo", {})
-
-        title = info.get("title")
-        authors = info.get("authors", [])
-        author_name = ", ".join(authors) if authors else None
-        publish_date = info.get("publishedDate")
-        description = info.get("description")
-        publisher = info.get("publisher")
-
-        # Edition info
-        page_count = info.get("pageCount")
-        language = info.get("language")
-        physical_format = info.get("printType")
-
-        image_links = info.get("imageLinks", {})
-        thumbnail_url = image_links.get("thumbnail") or image_links.get(
-            "smallThumbnail"
-        )
-        # Try to get larger images
-        cover_url = (
-            image_links.get("extraLarge")
-            or image_links.get("large")
-            or image_links.get("medium")
-            or thumbnail_url
-        )
-
-        # Ensure HTTPS
-        if thumbnail_url and thumbnail_url.startswith("http://"):
-            thumbnail_url = thumbnail_url.replace("http://", "https://", 1)
-        if cover_url and cover_url.startswith("http://"):
-            cover_url = cover_url.replace("http://", "https://", 1)
-
-        result = {
-            "title": html.unescape(title) if title else title,
-            "author": html.unescape(author_name) if author_name else author_name,
-            "publish_date": publish_date,
-            "thumbnail_url": thumbnail_url,
-            "cover_url": cover_url,
-            "publisher": (html.unescape(publisher) if publisher else publisher),
-            "description": html.unescape(description) if description else description,
-            "dewey_decimal": None,
-            "page_count": page_count,
-            "language": language,
-            "physical_format": physical_format,
-            "edition": None,
-        }
-        logger.debug(
-            f"Google Books returned data for {isbn13}: has_cover={bool(thumbnail_url)}"
-        )
-        return result
+        if "items" in data and data["items"]:
+            return _parse_google_books_item(data["items"][0])
     except Exception as e:
         logger.debug(f"Google Books lookup failed for {isbn13}: {e}")
-        return None
+    return None
+
+
+def _lookup_google_books_search(
+    title: str, author: Optional[str] = None
+) -> Optional[Dict[str, Optional[Any]]]:
+    """Search Google Books by title and author for covers."""
+    session = _get_session()
+    clean_title = _clean_title_for_search(title)
+    q = f'intitle:"{clean_title}"'
+    if author:
+        q += f' inauthor:"{author}"'
+
+    params: Dict[str, str] = {"q": q, "maxResults": "5"}
+    try:
+        response = session.get(GOOGLE_BOOKS_API, params=params, timeout=10)
+        data = response.json()
+        if "items" in data and data["items"]:
+            # Prioritize result with a cover
+            for item in data["items"]:
+                if item.get("volumeInfo", {}).get("imageLinks"):
+                    return _parse_google_books_item(item)
+            return _parse_google_books_item(data["items"][0])
+    except Exception as e:
+        logger.debug(f"Google Books search failed: {e}")
+    return None
+
+
+def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
+    """Helper to parse a Google Books API volume item."""
+    info = item.get("volumeInfo", {})
+    image_links = info.get("imageLinks", {})
+    thumbnail = _upgrade_google_books_image(
+        image_links.get("thumbnail") or image_links.get("smallThumbnail")
+    )
+
+    return {
+        "title": html.unescape(info.get("title", "")),
+        "author": ", ".join(info.get("authors", [])) if info.get("authors") else None,
+        "publish_date": info.get("publishedDate"),
+        "thumbnail_url": thumbnail,
+        "cover_url": thumbnail,
+        "publisher": info.get("publisher"),
+        "description": info.get("description"),
+        "page_count": info.get("pageCount"),
+        "language": info.get("language"),
+        "physical_format": info.get("printType"),
+    }
+
+
+def _lookup_itunes_search(
+    title: str, author: Optional[str] = None
+) -> Optional[Dict[str, Optional[Any]]]:
+    """Fallback search via iTunes Store for high-res eBook covers."""
+    session = _get_session()
+    clean_title = _clean_title_for_search(title)
+    term = f"{clean_title} {author}" if author else clean_title
+    params: Dict[str, str] = {"term": term, "media": "ebook", "limit": "5"}
+    try:
+        response = session.get(ITUNES_API, params=params, timeout=10)
+        data = response.json()
+        if data.get("results"):
+            item = data["results"][0]
+            base_url = item.get("artworkUrl100")
+            if base_url:
+                thumbnail = base_url.replace("100x100bb", "200x200bb")
+                cover = base_url.replace("100x100bb", "600x600bb")
+                return {
+                    "title": item.get("trackName"),
+                    "author": item.get("artistName"),
+                    "thumbnail_url": thumbnail,
+                    "cover_url": cover,
+                }
+    except Exception:
+        pass
+    return None
 
 
 def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Helper to lookup book details via iTunes Search API."""
     session = _get_session()
     url = "https://itunes.apple.com/search"
-    params = {"term": isbn13, "media": "ebook", "limit": "1"}
+    params: Dict[str, str] = {"term": isbn13, "media": "ebook", "limit": "1"}
     try:
         response = session.get(url, params=params, timeout=10)
         response.raise_for_status()
@@ -489,141 +538,102 @@ def _lookup_penguin_cover(isbn13: str) -> Optional[str]:
 
 
 def _merge_metadata(
-    base: Optional[Dict[str, Optional[Any]]],
-    overlay: Dict[str, Optional[Any]],
-) -> Dict[str, Optional[Any]]:
-    """Merge two metadata dicts, filling in missing fields from overlay.
-
-    The base dict takes priority for non-empty fields. Overlay fills gaps.
-    """
-    if base is None:
-        return dict(overlay)
-
-    merged = dict(base)
-    for key, value in overlay.items():
-        existing = merged.get(key)
-        if existing is None or (isinstance(existing, str) and not existing.strip()):
-            if value is not None and (not isinstance(value, str) or value.strip()):
-                merged[key] = value
-    return merged
+    target: Dict[str, Any], source: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Merge non-empty metadata fields from source into target."""
+    if not source:
+        return target
+    for k, v in source.items():
+        if v and not (isinstance(v, str) and not v.strip()):
+            if not target.get(k):
+                target[k] = v
+    return target
 
 
-def lookup_book_by_isbn13(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
-    """Lookup a book by ISBN-13 using cached data or fallback APIs.
-
-    Optimised lookup chain:
-      1. Cache
-      2. Open Library (ISBN)
-      3. Google Books (ISBN)
-      4. Open Library direct cover
-      5. Penguin Random House cover
-      6. Amazon cover (HEAD check, no full download)
-      7. Open Library search by title+author (finds covers from other editions)
-      8. iTunes (ISBN search)
-
-    Metadata from all sources is merged — the first source to provide a
-    value for a field wins. Cover-only sources augment existing metadata.
-
-    Returns a dict with keys: title, author, publish_date, thumbnail_url,
-    cover_url, etc., or None if absolutely nothing was found.
-    """
+def lookup_book_by_isbn13(
+    isbn13: str, title: Optional[str] = None, author: Optional[str] = None
+) -> Optional[Dict[str, Optional[Any]]]:
+    """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
-    logger.debug(f"Deep lookup for ISBN {clean_isbn}")
-
-    # 0. Check Cache
     cache = get_cache()
-    cached_data = cache.get(f"isbn:{clean_isbn}")
-    if cached_data is not None:
-        logger.debug(f"  Cache hit for {clean_isbn}")
-        return cast(Dict[str, Optional[Any]], cached_data)
 
-    best: Optional[Dict[str, Optional[Any]]] = None
+    # 0. Check Cache - return if cover found OR if we're not doing a search refinement
+    cached = cache.get(f"isbn:{clean_isbn}")
+    if cached and (cached.get("thumbnail_url") or not title):
+        logger.debug(f"Cache hit for ISBN {clean_isbn}")
+        return cast(Dict[str, Any], cached)
 
-    # 1. Open Library (ISBN) — primary metadata source
-    logger.debug("  Trying Open Library...")
-    ol_result = _lookup_open_library(clean_isbn)
-    if ol_result:
-        best = _merge_metadata(best, ol_result)
-        if best.get("thumbnail_url"):
-            logger.debug("  Found cover in Open Library")
-            cache.set(f"isbn:{clean_isbn}", best)
-            return best
+    best: Dict[str, Any] = {"isbn13": clean_isbn}
+    if title:
+        best["title"] = title
+    if author:
+        best["author"] = author
 
-    # 2. Google Books — often has covers when OL doesn't
-    logger.debug("  Trying Google Books...")
-    gb_result = _lookup_google_books(clean_isbn)
-    if gb_result:
-        best = _merge_metadata(best, gb_result)
-        if best.get("thumbnail_url"):
-            logger.debug("  Found cover in Google Books")
-            cache.set(f"isbn:{clean_isbn}", best)
-            return best
+    # 1. ISBN-based API Lookups
+    logger.debug("  Trying ISBN-based lookups...")
+    best = _merge_metadata(best, _lookup_open_library(clean_isbn))
+    best = _merge_metadata(best, _lookup_google_books(clean_isbn))
 
-    # 3. Open Library direct cover check
-    logger.debug("  Trying Open Library direct cover...")
-    ol_cover = _lookup_open_library_cover_direct(clean_isbn)
-    if ol_cover:
-        logger.debug("  Found cover in Open Library direct")
-        if best is None:
-            best = _empty_result()
-        best["thumbnail_url"] = ol_cover
-        best["cover_url"] = ol_cover.replace("-M.jpg", "-L.jpg")
+    if best.get("thumbnail_url"):
         cache.set(f"isbn:{clean_isbn}", best)
         return best
 
-    # 4. Penguin Random House cover
-    logger.debug("  Trying Penguin Random House cover...")
+    # 2. Direct Cover Lookups
+    logger.debug("  Trying direct cover lookups...")
+    ol_direct = _lookup_open_library_cover_direct(clean_isbn)
+    if ol_direct:
+        best["thumbnail_url"] = ol_direct
+        best["cover_url"] = ol_direct.replace("-M.jpg", "-L.jpg")
+        cache.set(f"isbn:{clean_isbn}", best)
+        return best
+
     prh_cover = _lookup_penguin_cover(clean_isbn)
     if prh_cover:
-        logger.debug("  Found cover in Penguin Random House")
-        if best is None:
-            best = _empty_result()
         best["thumbnail_url"] = prh_cover
         best["cover_url"] = prh_cover
         cache.set(f"isbn:{clean_isbn}", best)
         return best
 
-    # 5. Amazon cover (uses HEAD to avoid downloading the full image)
-    logger.debug("  Trying Amazon cover lookup...")
     amazon_cover = _lookup_amazon_cover(clean_isbn)
     if amazon_cover:
-        logger.debug("  Found cover on Amazon")
-        if best is None:
-            best = _empty_result()
         best["thumbnail_url"] = amazon_cover
         best["cover_url"] = amazon_cover
         cache.set(f"isbn:{clean_isbn}", best)
         return best
 
-    # 6. Open Library search by title+author — finds covers from OTHER editions
-    #    This is the most important fallback. Many books exist on OL under a
-    #    different ISBN edition that has a cover image attached. A search by
-    #    title (and author when available) often succeeds where ISBN lookup fails.
-    title = best.get("title") if best else None
-    author = best.get("author") if best else None
-    if title:
-        logger.debug(f"  Trying Open Library search for '{title}' by '{author}'...")
-        search_result = _lookup_open_library_search(title, author)
-        if search_result and search_result.get("thumbnail_url"):
-            logger.debug("  Found cover via Open Library search")
-            best = _merge_metadata(best, search_result)
+    # 3. Search Fallbacks (Crucial for missing covers on specific editions)
+    search_title = best.get("title")
+    search_author = best.get("author")
+
+    if search_title and search_title != "Unknown":
+        logger.debug(f"  Initiating search fallback for '{search_title}'")
+        # Open Library search often finds related editions with covers
+        ol_search = _lookup_open_library_search(search_title, search_author)
+        best = _merge_metadata(best, ol_search)
+        if best.get("thumbnail_url"):
             cache.set(f"isbn:{clean_isbn}", best)
             return best
 
-    # 7. iTunes Store — least likely to have covers but worth trying
-    logger.debug("  Trying iTunes...")
-    itunes_result = _lookup_itunes(clean_isbn)
-    if itunes_result:
-        best = _merge_metadata(best, itunes_result)
-        if best and best.get("thumbnail_url"):
-            logger.debug("  Found cover in iTunes")
+        # Google Books search
+        gb_search = _lookup_google_books_search(search_title, search_author)
+        best = _merge_metadata(best, gb_search)
+        if best.get("thumbnail_url"):
             cache.set(f"isbn:{clean_isbn}", best)
             return best
 
-    # If we have any metadata at all (even without a cover), cache it
-    if best:
+        # iTunes search
+        it_search = _lookup_itunes_search(search_title, search_author)
+        best = _merge_metadata(best, it_search)
+        if best.get("thumbnail_url"):
+            cache.set(f"isbn:{clean_isbn}", best)
+            return best
+
+    # Cache whatever we found (even if no cover)
+    if len(best) > 1:  # More than just the ISBN
         cache.set(f"isbn:{clean_isbn}", best)
-        logger.debug(f"  Cached metadata without cover for {clean_isbn}")
+        logger.debug(
+            f"  Cached metadata for {clean_isbn} (has_cover={bool(best.get('thumbnail_url'))})"
+        )
         return best
 
     logger.debug(f"  No data found for ISBN {clean_isbn}")
@@ -730,7 +740,11 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                     f"Batch lookup {'miss' if not info else 'has no cover'} for {title} "
                     f"(ISBN: {isbn}), trying deep lookup..."
                 )
-                deep_info = lookup_book_by_isbn13(isbn)
+                deep_info = lookup_book_by_isbn13(
+                    isbn,
+                    title=book_item.get("title"),
+                    author=book_item.get("author"),
+                )
                 if deep_info:
                     # Merge: deep lookup enriches batch data
                     if info:
