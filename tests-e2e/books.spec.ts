@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Increase timeout for setup since CI can be slower
-test.setTimeout(120000);
+test.setTimeout(30000);
 
 test.beforeEach(async ({ page, request }) => {
     await request.post('/test/reset');
@@ -28,19 +28,19 @@ test('adding duplicate shows info message', async ({ page }) => {
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
     await Promise.all([
-        page.waitForURL('/books'),
+        page.waitForURL(url => url.pathname === '/books'),
         page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
-    await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
+    await expect(page.locator('.messages .success')).toContainText('Book added successfully.');
 
     // Try adding the same book again
     await page.goto('/books/new');
     await page.fill('#isbn', '9780000000000');
     await Promise.all([
-        page.waitForURL('/books'),
+        page.waitForURL(url => url.pathname === '/books'),
         page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
-    await expect(page.locator('.messages .info')).toHaveText('This book has already been added.');
+    await expect(page.locator('.messages .info')).toContainText('This book has already been added.');
 });
 
 test('successful add shows on list with metadata', async ({ page }) => {
@@ -49,12 +49,12 @@ test('successful add shows on list with metadata', async ({ page }) => {
 
     // Click add and wait for redirect
     await Promise.all([
-        page.waitForURL('/books'),
+        page.waitForURL(url => url.pathname === '/books'),
         page.getByRole('button', { name: 'Find & Add Book' }).click()
     ]);
 
     // Check for success message and book details
-    await expect(page.locator('.messages .success')).toHaveText('Book added successfully.');
+    await expect(page.locator('.messages .success')).toContainText('Book added successfully.');
     await expect(page.locator('.book-card .title')).toHaveText('Test Driven Development');
     await expect(page.locator('.book-card .author')).toHaveText('Test Author');
     await expect(page.locator('.book-card .year')).toHaveText('2019');

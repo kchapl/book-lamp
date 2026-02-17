@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 
 // Increase timeout for setup since CI can be slower
-test.setTimeout(120000);
+test.setTimeout(30000);
 
 test.beforeEach(async ({ page, request }) => {
     // Reset the mock storage before each test
@@ -22,7 +22,7 @@ test('importing Libib CSV creates books and reading records', async ({ page }) =
 
     // Submit the import form
     await Promise.all([
-        page.waitForURL('/books'),
+        page.waitForURL(url => url.pathname === '/books'),
         page.getByRole('button', { name: 'Start Import' }).click()
     ]);
 
@@ -67,7 +67,7 @@ test('importing Libib CSV with covers displays images', async ({ page }) => {
 
     // Submit the import form
     await Promise.all([
-        page.waitForURL('/books'),
+        page.waitForURL(url => url.pathname === '/books'),
         page.getByRole('button', { name: 'Start Import' }).click()
     ]);
 

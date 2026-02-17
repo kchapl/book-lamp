@@ -71,7 +71,12 @@ def get_storage():
 
     # Initialize implementation with credentials from session
     credentials = session.get("credentials")
-    return GoogleSheetsStorage(sheet_name=sheet_name, credentials_dict=credentials)
+    spreadsheet_id = session.get("spreadsheet_id")
+    return GoogleSheetsStorage(
+        sheet_name=sheet_name,
+        credentials_dict=credentials,
+        spreadsheet_id=spreadsheet_id,
+    )
 
 
 def authorisation_required(f):
@@ -278,6 +283,10 @@ def init_sheets_command():
 def reading_history():
     """Show detailed reading history as a chronological list of individual events."""
     storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
     history = storage.get_reading_history()
 
     # Filtering
@@ -334,6 +343,10 @@ def new_book_form():
 @authorisation_required
 def list_books():
     storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
@@ -390,6 +403,10 @@ def search_books():
 @authorisation_required
 def collection_stats():
     storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
@@ -646,7 +663,7 @@ def create_book():
             "title": "Test Driven Development",
             "author": "Test Author",
             "publish_date": "2019-05-02",
-            "thumbnail_url": None,
+            "thumbnail_url": "http://example.com/thumb.jpg",
         }
     else:
         try:
@@ -745,7 +762,7 @@ def fetch_missing_data():
     )
 
     flash(
-        "Data retrieval started in the background. You can continue using the app.",
+        "Refreshing library catalog: Fetching metadata and covers in the background.",
         "info",
     )
     return redirect(url_for("list_books", job_id=job_id))
@@ -837,7 +854,7 @@ def import_books():
         )
 
         flash(
-            "Import started in the background. You can continue using the app while we process your file.",
+            "Library import in progress: Processing and enriching your reading history.",
             "info",
         )
         return redirect(url_for("list_books", job_id=job_id))

@@ -26,19 +26,24 @@ class GoogleSheetsStorage:
     """
 
     def __init__(
-        self, sheet_name: str, credentials_dict: Optional[Dict[str, Any]] = None
+        self,
+        sheet_name: str,
+        credentials_dict: Optional[Dict[str, Any]] = None,
+        spreadsheet_id: Optional[str] = None,
     ):
         """Initialise the storage adapter.
 
         Args:
             sheet_name: Name of the Google Sheet to use.
             credentials_dict: Dictionary containing OAuth2 credentials.
+            spreadsheet_id: Optional ID of an existing spreadsheet.
         """
         self.sheet_name = sheet_name
-        self.spreadsheet_id: Optional[str] = None
+        self.spreadsheet_id = spreadsheet_id
         self.credentials_dict = credentials_dict
         self.service = None
         self.drive_service = None
+        self._cache: Dict[str, List[List[Any]]] = {}
         if self.credentials_dict:
             self._connect()
 
@@ -172,6 +177,56 @@ class GoogleSheetsStorage:
 
         return self.spreadsheet_id
 
+    def prefetch(self) -> None:
+        """Fetch all primary data tabs in a single batch call to improve performance."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # Define the ranges we want to fetch
+        tabs = ["Books", "Authors", "BookAuthors", "ReadingRecords"]
+        ranges = [f"{tab}!A:P" for tab in tabs]
+
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .batchGet(spreadsheetId=sid, ranges=ranges)
+                .execute()
+            )
+            value_ranges = result.get("valueRanges", [])
+            for i, vr in enumerate(value_ranges):
+                if i < len(tabs):
+                    self._cache[tabs[i]] = vr.get("values", [])
+        except HttpError as error:
+            if error.resp.status == 400:
+                # One of the tabs might be missing, initialize and don't cache yet
+                self.initialize_sheets()
+            else:
+                raise Exception(f"Failed to prefetch data: {error}") from error
+
+    def _get_values(self, tab_name: str, range_def: str) -> List[List[Any]]:
+        """Internal helper to get values from a tab, using cache if available."""
+        if tab_name in self._cache:
+            return self._cache[tab_name]
+
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range=range_def)
+                .execute()
+            )
+            values = result.get("values", [])
+            self._cache[tab_name] = values
+            return values
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return []
+            raise
+
     def _get_next_id(self, tab_name: str) -> int:
         """Get the next available ID for a tab."""
         sid = self._ensure_spreadsheet_id()
@@ -205,16 +260,8 @@ class GoogleSheetsStorage:
 
     def get_authors(self) -> List[Dict[str, Any]]:
         """Retrieve all authors from the Authors tab."""
-        sid = self._ensure_spreadsheet_id()
-        assert self.service is not None
         try:
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="Authors!A:B")
-                .execute()
-            )
-            values = result.get("values", [])
+            values = self._get_values("Authors", "Authors!A:B")
             if not values or len(values) < 2:
                 return []
 
@@ -227,23 +274,12 @@ class GoogleSheetsStorage:
                 )
             return authors
         except HttpError as error:
-            if error.resp.status == 400:
-                self.initialize_sheets()
-                return []
             raise Exception(f"Failed to fetch authors: {error}") from error
 
     def get_book_authors(self) -> List[Dict[str, Any]]:
         """Retrieve all book-author relationships."""
-        sid = self._ensure_spreadsheet_id()
-        assert self.service is not None
         try:
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="BookAuthors!A:B")
-                .execute()
-            )
-            values = result.get("values", [])
+            values = self._get_values("BookAuthors", "BookAuthors!A:B")
             if not values or len(values) < 2:
                 return []
 
@@ -260,9 +296,6 @@ class GoogleSheetsStorage:
                     continue
             return links
         except HttpError as error:
-            if error.resp.status == 400:
-                self.initialize_sheets()
-                return []
             raise Exception(f"Failed to fetch book authors: {error}") from error
 
     def _sync_book_authors(self, sid: str, book_id: int, author_str: str) -> None:
@@ -342,16 +375,8 @@ class GoogleSheetsStorage:
 
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
-        sid = self._ensure_spreadsheet_id()
-        assert self.service is not None
         try:
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="Books!A:P")
-                .execute()
-            )
-            values = result.get("values", [])
+            values = self._get_values("Books", "Books!A:P")
             if not values or len(values) < 2:
                 return []
 
@@ -407,7 +432,7 @@ class GoogleSheetsStorage:
             links = self.get_book_authors()
 
             # Map book_id to list of author names
-            book_authors_map = {}
+            book_authors_map: dict[int, list[str]] = {}
             for link in links:
                 bid = link["book_id"]
                 aid = link["author_id"]
@@ -439,16 +464,8 @@ class GoogleSheetsStorage:
         self, book_id: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Retrieve reading records, optionally filtered by book ID."""
-        sid = self._ensure_spreadsheet_id()
-        assert self.service is not None
         try:
-            result = (
-                self.service.spreadsheets()
-                .values()
-                .get(spreadsheetId=sid, range="ReadingRecords!A:G")
-                .execute()
-            )
-            values = result.get("values", [])
+            values = self._get_values("ReadingRecords", "ReadingRecords!A:G")
             if not values or len(values) < 2:
                 return []
 

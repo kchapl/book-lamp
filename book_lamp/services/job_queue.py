@@ -65,7 +65,7 @@ class Job:
 class JobQueue:
     """Simple in-memory job queue with file-based persistence."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
 
@@ -141,7 +141,7 @@ class JobQueue:
         """
         job_id = self.create_job(function_name)
 
-        def run_task():
+        def run_task() -> None:
             try:
                 self.start_job(job_id)
                 result = task(job_id, *args, **kwargs)
