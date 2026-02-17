@@ -5,8 +5,7 @@ A personal reading history tracker using Google Sheets for storage.
 ## Setup
 
 1. Install dependencies: `poetry install`
-2. Follow [SHEETS_SETUP.md](SHEETS_SETUP.md) to configure Google Sheets
-3. Create `.env` file with required variables:
+2. Create `.env` file with required variables:
    ```
    FLASK_ENV=development
    GOOGLE_CLIENT_ID=your_oauth_client_id
@@ -14,8 +13,7 @@ A personal reading history tracker using Google Sheets for storage.
 
    SECRET_KEY=your_secret_key
    ```
-4. Initialize sheets: `poetry run flask --app book_lamp.app init-sheets`
-5. Run the app: `poetry run flask --app book_lamp.app run`
+3. Run the app: `poetry run flask --app book_lamp.app run`
 
 ## End-to-end tests (Playwright)
 
