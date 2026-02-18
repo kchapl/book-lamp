@@ -57,6 +57,8 @@
         font-weight: 700;
         margin-bottom: 0.5rem;
         color: white;
+        overflow-wrap: break-word;
+        word-break: break-word;
     }
 
     .book-author {
@@ -77,11 +79,20 @@
         display: flex;
         gap: 0.5rem;
         font-size: 1rem;
+        align-items: baseline;
+    }
+
+    [data-edit-mode="true"] .meta-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.25rem;
+        margin-bottom: 0.5rem;
     }
 
     .meta-label {
         color: var(--text-muted);
         font-weight: 600;
+        flex-shrink: 0;
     }
 
     .meta-value {
@@ -298,11 +309,12 @@
                 <!-- Book action buttons (view mode only) -->
                 <div class="view-only"
                     style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button type="button" class="btn-icon" onclick="setEditMode(true)" title="Edit Book">✏️</button>
+                    <button type="button" class="btn-icon" onclick="setEditMode(true)" title="Edit Book"
+                        aria-label="Edit Book">✏️</button>
                     <button type="button" class="btn-icon btn-icon-delete" data-book-id="{{ book.id }}"
                         data-delete-url="{{ url_for('delete_book', book_id=book.id) }}"
-                        onclick="deleteBook(this.dataset.bookId, this.dataset.deleteUrl)"
-                        title="Delete Book">🗑️</button>
+                        onclick="deleteBook(this.dataset.bookId, this.dataset.deleteUrl)" title="Delete Book"
+                        aria-label="Delete Book">🗑️</button>
                 </div>
 
                 <!-- Edit mode controls -->
@@ -384,12 +396,12 @@
                             </div>
                             <div style="display: flex; gap: 0.5rem;">
                                 <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
-                                    onclick="setRecordEditMode(this.dataset.recordId, true)"
-                                    title="Edit Record">✏️</button>
+                                    onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
+                                    aria-label="Edit Record">✏️</button>
                                 <button type="button" class="btn-icon btn-icon-delete" data-record-id="{{ record.id }}"
                                     data-delete-url="{{ url_for('delete_reading_record', record_id=record.id) }}"
                                     onclick="deleteRecord(this.dataset.recordId, this.dataset.deleteUrl)"
-                                    title="Delete Record">🗑️</button>
+                                    title="Delete Record" aria-label="Delete Record">🗑️</button>
                             </div>
                         </div>
                         <div class="record-dates">
