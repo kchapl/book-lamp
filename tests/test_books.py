@@ -31,18 +31,22 @@ def _mock_open_library_response() -> Dict:
     }
 
 
-@patch("book_lamp.services.book_lookup.requests.get")
-def test_add_book_success(mock_get, authenticated_client):
+@patch("book_lamp.services.book_lookup._get_session")
+def test_add_book_success(mock_session_factory, authenticated_client):
     storage = get_storage()
 
     class MockResp:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
         def json(self):
             return _mock_open_library_response()
 
-    mock_get.return_value = MockResp()
+    mock_session = mock_session_factory.return_value
+    mock_session.get.return_value = MockResp()
+    mock_session.head.return_value = MockResp()
 
     resp = authenticated_client.post(
         "/books", data={"isbn": "9780306406157"}, follow_redirects=True
@@ -58,11 +62,13 @@ def test_add_book_success(mock_get, authenticated_client):
     assert book["thumbnail_url"] is not None
 
 
-@patch("book_lamp.services.book_lookup.requests.get")
-def test_add_book_multiple_authors(mock_get, authenticated_client):
+@patch("book_lamp.services.book_lookup._get_session")
+def test_add_book_multiple_authors(mock_session_factory, authenticated_client):
     storage = get_storage()
 
     class MockResp:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
@@ -72,10 +78,15 @@ def test_add_book_multiple_authors(mock_get, authenticated_client):
                     "title": "Collaborative Book",
                     "authors": [{"name": "Author One"}, {"name": "Author Two"}],
                     "publish_date": "2020",
+                    "cover": {
+                        "medium": "https://covers.openlibrary.org/b/id/99999-M.jpg"
+                    },
                 }
             }
 
-    mock_get.return_value = MockResp()
+    mock_session = mock_session_factory.return_value
+    mock_session.get.return_value = MockResp()
+    mock_session.head.return_value = MockResp()
 
     resp = authenticated_client.post(
         "/books", data={"isbn": "9780306406157"}, follow_redirects=True
@@ -88,16 +99,20 @@ def test_add_book_multiple_authors(mock_get, authenticated_client):
     assert book["author"] == "Author One, Author Two"
 
 
-@patch("book_lamp.services.book_lookup.requests.get")
-def test_add_book_duplicate(mock_get, authenticated_client):
+@patch("book_lamp.services.book_lookup._get_session")
+def test_add_book_duplicate(mock_session_factory, authenticated_client):
     class MockResp:
+        status_code = 200
+
         def raise_for_status(self):
             return None
 
         def json(self):
             return _mock_open_library_response()
 
-    mock_get.return_value = MockResp()
+    mock_session = mock_session_factory.return_value
+    mock_session.get.return_value = MockResp()
+    mock_session.head.return_value = MockResp()
 
     # First add
     authenticated_client.post("/books", data={"isbn": "9780306406157"})
