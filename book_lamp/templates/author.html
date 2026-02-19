@@ -15,7 +15,7 @@
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, var(--primary-light), var(--accent-color));
+        background: linear-gradient(135deg, var(--primary-light), #c084fc);
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -33,15 +33,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="author-header">
-    <a href="{{ url_for('list_books') }}"
-        style="color: var(--text-muted); text-decoration: none; display: inline-block; margin-bottom: 1rem; transition: color 0.2s;"
-        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='var(--text-muted)'">
-        ← Back to Books
-    </a>
+<div class="author-header" style="text-align: center; margin-top: 2rem;">
     <h1 class="author-name">{{ author_name }}</h1>
     <div class="author-stats">
         {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your collection
+    </div>
+    <div style="margin-top: 1.5rem;">
+        <a href="{{ url_for('list_books') }}"
+            style="color: var(--text-muted); text-decoration: none; display: inline-block; transition: color 0.2s; font-size: 0.95rem; background: rgba(255, 255, 255, 0.05); padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid var(--glass-border);"
+            onmouseover="this.style.color='var(--primary-color)'; this.style.borderColor='var(--primary-color)';"
+            onmouseout="this.style.color='var(--text-muted)'; this.style.borderColor='var(--glass-border)';">
+            ← Back to Books
+        </a>
     </div>
 </div>
 
@@ -67,12 +70,12 @@
             <div class="author">
                 {% if book.authors %}
                 {% for author in book.authors %}
-                <a href="{{ url_for('author_page', author_name=author) }}"
+                <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
                     style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ author }}</a>{% if not
                 loop.last %}, {% endif %}
                 {% endfor %}
-                {% else %}
-                <a href="{{ url_for('author_page', author_name=book.author) }}"
+                {% elif book.author %}
+                <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
                     style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ book.author }}</a>
                 {% endif %}
             </div>
