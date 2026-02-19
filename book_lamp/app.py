@@ -108,9 +108,40 @@ APP_VERSION = get_app_version()
 def inject_global_vars():
     return {
         "is_authorised": get_storage().is_authorised(),
-        "version": APP_VERSION,
-        "current_year": datetime.date.today().year,
+        "current_year": datetime.datetime.now().year,
+        "app_version": getattr(app, "app_version", APP_VERSION),
     }
+
+
+def _normalize_publisher(name: str) -> str:
+    if not name:
+        return ""
+    # Remove common corporate suffixes
+    suffixes = [
+        r"\bbooks\b",
+        r"\blimited\b",
+        r"\bltd\.?\b",
+        r"\binc\.?\b",
+        r"\bllc\b",
+        r"\bpublishers?\b",
+        r"\bpublishing\b",
+        r"\bpress\b",
+        r"\bgroup\b",
+        r"\bcompany\b",
+        r"\bco\.?\b",
+    ]
+    pattern = re.compile("|".join(suffixes), flags=re.IGNORECASE)
+    cleaned = pattern.sub("", name)
+    cleaned = re.sub(r"[,.;:]", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return name.strip()
+    return cleaned
+
+
+@app.template_filter("normalize_pub")
+def normalize_pub_filter(s):
+    return _normalize_publisher(s)
 
 
 @app.route("/api/jobs/<job_id>", methods=["GET"])
@@ -473,9 +504,10 @@ def publisher_page(publisher_slug: str):
 
     for book in books:
         if book.get("publisher"):
-            if to_slug(book["publisher"]) == search_slug:
+            norm_pub = _normalize_publisher(book["publisher"])
+            if norm_pub and to_slug(norm_pub) == search_slug:
                 publisher_books.append(book)
-                display_publisher_name = book["publisher"]
+                display_publisher_name = norm_pub
 
     # Sort books by reverse publication date
     def get_pub_year(b):
@@ -559,7 +591,9 @@ def collection_stats():
     all_publishers = []
     for b in books:
         if b.get("publisher"):
-            all_publishers.append(b["publisher"])
+            norm_pub = _normalize_publisher(b["publisher"])
+            if norm_pub:
+                all_publishers.append(norm_pub)
     top_publishers = Counter(all_publishers).most_common(5)
 
     # Completed Books by Year and Month
