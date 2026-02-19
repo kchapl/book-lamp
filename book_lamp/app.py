@@ -399,6 +399,49 @@ def search_books():
         return redirect(url_for("list_books"))
 
 
+@app.route("/author/<path:author_name>", methods=["GET"])
+@authorisation_required
+def author_page(author_name: str):
+    storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
+    books = storage.get_all_books()
+
+    # Filter books by exact author name
+    author_books = []
+    for book in books:
+        if book.get("authors") and author_name in book["authors"]:
+            author_books.append(book)
+        elif (
+            not book.get("authors")
+            and book.get("author")
+            and author_name == book["author"]
+        ):
+            author_books.append(book)
+
+    # Sort books by reverse publication date
+    def get_pub_year(b):
+        py = b.get("publication_year")
+        if not py:
+            return 0
+        if isinstance(py, int):
+            return py
+        try:
+            return int(str(py))
+        except (ValueError, TypeError):
+            return 0
+
+    author_books.sort(key=get_pub_year, reverse=True)
+
+    return render_template(
+        "author.html",
+        author_name=author_name,
+        books=author_books,
+    )
+
+
 @app.route("/stats", methods=["GET"])
 @authorisation_required
 def collection_stats():

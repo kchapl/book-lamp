@@ -60,7 +60,10 @@
             {% for author, count in top_authors %}
             <div class="list-item">
                 <span class="rank">{{ loop.index }}</span>
-                <span class="item-name"><a href="{{ url_for('search_books', q=author) }}">{{ author }}</a></span>
+                <span class="item-name"><a href="{{ url_for('author_page', author_name=author) }}"
+                        style="text-decoration: none; color: inherit; transition: color 0.2s;"
+                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        author }}</a></span>
                 <span class="item-value">{{ count }} books</span>
             </div>
             {% endfor %}

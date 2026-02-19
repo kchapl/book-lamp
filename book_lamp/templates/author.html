@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}{{ author_name }} - Book Lamp{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
+<style>
+    .author-header {
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .author-name {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary-light), var(--accent-color));
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .author-stats {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .author a:hover {
+        color: var(--primary-color) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="author-header">
+    <a href="{{ url_for('list_books') }}"
+        style="color: var(--text-muted); text-decoration: none; display: inline-block; margin-bottom: 1rem; transition: color 0.2s;"
+        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='var(--text-muted)'">
+        ← Back to Books
+    </a>
+    <h1 class="author-name">{{ author_name }}</h1>
+    <div class="author-stats">
+        {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your collection
+    </div>
+</div>
+
+{% if books %}
+<div class="grid">
+    {% for book in books %}
+    <div class="book-card">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container"
+            style="text-decoration: none; color: inherit;">
+            {% if book.thumbnail_url %}
+            <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover" loading="lazy" width="120"
+                height="180">
+            {% else %}
+            <div
+                style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 2rem;">
+                📖</div>
+            {% endif %}
+        </a>
+        <div class="meta">
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+                <div class="title" title="{{ book.title }}">{{ book.title }}</div>
+            </a>
+            <div class="author">
+                {% if book.authors %}
+                {% for author in book.authors %}
+                <a href="{{ url_for('author_page', author_name=author) }}"
+                    style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ author }}</a>{% if not
+                loop.last %}, {% endif %}
+                {% endfor %}
+                {% else %}
+                <a href="{{ url_for('author_page', author_name=book.author) }}"
+                    style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ book.author }}</a>
+                {% endif %}
+            </div>
+            <div class="book-meta-summary">
+                {% if book.publication_year or book.publisher or book.dewey_decimal %}
+                {% if book.publication_year %}
+                <div class="year">{{ book.publication_year }}</div>
+                {% endif %}
+                {% if book.isbn13 %}
+                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                {% endif %}
+                {% if book.publisher %}
+                <div class="year">{{ book.publisher }}</div>
+                {% endif %}
+                {% if book.dewey_decimal %}
+                <div class="dewey">{{ book.dewey_decimal }}</div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🤔</div>
+    <h2>No books found</h2>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">We couldn't find any books by {{ author_name }} in your
+        collection.</p>
+    <a href="{{ url_for('list_books') }}" class="btn">View All Books</a>
+</div>
+{% endif %}
+{% endblock %}
