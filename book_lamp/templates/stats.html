@@ -60,10 +60,29 @@
             {% for author, count in top_authors %}
             <div class="list-item">
                 <span class="rank">{{ loop.index }}</span>
-                <span class="item-name"><a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
+                <span class="item-name"><a
+                        href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
                         style="text-decoration: none; color: inherit; transition: color 0.2s;"
                         onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
                         author }}</a></span>
+                <span class="item-value">{{ count }} books</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Top Publishers -->
+    <div class="chart-card">
+        <h3>Top Publishers</h3>
+        <div class="top-list">
+            {% for publisher, count in top_publishers %}
+            <div class="list-item">
+                <span class="rank">{{ loop.index }}</span>
+                <span class="item-name"><a
+                        href="{{ url_for('publisher_page', publisher_slug=publisher|lower|replace(' ', '-')) }}"
+                        style="text-decoration: none; color: inherit; transition: color 0.2s;"
+                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        publisher }}</a></span>
                 <span class="item-value">{{ count }} books</span>
             </div>
             {% endfor %}

@@ -1,41 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}{{ author_name }} - Book Lamp{% endblock %}
+{% block title %}{{ publisher_name }} - Book Lamp{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
 <style>
-    .author-header {
+    .publisher-header {
         margin-bottom: 2rem;
         padding-bottom: 1rem;
         border-bottom: 1px solid var(--border-color);
     }
 
-    .author-name {
+    .publisher-name {
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
-        background: linear-gradient(135deg, var(--primary-light), #c084fc);
+        background: linear-gradient(135deg, #34d399, #10b981);
         background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
-    .author-stats {
+    .publisher-stats {
         color: var(--text-muted);
         font-size: 1.1rem;
-    }
-
-    .author a:hover {
-        color: var(--primary-color) !important;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="author-header" style="text-align: center; margin-top: 2rem;">
-    <h1 class="author-name">{{ author_name }}</h1>
-    <div class="author-stats">
+<div class="publisher-header" style="text-align: center; margin-top: 2rem;">
+    <h1 class="publisher-name">{{ publisher_name }}</h1>
+    <div class="publisher-stats">
         {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your collection
     </div>
     <div style="margin-top: 1.5rem;">
@@ -108,7 +104,7 @@
 <div class="empty-state">
     <div style="font-size: 3rem; margin-bottom: 1rem;">🤔</div>
     <h2>No books found</h2>
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">We couldn't find any books by {{ author_name }} in your
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">We couldn't find any books by {{ publisher_name }} in your
         collection.</p>
     <a href="{{ url_for('list_books') }}" class="btn">View All Books</a>
 </div>
