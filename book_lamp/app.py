@@ -399,6 +399,60 @@ def search_books():
         return redirect(url_for("list_books"))
 
 
+@app.route("/author/<path:author_slug>", methods=["GET"])
+@authorisation_required
+def author_page(author_slug: str):
+    storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
+    books = storage.get_all_books()
+
+    author_books = []
+    display_author_name = author_slug.replace("-", " ").title()  # Fallback
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-") if name else ""
+
+    search_slug = author_slug.lower()
+
+    for book in books:
+        matched = False
+        if book.get("authors"):
+            for a in book["authors"]:
+                if to_slug(a) == search_slug:
+                    author_books.append(book)
+                    display_author_name = a
+                    matched = True
+                    break
+
+        if not matched and book.get("author"):
+            if to_slug(book["author"]) == search_slug:
+                author_books.append(book)
+                display_author_name = book["author"]
+
+    # Sort books by reverse publication date
+    def get_pub_year(b):
+        py = b.get("publication_year")
+        if not py:
+            return 0
+        if isinstance(py, int):
+            return py
+        try:
+            return int(str(py))
+        except (ValueError, TypeError):
+            return 0
+
+    author_books.sort(key=get_pub_year, reverse=True)
+
+    return render_template(
+        "author.html",
+        author_name=display_author_name,
+        books=author_books,
+    )
+
+
 @app.route("/stats", methods=["GET"])
 @authorisation_required
 def collection_stats():

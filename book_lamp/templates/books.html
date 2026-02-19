@@ -90,10 +90,16 @@
             <div class="author">
                 {% if book.authors %}
                 {% for author in book.authors %}
-                {{ author }}{% if not loop.last %}, {% endif %}
+                <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
+                    style="text-decoration: none; color: inherit; transition: color 0.2s;"
+                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    author }}</a>{% if not loop.last %}, {% endif %}
                 {% endfor %}
-                {% else %}
-                {{ book.author }}
+                {% elif book.author %}
+                <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
+                    style="text-decoration: none; color: inherit; transition: color 0.2s;"
+                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    book.author }}</a>
                 {% endif %}
             </div>
             <div class="book-meta-summary">
