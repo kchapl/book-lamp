@@ -108,9 +108,40 @@ APP_VERSION = get_app_version()
 def inject_global_vars():
     return {
         "is_authorised": get_storage().is_authorised(),
-        "version": APP_VERSION,
-        "current_year": datetime.date.today().year,
+        "current_year": datetime.datetime.now().year,
+        "app_version": getattr(app, "app_version", APP_VERSION),
     }
+
+
+def _normalize_publisher(name: str) -> str:
+    if not name:
+        return ""
+    # Remove common corporate suffixes
+    suffixes = [
+        r"\bbooks\b",
+        r"\blimited\b",
+        r"\bltd\.?\b",
+        r"\binc\.?\b",
+        r"\bllc\b",
+        r"\bpublishers?\b",
+        r"\bpublishing\b",
+        r"\bpress\b",
+        r"\bgroup\b",
+        r"\bcompany\b",
+        r"\bco\.?\b",
+    ]
+    pattern = re.compile("|".join(suffixes), flags=re.IGNORECASE)
+    cleaned = pattern.sub("", name)
+    cleaned = re.sub(r"[,.;:]", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return name.strip()
+    return cleaned
+
+
+@app.template_filter("normalize_pub")
+def normalize_pub_filter(s):
+    return _normalize_publisher(s)
 
 
 @app.route("/api/jobs/<job_id>", methods=["GET"])
@@ -453,6 +484,52 @@ def author_page(author_slug: str):
     )
 
 
+@app.route("/publisher/<path:publisher_slug>", methods=["GET"])
+@authorisation_required
+def publisher_page(publisher_slug: str):
+    storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
+    books = storage.get_all_books()
+
+    publisher_books = []
+    display_publisher_name = publisher_slug.replace("-", " ").title()  # Fallback
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-") if name else ""
+
+    search_slug = publisher_slug.lower()
+
+    for book in books:
+        if book.get("publisher"):
+            norm_pub = _normalize_publisher(book["publisher"])
+            if norm_pub and to_slug(norm_pub) == search_slug:
+                publisher_books.append(book)
+                display_publisher_name = norm_pub
+
+    # Sort books by reverse publication date
+    def get_pub_year(b):
+        py = b.get("publication_year")
+        if not py:
+            return 0
+        if isinstance(py, int):
+            return py
+        try:
+            return int(str(py))
+        except (ValueError, TypeError):
+            return 0
+
+    publisher_books.sort(key=get_pub_year, reverse=True)
+
+    return render_template(
+        "publisher.html",
+        publisher_name=display_publisher_name,
+        books=publisher_books,
+    )
+
+
 @app.route("/stats", methods=["GET"])
 @authorisation_required
 def collection_stats():
@@ -509,6 +586,15 @@ def collection_stats():
 
     total_authors = len(set(all_authors))
     top_authors = Counter(all_authors).most_common(5)
+
+    # Top publishers
+    all_publishers = []
+    for b in books:
+        if b.get("publisher"):
+            norm_pub = _normalize_publisher(b["publisher"])
+            if norm_pub:
+                all_publishers.append(norm_pub)
+    top_publishers = Counter(all_publishers).most_common(5)
 
     # Completed Books by Year and Month
     completed_records = [
@@ -588,6 +674,7 @@ def collection_stats():
         avg_rating=avg_rating,
         status_counts=status_counts,
         top_authors=top_authors,
+        top_publishers=top_publishers,
         dewey_distribution=dewey_distribution,
         max_dewey_count=max_dewey_count,
         yearly_counts=sorted_years,

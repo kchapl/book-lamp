@@ -111,7 +111,12 @@
                 <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
                 {% endif %}
                 {% if book.publisher %}
-                <div class="year">{{ book.publisher }}</div>
+                <div class="year">
+                    <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
+                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        book.publisher|normalize_pub }}</a>
+                </div>
                 {% endif %}
                 {% if book.dewey_decimal %}
                 <div class="dewey">{{ book.dewey_decimal }}</div>

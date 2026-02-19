@@ -279,7 +279,17 @@
                     </div>
                     <div class="meta-item">
                         <span class="meta-label">Publisher:</span>
-                        <span class="meta-value view-only">{{ book.publisher or '' }}</span>
+                        <span class="meta-value view-only">
+                            {% if book.publisher %}
+                            <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                                style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
+                                onmouseover="this.style.color='var(--primary-color)'"
+                                onmouseout="this.style.color='inherit'">{{
+                                book.publisher }}</a>
+                            {% else %}
+                            {{ book.publisher or '' }}
+                            {% endif %}
+                        </span>
                         <input type="text" name="publisher" class="edit-input edit-only"
                             value="{{ book.publisher or '' }}">
                     </div>
