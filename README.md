@@ -15,25 +15,10 @@ A personal reading history tracker using Google Sheets for storage.
    ```
 3. Run the app: `poetry run flask --app book_lamp.app run`
 
-## End-to-end tests (Playwright)
+## Testing
 
-Install Node dependencies once:
-
-```bash
-npm ci
-npx playwright install --with-deps
-```
-
-Run the E2E suite (starts the app automatically):
+Run unit tests:
 
 ```bash
-npm test
+poetry run pytest
 ```
-
-Headed mode:
-
-```bash
-npm run test:ui
-```
-
-Artifacts (screenshots/videos/traces) are saved under `playwright-report/` and `test-results/`.
