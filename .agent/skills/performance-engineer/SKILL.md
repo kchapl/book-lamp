@@ -42,17 +42,13 @@ Since our "database" is Google Sheets, minimizing latency and API overhead is cr
 - **Timeouts**: Set strict timeouts for external requests to prevent them from hanging the application.
 - **Stale-While-Revalidate**: Prefer serve-from-cache while updating data in the background.
 
-## 3. Performance Automation & Verification
+## 3. Performance Verification
 
-Performance is not an afterthought; it is a requirement.
+Performance is a requirement. All changes must be verified to ensure they meet the project's performance standards.
 
-### For New Features
-- **Lighthouse Check**: Before completing a feature, run a Lighthouse audit. If the performance score drops below 90, optimize before submitting.
-- **Payload Analysis**: Ensure the initial HTML payload is small (ideally < 14kb to fit in the first TCP window).
-
-### For Bug Fixes
-- **Regression Testing**: Ensure the fix doesn't introduce performance regressions (e.g., adding an N+1 query pattern).
-- **Profiling**: If fixing a performance-related bug, provide a "Before vs After" metric (e.g., "Reduced page load time from 4s to 1.2s").
+- **Efficiency Verification**: Use unit tests (refer to the **Testing** skill) to ensure backend operations use batching and avoid N+1 patterns.
+- **Auditing**: Perform manual Lighthouse audits for new features. Ensure the performance score remains 90+ and payloads fit within initial windows.
+- **Regressions**: Ensure no new feature or bug fix introduces performance regressions. If a bottleneck is suspected, use profiling tools (cProfile).
 
 ## 4. Architectural Patterns for Performance
 
