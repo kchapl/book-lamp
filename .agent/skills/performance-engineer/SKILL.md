@@ -62,7 +62,7 @@ Performance is not an afterthought; it is a requirement.
 
 ## 5. Standard Tools & Measurement
 - **Chrome DevTools**: Use the Network and Performance tabs for debugging.
-- **Lighthouse CI**: (If available) Ensure all PRs pass performance checks.
+- **Manual Auditing**: Regularly audit pages using Chrome DevTools Lighthouse to ensure performance scores remain 90+.
 - **cProfile / line_profiler**: Use these for identifying bottlenecks in Python logic.
 
 ## 6. Performance "Gotchas" (Awareness)
