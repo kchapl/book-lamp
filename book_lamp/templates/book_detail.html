@@ -347,7 +347,19 @@
         <h2>Reading History</h2>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <button class="btn" onclick="toggleForm('{{ book.id }}')">Add Reading</button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn" onclick="toggleForm('{{ book.id }}')">Add Reading</button>
+                {% if not is_planned %}
+                <form method="post" action="{{ url_for('add_existing_to_reading_list', book_id=book.id) }}"
+                    style="display: inline;">
+                    <button type="submit" class="btn btn-outline" style="background: var(--glass);">Add to Reading
+                        List</button>
+                </form>
+                {% else %}
+                <span class="status-badge status-plan-to-read" style="margin: 0; display: flex; align-items: center;">On
+                    Reading List</span>
+                {% endif %}
+            </div>
         </div>
 
         <div id="form-{{ book.id }}" class="add-record-form hidden">
@@ -409,6 +421,7 @@
                                 {% endif %}
                             </div>
                             <div style="display: flex; gap: 0.5rem;">
+                                {% if 'rl_' not in record.id|string %}
                                 <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
                                     onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
                                     aria-label="Edit Record">✏️</button>
@@ -416,10 +429,13 @@
                                     data-delete-url="{{ url_for('delete_reading_record', record_id=record.id) }}"
                                     onclick="deleteRecord(this.dataset.recordId, this.dataset.deleteUrl)"
                                     title="Delete Record" aria-label="Delete Record">🗑️</button>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="record-dates">
+                            {% if record.start_date %}
                             <span class="record-date-item">Began: {{ record.start_date }}</span>
+                            {% endif %}
                             {% if record.status == 'Completed' and record.end_date %}
                             <span class="record-date-item">Completed: {{ record.end_date }}</span>
                             {% elif record.status == 'Abandoned' and record.end_date %}

@@ -9,7 +9,7 @@ packages = [{include = "book_lamp"}]
 python = "^3.13"
 authlib = "1.6.6"
 click = "8.3.0"
-Flask = "3.1.2"
+Flask = "3.1.3"
 python-dotenv = "1.1.1"
 requests = "2.32.4"
 gunicorn = "23.0.0"

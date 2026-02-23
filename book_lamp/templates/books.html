@@ -102,6 +102,13 @@
                     book.author }}</a>
                 {% endif %}
             </div>
+            {% if book.latest_status %}
+            <div style="margin-bottom: 0.5rem;">
+                <span class="status-badge status-{{ book.latest_status.lower().replace(' ', '-') }}">
+                    {{ book.latest_status }}
+                </span>
+            </div>
+            {% endif %}
             <div class="book-meta-summary">
                 {% if book.publication_year or book.publisher or book.dewey_decimal %}
                 {% if book.publication_year %}

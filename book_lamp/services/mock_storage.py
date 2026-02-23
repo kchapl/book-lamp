@@ -12,6 +12,7 @@ class MockStorage:
         self.spreadsheet_id = spreadsheet_id
         self.books: list[dict[str, Any]] = []
         self.reading_records: list[dict[str, Any]] = []
+        self.reading_list: list[dict[str, Any]] = []
         self.next_book_id = 1
         self.next_record_id = 1
         self._authorised = False  # Default to False for security and testing
@@ -32,9 +33,26 @@ class MockStorage:
         return self.books
 
     def get_reading_records(self, book_id=None):
+        records = []
         if book_id is None:
-            return self.reading_records
-        return [r for r in self.reading_records if r["book_id"] == book_id]
+            records = list(self.reading_records)
+        else:
+            records = [r for r in self.reading_records if r["book_id"] == book_id]
+
+        for item in self.get_reading_list():
+            if book_id is None or item["book_id"] == book_id:
+                records.append(
+                    {
+                        "id": f"rl_{item['book_id']}",
+                        "book_id": item["book_id"],
+                        "status": "Plan to Read",
+                        "start_date": "",
+                        "end_date": None,
+                        "rating": 0,
+                        "created_at": item["created_at"],
+                    }
+                )
+        return records
 
     def get_book_by_id(self, book_id):
         for book in self.books:
@@ -236,6 +254,38 @@ class MockStorage:
                 self.books.pop(i)
                 return True
         return False
+
+    def get_reading_list(self):
+        return sorted(self.reading_list, key=lambda x: x["position"])
+
+    def add_to_reading_list(self, book_id):
+        if any(item["book_id"] == book_id for item in self.reading_list):
+            return
+        pos = max((item["position"] for item in self.reading_list), default=0) + 1
+        self.reading_list.append(
+            {"book_id": book_id, "position": pos, "created_at": "2024-01-01T00:00:00"}
+        )
+
+    def remove_from_reading_list(self, book_id):
+        for i, item in enumerate(self.reading_list):
+            if item["book_id"] == book_id:
+                self.reading_list.pop(i)
+                break
+        # Reassign positions
+        for idx, item in enumerate(self.reading_list):
+            item["position"] = idx + 1
+
+    def update_reading_list_order(self, book_ids):
+        item_map = {item["book_id"]: item for item in self.reading_list}
+        new_list = []
+        pos = 1
+        for bid in book_ids:
+            if bid in item_map:
+                item = item_map[bid]
+                item["position"] = pos
+                new_list.append(item)
+                pos += 1
+        self.reading_list = new_list
 
     def bulk_import(self, items):
         import_count = 0
