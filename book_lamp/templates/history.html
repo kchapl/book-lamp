@@ -96,6 +96,7 @@
                                     {% endif %}
                                 </div>
                                 <div style="display: flex; gap: 0.5rem;">
+                                    {% if 'rl_' not in record.id|string %}
                                     <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
                                         onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
                                         aria-label="Edit Record">✏️</button>
@@ -104,6 +105,7 @@
                                         data-delete-url="{{ url_for('delete_reading_record', record_id=record.id) }}"
                                         onclick="deleteRecord(this.dataset.recordId, this.dataset.deleteUrl)"
                                         title="Delete Record" aria-label="Delete Record">🗑️</button>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="event-dates" style="font-size: 0.85rem;">

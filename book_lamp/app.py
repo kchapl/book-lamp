@@ -6,6 +6,7 @@ import re
 from collections import Counter
 from functools import wraps
 from typing import Union
+from urllib.parse import urlparse
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -36,6 +37,28 @@ from book_lamp.utils.protobuf_patch import apply_patch
 
 # Apply security patch for CVE-2026-0994
 apply_patch()
+
+
+def get_safe_redirect_target(fallback_endpoint: str) -> str:
+    """
+    Return a safe redirect target derived from the request referrer.
+
+    If the referrer is an absolute URL, only accept it if it points to the
+    same host as the current request. Otherwise, or if no referrer is set,
+    fall back to the URL for the given endpoint.
+    """
+    referrer = request.referrer
+    if referrer:
+        # Normalize backslashes, which some browsers treat like forward slashes
+        normalized = referrer.replace("\\", "/")
+        parsed = urlparse(normalized)
+        # Accept relative URLs (no scheme and no netloc)
+        if not parsed.scheme and not parsed.netloc:
+            return normalized
+        # Accept absolute URLs that point to this host using http/https
+        if parsed.scheme in ("http", "https") and parsed.netloc == request.host:
+            return normalized
+    return url_for(fallback_endpoint)
 
 load_dotenv()
 
@@ -370,6 +393,53 @@ def new_book_form():
     return render_template("add_book.html")
 
 
+@app.route("/reading-list", methods=["GET"])
+@authorisation_required
+def reading_list():
+    storage = get_storage()
+    storage.prefetch()
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
+
+    rl_items = storage.get_reading_list()
+    books = []
+
+    all_books = storage.get_all_books()
+    book_map = {b["id"]: b for b in all_books}
+    for item in rl_items:
+        if item["book_id"] in book_map:
+            books.append(book_map[item["book_id"]])
+
+    return render_template("reading_list.html", books=books)
+
+
+@app.route("/reading-list/reorder", methods=["POST"])
+@authorisation_required
+def reorder_reading_list():
+    storage = get_storage()
+    book_ids = request.json.get("book_ids", [])
+    storage.update_reading_list_order(book_ids)
+    return jsonify({"success": True})
+
+
+@app.route("/reading-list/remove/<int:book_id>", methods=["POST"])
+@authorisation_required
+def remove_from_reading_list(book_id: int):
+    storage = get_storage()
+    storage.remove_from_reading_list(book_id)
+    flash("Removed from reading list.", "success")
+    return redirect(get_safe_redirect_target("reading_list"))
+
+
+@app.route("/books/<int:book_id>/add-to-reading-list", methods=["POST"])
+@authorisation_required
+def add_existing_to_reading_list(book_id: int):
+    storage = get_storage()
+    storage.add_to_reading_list(book_id)
+    flash("Added to reading list.", "success")
+    return redirect(url_for("reading_list"))
+
+
 @app.route("/books", methods=["GET"])
 @authorisation_required
 def list_books():
@@ -388,6 +458,21 @@ def list_books():
 
     # Sort books using the selected method
     books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+
+    # Attach latest status
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") >= latest_records[
+                bid
+            ].get("start_date", ""):
+                latest_records[bid] = r
+
+    for book in books:
+        record = latest_records.get(book.get("id"))
+        if record:
+            book["latest_status"] = record.get("status")
 
     return render_template(
         "books.html", books=books, sort_by=sort_by, sort_options=SORT_OPTIONS
@@ -701,8 +786,13 @@ def book_detail(book_id: int):
     # Sort records by start_date descending (most recent first)
     book["reading_records"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
 
+    rl_items = storage.get_reading_list()
+    is_planned = any(item["book_id"] == book_id for item in rl_items)
+
     today = datetime.date.today().isoformat()
-    return render_template("book_detail.html", book=book, today=today)
+    return render_template(
+        "book_detail.html", book=book, today=today, is_planned=is_planned
+    )
 
 
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
@@ -790,9 +880,19 @@ def create_book():
         flash("Please enter a valid 13-digit ISBN.", "error")
         return redirect(url_for("new_book_form"))
 
+    add_to_rl = (
+        request.form.get("add_to_reading_list") in ("1", "on", "true")
+        or "add_to_reading_list" in request.form
+        and request.form.get("add_to_reading_list") != "0"
+    )
+
     # Avoid duplicates
     existing = storage.get_book_by_isbn(isbn)
     if existing:
+        if add_to_rl:
+            storage.add_to_reading_list(existing["id"])
+            flash("Book added to your reading list.", "success")
+            return redirect(url_for("reading_list"))
         flash("This book has already been added.", "info")
         return redirect(url_for("list_books"))
 
@@ -827,7 +927,7 @@ def create_book():
         flash("The external service did not return required fields.", "error")
         return redirect(url_for("list_books"))
 
-    storage.add_book(
+    created_book = storage.add_book(
         isbn13=isbn,
         title=title[:300],
         author=author[:200],
@@ -842,6 +942,11 @@ def create_book():
         edition=data.get("edition"),
         cover_url=data.get("cover_url"),
     )
+    if add_to_rl:
+        storage.add_to_reading_list(created_book["id"])
+        flash("Book added to catalogue and reading list.", "success")
+        return redirect(url_for("reading_list"))
+
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
 
@@ -1089,6 +1194,8 @@ if TEST_MODE:
         try:
             storage.books = []
             storage.reading_records = []
+            if hasattr(storage, "reading_list"):
+                storage.reading_list = []
             storage.next_book_id = 1
             storage.next_record_id = 1
             # Default to unauthorised for testing the connect flow

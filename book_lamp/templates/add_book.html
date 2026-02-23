@@ -26,8 +26,13 @@
                 </script>
             </div>
 
+            <input type="hidden" name="add_to_reading_list" id="add_to_reading_list_hidden" value="0">
             <div style="display: flex; gap: 1rem;">
-                <button type="submit" class="btn" style="flex: 1;">Find & Add Book</button>
+                <button type="submit" class="btn" style="flex: 1;"
+                    onclick="document.getElementById('add_to_reading_list_hidden').value='0';">Find & Add Book</button>
+                <button type="submit" class="btn" style="flex: 1; background: var(--primary-light);"
+                    onclick="document.getElementById('add_to_reading_list_hidden').value='1';">Add to Reading
+                    List</button>
                 <a href="{{ url_for('list_books') }}" class="btn btn-outline" style="flex: 1;">Cancel</a>
             </div>
         </form>
