@@ -819,6 +819,22 @@ def create_reading_record(book_id: int):
     return redirect(url_for("book_detail", book_id=book_id))
 
 
+def _get_safe_redirect_target(target: str | None) -> str | None:
+    """
+    Return a safe redirect target derived from user-controlled input.
+
+    Only relative URLs (no scheme, no netloc) are allowed. Backslashes are
+    stripped to avoid alternative path separators being interpreted by browsers.
+    """
+    if not target:
+        return None
+    cleaned = target.replace("\\", "")
+    parsed = urlparse(cleaned)
+    if parsed.scheme or parsed.netloc:
+        return None
+    return cleaned
+
+
 @app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
 @authorisation_required
 def update_reading_record(record_id: int):
@@ -830,7 +846,8 @@ def update_reading_record(record_id: int):
 
     if not status or not start_date:
         flash("Status and start date are required.", "error")
-        return redirect(request.referrer or url_for("reading_history"))
+        safe_target = _get_safe_redirect_target(request.referrer)
+        return redirect(safe_target or url_for("reading_history"))
 
     try:
         storage.update_reading_record(
@@ -845,7 +862,8 @@ def update_reading_record(record_id: int):
         app.logger.error(f"Failed to update reading record: {str(e)}")
         flash(f"Error updating record: {str(e)}", "error")
 
-    return redirect(request.referrer or url_for("reading_history"))
+    safe_target = _get_safe_redirect_target(request.referrer)
+    return redirect(safe_target or url_for("reading_history"))
 
 
 @app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
@@ -862,7 +880,8 @@ def delete_reading_record(record_id: int):
         app.logger.error(f"Failed to delete reading record: {str(e)}")
         flash(f"Error deleting record: {str(e)}", "error")
 
-    return redirect(request.referrer or url_for("reading_history"))
+    safe_target = _get_safe_redirect_target(request.referrer)
+    return redirect(safe_target or url_for("reading_history"))
 
 
 @app.route("/books", methods=["POST"])
