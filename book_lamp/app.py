@@ -6,6 +6,7 @@ import re
 from collections import Counter
 from functools import wraps
 from typing import Union
+from urllib.parse import urlparse
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -36,6 +37,26 @@ from book_lamp.utils.protobuf_patch import apply_patch
 
 # Apply security patch for CVE-2026-0994
 apply_patch()
+
+
+def get_safe_redirect_target(fallback_endpoint: str) -> str:
+    """
+    Return a safe redirect target derived from the request referrer.
+
+    If the referrer is an absolute URL, only accept it if it points to the
+    same host as the current request. Otherwise, or if no referrer is set,
+    fall back to the URL for the given endpoint.
+    """
+    referrer = request.referrer
+    if referrer:
+        parsed = urlparse(referrer)
+        # Accept relative URLs (no scheme and no netloc)
+        if not parsed.scheme and not parsed.netloc:
+            return referrer
+        # Accept absolute URLs that point to this host
+        if parsed.netloc == request.host:
+            return referrer
+    return url_for(fallback_endpoint)
 
 load_dotenv()
 
@@ -405,7 +426,7 @@ def remove_from_reading_list(book_id: int):
     storage = get_storage()
     storage.remove_from_reading_list(book_id)
     flash("Removed from reading list.", "success")
-    return redirect(request.referrer or url_for("reading_list"))
+    return redirect(get_safe_redirect_target("reading_list"))
 
 
 @app.route("/books/<int:book_id>/add-to-reading-list", methods=["POST"])
