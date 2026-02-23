@@ -49,13 +49,15 @@ def get_safe_redirect_target(fallback_endpoint: str) -> str:
     """
     referrer = request.referrer
     if referrer:
-        parsed = urlparse(referrer)
+        # Normalize backslashes, which some browsers treat like forward slashes
+        normalized = referrer.replace("\\", "/")
+        parsed = urlparse(normalized)
         # Accept relative URLs (no scheme and no netloc)
         if not parsed.scheme and not parsed.netloc:
-            return referrer
-        # Accept absolute URLs that point to this host
-        if parsed.netloc == request.host:
-            return referrer
+            return normalized
+        # Accept absolute URLs that point to this host using http/https
+        if parsed.scheme in ("http", "https") and parsed.netloc == request.host:
+            return normalized
     return url_for(fallback_endpoint)
 
 load_dotenv()
