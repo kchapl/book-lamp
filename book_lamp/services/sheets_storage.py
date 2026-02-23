@@ -183,7 +183,7 @@ class GoogleSheetsStorage:
         assert self.service is not None
 
         # Define the ranges we want to fetch
-        tabs = ["Books", "Authors", "BookAuthors", "ReadingRecords"]
+        tabs = ["Books", "Authors", "BookAuthors", "ReadingRecords", "ReadingList"]
         ranges = [f"{tab}!A:P" for tab in tabs]
 
         try:
@@ -499,6 +499,23 @@ class GoogleSheetsStorage:
                 }
                 if book_id is None or record["book_id"] == book_id:
                     records.append(record)
+
+            # Inject Planning/Reading list pseudo-records
+            rl_items = self.get_reading_list()
+            for item in rl_items:
+                if book_id is None or item["book_id"] == book_id:
+                    records.append(
+                        {
+                            "id": f"rl_{item['book_id']}",
+                            "book_id": item["book_id"],
+                            "status": "Plan to Read",
+                            "start_date": "",
+                            "end_date": None,
+                            "rating": 0,
+                            "created_at": item["created_at"],
+                        }
+                    )
+
             return records
         except HttpError as error:
             # If the tab doesn't exist yet, try initializing and return empty list
@@ -506,6 +523,153 @@ class GoogleSheetsStorage:
                 self.initialize_sheets()
                 return []
             raise Exception(f"Failed to fetch reading records: {error}") from error
+
+    def get_reading_list(self) -> List[Dict[str, Any]]:
+        self._ensure_spreadsheet_id()
+        try:
+            values = self._get_values("ReadingList", "ReadingList!A:C")
+            if not values or len(values) < 2:
+                return []
+
+            items = []
+            for row in values[1:]:
+                if not row or not row[0]:
+                    continue
+                try:
+                    book_id = int(float(row[0]))
+                    pos = int(float(row[1])) if len(row) > 1 and row[1] else 0
+                    created_at = row[2] if len(row) > 2 else ""
+                    items.append(
+                        {"book_id": book_id, "position": pos, "created_at": created_at}
+                    )
+                except (ValueError, TypeError):
+                    pass
+            items.sort(key=lambda x: x["position"])
+            return items
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return []
+            raise
+
+    def add_to_reading_list(self, book_id: int) -> None:
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        items = self.get_reading_list()
+        if any(item["book_id"] == book_id for item in items):
+            return
+
+        pos = max((item["position"] for item in items), default=0) + 1
+        created_at = datetime.now(timezone.utc).isoformat()
+        row = [book_id, pos, created_at]
+
+        try:
+            self.service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="ReadingList!A:C",
+                valueInputOption="RAW",
+                body={"values": [row]},
+            ).execute()
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="ReadingList!A:C",
+                    valueInputOption="RAW",
+                    body={"values": [row]},
+                ).execute()
+            else:
+                raise
+        finally:
+            self._cache.pop("ReadingList", None)
+
+    def remove_from_reading_list(self, book_id: int) -> None:
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingList!A:C")
+                .execute()
+            )
+            values = result.get("values", [])
+            if len(values) <= 1:
+                return
+
+            new_rows = [values[0]]
+            pos = 1
+            for row in values[1:]:
+                if not row or not row[0]:
+                    continue
+                try:
+                    bid = int(float(row[0]))
+                    if bid != book_id:
+                        created = row[2] if len(row) > 2 else ""
+                        new_rows.append([bid, pos, created])
+                        pos += 1
+                except (ValueError, TypeError):
+                    new_rows.append(row)
+
+            self.service.spreadsheets().values().clear(
+                spreadsheetId=sid, range="ReadingList!A:C"
+            ).execute()
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range="ReadingList!A:C",
+                valueInputOption="RAW",
+                body={"values": new_rows},
+            ).execute()
+        except HttpError:
+            pass
+        finally:
+            self._cache.pop("ReadingList", None)
+
+    def update_reading_list_order(self, book_ids: List[int]) -> None:
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="ReadingList!A:C")
+                .execute()
+            )
+            values = result.get("values", [])
+            if len(values) <= 1:
+                return
+
+            created_map = {}
+            for row in values[1:]:
+                if row and row[0]:
+                    try:
+                        bid = int(float(row[0]))
+                        created = row[2] if len(row) > 2 else ""
+                        created_map[bid] = created
+                    except (ValueError, TypeError):
+                        pass
+
+            new_rows = [values[0]]
+            pos = 1
+            for bid in book_ids:
+                if bid in created_map:
+                    new_rows.append([bid, pos, created_map[bid]])
+                    pos += 1
+
+            self.service.spreadsheets().values().clear(
+                spreadsheetId=sid, range="ReadingList!A:C"
+            ).execute()
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range="ReadingList!A:C",
+                valueInputOption="RAW",
+                body={"values": new_rows},
+            ).execute()
+        except HttpError:
+            pass
+        finally:
+            self._cache.pop("ReadingList", None)
 
     def get_book_by_id(self, book_id: int) -> Optional[Dict[str, Any]]:
         """Get a single book by ID."""
@@ -1485,7 +1649,13 @@ class GoogleSheetsStorage:
             ]
 
             # 1. Create missing tabs in one batch
-            required_tabs = ["Books", "ReadingRecords", "Authors", "BookAuthors"]
+            required_tabs = [
+                "Books",
+                "ReadingRecords",
+                "Authors",
+                "BookAuthors",
+                "ReadingList",
+            ]
             add_requests = []
             for tab in required_tabs:
                 if tab not in sheets_in_doc:
@@ -1527,6 +1697,7 @@ class GoogleSheetsStorage:
                 ],
                 "Authors": ["id", "name"],
                 "BookAuthors": ["book_id", "author_id"],
+                "ReadingList": ["book_id", "position", "created_at"],
             }
 
             for tab, headers in tab_headers.items():
