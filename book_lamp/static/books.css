@@ -173,6 +173,11 @@
     color: white;
 }
 
+.status-plan-to-read {
+    background: var(--primary-light);
+    color: white;
+}
+
 .stars {
     color: #fbbf24;
     margin-left: 0.5rem;
