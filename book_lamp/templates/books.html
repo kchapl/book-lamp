@@ -9,24 +9,23 @@
 {% block content %}
 <div class="books-header">
     <h1>Books</h1>
-    <div style="display: flex; gap: 1rem;">
+    <div class="flex gap-1">
         <form method="post" action="{{ url_for('fetch_missing_data') }}">
             <button type="submit" class="btn btn-outline-primary">Fetch missing data</button>
         </form>
-        <form method="get" action="{{ url_for('import_books_form') }}" style="display:inline;">
+        <form method="get" action="{{ url_for('import_books_form') }}">
             <button type="submit" class="btn btn-outline-primary">Import from Libib</button>
         </form>
-        <form method="get" action="{{ url_for('new_book_form') }}" style="display:inline;">
+        <form method="get" action="{{ url_for('new_book_form') }}">
             <button type="submit" class="btn">Add new book</button>
         </form>
     </div>
 </div>
 
 <!-- Search Form -->
-<div style="margin-bottom: 1.5rem;">
-    <form method="get" action="{{ url_for('search_books') }}"
-        style="display: flex; gap: 1rem; align-items: flex-start;">
-        <div style="flex: 1; position: relative;">
+<div class="mb-15">
+    <form method="get" action="{{ url_for('search_books') }}" class="flex gap-1 align-start">
+        <div class="flex-grow rel">
             <input type="text" name="q" placeholder="Search books, authors, ISBN, series..."
                 value="{{ search_query if search_query else '' }}"
                 class="search-input {% if search_query %}has-query{% endif %}"
@@ -38,10 +37,9 @@
         <button type="submit" class="btn btn-search">🔍 Search</button>
     </form>
     {% if search_query %}
-    <div
-        style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; font-size: 0.9rem;">
+    <div class="search-results-badge mt-1 pt-075">
         <strong>Search results for:</strong> "{{ search_query }}"
-        <span style="color: var(--text-muted); margin-left: 1rem;">{{ books|length }} result{% if books|length != 1
+        <span class="text-muted ml-1">{{ books|length }} result{% if books|length != 1
             %}s{% endif %} found</span>
     </div>
     {% endif %}
@@ -49,8 +47,8 @@
 
 <!-- Sort Controls -->
 {% if sort_options %}
-<div style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-    <label for="sort-select" style="color: var(--text-muted); font-size: 0.9rem; white-space: nowrap;">Sort by:</label>
+<div class="mb-15 flex-center gap-1 flex-wrap">
+    <label for="sort-select" class="text-muted text-small no-wrap">Sort by:</label>
     <form method="get" action="{{ url_for('list_books' if not search_query else 'search_books') }}"
         style="display: inline-block;" id="sort-form">
         {% if search_query %}
@@ -72,19 +70,17 @@
 <div class="grid">
     {% for book in books %}
     <div class="book-card">
-        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container"
-            style="text-decoration: none; color: inherit;">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container author-link">
             {% if book.thumbnail_url %}
             <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover" loading="lazy" width="120"
                 height="180">
             {% else %}
-            <div
-                style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 2rem;">
+            <div class="flex-center h-full text-muted text-2rem">
                 📖</div>
             {% endif %}
         </a>
         <div class="meta">
-            <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" class="author-link">
                 <div class="title" title="{{ book.title }}">{{ book.title }}</div>
             </a>
             <div class="author">
@@ -101,7 +97,7 @@
                 {% endif %}
             </div>
             {% if book.latest_status %}
-            <div style="margin-bottom: 0.5rem;">
+            <div class="mb-05">
                 <span class="status-badge status-{{ book.latest_status.lower().replace(' ', '-') }}">
                     {{ book.latest_status }}
                 </span>
@@ -118,8 +114,7 @@
                 {% if book.publisher %}
                 <div class="year">
                     <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
-                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        class="publisher-link">{{
                         book.publisher|normalize_pub }}</a>
                 </div>
                 {% endif %}
@@ -135,14 +130,14 @@
 {% else %}
 {% if search_query %}
 <div class="empty-state">
-    <div style="font-size: 3rem; margin-bottom: 1rem;">�</div>
+    <div class="text-3rem mb-1"></div>
     <h2>No matching books found</h2>
     <p style="color: var(--text-muted); margin-bottom: 2rem;">Try adjusting your search terms.</p>
     <a href="{{ url_for('list_books') }}" class="btn">Clear Search</a>
 </div>
 {% else %}
 <div class="empty-state">
-    <div style="font-size: 3rem; margin-bottom: 1rem;">�📭</div>
+    <div class="text-3rem mb-1">📭</div>
     <h2>Your bookshelf is empty</h2>
     <p style="color: var(--text-muted); margin-bottom: 2rem;">Start building your digital library by adding your first
         book.</p>

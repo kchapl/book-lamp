@@ -64,14 +64,12 @@
                 {% if record.book_authors %}
                 {% for author in record.book_authors %}
                 <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
-                    style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    class="publisher-link">{{
                     author }}</a>{% if not loop.last %}, {% endif %}
                 {% endfor %}
                 {% elif record.book_author %}
                 <a href="{{ url_for('author_page', author_slug=record.book_author|lower|replace(' ', '-')) }}"
-                    style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    class="publisher-link">{{
                     record.book_author }}</a>
                 {% endif %}
             </div>
@@ -81,9 +79,8 @@
                     <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
                         <!-- View Mode -->
                         <div class="view-only">
-                            <div
-                                style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="flex-between mb-05">
+                                <div class="flex-center gap-075">
                                     <span class="status-badge status-{{ record.status | lower | replace(' ', '-') }}">
                                         {{ record.status }}
                                     </span>
@@ -95,7 +92,7 @@
                                     </span>
                                     {% endif %}
                                 </div>
-                                <div style="display: flex; gap: 0.5rem;">
+                                <div class="flex gap-05">
                                     {% if 'rl_' not in record.id|string %}
                                     <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
                                         onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
@@ -108,7 +105,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="event-dates" style="font-size: 0.85rem;">
+                            <div class="event-dates text-xs">
                                 {% if record.end_date %}
                                 Completed: {{ record.end_date }}
                                 {% elif record.start_date %}
@@ -177,9 +174,9 @@
     {% endfor %}
     {% else %}
     <div class="empty-state">
-        <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+        <div class="text-3rem mb-1">🔍</div>
         <h2>No history found</h2>
-        <p style="color: var(--text-muted); margin-bottom: 2rem;">No reading records match your current filters.</p>
+        <p class="text-muted mb-2">No reading records match your current filters.</p>
         <a href="{{ url_for('list_books') }}" class="btn">Browse Bookshelf</a>
     </div>
     {% endif %}

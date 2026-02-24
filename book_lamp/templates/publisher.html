@@ -7,16 +7,13 @@
 {% endblock %}
 
 {% block content %}
-<div class="publisher-header" style="text-align: center; margin-top: 2rem;">
+<div class="publisher-header text-center mt-2">
     <h1 class="publisher-name">{{ publisher_name }}</h1>
     <div class="publisher-stats">
         {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your reading log
     </div>
-    <div style="margin-top: 1.5rem;">
-        <a href="{{ url_for('list_books') }}"
-            style="color: var(--text-muted); text-decoration: none; display: inline-block; transition: color 0.2s; font-size: 0.95rem; background: rgba(255, 255, 255, 0.05); padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid var(--glass-border);"
-            onmouseover="this.style.color='var(--primary-color)'; this.style.borderColor='var(--primary-color)';"
-            onmouseout="this.style.color='var(--text-muted)'; this.style.borderColor='var(--glass-border)';">
+    <div class="mt-15">
+        <a href="{{ url_for('list_books') }}" class="back-btn-pill">
             ← Back to Books
         </a>
     </div>
@@ -26,31 +23,29 @@
 <div class="grid">
     {% for book in books %}
     <div class="book-card">
-        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container"
-            style="text-decoration: none; color: inherit;">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container author-link">
             {% if book.thumbnail_url %}
             <img class="thumb" src="{{ book.thumbnail_url }}" alt="{{ book.title }} cover" loading="lazy" width="120"
                 height="180">
             {% else %}
-            <div
-                style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 2rem;">
+            <div class="flex-center h-full text-muted text-2rem">
                 📖</div>
             {% endif %}
         </a>
         <div class="meta">
-            <a href="{{ url_for('book_detail', book_id=book.id) }}" style="text-decoration: none; color: inherit;">
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" class="author-link">
                 <div class="title" title="{{ book.title }}">{{ book.title }}</div>
             </a>
             <div class="author">
                 {% if book.authors %}
                 {% for author in book.authors %}
                 <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
-                    style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ author }}</a>{% if not
+                    class="author-link">{{ author }}</a>{% if not
                 loop.last %}, {% endif %}
                 {% endfor %}
                 {% elif book.author %}
                 <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
-                    style="text-decoration: none; color: inherit; transition: color 0.2s;">{{ book.author }}</a>
+                    class="author-link">{{ book.author }}</a>
                 {% endif %}
             </div>
             <div class="book-meta-summary">
@@ -64,8 +59,7 @@
                 {% if book.publisher %}
                 <div class="year">
                     <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
-                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        class="publisher-link">{{
                         book.publisher|normalize_pub }}</a>
                 </div>
                 {% endif %}
@@ -80,9 +74,9 @@
 </div>
 {% else %}
 <div class="empty-state">
-    <div style="font-size: 3rem; margin-bottom: 1rem;">🤔</div>
+    <div class="text-3rem mb-1">🤔</div>
     <h2>No books found</h2>
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">We couldn't find any books by {{ publisher_name }} in your
+    <p class="text-muted mb-2">We couldn't find any books by {{ publisher_name }} in your
         reading log.</p>
     <a href="{{ url_for('list_books') }}" class="btn">View All Books</a>
 </div>

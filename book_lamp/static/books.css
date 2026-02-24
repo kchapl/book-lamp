@@ -834,3 +834,92 @@
 .publisher-link:hover {
     color: var(--primary-light);
 }
+
+/* Reading List Styles */
+.reading-list-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.reading-list-item-thumb {
+    flex-shrink: 0;
+    width: 50px;
+    height: 75px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.reading-list-item-title {
+    margin: 0 0 0.25rem 0;
+    font-family: 'Playfair Display', serif;
+}
+
+/* Generic Flex/Grid Layouts for Books */
+.grid-column-gap-05 {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Book Detail header large cover container */
+.book-detail-cover-wrapper {
+    flex-shrink: 0;
+    width: 300px;
+}
+
+/* Book Detail specific layouts */
+.book-detail-toolbar {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.book-detail-edit-actions {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.book-detail-reading-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.book-detail-record-view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+/* Status badge extension */
+.status-badge-inline {
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Specialized back button for author/publisher pages */
+.back-btn-pill {
+    color: var(--text-muted);
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+}
+
+.back-btn-pill:hover {
+    color: var(--primary-light);
+    border-color: var(--primary-light);
+    background: rgba(255, 255, 255, 0.1);
+}
