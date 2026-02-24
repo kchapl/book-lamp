@@ -318,6 +318,112 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
     return results
 
 
+def lookup_books_by_author(
+    author_name: str, max_results: int = 50
+) -> List[Dict[str, Any]]:
+    """Search Open Library for all books by a given author name.
+
+    Returns deduplicated results with the latest edition per title, sorted
+    by reverse publication year. Results are cached to avoid redundant API calls.
+
+    Args:
+        author_name: The author's full name (e.g. "Jane Austen").
+        max_results: Maximum number of books to return (default 50).
+
+    Returns:
+        List of book dicts with keys: title, author, publication_year,
+        thumbnail_url, isbn13, publisher, description.
+    """
+    cache = get_cache()
+    cache_key = f"author_books:{author_name.lower().strip()}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cast(List[Dict[str, Any]], cached)
+
+    session = _get_session()
+    params: Dict[str, str] = {
+        "author": author_name,
+        "limit": str(min(max_results, 100)),
+        "fields": (
+            "key,title,author_name,cover_i,first_publish_year,"
+            "isbn,publisher,subject,language"
+        ),
+    }
+
+    books: List[Dict[str, Any]] = []
+    try:
+        response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=15)
+        response.raise_for_status()
+        docs = response.json().get("docs") or []
+
+        # Deduplicate by normalised title, keeping the entry with the latest year.
+        # Each doc may have many ISBNs; we prefer an ISBN-13 (13 digits).
+        seen_titles: Dict[str, Dict[str, Any]] = {}
+
+        for doc in docs:
+            raw_title = doc.get("title")
+            if not raw_title:
+                continue
+
+            # Normalise title for dedup purposes (lower, strip)
+            norm_title = raw_title.strip().lower()
+
+            year_val = doc.get("first_publish_year")
+            try:
+                year = int(year_val) if year_val else 0
+            except (ValueError, TypeError):
+                year = 0
+
+            # Choose a preferred ISBN-13
+            isbn13 = None
+            for isbn_candidate in doc.get("isbn") or []:
+                clean = isbn_candidate.replace("-", "").replace(" ", "")
+                if len(clean) == 13 and clean.isdigit():
+                    isbn13 = clean
+                    break
+
+            cover_id = doc.get("cover_i")
+            thumbnail_url = (
+                f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
+                if cover_id
+                else None
+            )
+
+            doc_authors = doc.get("author_name") or []
+            author_str = ", ".join(doc_authors) if doc_authors else author_name
+
+            publishers = doc.get("publisher") or []
+            publisher = publishers[0] if publishers else None
+
+            entry: Dict[str, Any] = {
+                "title": raw_title.strip(),
+                "author": author_str,
+                "publication_year": year if year else None,
+                "thumbnail_url": thumbnail_url,
+                "isbn13": isbn13,
+                "publisher": publisher,
+                "description": None,  # Not available from search endpoint
+            }
+
+            # Keep entry with the latest year for a given title
+            existing = seen_titles.get(norm_title)
+            if existing is None or year > (existing.get("publication_year") or 0):
+                seen_titles[norm_title] = entry
+
+        books = sorted(
+            seen_titles.values(),
+            key=lambda b: b.get("publication_year") or 0,
+            reverse=True,
+        )
+
+    except Exception as e:
+        logger.debug(f"Author books lookup failed for '{author_name}': {e}")
+
+    # Cache for 24 hours (86400s); author bibliographies rarely change
+    cache.set(cache_key, books, ttl=86400)
+    return books
+
+
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     """Lookup book details via Google Books API (ISBN)."""
     session = _get_session()
