@@ -432,3 +432,26 @@ select.edit-input option {
         transform: rotate(360deg);
     }
 }
+
+/* Pulsing dot animation — used by the background-job progress indicator */
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Version badge used on the About page */
+.version-tag {
+    background: var(--glass);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-family: monospace;
+    color: var(--primary-light);
+    border: 1px solid var(--glass-border);
+}

@@ -4,36 +4,6 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
-<style>
-    .draggable-item {
-        background: var(--glass);
-        border: 1px solid var(--glass-border);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        cursor: grab;
-        transition: transform 0.2s, background-color 0.2s;
-    }
-
-    .draggable-item:active {
-        cursor: grabbing;
-    }
-
-    .draggable-item.dragging {
-        opacity: 0.5;
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .drag-handle {
-        color: var(--text-muted);
-        font-size: 1.5rem;
-        cursor: grab;
-        user-select: none;
-    }
-</style>
 {% endblock %}
 
 {% block content %}

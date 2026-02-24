@@ -91,14 +91,12 @@
                 {% if book.authors %}
                 {% for author in book.authors %}
                 <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
-                    style="text-decoration: none; color: inherit; transition: color 0.2s;"
-                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    class="author-link">{{
                     author }}</a>{% if not loop.last %}, {% endif %}
                 {% endfor %}
                 {% elif book.author %}
                 <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
-                    style="text-decoration: none; color: inherit; transition: color 0.2s;"
-                    onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                    class="author-link">{{
                     book.author }}</a>
                 {% endif %}
             </div>
