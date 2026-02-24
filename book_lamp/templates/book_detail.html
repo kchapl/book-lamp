@@ -4,225 +4,18 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
-<style>
-    .book-detail-container {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-
-    .book-detail-header {
-        display: flex;
-        gap: 2rem;
-        margin-bottom: 2rem;
-        background: var(--glass);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        padding: 2rem;
-    }
-
-    .book-cover {
-        flex-shrink: 0;
-        width: 300px;
-        height: 450px;
-        border-radius: 12px;
-        overflow: hidden;
-        background: #1e293b;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-    }
-
-    .book-cover img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .book-cover-placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: var(--text-muted);
-        font-size: 4rem;
-    }
-
-    .book-info {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .book-title {
-        font-family: 'Playfair Display', serif;
-        font-size: 2.5rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        color: white;
-        overflow-wrap: break-word;
-        word-break: break-word;
-    }
-
-    .book-author {
-        color: var(--primary-light);
-        font-size: 1.5rem;
-        margin-bottom: 1.5rem;
-        font-weight: 600;
-    }
-
-    .book-meta {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .meta-item {
-        display: flex;
-        gap: 0.5rem;
-        font-size: 1rem;
-        align-items: baseline;
-    }
-
-    [data-edit-mode="true"] .meta-item {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.25rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .meta-label {
-        color: var(--text-muted);
-        font-weight: 600;
-        flex-shrink: 0;
-    }
-
-    .meta-value {
-        color: white;
-    }
-
-    .book-description {
-        margin-top: 1.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--glass-border);
-    }
-
-    .book-description h3 {
-        font-size: 1.25rem;
-        margin-bottom: 0.75rem;
-        color: white;
-    }
-
-    .book-description p {
-        color: var(--text-muted);
-        line-height: 1.6;
-        font-size: 1rem;
-    }
-
-    .reading-history-section {
-        background: var(--glass);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        padding: 2rem;
-        margin-top: 2rem;
-    }
-
-    .reading-history-section h2 {
-        font-size: 1.75rem;
-        margin-bottom: 1.5rem;
-        color: white;
-    }
-
-    .back-link {
-        display: inline-block;
-        margin-bottom: 1.5rem;
-        color: var(--primary-light);
-        text-decoration: none;
-        font-size: 1rem;
-        transition: color 0.2s;
-    }
-
-    .back-link:hover {
-        color: var(--primary);
-    }
-
-    .actions-section {
-        margin-top: 2rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--glass-border);
-    }
-
-    .edit-controls {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 2rem;
-    }
-
-    .btn-edit {
-        background: var(--primary);
-        color: white;
-        border: none;
-        padding: 0.5rem 1.5rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: opacity 0.2s;
-    }
-
-    .btn-edit:hover {
-        opacity: 0.9;
-    }
-
-    .btn-save {
-        background: #10b981;
-        color: white;
-        border: none;
-        padding: 0.5rem 1.5rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-
-    .btn-cancel {
-        background: transparent;
-        color: white;
-        border: 1px solid var(--glass-border);
-        padding: 0.5rem 1.5rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: 600;
-    }
-
-    @media (max-width: 768px) {
-        .book-detail-header {
-            flex-direction: column;
-        }
-
-        .book-cover {
-            width: 100%;
-            max-width: 300px;
-            margin: 0 auto;
-        }
-
-        .book-title {
-            font-size: 2rem;
-        }
-
-        .book-author {
-            font-size: 1.25rem;
-        }
-    }
-</style>
 {% endblock %}
 
 {% block content %}
 <div class="book-detail-container" id="book-container">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <a href="{{ url_for('list_books') }}" class="back-link" style="margin-bottom: 0;">← Back to Books</a>
+    <div class="flex-between mb-15">
+        <a href="{{ url_for('list_books') }}" class="back-link mb-0">← Back to Books</a>
     </div>
 
     <form id="edit-form" method="post" action="{{ url_for('edit_book', book_id=book.id) }}">
 
         <div class="book-detail-header" id="book-header" data-edit-mode="false">
-            <div style="flex-shrink: 0; width: 300px;">
+            <div class="book-detail-cover-wrapper">
                 <div class="book-cover">
                     {% if book.cover_url %}
                     <img src="{{ book.cover_url }}" alt="{{ book.title }} cover" loading="lazy" width="300"
@@ -234,18 +27,18 @@
                     <div class="book-cover-placeholder">📖</div>
                     {% endif %}
                 </div>
-                <div class="edit-only" style="margin-top: 1rem;">
+                <div class="edit-only mt-1">
                     <label class="meta-label">Thumbnail URL (Small)</label>
                     <input type="text" name="thumbnail_url" class="edit-input" value="{{ book.thumbnail_url or '' }}">
                 </div>
-                <div class="edit-only" style="margin-top: 1rem;">
+                <div class="edit-only mt-1">
                     <label class="meta-label">Cover URL (Large)</label>
                     <input type="text" name="cover_url" class="edit-input" value="{{ book.cover_url or '' }}">
                 </div>
             </div>
             <div class="book-info">
                 <h1 class="book-title view-only">{{ book.title }}</h1>
-                <div class="edit-only" style="margin-bottom: 1rem;">
+                <div class="edit-only mb-1">
                     <label class="meta-label">Title</label>
                     <input type="text" name="title" class="edit-input" value="{{ book.title }}" required>
                 </div>
@@ -254,18 +47,16 @@
                     {% if book.authors %}
                     {% for author in book.authors %}
                     <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
-                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        class="publisher-link">{{
                         author }}</a>{% if not loop.last %}, {% endif %}
                     {% endfor %}
                     {% elif book.author %}
                     <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
-                        style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        class="publisher-link">{{
                         book.author }}</a>
                     {% endif %}
                 </div>
-                <div class="edit-only" style="margin-bottom: 1.5rem;">
+                <div class="edit-only mb-15">
                     <label class="meta-label">Author(s) (comma separated)</label>
                     <input type="text" name="author" class="edit-input" value="{{ book.author }}" required>
                 </div>
@@ -282,9 +73,7 @@
                         <span class="meta-value view-only">
                             {% if book.publisher %}
                             <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
-                                style="color: inherit; text-decoration: none; border-bottom: 1px dotted var(--primary-light); transition: color 0.2s;"
-                                onmouseover="this.style.color='var(--primary-color)'"
-                                onmouseout="this.style.color='inherit'">{{
+                                class="publisher-link">{{
                                 book.publisher }}</a>
                             {% else %}
                             {{ book.publisher or '' }}
@@ -321,8 +110,7 @@
                 </div>
 
                 <!-- Book action buttons (view mode only) -->
-                <div class="view-only"
-                    style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border); display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <div class="view-only book-detail-toolbar">
                     <button type="button" class="btn-icon" onclick="setEditMode(true)" title="Edit Book"
                         aria-label="Edit Book">✏️</button>
                     <button type="button" class="btn-icon btn-icon-delete" data-book-id="{{ book.id }}"
@@ -332,9 +120,8 @@
                 </div>
 
                 <!-- Edit mode controls -->
-                <div class="edit-only"
-                    style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--glass-border);">
-                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <div class="edit-only book-detail-edit-actions">
+                    <div class="flex gap-05 justify-end">
                         <button type="submit" class="btn-save">Save Changes</button>
                         <button type="button" class="btn-cancel" onclick="setEditMode(false)">Cancel</button>
                     </div>
@@ -346,17 +133,17 @@
     <div class="reading-history-section">
         <h2>Reading History</h2>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <div style="display: flex; gap: 0.5rem;">
+        <div class="book-detail-reading-history-header">
+            <div class="flex gap-05">
                 <button class="btn" onclick="toggleForm('{{ book.id }}')">Add Reading</button>
                 {% if not is_planned %}
                 <form method="post" action="{{ url_for('add_existing_to_reading_list', book_id=book.id) }}"
-                    style="display: inline;">
+                    class="flex">
                     <button type="submit" class="btn btn-outline" style="background: var(--glass);">Add to Reading
                         List</button>
                 </form>
                 {% else %}
-                <span class="status-badge status-plan-to-read" style="margin: 0; display: flex; align-items: center;">On
+                <span class="status-badge status-plan-to-read status-badge-inline">On
                     Reading List</span>
                 {% endif %}
             </div>
@@ -391,7 +178,7 @@
                         <option value="5">5 Stars</option>
                     </select>
                 </div>
-                <div style="display: flex; gap: 0.5rem;">
+                <div class="flex gap-05">
                     <button type="submit" class="btn btn-small">Save</button>
                     <button type="button" class="btn btn-small"
                         style="background: transparent; border: 1px solid var(--glass-border);"
@@ -401,15 +188,17 @@
         </div>
 
         {% if book.reading_records %}
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <div class="flex-column gap-075">
             {% for record in book.reading_records %}
+            {% set is_real_record = 'rl_' not in record.id|string %}
             <div class="record-item" id="record-{{ record.id }}" data-edit-mode="false">
+                {% if is_real_record %}
                 <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
+                    {% endif %}
                     <!-- View Mode -->
                     <div class="view-only">
-                        <div
-                            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="book-detail-record-view-header">
+                            <div class="flex-center gap-075">
                                 <span class="status-badge status-{{ record.status.lower().replace(' ', '-') }}">
                                     {{ record.status }}
                                 </span>
@@ -420,8 +209,8 @@
                                 </span>
                                 {% endif %}
                             </div>
-                            <div style="display: flex; gap: 0.5rem;">
-                                {% if 'rl_' not in record.id|string %}
+                            <div class="flex gap-05">
+                                {% if is_real_record %}
                                 <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
                                     onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
                                     aria-label="Edit Record">✏️</button>
@@ -444,6 +233,7 @@
                         </div>
                     </div>
 
+                    {% if is_real_record %}
                     <!-- Edit Mode -->
                     <div class="edit-only edit-form-container">
                         <div class="edit-form-grid">
@@ -494,6 +284,7 @@
                         </div>
                     </div>
                 </form>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

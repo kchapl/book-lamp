@@ -305,6 +305,35 @@ Track meaningful metrics:
 
 When working with Book Lamp's data model:
 
+### Core Application Model — Reading Log, Not Ownership
+
+> **This is the most important conceptual distinction in the entire application.**
+
+Book Lamp is a **personal reading log**, not a catalogue of books the reader owns.
+
+- A book appearing in Book Lamp means the reader has **read, is reading, plans to read, or has attempted to read** it — not that they own a physical or digital copy.
+- **Never use** words like "collection", "library", "owned", or "your books" when referring to a user's Book Lamp data. These imply possession.
+- **Always use** words like "reading log", "reading history", "reading list", "read", or "tracked" instead.
+
+#### Correct Vocabulary
+
+| ❌ Avoid | ✅ Use instead |
+|---|---|
+| "in your collection" | "in your reading log" |
+| "your library" | "your reading history" |
+| "books you own" | "books you have read" |
+| "your catalogue" | "your reading log" |
+| "Collection Statistics" | "Reading Statistics" |
+| "Not in collection" | "Not yet read" |
+
+#### Consequences for Feature Design
+
+- The author page shows **all books the reader has read by that author**, then shows further books by that author that the reader **has not yet read** — both framed around reading, not ownership.
+- A book entry in the `Books` sheet represents a book that appeared in the reading history at some point. It is not an asset record.
+- The `ReadingRecords` sheet is the authoritative source of reading activity; the `Books` sheet is supporting metadata.
+
+
+
 ### Book Schema
 - Fields: `id`, `isbn13`, `title`, `author`, `publication_year`, `thumbnail_url`, `created_at`, `publisher`, `description`, `series`, `dewey_decimal`
 - **Primary Identifier**: `isbn13`

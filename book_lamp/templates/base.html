@@ -18,56 +18,39 @@
 <body>
     <nav>
         <a href="/" class="logo">Book Lamp</a>
-        <div class="nav-links" style="display: flex; align-items: center; gap: 1rem;">
+        <div class="nav-links">
             <a href="/books">Books</a>
             <a href="/history">History</a>
             <a href="/reading-list">Reading List</a>
             <a href="/stats">Stats</a>
             <a href="/about">About</a>
             {% if not is_authorised %}
-            <a href="/connect" class="btn" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Authorise</a>
+            <a href="/connect" class="btn btn-small">Authorise</a>
             {% endif %}
 
             <span id="connection-status" class="status-dot {{ 'connected' if is_authorised else 'disconnected' }}"
                 title="{{ 'Google Sheets Connected (Click to Disconnect)' if is_authorised else 'Google Sheets Not Connected (Click to Authorise)' }}"
-                data-authorised="{{ 'true' if is_authorised else 'false' }}" style="margin-left: 0.5rem;"
-                onclick="toggleConnection()"></span>
+                data-authorised="{{ 'true' if is_authorised else 'false' }}" onclick="toggleConnection()"></span>
         </div>
     </nav>
 
     <!-- Background Job Progress Indicator -->
-    <div id="job-indicator" style="display: none; position: relative; width: 100%; margin: 0; padding: 0;">
+    <div id="job-indicator">
         <!-- Subtle progress bar -->
-        <div id="job-progress-bar"
-            style="width: 100%; height: 3px; background-color: rgba(59, 130, 246, 0.1); overflow: hidden; position: relative;">
-            <div id="job-progress-fill"
-                style="height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);">
+        <div id="job-progress-bar">
+            <div id="job-progress-fill">
             </div>
         </div>
         <!-- Status message below progress bar -->
-        <div
-            style="padding: 0.75rem 1.5rem; background: rgba(59, 130, 246, 0.05); border-bottom: 1px solid rgba(59, 130, 246, 0.1); display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
-            <span
-                style="display: inline-block; width: 6px; height: 6px; background: #3b82f6; border-radius: 50%; animation: pulse 2s infinite;"></span>
+        <div class="job-status-bar">
+            <span class="job-pulse-dot"></span>
             <span id="job-status-text">Processing...</span>
         </div>
     </div>
 
-    <style>
-        @keyframes pulse {
 
-            0%,
-            100% {
-                opacity: 1;
-            }
 
-            50% {
-                opacity: 0.5;
-            }
-        }
-    </style>
-
-    <div class="container" style="padding-top: 1rem;">
+    <div class="container pt-1">
         <div class="messages">
             {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -185,7 +168,6 @@
                 }, 10000);
             });
         });
-    </script>
     </script>
 
     <footer>

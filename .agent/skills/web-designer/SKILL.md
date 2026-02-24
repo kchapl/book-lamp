@@ -127,7 +127,7 @@ badges: 0.8rem      /* Status badges (uppercase) */
 - **Variants**: Use consistent variants (primary, secondary, disabled states).
 
 ### CSS Architecture
-- **Separation**: Keep CSS in dedicated files, avoid inline styles.
+- **Separation (CRITICAL)**: serve all CSS from dedicated `.css` files in `book_lamp/static/`. **Avoid inline `<style>` blocks in HTML templates at all costs.**
 - **Naming**: Use consistent naming conventions (BEM, utility classes, or component-based).
 - **Specificity**: Keep CSS specificity low to avoid conflicts.
 - **Variables**: Use CSS custom properties for theming and consistency.

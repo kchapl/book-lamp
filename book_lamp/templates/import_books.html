@@ -3,32 +3,29 @@
 {% block title %}Import from Libib - Book Lamp{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 0 auto;">
-    <div style="margin-bottom: 2rem;">
-        <a href="{{ url_for('list_books') }}"
-            style="color: var(--primary-light); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+<div class="form-container-narrow">
+    <div class="mb-2">
+        <a href="{{ url_for('list_books') }}" class="publisher-link flex-center gap-05 text-small">
             ← Back to Library
         </a>
     </div>
 
     <div class="card p-4">
-        <h1 style="margin-top: 0;">Import from Libib</h1>
-        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+        <h1 class="mt-0">Import from Libib</h1>
+        <p class="text-muted mb-15">
             Upload your Libib library export (CSV) to bulk-add books and their reading history.
         </p>
 
         <form method="post" enctype="multipart/form-data">
-            <div class="form-group mb-4">
-                <label for="csv_file" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Choose CSV
+            <div class="form-group mb-1">
+                <label for="csv_file" class="form-label">Choose CSV
                     File</label>
-                <input type="file" id="csv_file" name="file" accept=".csv" required
-                    style="width: 100%; padding: 1rem; background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--glass-border); border-radius: 12px; color: white; cursor: pointer;">
+                <input type="file" id="csv_file" name="file" accept=".csv" required class="file-input-wrapper">
             </div>
 
-            <div
-                style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem;">
-                <h3 style="margin-top: 0; font-size: 1rem; color: #60a5fa;">💡 How to export from Libib:</h3>
-                <ol style="margin-bottom: 0; padding-left: 1.25rem; font-size: 0.9rem; color: var(--text-muted);">
+            <div class="info-box info-box-blue">
+                <h3 class="info-box-title info-box-title-blue">💡 How to export from Libib:</h3>
+                <ol class="info-list">
                     <li>Log in to your Libib account.</li>
                     <li>Go to <strong>Settings</strong> → <strong>Export</strong>.</li>
                     <li>Select the library you want to export.</li>
@@ -36,15 +33,13 @@
                 </ol>
             </div>
 
-            <div class="form-group mb-4"
-                style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1rem;">
-                <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; margin: 0;">
-                    <input type="checkbox" name="fetch_metadata" checked
-                        style="width: 1.25rem; height: 1.25rem; accent-color: var(--primary);">
-                    <div style="flex: 1;">
-                        <span style="display: block; font-weight: 600; margin-bottom: 0.25rem;">Automatically fetch
+            <div class="checkbox-card mb-1">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="fetch_metadata" checked class="checkbox-input">
+                    <div class="checkbox-text-wrapper">
+                        <span class="checkbox-title">Automatically fetch
                             missing covers & metadata</span>
-                        <span style="display: block; font-size: 0.85rem; color: var(--text-muted);">
+                        <span class="checkbox-desc">
                             This will search external databases for covers, page counts, and more.
                             The process runs in the background, so you can continue using the app.
                         </span>
@@ -52,15 +47,15 @@
                 </label>
             </div>
 
-            <div
-                style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.85rem;">
-                <strong style="color: #c084fc;">⚡ Fast Import:</strong>
-                <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">
-                    Your import will start immediately and run in the background. You'll see a message confirming the process has begun, and books will appear as they're processed.
+            <div class="info-box info-box-purple text-xs">
+                <strong class="info-box-title-purple">⚡ Fast Import:</strong>
+                <p class="text-muted mt-05">
+                    Your import will start immediately and run in the background. You'll see a message confirming the
+                    process has begun, and books will appear as they're processed.
                 </p>
             </div>
 
-            <button type="submit" class="btn w-100">Start Import</button>
+            <button type="submit" class="btn w-full">Start Import</button>
         </form>
     </div>
 </div>

@@ -4,68 +4,35 @@
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
-<style>
-    .draggable-item {
-        background: var(--glass);
-        border: 1px solid var(--glass-border);
-        border-radius: 12px;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        cursor: grab;
-        transition: transform 0.2s, background-color 0.2s;
-    }
-
-    .draggable-item:active {
-        cursor: grabbing;
-    }
-
-    .draggable-item.dragging {
-        opacity: 0.5;
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .drag-handle {
-        color: var(--text-muted);
-        font-size: 1.5rem;
-        cursor: grab;
-        user-select: none;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 800px; margin: 0 auto;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+<div class="reading-list-wrapper">
+    <div class="flex-between mb-2">
         <h1>Reading List</h1>
         <a href="{{ url_for('new_book_form') }}" class="btn">Add to List</a>
     </div>
 
     {% if books %}
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">Drag and drop to reorder your reading list. Changes are
+    <p class="text-muted mb-2">Drag and drop to reorder your reading list. Changes are
         saved automatically.</p>
 
-    <div id="reading-list-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+    <div id="reading-list-container" class="grid-column-gap-05">
         {% for book in books %}
         <div class="draggable-item" draggable="true" data-book-id="{{ book.id }}">
             <div class="drag-handle">≡</div>
-            <div
-                style="flex-shrink: 0; width: 50px; height: 75px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+            <div class="reading-list-item-thumb">
                 {% if book.thumbnail_url %}
-                <img src="{{ book.thumbnail_url }}" alt="Cover" style="width: 100%; height: 100%; object-fit: cover;">
+                <img src="{{ book.thumbnail_url }}" alt="Cover" class="w-full h-full object-cover">
                 {% else %}
-                <div
-                    style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 1.5rem;">
+                <div class="flex-center h-full text-small">
                     📖</div>
                 {% endif %}
             </div>
-            <div style="flex: 1;">
-                <h3 style="margin: 0 0 0.25rem 0; font-family: 'Playfair Display', serif;"><a
-                        href="{{ url_for('book_detail', book_id=book.id) }}"
-                        style="color: inherit; text-decoration: none;">{{ book.title }}</a></h3>
-                <div style="font-size: 0.9rem; color: var(--primary-light);">{{ book.author }}</div>
+            <div class="flex-grow">
+                <h3 class="reading-list-item-title"><a href="{{ url_for('book_detail', book_id=book.id) }}"
+                        class="author-link">{{ book.title }}</a></h3>
+                <div class="text-small" style="color: var(--primary-light);">{{ book.author }}</div>
             </div>
             <div>
                 <button type="button" class="btn-icon" data-book-id="{{ book.id }}"
@@ -77,10 +44,10 @@
         {% endfor %}
     </div>
     {% else %}
-    <div class="card" style="text-align: center; padding: 4rem 2rem;">
+    <div class="card text-center" style="padding: 4rem 2rem;">
         <div style="font-size: 4rem; margin-bottom: 1rem;">📚</div>
         <h2>Your reading list is empty</h2>
-        <p style="color: var(--text-muted); margin-bottom: 2rem;">Plan what you'll read next by adding books to your
+        <p class="text-muted mb-2">Plan what you'll read next by adding books to your
             list.</p>
         <a href="{{ url_for('new_book_form') }}" class="btn">Add a Book</a>
     </div>

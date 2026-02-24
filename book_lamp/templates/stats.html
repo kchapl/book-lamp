@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Collection Statistics - Book Lamp{% endblock %}
+{% block title %}Reading Statistics - Book Lamp{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='stats.css') }}">
@@ -8,8 +8,8 @@
 
 {% block content %}
 <div class="stats-header">
-    <h1>Collection Statistics</h1>
-    <p class="text-muted">A deep dive into your reading library.</p>
+    <h1>Reading Statistics</h1>
+    <p class="text-muted">A deep dive into your reading history.</p>
 </div>
 
 <div class="stats-grid">
@@ -45,7 +45,7 @@
                 </div>
                 <div class="bar-wrapper">
                     <div class="bar {{ status|lower|replace(' ', '-') }}"
-                        style="width: {{ (count / total_books * 100)|round if total_books > 0 else 0 }}%;"></div>
+                        style="--bar-width: {{ (count / total_books * 100)|round if total_books > 0 else 0 }}%;"></div>
                 </div>
                 <div class="count">{{ count }}</div>
             </div>
@@ -61,9 +61,7 @@
             <div class="list-item">
                 <span class="rank">{{ loop.index }}</span>
                 <span class="item-name"><a
-                        href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
-                        style="text-decoration: none; color: inherit; transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}">{{
                         author }}</a></span>
                 <span class="item-value">{{ count }} books</span>
             </div>
@@ -79,9 +77,7 @@
             <div class="list-item">
                 <span class="rank">{{ loop.index }}</span>
                 <span class="item-name"><a
-                        href="{{ url_for('publisher_page', publisher_slug=publisher|lower|replace(' ', '-')) }}"
-                        style="text-decoration: none; color: inherit; transition: color 0.2s;"
-                        onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='inherit'">{{
+                        href="{{ url_for('publisher_page', publisher_slug=publisher|lower|replace(' ', '-')) }}">{{
                         publisher }}</a></span>
                 <span class="item-value">{{ count }} books</span>
             </div>
@@ -94,14 +90,14 @@
         <h3>Books finished by year</h3>
         <div class="timeline-grid">
             <div class="marker-line"
-                style="bottom: {{ (avg_year_count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
+                style="--marker-bottom: {{ (avg_year_count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
                 <span class="marker-tooltip">Avg: {{ avg_year_count|round(1) }}</span>
             </div>
             {% for year, count in yearly_counts %}
             <div class="timeline-item">
                 <div class="timeline-bar-container">
                     <div class="timeline-bar"
-                        style="height: {{ (count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
+                        style="--bar-height: {{ (count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
                         <span class="count-tooltip">{{ count }}</span>
                     </div>
                 </div>
@@ -115,14 +111,14 @@
         <h3>Books finished by month</h3>
         <div class="timeline-grid">
             <div class="marker-line"
-                style="bottom: {{ (avg_month_count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">
+                style="--marker-bottom: {{ (avg_month_count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">
                 <span class="marker-tooltip">Avg: {{ avg_month_count|round(1) }}</span>
             </div>
             {% for month, count in monthly_counts %}
             <div class="timeline-item">
                 <div class="timeline-bar-container">
                     <div class="timeline-bar month"
-                        style="height: {{ (count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">
+                        style="--bar-height: {{ (count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">
                         <span class="count-tooltip">{{ count }}</span>
                     </div>
                 </div>
@@ -134,13 +130,13 @@
 
     <!-- Dewey Distribution -->
     <div class="chart-card wide">
-        <h3>Collection by subject (Dewey Decimal)</h3>
+        <h3>Books read by subject (Dewey Decimal)</h3>
         <div class="dewey-grid">
             {% for category, count in dewey_distribution.items() %}
             <div class="dewey-item">
                 <div class="dewey-bar-container">
                     <div class="dewey-bar"
-                        style="height: {{ (count / max_dewey_count * 100)|round if max_dewey_count > 0 else 0 }}%;">
+                        style="--bar-height: {{ (count / max_dewey_count * 100)|round if max_dewey_count > 0 else 0 }}%;">
                         <span class="count-tooltip">{{ count }}</span>
                     </div>
                 </div>

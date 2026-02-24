@@ -60,6 +60,7 @@ def get_safe_redirect_target(fallback_endpoint: str) -> str:
             return normalized
     return url_for(fallback_endpoint)
 
+
 load_dotenv()
 
 logging.basicConfig(
@@ -518,22 +519,34 @@ def search_books():
 @app.route("/author/<path:author_slug>", methods=["GET"])
 @authorisation_required
 def author_page(author_slug: str):
+    """Display all books by an author, including unread books from Open Library.
+
+    Books in the user's reading log are shown normally.  Books the user has not
+    yet read (sourced from Open Library) are shown semi-transparently with an option
+    to add them to the reading list.  Duplicates are suppressed and only the
+    latest edition of each title is shown.
+    """
+    from book_lamp.services.book_lookup import lookup_books_by_author
+
     storage = get_storage()
     storage.prefetch()
     if storage.spreadsheet_id:
         session["spreadsheet_id"] = storage.spreadsheet_id
 
-    books = storage.get_all_books()
+    all_user_books = storage.get_all_books()
+    rl_items = storage.get_reading_list()
+    reading_list_book_ids = {item["book_id"] for item in rl_items}
 
-    author_books = []
+    # 1. Identify the user's books for this author
+    author_books: list[dict] = []
     display_author_name = author_slug.replace("-", " ").title()  # Fallback
 
-    def to_slug(name):
+    def to_slug(name: str) -> str:
         return name.lower().replace(" ", "-") if name else ""
 
     search_slug = author_slug.lower()
 
-    for book in books:
+    for book in all_user_books:
         matched = False
         if book.get("authors"):
             for a in book["authors"]:
@@ -548,8 +561,13 @@ def author_page(author_slug: str):
                 author_books.append(book)
                 display_author_name = book["author"]
 
-    # Sort books by reverse publication date
-    def get_pub_year(b):
+    # Mark owned books and their reading list status
+    for book in author_books:
+        book["is_owned"] = True
+        book["in_reading_list"] = book["id"] in reading_list_book_ids
+
+    # Sort owned books by reverse publication date
+    def get_pub_year(b: dict) -> int:
         py = b.get("publication_year")
         if not py:
             return 0
@@ -562,10 +580,49 @@ def author_page(author_slug: str):
 
     author_books.sort(key=get_pub_year, reverse=True)
 
+    # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
+    unread_books: list[dict] = []
+    if not TEST_MODE:
+        try:
+            external_books = lookup_books_by_author(display_author_name)
+
+            # Build sets for dedup against already-owned books
+            owned_isbns = {
+                b.get("isbn13", "").replace("-", "").replace(" ", "")
+                for b in author_books
+                if b.get("isbn13")
+            }
+            owned_norm_titles = {
+                b.get("title", "").strip().lower() for b in author_books
+            }
+
+            for ext_book in external_books:
+                isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
+                norm_title = ext_book.get("title", "").strip().lower()
+
+                # Skip if user already owns a book with that ISBN or title
+                if isbn and isbn in owned_isbns:
+                    continue
+                if norm_title in owned_norm_titles:
+                    continue
+
+                ext_book["is_owned"] = False
+                ext_book["in_reading_list"] = False
+                ext_book["id"] = None
+                unread_books.append(ext_book)
+                owned_norm_titles.add(norm_title)
+
+        except Exception:
+            app.logger.warning(
+                f"Failed to fetch external books for author: {display_author_name}",
+                exc_info=True,
+            )
+
     return render_template(
         "author.html",
         author_name=display_author_name,
         books=author_books,
+        unread_books=unread_books,
     )
 
 

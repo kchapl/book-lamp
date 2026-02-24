@@ -3,45 +3,35 @@
 {% block title %}Add New Book - Book Lamp{% endblock %}
 
 {% block content %}
-<div style="max-width: 600px; margin: 0 auto;">
+<div class="form-container-narrow">
     <div class="card">
         <h1>Add a Book</h1>
-        <p style="color: var(--text-muted); margin-bottom: 2rem;">
+        <p class="text-muted mb-2">
             Enter the 13-digit ISBN of the book you want to add. We'll automatically fetch the details for you.
         </p>
 
         <form method="post" action="{{ url_for('create_book') }}">
-            <div style="margin-bottom: 1.5rem;">
-                <label for="isbn"
-                    style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text);">ISBN-13</label>
+            <div class="mb-15">
+                <label for="isbn" class="form-label">ISBN-13</label>
                 <input type="text" id="isbn" name="isbn" placeholder="9780000000000" required autofocus
-                    style="width: 100%; padding: 1rem; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2); color: white; font-size: 1.1rem; box-sizing: border-box; outline: none; transition: border-color 0.3s;">
-                <script>
-                    document.getElementById('isbn').addEventListener('focus', function () {
-                        this.style.borderColor = 'var(--primary)';
-                    });
-                    document.getElementById('isbn').addEventListener('blur', function () {
-                        this.style.borderColor = 'var(--glass-border)';
-                    });
-                </script>
+                    class="form-input-large">
             </div>
 
             <input type="hidden" name="add_to_reading_list" id="add_to_reading_list_hidden" value="0">
-            <div style="display: flex; gap: 1rem;">
-                <button type="submit" class="btn" style="flex: 1;"
+            <div class="flex gap-1">
+                <button type="submit" class="btn flex-grow"
                     onclick="document.getElementById('add_to_reading_list_hidden').value='0';">Find & Add Book</button>
-                <button type="submit" class="btn" style="flex: 1; background: var(--primary-light);"
+                <button type="submit" class="btn flex-grow" style="background: var(--primary-light);"
                     onclick="document.getElementById('add_to_reading_list_hidden').value='1';">Add to Reading
                     List</button>
-                <a href="{{ url_for('list_books') }}" class="btn btn-outline" style="flex: 1;">Cancel</a>
+                <a href="{{ url_for('list_books') }}" class="btn btn-outline flex-grow">Cancel</a>
             </div>
         </form>
     </div>
 
-    <div
-        style="margin-top: 2rem; padding: 1.5rem; background: var(--glass); border-radius: 16px; border: 1px solid var(--glass-border);">
-        <h4 style="margin-top: 0; margin-bottom: 0.5rem; color: var(--primary-light);">Pro Tip</h4>
-        <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+    <div class="tip-box">
+        <h4 class="tip-title">Pro Tip</h4>
+        <p class="tip-content">
             You can find the ISBN-13 on the back cover of most books, usually near the barcode. It starts with 978 or
             979.
         </p>
