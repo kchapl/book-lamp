@@ -190,8 +190,11 @@
         {% if book.reading_records %}
         <div class="flex-column gap-075">
             {% for record in book.reading_records %}
+            {% set is_real_record = 'rl_' not in record.id|string %}
             <div class="record-item" id="record-{{ record.id }}" data-edit-mode="false">
+                {% if is_real_record %}
                 <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
+                    {% endif %}
                     <!-- View Mode -->
                     <div class="view-only">
                         <div class="book-detail-record-view-header">
@@ -207,7 +210,7 @@
                                 {% endif %}
                             </div>
                             <div class="flex gap-05">
-                                {% if 'rl_' not in record.id|string %}
+                                {% if is_real_record %}
                                 <button type="button" class="btn-icon" data-record-id="{{ record.id }}"
                                     onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
                                     aria-label="Edit Record">✏️</button>
@@ -230,6 +233,7 @@
                         </div>
                     </div>
 
+                    {% if is_real_record %}
                     <!-- Edit Mode -->
                     <div class="edit-only edit-form-container">
                         <div class="edit-form-grid">
@@ -280,6 +284,7 @@
                         </div>
                     </div>
                 </form>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
