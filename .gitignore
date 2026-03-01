@@ -214,10 +214,10 @@ __marimo__/
 # Node
 node_modules/
 
-# Playwright
-playwright-report/
-test-results/
-
-# Agent skill usage logs
-.agent/skill_usage.log
-.agent/skill_usage.json
+# Compiled Frontend Assets
+book_lamp/static/*.js
+!book_lamp/static/favicon.js # In case there was one, but keep images
+coverage/
+node_modules/
+dist/
+*.tsbuildinfo

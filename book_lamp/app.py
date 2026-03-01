@@ -437,6 +437,8 @@ def remove_from_reading_list(book_id: int):
 def add_existing_to_reading_list(book_id: int):
     storage = get_storage()
     storage.add_to_reading_list(book_id)
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
     flash("Added to reading list.", "success")
     return redirect(url_for("reading_list"))
 
@@ -1020,9 +1022,13 @@ def create_book():
     )
     if add_to_rl:
         storage.add_to_reading_list(created_book["id"])
+        if storage.spreadsheet_id:
+            session["spreadsheet_id"] = storage.spreadsheet_id
         flash("Book added to catalogue and reading list.", "success")
         return redirect(url_for("reading_list"))
 
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
 
