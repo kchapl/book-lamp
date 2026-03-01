@@ -1,4 +1,7 @@
+import logging
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class MockStorage:
@@ -260,11 +263,13 @@ class MockStorage:
 
     def add_to_reading_list(self, book_id):
         if any(item["book_id"] == book_id for item in self.reading_list):
+            logger.info(f"Book {book_id} is already in the reading list (MockStorage)")
             return
         pos = max((item["position"] for item in self.reading_list), default=0) + 1
         self.reading_list.append(
             {"book_id": book_id, "position": pos, "created_at": "2024-01-01T00:00:00"}
         )
+        logger.info(f"Successfully added book {book_id} to reading list (MockStorage)")
 
     def remove_from_reading_list(self, book_id):
         for i, item in enumerate(self.reading_list):
