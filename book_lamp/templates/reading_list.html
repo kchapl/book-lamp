@@ -17,7 +17,8 @@
     <p class="text-muted mb-2">Drag and drop to reorder your reading list. Changes are
         saved automatically.</p>
 
-    <div id="reading-list-container" class="grid-column-gap-05">
+    <div id="reading-list-container" class="grid-column-gap-05"
+        data-reorder-url="{{ url_for('reorder_reading_list') }}">
         {% for book in books %}
         <div class="draggable-item" draggable="true" data-book-id="{{ book.id }}">
             <div class="drag-handle">≡</div>
@@ -54,69 +55,5 @@
     {% endif %}
 </div>
 
-<script>
-    function removeBook(bookId, deleteUrl) {
-        submitPostRequest(deleteUrl);
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const list = document.getElementById('reading-list-container');
-        if (!list) return;
-
-        let draggingItem = null;
-
-        list.addEventListener('dragstart', e => {
-            if (!e.target.classList.contains('draggable-item')) return;
-            draggingItem = e.target;
-            setTimeout(() => e.target.classList.add('dragging'), 0);
-        });
-
-        list.addEventListener('dragend', e => {
-            if (!e.target.classList.contains('draggable-item')) return;
-            e.target.classList.remove('dragging');
-            draggingItem = null;
-            saveOrder();
-        });
-
-        list.addEventListener('dragover', e => {
-            e.preventDefault();
-            const afterElement = getDragAfterElement(list, e.clientY);
-            const currentDraggable = document.querySelector('.dragging');
-            if (currentDraggable) {
-                if (afterElement == null) {
-                    list.appendChild(currentDraggable);
-                } else {
-                    list.insertBefore(currentDraggable, afterElement);
-                }
-            }
-        });
-
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.draggable-item:not(.dragging)')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-
-        function saveOrder() {
-            const items = [...list.querySelectorAll('.draggable-item')];
-            const bookIds = items.map(item => parseInt(item.dataset.bookId));
-
-            fetch('{{ url_for("reorder_reading_list") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ book_ids: bookIds })
-            });
-        }
-    });
-</script>
+<script src="{{ url_for('static', filename='reading-list.js') }}" type="module" defer></script>
 {% endblock %}

@@ -436,8 +436,17 @@ def remove_from_reading_list(book_id: int):
 @authorisation_required
 def add_existing_to_reading_list(book_id: int):
     storage = get_storage()
-    storage.add_to_reading_list(book_id)
-    flash("Added to reading list.", "success")
+    try:
+        storage.add_to_reading_list(book_id)
+        app.logger.info(f"Successfully added book ID {book_id} to reading list")
+        if storage.spreadsheet_id:
+            session["spreadsheet_id"] = storage.spreadsheet_id
+        flash("Added to reading list.", "success")
+    except Exception as e:
+        app.logger.error(
+            f"Failed to add book ID {book_id} to reading list: {str(e)}", exc_info=True
+        )
+        flash(f"Error adding to reading list: {str(e)}", "error")
     return redirect(url_for("reading_list"))
 
 
@@ -966,8 +975,18 @@ def create_book():
     existing = storage.get_book_by_isbn(isbn)
     if existing:
         if add_to_rl:
-            storage.add_to_reading_list(existing["id"])
-            flash("Book added to your reading list.", "success")
+            try:
+                storage.add_to_reading_list(existing["id"])
+                app.logger.info(
+                    f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
+                )
+                flash("Book added to your reading list.", "success")
+            except Exception as e:
+                app.logger.error(
+                    f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
+                    exc_info=True,
+                )
+                flash(f"Error adding to reading list: {str(e)}", "error")
             return redirect(url_for("reading_list"))
         flash("This book has already been added.", "info")
         return redirect(url_for("list_books"))
@@ -1019,10 +1038,26 @@ def create_book():
         cover_url=data.get("cover_url"),
     )
     if add_to_rl:
-        storage.add_to_reading_list(created_book["id"])
-        flash("Book added to catalogue and reading list.", "success")
+        try:
+            storage.add_to_reading_list(created_book["id"])
+            app.logger.info(
+                f"Successfully added newly created book (ID: {created_book['id']}, Title: {created_book['title']}) to reading list"
+            )
+            if storage.spreadsheet_id:
+                session["spreadsheet_id"] = storage.spreadsheet_id
+            flash("Book added to catalogue and reading list.", "success")
+        except Exception as e:
+            app.logger.error(
+                f"Failed to add newly created book {created_book['id']} to reading list: {str(e)}",
+                exc_info=True,
+            )
+            flash(
+                "Book added to catalogue, but failed to add to reading list.", "warning"
+            )
         return redirect(url_for("reading_list"))
 
+    if storage.spreadsheet_id:
+        session["spreadsheet_id"] = storage.spreadsheet_id
     flash("Book added successfully.", "success")
     return redirect(url_for("list_books"))
 

@@ -53,6 +53,12 @@ jobs:
         run: |
           poetry run pytest --junit-xml=pytest-results.xml
 
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm run test
+
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@c950f6fb443cb5af20a377fd0dfaa78838901040 # v2.23.0
         if: always()

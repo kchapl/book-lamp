@@ -1,5 +1,6 @@
 """Google Sheets storage adapter for book data."""
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -13,6 +14,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleSheetsStorage:
@@ -557,6 +560,9 @@ class GoogleSheetsStorage:
         assert self.service is not None
         items = self.get_reading_list()
         if any(item["book_id"] == book_id for item in items):
+            logger.info(
+                f"Book {book_id} is already in the reading list on spreadsheet {sid}"
+            )
             return
 
         pos = max((item["position"] for item in items), default=0) + 1
@@ -570,8 +576,14 @@ class GoogleSheetsStorage:
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
+            logger.info(
+                f"Successfully appended book {book_id} to ReadingList on spreadsheet {sid}"
+            )
         except HttpError as error:
             if error.resp.status == 400:
+                logger.warning(
+                    f"ReadingList tab missing on spreadsheet {sid}, attempting to initialize"
+                )
                 self.initialize_sheets()
                 self.service.spreadsheets().values().append(
                     spreadsheetId=sid,
@@ -579,8 +591,21 @@ class GoogleSheetsStorage:
                     valueInputOption="RAW",
                     body={"values": [row]},
                 ).execute()
+                logger.info(
+                    f"Successfully appended book {book_id} to ReadingList after initialization"
+                )
             else:
+                logger.error(
+                    f"Failed to append book {book_id} to ReadingList on spreadsheet {sid}. Error: {error}",
+                    exc_info=True,
+                )
                 raise
+        except Exception as error:
+            logger.error(
+                f"Unexpected error adding book {book_id} to ReadingList: {error}",
+                exc_info=True,
+            )
+            raise
         finally:
             self._cache.pop("ReadingList", None)
 

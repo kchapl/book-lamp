@@ -85,90 +85,10 @@
         </div>
     </div>
 
-    <script>
-        function showConfirm(title, message, onConfirm) {
-            const modal = document.getElementById('confirm-modal');
-            document.getElementById('modal-title').textContent = title;
-            document.getElementById('modal-message').textContent = message;
-            const confirmBtn = document.getElementById('modal-confirm-btn');
 
-            // Remove old listeners
-            const newConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-
-            newConfirmBtn.addEventListener('click', () => {
-                onConfirm();
-                closeModal();
-            });
-
-            modal.style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function (event) {
-            const modal = document.getElementById('confirm-modal');
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
-
-        function submitPostRequest(urlStr) {
-            try {
-                var url = new URL(urlStr, window.location.origin);
-                if ((url.protocol === 'http:' || url.protocol === 'https:') &&
-                    url.origin === window.location.origin) {
-                    var f = document.createElement('form');
-                    f.method = 'POST';
-                    f.action = url.toString();
-                    document.body.appendChild(f);
-                    f.submit();
-                }
-            } catch (e) {
-                console.error('Failed to submit request:', e);
-            }
-        }
-
-        function toggleConnection() {
-            const statusDot = document.getElementById('connection-status');
-            const isAuthorised = statusDot.getAttribute('data-authorised') === 'true';
-            if (isAuthorised) {
-                showConfirm(
-                    'Disconnect Google Sheets',
-                    'Are you sure you want to disconnect? You will need to re-authorise to access your data.',
-                    () => { window.location.href = '/logout'; }
-                );
-            } else {
-                showConfirm(
-                    'Authorise Google Sheets',
-                    'Would you like to authorise Google Sheets to store your reading data?',
-                    () => { window.location.href = '/connect'; }
-                );
-            }
-        }
-    </script>
-    <script src="{{ url_for('static', filename='button-feedback.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='job-monitor.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='enhanced-monitor.js') }}" defer></script>
-    <script>
-        // Auto-hide alert messages after 10 seconds
-        document.addEventListener('DOMContentLoaded', function () {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(function (alert) {
-                setTimeout(function () {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateY(-10px)';
-                    alert.style.transition = 'all 0.5s ease';
-                    setTimeout(function () {
-                        alert.remove();
-                    }, 500);
-                }, 10000);
-            });
-        });
-    </script>
+    <script src="{{ url_for('static', filename='base-ui.js') }}" type="module" defer></script>
+    <script src="{{ url_for('static', filename='button-feedback.js') }}" type="module" defer></script>
+    <script src="{{ url_for('static', filename='job-indicator.js') }}" type="module" defer></script>
 
     <footer>
         &copy; {{ current_year }} Kelvin Chappell. Built with Python and Google Sheets.

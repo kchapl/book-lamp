@@ -1,0 +1,78 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Development Server",
+            "type": "shell",
+            "command": "poetry run flask --app book_lamp.app run --debug --port 5000",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Watch TypeScript",
+            "type": "shell",
+            "command": "npm run build -- --watch",
+            "isBackground": true,
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": [
+                "$tsc-watch"
+            ]
+        },
+        {
+            "label": "Run Tests (pytest)",
+            "type": "shell",
+            "command": "poetry run pytest",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Tests (vitest)",
+            "type": "shell",
+            "command": "npm test",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lint and Format (Ruff)",
+            "type": "shell",
+            "command": "poetry run ruff check . --fix && poetry run ruff format .",
+            "group": "build",
+            "presentation": {
+                "reveal": "silent"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Type Check (mypy)",
+            "type": "shell",
+            "command": "poetry run mypy .",
+            "group": "build",
+            "presentation": {
+                "reveal": "always"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

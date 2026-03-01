@@ -187,36 +187,5 @@
     {% endif %}
 </div>
 
-<script>
-    function setRecordEditMode(recordId, isEdit) {
-        document.getElementById(`record-${recordId}`).setAttribute('data-edit-mode', isEdit);
-    }
-
-    function deleteRecord(recordId, deleteUrl) {
-        showConfirm(
-            'Delete Record',
-            'Remove this reading record from your history?',
-            () => submitPostRequest(deleteUrl)
-        );
-    }
-
-    function updateRecordDateLabels(recordId, status) {
-        const endGroup = document.getElementById(`record-end-date-group-${recordId}`);
-        const endLabel = document.getElementById(`record-end-date-label-${recordId}`);
-        const endInput = endGroup.querySelector('input');
-
-        if (status === 'Completed') {
-            endGroup.classList.remove('hidden');
-            endLabel.textContent = 'Completion Date';
-            endInput.required = true;
-        } else if (status === 'Abandoned') {
-            endGroup.classList.remove('hidden');
-            endLabel.textContent = 'Abandoned Date';
-            endInput.required = true;
-        } else {
-            endGroup.classList.add('hidden');
-            endInput.required = false;
-        }
-    }
-</script>
+<script src="{{ url_for('static', filename='reading-records.js') }}" type="module" defer></script>
 {% endblock %}

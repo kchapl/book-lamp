@@ -1,0 +1,41 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Flask",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "book_lamp/app.py",
+                "FLASK_DEBUG": "1"
+            },
+            "args": [
+                "run",
+                "--no-debugger",
+                "--no-reload",
+                "--port",
+                "5000"
+            ],
+            "jinja": true,
+            "autoStartBrowser": true
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Pytest",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${workspaceFolder}/tests"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}

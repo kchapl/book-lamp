@@ -29,9 +29,10 @@ The project is structured into distinct layers to separate business logic from e
 - **Standard Library**: Prefer modern Python standards (e.g., `datetime.now(timezone.utc)`, `pathlib`).
 
 ### 4. Frontend Architecture
-- **Separation of Concerns**: CSS and JavaScript must be kept in dedicated files in `book_lamp/static/`.
+- **Type Safety**: All frontend logic MUST be written in TypeScript in `src/ts/`. Never edit the compiled `.js` files in `book_lamp/static/`.
+- **Separation of Concerns**: CSS and compiled JavaScript artifacts must be kept in dedicated files in `book_lamp/static/`.
 - **CSS**: Avoid inline styles or `<style>` blocks in HTML templates. Use descriptive filenames (e.g., `base.css`, `books.css`).
-- **HTML**: Keep templates focused on structure and Jinja2 logic.
+- **HTML**: Keep templates focused on structure and Jinja2 logic. Extract all logic to TypeScript modules.
 
 ## Documentation Standard
 - **Docstrings**: Use **Google Style** docstrings for all public functions and classes.
@@ -105,11 +106,12 @@ Refer to the **Testing** skill for standards and patterns. All code must be veri
 - Application logs are configured with standard formatting. Check terminal output for OAuth flow logs and API interactions.
 
 ## Environment Setup
-1.  **Dependencies**: Run `mise install` followed by `poetry install`.
+1.  **Dependencies**: Run `mise install`, then `poetry install` for backend and `npm install` for frontend.
 2.  **Configuration**: Copy `.env.example` to `.env` and fill in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 3.  **Authentication**: Start the app and visit `/login` to authorize Google access.
-4.  **Initialization**: The app automatically creates the necessary folders and spreadsheets on first use. You can also run `poetry run flask --app book_lamp.app init-sheets` to prepare it manually.
-5.  **Local Run**: `poetry run flask --app book_lamp.app run --debug`.
+4.  **Frontend Build**: Run `npm run build` to compile TypeScript to JavaScript.
+5.  **Initialization**: The app automatically creates the necessary folders and spreadsheets on first use. You can also run `poetry run flask --app book_lamp.app init-sheets` to prepare it manually.
+6.  **Local Run**: `poetry run flask --app book_lamp.app run --debug`.
 
 ## Commits and Change Discipline
 - Use **Semantic Commits** (e.g., `feat:`, `fix:`, `refactor:`, `docs:`).
@@ -120,6 +122,8 @@ Refer to the **Testing** skill for standards and patterns. All code must be veri
 ## Tooling
 - **Tool Manager**: `mise` (manages Python, Node, and Poetry versions)
 - **Python**: 3.13.x
-- **Dependency Manager**: Poetry (`poetry install`, `poetry run`)
+- **Dependency Managers**: Poetry (`poetry run`) and NPM (`npm install`)
+- **Build**: TypeScript (`npm run build`) via `tsc`.
 - **Formatters**: `black`, `isort`
-- **Linters**: `ruff`, `mypy` (strict mode)
+- **Linters**: `ruff`, `mypy` (strict mode), `tsc` (strict mode)
+- **Testing**: `pytest` (backend) and `vitest` (frontend)

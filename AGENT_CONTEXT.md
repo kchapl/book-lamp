@@ -40,9 +40,10 @@ This file provides shared context and guardrails for Cursor and other AI agents 
   - Keep functions small; prefer pure helpers for logic.
   - Do not add comments for the obvious; document "why" more than "how".
 - **Frontend standards**:
-  - **Separation of Concerns**: Keep CSS and JavaScript in dedicated files in `book_lamp/static/`. 
+  - **Type Safety**: All frontend logic MUST be written in TypeScript in `src/ts/`. Never edit the compiled `.js` files in `book_lamp/static/`.
+  - **Separation of Concerns**: Keep CSS in dedicated files in `book_lamp/static/`. Compiled JavaScript artifacts also reside there.
   - **CSS**: Avoid inline styles and `<style>` blocks in HTML templates. Use `base.css` for global styles and specific files (e.g., `books.css`) for page-specific styles.
-  - **HTML**: Templates should focus on structure and Jinja2 logic only.
+  - **HTML**: Templates should focus on structure and Jinja2 logic. Logic should be extracted to modules.
 - **Structure**:
   - Keep Flask routes thin; delegate to services/use-cases (pure where possible).
   - Use adapters/gateways for Google Sheets and external APIs; keep their interfaces narrow.
@@ -84,3 +85,11 @@ This file provides shared context and guardrails for Cursor and other AI agents 
  - Subject line should be maximum of 50 chars in semantic commit format.
  - Body lines should be maximum of 72 chars.
 
+### Tooling
+- **Tool Manager**: `mise` (manages Python, Node, and Poetry versions)
+- **Python**: 3.13.x
+- **Dependency Managers**: Poetry (`poetry run`) and NPM (`npm install`)
+- **Build**: TypeScript (`npm run build`) via `tsc`.
+- **Formatters**: `black`, `isort`
+- **Linters**: `ruff`, `mypy` (strict mode), `tsc` (strict mode)
+- **Testing**: `pytest` (backend) and `vitest` (frontend)
