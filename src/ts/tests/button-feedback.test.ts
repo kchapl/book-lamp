@@ -1,7 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { initButtonFeedback } from '../button-feedback.js';
 
 describe('button-feedback', () => {
+    const preventNavigation = (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('a')) {
+            e.preventDefault();
+        }
+    };
+
     beforeEach(() => {
         document.body.innerHTML = `
       <form id="test-form">
@@ -10,7 +16,13 @@ describe('button-feedback', () => {
       <a href="/books" id="link-btn" class="btn">Books</a>
       <a href="https://external.com" id="ext-link" class="btn">External</a>
     `;
+        document.body.addEventListener('click', preventNavigation);
         initButtonFeedback();
+    });
+
+    afterEach(() => {
+        document.body.removeEventListener('click', preventNavigation);
+        document.body.innerHTML = '';
     });
 
     it('sets loading state on form submit', () => {
