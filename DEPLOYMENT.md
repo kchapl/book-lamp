@@ -21,10 +21,10 @@ These credentials are obtained from the [Google Cloud Console](https://console.c
 
 ### Security Notes
 
-- The `token.json` file (stored locally or in Render's persistent disk) contains only OAuth tokens, NOT client credentials
+- OAuth tokens are managed securely by the application and are NOT stored as local files.
 - Client ID and Secret are read from environment variables at runtime
 - This follows the [12-factor app](https://12factor.net/config) methodology for configuration management
-- Never commit `.env` file or `token.json` to version control
+- Never commit `.env` file to version control
 
 ### Build Configuration
 
@@ -44,12 +44,11 @@ After deployment:
 1. Visit your app URL
 2. Click "Authorize Google Sheets Access"
 3. Complete the OAuth flow
-4. The app will create a `token.json` file with your access/refresh tokens
-5. On Render, this file persists in the service's disk (if using persistent disk)
+4. The app will securely hold your access/refresh tokens via the persistent storage mechanism
 
 ### Troubleshooting
 
 If you see "Authorization Error" after deployment:
 1. Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in Render environment variables
 2. Ensure your Render URL is added to authorized redirect URIs in Google Cloud Console
-3. Delete `token.json` (if it exists) and re-authorize
+3. Verify your authorization status and re-authorize if needed

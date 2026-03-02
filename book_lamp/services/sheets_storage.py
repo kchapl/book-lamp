@@ -9,7 +9,7 @@ from google.oauth2.credentials import Credentials  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
-# If modifying these scopes, delete the token.json file.
+# If modifying these scopes, authorization must be re-run.
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
