@@ -30,7 +30,7 @@ These credentials are obtained from the [Google Cloud Console](https://console.c
 
 **Build Command:**
 ```bash
-pip install poetry && poetry install --no-dev
+npm ci && npm run build && pip install poetry && poetry install --no-dev
 ```
 
 **Start Command:**
