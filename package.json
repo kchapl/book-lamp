@@ -7,9 +7,11 @@
         "build": "tsc",
         "test": "vitest run",
         "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "lighthouse:ci": "lhci autorun"
     },
     "devDependencies": {
+        "@lhci/cli": "^0.14.0",
         "@vitest/coverage-v8": "^3.0.0",
         "jsdom": "^26.0.0",
         "typescript": "^5.0.0",

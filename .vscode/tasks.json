@@ -73,6 +73,20 @@
                 "reveal": "always"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Run Lighthouse Audit",
+            "type": "shell",
+            "command": "npm run lighthouse:ci",
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
         }
     ]
 }

@@ -221,3 +221,6 @@ coverage/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Lighthouse CI
+.lighthouseci/
