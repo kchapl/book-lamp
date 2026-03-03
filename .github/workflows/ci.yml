@@ -113,6 +113,8 @@ jobs:
   performance:
     runs-on: ubuntu-latest
     needs: [test, lint-and-format]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
 
