@@ -2,8 +2,6 @@ import os
 import sys
 from pathlib import Path
 
-from book_lamp.app import app, get_storage
-
 # Force TEST_MODE before importing app
 os.environ["TEST_MODE"] = "1"
 os.environ["SECRET_KEY"] = "lhci-secret-key"
@@ -13,6 +11,8 @@ os.environ["GOOGLE_CLIENT_SECRET"] = "dummy-secret"
 # Add project root to sys.path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from book_lamp.app import app, get_storage  # noqa: E402
 
 
 def seed_data():
