@@ -4,15 +4,15 @@ from pathlib import Path
 
 from book_lamp.app import app, get_storage
 
-# Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
-
 # Force TEST_MODE before importing app
 os.environ["TEST_MODE"] = "1"
 os.environ["SECRET_KEY"] = "lhci-secret-key"
 os.environ["GOOGLE_CLIENT_ID"] = "dummy-id"
 os.environ["GOOGLE_CLIENT_SECRET"] = "dummy-secret"
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def seed_data():
