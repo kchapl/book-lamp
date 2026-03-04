@@ -60,7 +60,7 @@
 }
 
 .title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
@@ -713,7 +713,7 @@
 }
 
 .book-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
@@ -865,7 +865,7 @@
 
 .reading-list-item-title {
     margin: 0 0 0.25rem 0;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
 }
 
 /* Generic Flex/Grid Layouts for Books */

@@ -99,7 +99,7 @@
 }
 
 .history-book-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 1.75rem;
     margin-bottom: 0.5rem;
     overflow-wrap: break-word;

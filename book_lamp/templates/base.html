@@ -12,6 +12,30 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=swap"
         rel="stylesheet">
+    <style>
+        /* Fallback font metric overrides to minimise CLS during font swap */
+        @font-face {
+            font-family: 'Outfit Fallback';
+            src: local('Arial');
+            size-adjust: 100%;
+            ascent-override: 96%;
+            descent-override: 22%;
+            line-gap-override: 0%;
+        }
+
+        @font-face {
+            font-family: 'Playfair Fallback';
+            src: local('Georgia');
+            size-adjust: 97%;
+            ascent-override: 93%;
+            descent-override: 25%;
+            line-gap-override: 0%;
+        }
+
+        body {
+            font-family: 'Outfit', 'Outfit Fallback', sans-serif;
+        }
+    </style>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}">
     {% block head %}{% endblock %}
