@@ -78,6 +78,11 @@
             "label": "Run Lighthouse Audit",
             "type": "shell",
             "command": "npm run lighthouse:ci",
+            "options": {
+                "env": {
+                    "LHCI_GITHUB_APP_TOKEN": "local-only"
+                }
+            },
             "group": {
                 "kind": "test",
                 "isDefault": false
@@ -91,7 +96,12 @@
         {
             "label": "Run Lighthouse Fast",
             "type": "shell",
-            "command": "npm run lighthouse:fast && npm run lighthouse:report",
+            "command": "npm run lighthouse:fast; npm run lighthouse:report",
+            "options": {
+                "env": {
+                    "LHCI_GITHUB_APP_TOKEN": "local-only"
+                }
+            },
             "group": "test",
             "presentation": {
                 "reveal": "always",
