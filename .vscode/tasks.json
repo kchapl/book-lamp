@@ -87,6 +87,17 @@
                 "panel": "new"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "Run Lighthouse Fast",
+            "type": "shell",
+            "command": "npm run lighthouse:fast && npm run lighthouse:report",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
         }
     ]
 }
