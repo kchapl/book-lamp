@@ -56,5 +56,6 @@ def seed_data():
 if __name__ == "__main__":
     seed_data()
     print("Seeded LHCI server data.")
+    print("Server is ready!")
     # Run mirroring the ci.yml setup but with a fixed port
     app.run(host="127.0.0.1", port=5000)

@@ -8,7 +8,9 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
-        "lighthouse:ci": "lhci autorun"
+        "lighthouse:ci": "lhci autorun",
+        "lighthouse:fast": "lhci autorun --collect.numberOfRuns=1",
+        "lighthouse:report": "poetry run python scripts/lhci_actionable_report.py"
     },
     "devDependencies": {
         "@lhci/cli": "^0.14.0",
