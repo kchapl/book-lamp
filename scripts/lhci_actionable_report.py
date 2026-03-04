@@ -75,6 +75,7 @@ def get_actionable_report():
                         report_lines.append("- **Actionable Items**:")
                         for item in details["items"][:5]:  # top 5
                             # Try to extract useful info from the dictionary
+                            item_str = str(item)
                             if isinstance(item, dict):
                                 if "node" in item:
                                     node_info = item["node"]
