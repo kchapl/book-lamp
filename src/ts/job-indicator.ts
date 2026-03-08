@@ -39,8 +39,7 @@ export class JobIndicator extends JobTracker {
                     // Auto-hide alert after 10 seconds (consistent with base.html logic)
                     setTimeout(() => {
                         alert.style.opacity = '0';
-                        alert.style.transform = 'translateY(-10px)';
-                        alert.style.transition = 'all 0.5s ease';
+                        alert.style.transition = 'opacity 0.5s ease';
                         setTimeout(() => alert.remove(), 500);
                     }, 10000);
                 }

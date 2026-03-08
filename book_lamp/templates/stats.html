@@ -35,7 +35,7 @@
 <div class="charts-container">
     <!-- Reading Status -->
     <div class="chart-card">
-        <h3>Reading Progress</h3>
+        <h2>Reading Progress</h2>
         <div class="progress-container">
             {% for status, count in status_counts.items() %}
             <div class="progress-row">
@@ -55,7 +55,7 @@
 
     <!-- Top Authors -->
     <div class="chart-card">
-        <h3>Top Authors</h3>
+        <h2>Top Authors</h2>
         <div class="top-list">
             {% for author, count in top_authors %}
             <div class="list-item">
@@ -71,7 +71,7 @@
 
     <!-- Top Publishers -->
     <div class="chart-card">
-        <h3>Top Publishers</h3>
+        <h2>Top Publishers</h2>
         <div class="top-list">
             {% for publisher, count in top_publishers %}
             <div class="list-item">
@@ -87,7 +87,7 @@
 
     <!-- Yearly and Monthly Activity -->
     <div class="chart-card">
-        <h3>Books finished by year</h3>
+        <h2>Books finished by year</h2>
         <div class="timeline-grid">
             <div class="marker-line"
                 style="--marker-bottom: {{ (avg_year_count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
@@ -108,7 +108,7 @@
     </div>
 
     <div class="chart-card">
-        <h3>Books finished by month</h3>
+        <h2>Books finished by month</h2>
         <div class="timeline-grid">
             <div class="marker-line"
                 style="--marker-bottom: {{ (avg_month_count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">
@@ -130,7 +130,7 @@
 
     <!-- Dewey Distribution -->
     <div class="chart-card wide">
-        <h3>Books read by subject (Dewey Decimal)</h3>
+        <h2>Books read by subject (Dewey Decimal)</h2>
         <div class="dewey-grid">
             {% for category, count in dewey_distribution.items() %}
             <div class="dewey-item">

@@ -2,6 +2,7 @@
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -9,7 +10,9 @@ from google.oauth2.credentials import Credentials  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
-# If modifying these scopes, delete the token.json file.
+from book_lamp.services.cache import get_cache
+
+# If modifying these scopes, authorization must be re-run.
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
@@ -54,8 +57,14 @@ class GoogleSheetsStorage:
         """Establish connection to Google Sheets and Drive APIs."""
         creds = self.load_credentials()
         if creds and creds.valid:
-            self.service = build("sheets", "v4", credentials=creds)
-            self.drive_service = build("drive", "v3", credentials=creds)
+            # Building service objects can be slow as it fetches
+            # large discovery documents from the internet.
+            # We parallelize these calls to save 1-2 seconds.
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                f_sheets = executor.submit(build, "sheets", "v4", credentials=creds)
+                f_drive = executor.submit(build, "drive", "v3", credentials=creds)
+                self.service = f_sheets.result()
+                self.drive_service = f_drive.result()
 
     def load_credentials(self) -> Optional[Credentials]:
         """Load credentials from the internal dictionary.
@@ -180,16 +189,37 @@ class GoogleSheetsStorage:
 
         return self.spreadsheet_id
 
-    def prefetch(self) -> None:
-        """Fetch all primary data tabs in a single batch call to improve performance."""
+    def _clear_persistent_cache(self) -> None:
+        """Clear the persistent cache for this spreadsheet."""
+        if self.spreadsheet_id:
+            get_cache().delete(f"sheets_data:{self.spreadsheet_id}")
+        self._cache.clear()
+
+    def prefetch(self, force: bool = False) -> None:
+        """Fetch all primary data tabs in a single batch call to improve performance.
+
+        Args:
+            force: If True, bypass the persistent cache.
+        """
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
+
+        # Try persistent cache first
+        cache = get_cache()
+        cache_key = f"sheets_data:{sid}"
+        if not force:
+            cached = cache.get(cache_key)
+            if cached:
+                logger.debug(f"Prefetch cache hit for {sid}")
+                self._cache.update(cached)
+                return
 
         # Define the ranges we want to fetch
         tabs = ["Books", "Authors", "BookAuthors", "ReadingRecords", "ReadingList"]
         ranges = [f"{tab}!A:P" for tab in tabs]
 
         try:
+            logger.info(f"Prefetching data from Google Sheets API for {sid}")
             result = (
                 self.service.spreadsheets()
                 .values()
@@ -197,9 +227,14 @@ class GoogleSheetsStorage:
                 .execute()
             )
             value_ranges = result.get("valueRanges", [])
+            new_cache_data = {}
             for i, vr in enumerate(value_ranges):
                 if i < len(tabs):
-                    self._cache[tabs[i]] = vr.get("values", [])
+                    new_cache_data[tabs[i]] = vr.get("values", [])
+
+            self._cache.update(new_cache_data)
+            # Store in persistent cache for 15 minutes
+            cache.set(cache_key, self._cache, ttl=900)
         except HttpError as error:
             if error.resp.status == 400:
                 # One of the tabs might be missing, initialize and don't cache yet
@@ -213,6 +248,15 @@ class GoogleSheetsStorage:
             return self._cache[tab_name]
 
         sid = self._ensure_spreadsheet_id()
+
+        # Check persistent cache
+        cache = get_cache()
+        cache_key = f"sheets_data:{sid}"
+        cached = cache.get(cache_key)
+        if isinstance(cached, dict) and tab_name in cached:
+            self._cache.update(cached)
+            return self._cache[tab_name]
+
         assert self.service is not None
         try:
             result = (
@@ -607,7 +651,7 @@ class GoogleSheetsStorage:
             )
             raise
         finally:
-            self._cache.pop("ReadingList", None)
+            self._clear_persistent_cache()
 
     def remove_from_reading_list(self, book_id: int) -> None:
         sid = self._ensure_spreadsheet_id()
@@ -649,7 +693,7 @@ class GoogleSheetsStorage:
         except HttpError:
             pass
         finally:
-            self._cache.pop("ReadingList", None)
+            self._clear_persistent_cache()
 
     def update_reading_list_order(self, book_ids: List[int]) -> None:
         sid = self._ensure_spreadsheet_id()
@@ -694,7 +738,7 @@ class GoogleSheetsStorage:
         except HttpError:
             pass
         finally:
-            self._cache.pop("ReadingList", None)
+            self._clear_persistent_cache()
 
     def get_book_by_id(self, book_id: int) -> Optional[Dict[str, Any]]:
         """Get a single book by ID."""

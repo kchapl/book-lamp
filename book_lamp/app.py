@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -88,19 +89,21 @@ def get_storage():
     if os.environ.get("TEST_MODE", "0") == "1":
         return _mock_storage_singleton
 
-    # Use different sheet names for production and development
-    # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
+    if "storage" not in g:
+        # Use different sheet names for production and development
+        # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
+        is_prod = os.environ.get("FLASK_ENV") == "production"
+        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
 
-    # Initialize implementation with credentials from session
-    credentials = session.get("credentials")
-    spreadsheet_id = session.get("spreadsheet_id")
-    return GoogleSheetsStorage(
-        sheet_name=sheet_name,
-        credentials_dict=credentials,
-        spreadsheet_id=spreadsheet_id,
-    )
+        # Initialize implementation with credentials from session
+        credentials = session.get("credentials")
+        spreadsheet_id = session.get("spreadsheet_id")
+        g.storage = GoogleSheetsStorage(
+            sheet_name=sheet_name,
+            credentials_dict=credentials,
+            spreadsheet_id=spreadsheet_id,
+        )
+    return g.storage
 
 
 def authorisation_required(f):
@@ -130,8 +133,17 @@ APP_VERSION = get_app_version()
 
 @app.context_processor
 def inject_global_vars():
+    # Use a fast check for the template context to avoid redundant storage creation
+    is_auth = False
+    if "credentials" in session:
+        # In test mode, we might want to still call is_authorised
+        if TEST_MODE:
+            is_auth = get_storage().is_authorised()
+        else:
+            is_auth = True
+
     return {
-        "is_authorised": get_storage().is_authorised(),
+        "is_authorised": is_auth,
         "current_year": datetime.datetime.now().year,
         "app_version": getattr(app, "app_version", APP_VERSION),
     }
