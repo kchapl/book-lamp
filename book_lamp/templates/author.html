@@ -24,7 +24,7 @@
 
 {# ── Owned books ─────────────────────────────────────────────────────────── #}
 {% if books %}
-<div class="section-heading">In Your Reading Log</div>
+<h2 class="section-heading">In Your Reading Log</h2>
 <div class="grid">
     {% for book in books %}
     <div class="book-card">
@@ -87,7 +87,7 @@
 
 {# ── Unread books from Open Library ─────────────────────────────────────── #}
 {% if unread_books %}
-<div class="section-heading">Also by {{ author_name }}</div>
+<h2 class="section-heading">Also by {{ author_name }}</h2>
 <p class="text-muted text-small mb-15">
     These books are not yet in your reading log. Add them to your reading list to plan your next read.
 </p>

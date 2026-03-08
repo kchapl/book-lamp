@@ -1,5 +1,5 @@
 :root {
-    --primary: #6366f1;
+    --primary: #4f46e5;
     --primary-light: #818cf8;
     --bg: #0f172a;
     --card-bg: rgba(30, 41, 59, 0.7);
@@ -10,7 +10,7 @@
 }
 
 body {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', 'Outfit Fallback', sans-serif;
     background-color: var(--bg);
     background-image:
         radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0, transparent 50%),
@@ -41,6 +41,8 @@ nav {
     position: sticky;
     top: 0;
     z-index: 100;
+    min-height: 80px;
+    box-sizing: border-box;
     flex-wrap: wrap;
     gap: 1rem;
 }
@@ -54,8 +56,6 @@ nav {
 
 @media (max-width: 640px) {
     nav {
-        flex-direction: column;
-        align-items: stretch;
         padding: 1rem;
     }
 
@@ -84,7 +84,7 @@ nav {
 }
 
 .logo {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 1.5rem;
     font-weight: 700;
     background: linear-gradient(to right, #818cf8, #c084fc);
@@ -206,12 +206,10 @@ nav {
 @keyframes slideDownFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-20px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -272,7 +270,7 @@ footer {
 }
 
 .modal-content h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 1.75rem;
     margin-top: 0;
     margin-bottom: 1rem;
@@ -597,10 +595,16 @@ select.edit-input option {
 
 #job-indicator {
     display: none;
-    position: relative;
+    position: fixed;
+    bottom: 0;
+    left: 0;
     width: 100%;
+    z-index: 1000;
     margin: 0;
     padding: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--primary);
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
 }
 
 #job-progress-bar {
@@ -638,15 +642,39 @@ select.edit-input option {
     border-radius: 50%;
     animation: pulse 2s infinite;
 }
+
 /* Additional Utility Classes */
-.rel { position: relative; }
-.align-start { align-items: flex-start; }
-.justify-end { justify-content: flex-end; }
-.no-wrap { white-space: nowrap; }
-.text-2rem { font-size: 2rem; }
-.text-3rem { font-size: 3rem; }
-.ml-1 { margin-left: 1rem; }
-.pt-075 { padding-top: 0.75rem; }
+.rel {
+    position: relative;
+}
+
+.align-start {
+    align-items: flex-start;
+}
+
+.justify-end {
+    justify-content: flex-end;
+}
+
+.no-wrap {
+    white-space: nowrap;
+}
+
+.text-2rem {
+    font-size: 2rem;
+}
+
+.text-3rem {
+    font-size: 3rem;
+}
+
+.ml-1 {
+    margin-left: 1rem;
+}
+
+.pt-075 {
+    padding-top: 0.75rem;
+}
 
 /* Search results highlight */
 .search-results-badge {
@@ -675,7 +703,7 @@ select.edit-input option {
     padding: 1rem;
     border-radius: 12px;
     border: 1px solid var(--glass-border);
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.2);
     color: white;
     font-size: 1.1rem;
     box-sizing: border-box;
@@ -730,8 +758,13 @@ select.edit-input option {
     font-size: 1rem;
 }
 
-.info-box-title-blue { color: #60a5fa; }
-.info-box-title-purple { color: #c084fc; }
+.info-box-title-blue {
+    color: #60a5fa;
+}
+
+.info-box-title-purple {
+    color: #c084fc;
+}
 
 .info-list {
     margin-bottom: 0;
@@ -790,4 +823,6 @@ select.edit-input option {
 }
 
 /* Unauthorised page */
-.text-error { color: #fca5a5; }
+.text-error {
+    color: #fca5a5;
+}

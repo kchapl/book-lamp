@@ -25,7 +25,7 @@
 }
 
 .stat-value {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 3.5rem;
     font-weight: 700;
     line-height: 1;
@@ -130,7 +130,10 @@
     height: 100%;
     width: var(--bar-width, 0%);
     border-radius: 6px;
-    transition: width 1s ease-out;
+    /* Use transform instead of width to avoid layout shift */
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: bar-grow-x 0.8s ease-out forwards;
 }
 
 .bar.completed {
@@ -153,6 +156,12 @@
     font-weight: 600;
     width: 30px;
     text-align: right;
+}
+
+@keyframes bar-grow-x {
+    to {
+        transform: scaleX(1);
+    }
 }
 
 /* Top List */
@@ -278,11 +287,14 @@
 .timeline-bar,
 .dewey-bar {
     width: 80%;
+    /* Set final height directly; animate with scaleY to avoid layout shift */
     height: var(--bar-height, 0%);
     background: linear-gradient(to top, var(--primary), var(--primary-light));
     border-radius: 6px 6px 0 0;
     position: relative;
-    transition: height 1s ease-out;
+    transform: scaleY(0);
+    transform-origin: bottom;
+    animation: bar-grow-y 0.8s ease-out forwards;
 }
 
 .timeline-bar.month {
@@ -315,6 +327,12 @@
 .timeline-bar:hover .count-tooltip,
 .dewey-bar:hover .count-tooltip {
     opacity: 1;
+}
+
+@keyframes bar-grow-y {
+    to {
+        transform: scaleY(1);
+    }
 }
 
 .timeline-label,

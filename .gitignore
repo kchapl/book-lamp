@@ -215,9 +215,12 @@ __marimo__/
 node_modules/
 
 # Compiled Frontend Assets
-book_lamp/static/*.js
+book_lamp/static/**/*.js
 !book_lamp/static/favicon.js # In case there was one, but keep images
 coverage/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Lighthouse CI
+.lighthouseci/

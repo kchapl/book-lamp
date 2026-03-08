@@ -31,8 +31,8 @@
 
 .thumb-container {
     flex-shrink: 0;
-    width: 100px;
-    height: 150px;
+    width: 120px;
+    height: 180px;
     border-radius: 12px;
     overflow: hidden;
     background: #1e293b;
@@ -60,7 +60,7 @@
 }
 
 .title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
@@ -78,8 +78,20 @@
 .author {
     color: var(--primary-light);
     font-size: 0.95rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     font-weight: 600;
+}
+
+.author-link {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.author-link:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .year,
@@ -159,22 +171,22 @@
 }
 
 .status-in-progress {
-    background: #3b82f6;
+    background: #2563eb;
     color: white;
 }
 
 .status-completed {
-    background: #10b981;
+    background: #059669;
     color: white;
 }
 
 .status-abandoned {
-    background: #6b7280;
+    background: #4b5563;
     color: white;
 }
 
 .status-plan-to-read {
-    background: var(--primary-light);
+    background: #4f46e5;
     color: white;
 }
 
@@ -701,7 +713,7 @@
 }
 
 .book-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
@@ -812,6 +824,7 @@
         font-size: 1.25rem;
     }
 }
+
 /* Author links with hover effects */
 .author-link {
     text-decoration: none;
@@ -852,7 +865,7 @@
 
 .reading-list-item-title {
     margin: 0 0 0.25rem 0;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
 }
 
 /* Generic Flex/Grid Layouts for Books */
