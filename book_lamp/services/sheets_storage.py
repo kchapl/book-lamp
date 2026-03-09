@@ -13,8 +13,10 @@ from googleapiclient.errors import HttpError  # type: ignore
 from book_lamp.services.cache import get_cache
 
 # If modifying these scopes, authorization must be re-run.
+# Only request drive.file since the app only needs to create and edit the
+# spreadsheet it owns; this keeps the OAuth consent screen to a single
+# service instead of two.
 SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
 
