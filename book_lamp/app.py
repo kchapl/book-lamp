@@ -748,9 +748,14 @@ def collection_stats():
             statuses.append("Not begun")
     status_counts = Counter(statuses)
 
-    # Top authors
+    # Top authors (only count books that have been completed)
+    completed_book_ids = {
+        r.get("book_id") for r in all_records if r.get("status") == "Completed"
+    }
     all_authors = []
     for b in books:
+        if b.get("id") not in completed_book_ids:
+            continue
         if b.get("authors"):
             all_authors.extend(b["authors"])
         elif b.get("author"):
