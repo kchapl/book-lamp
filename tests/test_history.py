@@ -12,7 +12,7 @@ def test_get_reading_history_empty(authenticated_client):
 
 
 def test_get_reading_history_populated(authenticated_client):
-    """Test reading history with records."""
+    """Test reading history with records; reading list items are excluded."""
     storage = get_storage()
     book = storage.add_book(
         isbn13="1", title="Pride and Prejudice", author="Jane Austen"
@@ -24,11 +24,15 @@ def test_get_reading_history_populated(authenticated_client):
         end_date="2023-01-15",
         rating=5,
     )
+    # also add the book to the reading list; it should not appear in history
+    storage.add_to_reading_list(book["id"])
 
     response = authenticated_client.get("/history", follow_redirects=True)
     assert response.status_code == 200
-    assert b"Pride and Prejudice" in response.data
-    assert b"Completed: 2023-01-15" in response.data
+    html = response.data.decode("utf-8")
+    assert "Pride and Prejudice" in html
+    assert "Completed: 2023-01-15" in html
+    assert "Plan to Read" not in html
 
 
 def test_reading_history_filtering(authenticated_client):

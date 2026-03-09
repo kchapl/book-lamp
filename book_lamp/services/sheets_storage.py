@@ -1859,6 +1859,11 @@ class GoogleSheetsStorage:
         book_map = {b["id"]: b for b in books}
         history = []
         for record in records:
+            # Exclude pseudo-records generated from the reading list. The
+            # history page should only show actual reading events.
+            if record.get("status") == "Plan to Read":
+                continue
+
             book = book_map.get(record["book_id"])
             if book:
                 enriched_record = record.copy()
