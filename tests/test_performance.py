@@ -2,7 +2,20 @@
 
 from unittest.mock import MagicMock
 
-from book_lamp.services.sheets_storage import GoogleSheetsStorage
+from book_lamp.services.sheets_storage import SCOPES, GoogleSheetsStorage
+
+
+def test_google_api_scopes_are_minimal():
+    """The application should only request the Drive file scope.
+
+    Requesting unnecessary scopes makes the consent screen look more
+    invasive. Keeping the list small also narrows the impact if credentials are
+    ever compromised. We only need drive.file to find and manage the spreadsheet
+    across sessions.
+    """
+    assert SCOPES == [
+        "https://www.googleapis.com/auth/drive.file",
+    ]
 
 
 def test_bulk_import_batch_efficiency():

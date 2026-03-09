@@ -42,7 +42,9 @@ poetry run gunicorn book_lamp.app:app
 
 After deployment:
 1. Visit your app URL
-2. Click "Authorize Google Sheets Access"
+2. Click "Authorize Google Sheets Access" (the consent screen will now request
+   access to spreadsheets and files created by the app, allowing the spreadsheet
+   to persist across sessions and devices)
 3. Complete the OAuth flow
 4. The app will securely hold your access/refresh tokens via the persistent storage mechanism
 

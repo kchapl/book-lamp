@@ -7,11 +7,16 @@ Covers:
 - Page renders successfully with no books at all
 """
 
-from book_lamp.app import get_storage
+# Avoid importing get_storage at module level.  TEST_MODE is read from
+# the environment when the module is imported; the `app` fixture sets
+# the variable before the application is loaded, but importing here
+# would occur earlier so the flag would be evaluated incorrectly.
 
 
 def test_author_page_shows_owned_books(authenticated_client):
     """Author page renders owned books for a matching author."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     storage.add_book(
         isbn13="9780141439518",
@@ -30,6 +35,8 @@ def test_author_page_shows_owned_books(authenticated_client):
 
 def test_author_page_no_unread_section_in_test_mode(authenticated_client):
     """In TEST_MODE no external API call is made, so the unread section is absent."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     storage.add_book(
         isbn13="9780141439518",
@@ -53,6 +60,8 @@ def test_author_page_empty_state(authenticated_client):
 
 def test_author_page_reading_list_flag(authenticated_client):
     """Books already on the reading list are flagged in the author page."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     book = storage.add_book(
         isbn13="9780141439518",
@@ -68,6 +77,8 @@ def test_author_page_reading_list_flag(authenticated_client):
 
 def test_author_page_sorts_by_pub_year_desc(authenticated_client):
     """Owned books are sorted by publication year, newest first."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     storage.add_book(
         isbn13="9780141439518",
@@ -91,6 +102,8 @@ def test_author_page_sorts_by_pub_year_desc(authenticated_client):
 
 def test_author_page_no_duplicate_books(authenticated_client):
     """The same book added twice must only appear once."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     storage.add_book(
         isbn13="9780141439518",
@@ -108,6 +121,8 @@ def test_author_page_no_duplicate_books(authenticated_client):
 
 def test_author_page_unauthorised_redirect(client):
     """Unauthenticated access redirects to the unauthorised page."""
+    from book_lamp.app import get_storage
+
     storage = get_storage()
     storage.set_authorised(False)
 
