@@ -618,7 +618,6 @@ def author_page(author_slug: str):
     author_books.sort(key=get_pub_year, reverse=True)
 
     # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
-    # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
     unread_books: list[dict] = []
     if not is_test_mode():
 
