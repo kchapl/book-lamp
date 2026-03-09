@@ -91,6 +91,26 @@ def test_stats_top_authors_only_completed(authenticated_client):
     assert html.count("books") >= 2
 
 
+def test_stats_status_links(authenticated_client):
+    """Each status row should link to a filtered history view."""
+    storage = get_storage()
+    # create two books with different statuses
+    b1 = storage.add_book(isbn13="1", title="Book One", author="A1")
+    b2 = storage.add_book(isbn13="2", title="Book Two", author="A2")
+    storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-05")
+    storage.add_reading_record(b2["id"], "Reading", "2023-02-01")
+
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+    # Each status row now has two links (label + bar)
+    assert html.count('href="/history?status=Completed"') >= 2
+    assert html.count('href="/history?status=Reading"') >= 2
+    # clicking one of the links still works
+    resp2 = authenticated_client.get("/history?status=Completed")
+    assert b"Book One" in resp2.data
+    assert b"Book Two" not in resp2.data
+
+
 # --- Reading Record Management ---
 
 

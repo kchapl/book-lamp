@@ -118,6 +118,26 @@
     color: var(--text);
 }
 
+/* make status names look and behave like links */
+.progress-row .status-name a {
+    color: var(--primary-light);
+    text-decoration: none;
+    cursor: pointer;
+}
+.progress-row .status-name a:hover {
+    text-decoration: underline;
+}
+
+/* make the bars clickable links */
+.bar-wrapper a {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.bar-wrapper a .bar {
+    cursor: pointer;
+}
+
 .bar-wrapper {
     flex-grow: 1;
     height: 12px;
