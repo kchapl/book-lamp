@@ -46,7 +46,7 @@
                     </span>
                 </div>
                 <div class="bar-wrapper">
-                    <a href="{{ url_for('reading_history', status=status) }}">
+                    <a href="{{ url_for('reading_history', status=status) }}" aria-label="View books with {{ status|lower }} status">
                         <div class="bar {{ status|lower|replace(' ', '-') }}"
                             style="--bar-width: {{ (count / total_books * 100)|round if total_books > 0 else 0 }}%;"></div>
                     </a>
