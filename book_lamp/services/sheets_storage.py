@@ -12,10 +12,12 @@ from googleapiclient.errors import HttpError  # type: ignore
 
 from book_lamp.services.cache import get_cache
 
-# If modifying these scopes, authorization must be re-run.
-# Only request drive.file since the app only needs to create and edit the
-# spreadsheet it owns; this keeps the OAuth consent screen to a single
-# service instead of two.
+# We request the Drive file scope to allow searching for and managing the specific
+# spreadsheet created by this app. The Drive scope is limited to files
+# created by the app, so it doesn't grant broad access to the user's Drive.
+#
+# See https://developers.google.com/drive/api/guides/about-auth for
+# more information about available scopes.
 SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
@@ -56,7 +58,7 @@ class GoogleSheetsStorage:
             self._connect()
 
     def _connect(self) -> None:
-        """Establish connection to Google Sheets and Drive APIs."""
+        """Establish connection to the Google Sheets and Drive APIs."""
         creds = self.load_credentials()
         if creds and creds.valid:
             # Building service objects can be slow as it fetches
