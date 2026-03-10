@@ -10,9 +10,16 @@
 <div class="author-header text-center mt-2">
     <h1 class="author-name">{{ author_name }}</h1>
     <div class="author-stats">
-        {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your reading log
+        {% if read_books %}
+        {{ read_books|length }} read book{% if read_books|length != 1 %}s{% endif %}
+        {% endif %}
+        {% if reading_list_books %}
+        {% if read_books %} &nbsp;·&nbsp; {% endif %}
+        {{ reading_list_books|length }} in reading list
+        {% endif %}
         {% if unread_books %}
-        &nbsp;·&nbsp; {{ unread_books|length }} unread
+        {% if read_books or reading_list_books %} &nbsp;·&nbsp; {% endif %}
+        {{ unread_books|length }} unread
         {% endif %}
     </div>
     <div class="mt-15">
@@ -22,11 +29,11 @@
     </div>
 </div>
 
-{# ── Owned books ─────────────────────────────────────────────────────────── #}
-{% if books %}
-<h2 class="section-heading">In Your Reading Log</h2>
+{# ── Read books ─────────────────────────────────────────────────────────── #}
+{% if read_books %}
+<h2 class="section-heading">Read</h2>
 <div class="grid">
-    {% for book in books %}
+    {% for book in read_books %}
     <div class="book-card">
         <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container author-link">
             {% if book.thumbnail_url %}
@@ -76,9 +83,66 @@
                 <p class="book-description-snippet">{{ book.description }}</p>
                 {% endif %}
             </div>
-            {% if book.in_reading_list %}
-            <div class="in-rl-badge">📋 On reading list</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ── Reading list books ──────────────────────────────────────────────────── #}
+{% if reading_list_books %}
+<h2 class="section-heading">In Reading List</h2>
+<div class="grid">
+    {% for book in reading_list_books %}
+    <div class="book-card">
+        <a href="{{ url_for('book_detail', book_id=book.id) }}" class="thumb-container author-link">
+            {% if book.thumbnail_url %}
+            <img class="thumb" src="{{ book.thumbnail_url }}" alt="Cover of {{ book.title }}" loading="lazy" width="120"
+                height="180">
+            {% else %}
+            <div class="flex-center h-full text-muted text-2rem">
+                📖</div>
             {% endif %}
+        </a>
+        <div class="meta">
+            <a href="{{ url_for('book_detail', book_id=book.id) }}" class="author-link">
+                <div class="title" title="{{ book.title }}">{{ book.title }}</div>
+            </a>
+            <div class="author">
+                {% if book.authors %}
+                {% for author in book.authors %}
+                <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
+                    class="author-link">{{ author }}</a>{% if not
+                loop.last %}, {% endif %}
+                {% endfor %}
+                {% elif book.author %}
+                <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
+                    class="author-link">{{ book.author }}</a>
+                {% endif %}
+            </div>
+            <div class="book-meta-summary">
+                {% if book.publication_year or book.publisher or book.dewey_decimal %}
+                {% if book.publication_year %}
+                <div class="year">{{ book.publication_year }}</div>
+                {% endif %}
+                {% if book.isbn13 %}
+                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                {% endif %}
+                {% if book.publisher %}
+                <div class="year">
+                    <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                        class="publisher-link">{{
+                        book.publisher|normalize_pub }}</a>
+                </div>
+                {% endif %}
+                {% if book.dewey_decimal %}
+                <div class="dewey">{{ book.dewey_decimal }}</div>
+                {% endif %}
+                {% endif %}
+                {% if book.description %}
+                <p class="book-description-snippet">{{ book.description }}</p>
+                {% endif %}
+            </div>
         </div>
     </div>
     {% endfor %}
@@ -140,7 +204,7 @@
     <div class="text-3rem mb-1">🤔</div>
     <h2>No books found</h2>
     <p class="text-muted mb-2">We couldn't find any books by {{ author_name }} in your
-        reading log or in our catalogue.</p>
+        reading log.</p>
     <a href="{{ url_for('list_books') }}" class="btn">View All Books</a>
 </div>
 {% endif %}

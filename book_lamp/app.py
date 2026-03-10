@@ -272,7 +272,9 @@ if not is_test_mode():
         client_id=app.config["GOOGLE_CLIENT_ID"],
         client_secret=app.config["GOOGLE_CLIENT_SECRET"],
         server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-        client_kwargs={"scope": " ".join(from_sheets_storage.SCOPES)},
+        client_kwargs={
+            "scope": " ".join(from_sheets_storage.SCOPES)
+        },  # drive.file only
     )
 
 
@@ -321,7 +323,7 @@ def authorize():
                 "token": token.get("access_token"),
                 "refresh_token": token.get("refresh_token"),
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "scopes": from_sheets_storage.SCOPES,
+                "scopes": from_sheets_storage.SCOPES,  # drive.file only
             }
             if token.get("expires_at"):
                 creds_data["expiry"] = (
@@ -559,10 +561,11 @@ def search_books():
 def author_page(author_slug: str):
     """Display all books by an author, including unread books from Open Library.
 
-    Books in the user's reading log are shown normally.  Books the user has not
-    yet read (sourced from Open Library) are shown semi-transparently with an option
-    to add them to the reading list.  Duplicates are suppressed and only the
-    latest edition of each title is shown.
+    Books the user has read (their reading log) are shown normally. Books they
+    plan to read in future are kept in the reading list. Unread titles sourced
+    from Open Library are shown semi-transparently with an option to add them
+    to the reading list.  Duplicates are suppressed and only the latest edition
+    of each title is shown.
     """
 
     storage = get_storage()
@@ -603,7 +606,11 @@ def author_page(author_slug: str):
         book["is_owned"] = True
         book["in_reading_list"] = book["id"] in reading_list_book_ids
 
-    # Sort owned books by reverse publication date
+    # Split into read and reading list books
+    read_books = [b for b in author_books if not b["in_reading_list"]]
+    reading_list_books = [b for b in author_books if b["in_reading_list"]]
+
+    # Sort each category by reverse publication date
     def get_pub_year(b: dict) -> int:
         py = b.get("publication_year")
         if not py:
@@ -615,7 +622,8 @@ def author_page(author_slug: str):
         except (ValueError, TypeError):
             return 0
 
-    author_books.sort(key=get_pub_year, reverse=True)
+    read_books.sort(key=get_pub_year, reverse=True)
+    reading_list_books.sort(key=get_pub_year, reverse=True)
 
     # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
     unread_books: list[dict] = []
@@ -658,7 +666,8 @@ def author_page(author_slug: str):
     return render_template(
         "author.html",
         author_name=display_author_name,
-        books=author_books,
+        read_books=read_books,
+        reading_list_books=reading_list_books,
         unread_books=unread_books,
     )
 
@@ -755,9 +764,14 @@ def collection_stats():
             statuses.append("Not begun")
     status_counts = Counter(statuses)
 
-    # Top authors
+    # Top authors (only count books that have been completed)
+    completed_book_ids = {
+        r.get("book_id") for r in all_records if r.get("status") == "Completed"
+    }
     all_authors = []
     for b in books:
+        if b.get("id") not in completed_book_ids:
+            continue
         if b.get("authors"):
             all_authors.extend(b["authors"])
         elif b.get("author"):
@@ -1064,14 +1078,15 @@ def create_book():
             )
             if storage.spreadsheet_id:
                 session["spreadsheet_id"] = storage.spreadsheet_id
-            flash("Book added to catalogue and reading list.", "success")
+            flash("Book added to reading log and reading list.", "success")
         except Exception as e:
             app.logger.error(
                 f"Failed to add newly created book {created_book['id']} to reading list: {str(e)}",
                 exc_info=True,
             )
             flash(
-                "Book added to catalogue, but failed to add to reading list.", "warning"
+                "Book added to reading log, but failed to add to reading list.",
+                "warning",
             )
         return redirect(url_for("reading_list"))
 

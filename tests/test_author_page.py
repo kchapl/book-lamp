@@ -30,7 +30,7 @@ def test_author_page_shows_owned_books(authenticated_client):
     html = resp.data.decode("utf-8")
     assert "Pride and Prejudice" in html
     assert "Jane Austen" in html
-    assert "In Your Reading Log" in html
+    assert "Read" in html
 
 
 def test_author_page_no_unread_section_in_test_mode(authenticated_client):
@@ -50,6 +50,10 @@ def test_author_page_no_unread_section_in_test_mode(authenticated_client):
     # The "Also by" section is only rendered when unread_books is non-empty
     assert "Also by" not in html
 
+    # Ensure the read/reading-list summary is correct
+    assert "Read" in html
+    assert "In Reading List" not in html
+
 
 def test_author_page_empty_state(authenticated_client):
     """Author page shows a helpful empty state when no books are found."""
@@ -59,7 +63,7 @@ def test_author_page_empty_state(authenticated_client):
 
 
 def test_author_page_reading_list_flag(authenticated_client):
-    """Books already on the reading list are flagged in the author page."""
+    """Books added to the reading list appear in their own section."""
     from book_lamp.app import get_storage
 
     storage = get_storage()
@@ -72,7 +76,11 @@ def test_author_page_reading_list_flag(authenticated_client):
 
     resp = authenticated_client.get("/author/jane-austen")
     assert resp.status_code == 200
-    assert b"On reading list" in resp.data
+    html = resp.data.decode("utf-8")
+    # should be present as a section heading
+    assert "In Reading List" in html
+    # the book itself should still show up
+    assert "Pride and Prejudice" in html
 
 
 def test_author_page_sorts_by_pub_year_desc(authenticated_client):
@@ -115,8 +123,8 @@ def test_author_page_no_duplicate_books(authenticated_client):
     resp = authenticated_client.get("/author/jane-austen")
     html = resp.data.decode("utf-8")
     assert html.count("Pride and Prejudice") >= 1
-    # "1 book in your collection" (not 2)
-    assert "1 book in your reading log" in html
+    # "1 read book" (not 2)
+    assert "1 read book" in html
 
 
 def test_author_page_unauthorised_redirect(client):
