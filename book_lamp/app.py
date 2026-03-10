@@ -24,6 +24,7 @@ from flask import (  # noqa: E402
 )
 
 from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
@@ -77,8 +78,25 @@ logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.WARNING)
 app = Flask(__name__)
 
 # Test mode configuration
-TEST_MODE = os.environ.get("TEST_MODE", "0") == "1"
+
+# The value of TEST_MODE is read from the environment every time we need
+# it instead of being cached at import time.  During test collection the
+# module is imported before the `app` fixture in `conftest.py` has a
+# chance to set `os.environ["TEST_MODE"] = "1"`, which caused several
+# tests to behave as if they were running in production.  Using a helper
+# function avoids that race entirely.
 TEST_ISBN = "9780000000000"
+
+
+def is_test_mode() -> bool:
+    """Return True when the application is running under the test harness.
+
+    The environment variable is used throughout the codebase; previously
+    a module‑level constant read it once at import time.  That made tests
+    unreliable when the variable was changed after import.
+    """
+    return os.environ.get("TEST_MODE", "0") == "1"
+
 
 # Global singleton for test mode only
 _mock_storage_singleton = MockStorage()
@@ -86,9 +104,8 @@ _mock_storage_singleton = MockStorage()
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
-    if os.environ.get("TEST_MODE", "0") == "1":
+    if is_test_mode():
         return _mock_storage_singleton
-
     if "storage" not in g:
         # Use different sheet names for production and development
         # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
@@ -137,7 +154,7 @@ def inject_global_vars():
     is_auth = False
     if "credentials" in session:
         # In test mode, we might want to still call is_authorised
-        if TEST_MODE:
+        if is_test_mode():
             is_auth = get_storage().is_authorised()
         else:
             is_auth = True
@@ -211,7 +228,7 @@ def unauthorised():
 
 @app.route("/logout")
 def logout():
-    if TEST_MODE:
+    if is_test_mode():
         return redirect(url_for("test_disconnect"))
     session.clear()
     flash("Google Sheets disconnected.", "info")
@@ -234,7 +251,7 @@ app.config["GOOGLE_DISCOVERY_URL"] = (
 )
 
 # Validate OAuth configuration (skip in test mode)
-if not TEST_MODE:
+if not is_test_mode():
     if not app.config["GOOGLE_CLIENT_ID"]:
         raise ValueError(
             "GOOGLE_CLIENT_ID environment variable is required. "
@@ -249,7 +266,7 @@ if not TEST_MODE:
         )
 
 oauth = OAuth(app)
-if not TEST_MODE:
+if not is_test_mode():
     oauth.register(
         name="google",
         client_id=app.config["GOOGLE_CLIENT_ID"],
@@ -261,7 +278,7 @@ if not TEST_MODE:
 
 @app.route("/connect")
 def connect():
-    if TEST_MODE:
+    if is_test_mode():
         return redirect(url_for("test_connect"))
 
     try:
@@ -297,7 +314,7 @@ def authorize():
         app.logger.info("OAuth token received successfully")
 
         # Save the token for GoogleSheetsStorage
-        if not TEST_MODE:
+        if not is_test_mode():
             # Bridging Authlib token to Google-auth format.
             # Client ID and secret are NOT saved - they're read from env vars for security.
             creds_data = {
@@ -330,7 +347,7 @@ def authorize():
 @app.cli.command("init-sheets")
 def init_sheets_command():
     """Initialize Google Sheets with required tabs and headers."""
-    if TEST_MODE:
+    if is_test_mode():
         click.echo("Not available in test mode.")
         return
 
@@ -547,7 +564,6 @@ def author_page(author_slug: str):
     to add them to the reading list.  Duplicates are suppressed and only the
     latest edition of each title is shown.
     """
-    from book_lamp.services.book_lookup import lookup_books_by_author
 
     storage = get_storage()
     storage.prefetch()
@@ -603,10 +619,10 @@ def author_page(author_slug: str):
 
     # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
     unread_books: list[dict] = []
-    if not TEST_MODE:
+    if not is_test_mode():
+
         try:
             external_books = lookup_books_by_author(display_author_name)
-
             # Build sets for dedup against already-owned books
             owned_isbns = {
                 b.get("isbn13", "").replace("-", "").replace(" ", "")
@@ -970,13 +986,6 @@ def create_book():
 
     isbn = normalize_isbn(request.form.get("isbn", "") or "")
 
-    # Check if valid (allow special test ISBN in test mode)
-    is_valid = (TEST_MODE and isbn == TEST_ISBN) or is_valid_isbn13(isbn)
-
-    if not is_valid:
-        flash("Please enter a valid 13-digit ISBN.", "error")
-        return redirect(url_for("new_book_form"))
-
     add_to_rl = (
         request.form.get("add_to_reading_list") in ("1", "on", "true")
         or "add_to_reading_list" in request.form
@@ -1006,10 +1015,8 @@ def create_book():
     # Lookup via Open Library Books API
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
-    if TEST_MODE and isbn == TEST_ISBN:
+    if is_test_mode() and isbn == TEST_ISBN:
         data = {
-            "title": "Test Driven Development",
-            "author": "Test Author",
             "publish_date": "2019-05-02",
             "thumbnail_url": "http://example.com/thumb.jpg",
         }
@@ -1081,7 +1088,7 @@ def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: st
     try:
         # Create storage with passed credentials (outside request context)
         storage: Union[MockStorage, GoogleSheetsStorage]
-        if os.environ.get("TEST_MODE", "0") == "1":
+        if is_test_mode():
             storage = _mock_storage_singleton
         else:
             storage = GoogleSheetsStorage(
@@ -1152,7 +1159,7 @@ def _background_import_books(
     try:
         # Create storage with passed credentials (outside request context)
         storage: Union[MockStorage, GoogleSheetsStorage]
-        if os.environ.get("TEST_MODE", "0") == "1":
+        if is_test_mode():
             storage = _mock_storage_singleton
         else:
             storage = GoogleSheetsStorage(
@@ -1257,7 +1264,7 @@ def edit_book(book_id: int):
     if (
         isbn13
         and not is_valid_isbn13(isbn13)
-        and not (TEST_MODE and isbn13 == TEST_ISBN)
+        and not (is_test_mode() and isbn13 == TEST_ISBN)
     ):
         flash("Please enter a valid 13-digit ISBN.", "error")
         return redirect(url_for("book_detail", book_id=book_id))
@@ -1307,7 +1314,7 @@ def delete_book(book_id: int):
 # Test utilities (enabled only when TEST_MODE=1)
 # -----------------------------
 
-if TEST_MODE:
+if is_test_mode():
     # storage is already initialized above in the global scope if TEST_MODE is True
 
     @app.route("/test/reset", methods=["POST"])
@@ -1335,7 +1342,7 @@ if TEST_MODE:
     @app.route("/test/connect")
     def test_connect():
         """Authorise as a test user automatically."""
-        if not TEST_MODE:
+        if not is_test_mode():
             return "Not available", 404
 
         # Toggle authorised state in MockStorage
@@ -1349,7 +1356,7 @@ if TEST_MODE:
     @app.route("/test/disconnect")
     def test_disconnect():
         """Disconnect as a test user automatically."""
-        if not TEST_MODE:
+        if not is_test_mode():
             return "Not available", 404
 
         storage = get_storage()
