@@ -27,7 +27,7 @@ export function initButtonFeedback(): void {
 
     const handleBodyClick = (e: MouseEvent): void => {
         const el = (e.target as HTMLElement).closest('a.btn, button.btn, .btn') as HTMLElement;
-        if (!el) return;
+        if (!el || el.classList.contains('no-feedback')) return;
 
         // If it's a link with target or external, skip
         if (el.tagName === 'A') {

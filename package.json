@@ -19,5 +19,8 @@
         "jsdom": "^26.0.0",
         "typescript": "^5.0.0",
         "vitest": "^3.0.0"
+    },
+    "dependencies": {
+        "html5-qrcode": "^2.3.8"
     }
 }
