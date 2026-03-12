@@ -20,50 +20,38 @@ class MockStorage:
         self.next_record_id = 1
         self._authorised = False  # Default to False for security and testing
 
-    def prefetch(self):
+    def prefetch(self) -> None:
         """Mock implementation of prefetch - does nothing as data is already in memory."""
         pass
 
-    def is_authorised(self):
+    def is_authorised(self) -> bool:
         """Authorisation state can be toggled in mock mode for testing."""
         return self._authorised
 
-    def set_authorised(self, status: bool):
+    def set_authorised(self, status: bool) -> None:
         """Manually set authorisation status (used for E2E tests)."""
         self._authorised = status
 
-    def get_all_books(self):
+    def get_all_books(self) -> list[dict[str, Any]]:
         return self.books
 
-    def get_reading_records(self, book_id=None):
+    def get_reading_records(
+        self, book_id: Optional[int] = None
+    ) -> list[dict[str, Any]]:
         records = []
         if book_id is None:
             records = list(self.reading_records)
         else:
             records = [r for r in self.reading_records if r["book_id"] == book_id]
-
-        for item in self.get_reading_list():
-            if book_id is None or item["book_id"] == book_id:
-                records.append(
-                    {
-                        "id": f"rl_{item['book_id']}",
-                        "book_id": item["book_id"],
-                        "status": "Plan to Read",
-                        "start_date": "",
-                        "end_date": None,
-                        "rating": 0,
-                        "created_at": item["created_at"],
-                    }
-                )
         return records
 
-    def get_book_by_id(self, book_id):
+    def get_book_by_id(self, book_id: int) -> Optional[dict[str, Any]]:
         for book in self.books:
             if book["id"] == book_id:
                 return book
         return None
 
-    def get_book_by_isbn(self, isbn13):
+    def get_book_by_isbn(self, isbn13: str) -> Optional[dict[str, Any]]:
         from book_lamp.utils.books import normalize_isbn
 
         target_isbn = normalize_isbn(isbn13)
@@ -74,21 +62,21 @@ class MockStorage:
 
     def add_book(
         self,
-        isbn13,
-        title,
-        author,
-        publication_year=None,
-        thumbnail_url=None,
-        publisher=None,
-        description=None,
-        series=None,
-        dewey_decimal=None,
-        language=None,
-        page_count=None,
-        physical_format=None,
-        edition=None,
-        cover_url=None,
-    ):
+        isbn13: str,
+        title: str,
+        author: str,
+        publication_year: Optional[int] = None,
+        thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
+    ) -> dict[str, Any]:
         from book_lamp.utils.authors import split_authors
         from book_lamp.utils.books import normalize_isbn
 
@@ -117,22 +105,22 @@ class MockStorage:
 
     def update_book(
         self,
-        book_id,
-        isbn13,
-        title,
-        author,
-        publication_year=None,
-        thumbnail_url=None,
-        publisher=None,
-        description=None,
-        series=None,
-        dewey_decimal=None,
-        language=None,
-        page_count=None,
-        physical_format=None,
-        edition=None,
-        cover_url=None,
-    ):
+        book_id: int,
+        isbn13: str,
+        title: str,
+        author: str,
+        publication_year: Optional[int] = None,
+        thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
+    ) -> dict[str, Any]:
         from book_lamp.utils.authors import split_authors
 
         for book in self.books:
@@ -162,21 +150,21 @@ class MockStorage:
 
     def upsert_book(
         self,
-        isbn13,
-        title,
-        author,
-        publication_year=None,
-        thumbnail_url=None,
-        publisher=None,
-        description=None,
-        series=None,
-        dewey_decimal=None,
-        language=None,
-        page_count=None,
-        physical_format=None,
-        edition=None,
-        cover_url=None,
-    ):
+        isbn13: str,
+        title: str,
+        author: str,
+        publication_year: Optional[int] = None,
+        thumbnail_url: Optional[str] = None,
+        publisher: Optional[str] = None,
+        description: Optional[str] = None,
+        series: Optional[str] = None,
+        dewey_decimal: Optional[str] = None,
+        language: Optional[str] = None,
+        page_count: Optional[int] = None,
+        physical_format: Optional[str] = None,
+        edition: Optional[str] = None,
+        cover_url: Optional[str] = None,
+    ) -> dict[str, Any]:
         existing = self.get_book_by_isbn(isbn13)
         if existing:
             return self.update_book(
@@ -214,7 +202,14 @@ class MockStorage:
                 cover_url=cover_url,
             )
 
-    def add_reading_record(self, book_id, status, start_date, end_date=None, rating=0):
+    def add_reading_record(
+        self,
+        book_id: int,
+        status: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        rating: int = 0,
+    ) -> dict[str, Any]:
         record = {
             "id": self.next_record_id,
             "book_id": book_id,
@@ -226,13 +221,22 @@ class MockStorage:
         }
         self.reading_records.append(record)
         self.next_record_id += 1
+        logger.info(
+            f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={record['id']}"
+        )
         return record
 
     def update_reading_record(
-        self, record_id, status, start_date, end_date=None, rating=0
-    ):
+        self,
+        record_id: int,
+        status: str,
+        start_date: str,
+        end_date: Optional[str] = None,
+        rating: int = 0,
+    ) -> dict[str, Any]:
         for record in self.reading_records:
             if record["id"] == record_id:
+                old_status = record.get("status")
                 record.update(
                     {
                         "status": status,
@@ -241,27 +245,30 @@ class MockStorage:
                         "rating": rating,
                     }
                 )
+                logger.info(
+                    f"READING_RECORD_UPDATED: id={record_id}, status_change='{old_status}'->'{status}'"
+                )
                 return record
         raise Exception(f"Reading record with ID {record_id} not found")
 
-    def delete_reading_record(self, record_id):
+    def delete_reading_record(self, record_id: int) -> bool:
         for i, record in enumerate(self.reading_records):
             if record["id"] == record_id:
                 self.reading_records.pop(i)
                 return True
         return False
 
-    def delete_book(self, book_id):
+    def delete_book(self, book_id: int) -> bool:
         for i, book in enumerate(self.books):
             if book["id"] == book_id:
                 self.books.pop(i)
                 return True
         return False
 
-    def get_reading_list(self):
+    def get_reading_list(self) -> list[dict[str, Any]]:
         return sorted(self.reading_list, key=lambda x: x["position"])
 
-    def add_to_reading_list(self, book_id):
+    def add_to_reading_list(self, book_id: int) -> None:
         if any(item["book_id"] == book_id for item in self.reading_list):
             logger.info(f"Book {book_id} is already in the reading list (MockStorage)")
             return
@@ -271,7 +278,7 @@ class MockStorage:
         )
         logger.info(f"Successfully added book {book_id} to reading list (MockStorage)")
 
-    def remove_from_reading_list(self, book_id):
+    def remove_from_reading_list(self, book_id: int) -> None:
         for i, item in enumerate(self.reading_list):
             if item["book_id"] == book_id:
                 self.reading_list.pop(i)
@@ -280,7 +287,7 @@ class MockStorage:
         for idx, item in enumerate(self.reading_list):
             item["position"] = idx + 1
 
-    def update_reading_list_order(self, book_ids):
+    def update_reading_list_order(self, book_ids: list[int]) -> None:
         item_map = {item["book_id"]: item for item in self.reading_list}
         new_list = []
         pos = 1
@@ -292,7 +299,7 @@ class MockStorage:
                 pos += 1
         self.reading_list = new_list
 
-    def bulk_import(self, items):
+    def bulk_import(self, items: list[dict[str, Any]]) -> int:
         import_count = 0
         for item in items:
             book_data = item["book"]
@@ -346,11 +353,31 @@ class MockStorage:
             import_count += 1
         return import_count
 
-    def get_reading_history(self):
+    def start_reading(self, book_id: int) -> None:
+        """Atomic operation: remove from reading list and add 'In Progress' record."""
+        # 1. Remove from reading list
+        self.remove_from_reading_list(book_id)
+
+        # 2. Add 'In Progress' record
+        from datetime import date
+
+        self.add_reading_record(
+            book_id=book_id, status="In Progress", start_date=date.today().isoformat()
+        )
+
+    def get_reading_history(self) -> list[dict[str, Any]]:
         """Retrieve all reading records joined with book metadata."""
         history = []
         book_map = {b["id"]: b for b in self.books}
-        for record in self.reading_records:
+        # Use get_reading_records to ensure consistency with GoogleSheetsStorage
+        records = self.get_reading_records()
+        valid_statuses = ["In Progress", "Completed", "Abandoned"]
+        for record in records:
+            # The reading log view should not show books that are in 'Plan to read' status.
+            # The books in the reading log should be either in progress, completed or abandoned.
+            if record.get("status") not in valid_statuses:
+                continue
+
             book = book_map.get(record["book_id"])
             if book:
                 # Create a copy of the record and enrich it
@@ -362,7 +389,7 @@ class MockStorage:
                 history.append(enriched_record)
         return history
 
-    def search(self, query):
+    def search(self, query: str) -> list[dict[str, Any]]:
         """Search across all book data fields.
 
         Args:
