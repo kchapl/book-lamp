@@ -44,7 +44,7 @@ def test_reading_history_filtering(authenticated_client):
     storage.add_reading_record(
         b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5
     )
-    storage.add_reading_record(b2["id"], "Reading", "2023-02-01")
+    storage.add_reading_record(b2["id"], "In Progress", "2023-02-01")
 
     # Filter by status
     response = authenticated_client.get("/history?status=Completed")
@@ -75,7 +75,7 @@ def test_stats_top_authors_only_completed(authenticated_client):
     b2 = storage.add_book(isbn13="2", title="B", author="Author1")
     b3 = storage.add_book(isbn13="3", title="C", author="Author2")
     storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-10")
-    storage.add_reading_record(b2["id"], "Reading", "2023-02-01")
+    storage.add_reading_record(b2["id"], "In Progress", "2023-02-01")
     storage.add_reading_record(b3["id"], "Completed", "2023-03-01", "2023-03-10")
     # make sure reading list items also don't affect author counts
     storage.add_to_reading_list(b1["id"])
@@ -98,13 +98,13 @@ def test_stats_status_links(authenticated_client):
     b1 = storage.add_book(isbn13="1", title="Book One", author="A1")
     b2 = storage.add_book(isbn13="2", title="Book Two", author="A2")
     storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-05")
-    storage.add_reading_record(b2["id"], "Reading", "2023-02-01")
+    storage.add_reading_record(b2["id"], "In Progress", "2023-02-01")
 
     resp = authenticated_client.get("/stats")
     html = resp.data.decode("utf-8")
     # Each status row now has two links (label + bar)
     assert html.count('href="/history?status=Completed"') >= 2
-    assert html.count('href="/history?status=Reading"') >= 2
+    assert html.count('href="/history?status=In+Progress"') >= 2
     # clicking one of the links still works
     resp2 = authenticated_client.get("/history?status=Completed")
     assert b"Book One" in resp2.data

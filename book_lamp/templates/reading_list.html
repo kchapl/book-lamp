@@ -35,7 +35,15 @@
                         class="author-link">{{ book.title }}</a></h3>
                 <div class="text-small" style="color: var(--primary-light);">{{ book.author }}</div>
             </div>
-            <div>
+            <div class="flex gap-05">
+                <button type="button" class="btn btn-small" 
+                    data-book-id="{{ book.id }}"
+                    data-start-url="{{ url_for('start_reading', book_id=book.id) }}"
+                    onclick="startReading(this.dataset.bookId, this.dataset.startUrl)"
+                    title="Start Reading"
+                    style="background: #10b981;">
+                    Start Reading
+                </button>
                 <button type="button" class="btn-icon" data-book-id="{{ book.id }}"
                     data-delete-url="{{ url_for('remove_from_reading_list', book_id=book.id) }}"
                     onclick="removeBook(this.dataset.bookId, this.dataset.deleteUrl)"

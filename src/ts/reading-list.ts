@@ -8,6 +8,10 @@ export function removeBook(bookId: string, deleteUrl: string): void {
     submitPostRequest(deleteUrl);
 }
 
+export function startReading(bookId: string, startUrl: string): void {
+    submitPostRequest(startUrl);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const list = document.getElementById('reading-list-container');
     if (!list) return;
@@ -76,4 +80,5 @@ export function saveOrder(list: HTMLElement, reorderUrl: string): void {
 // Expose for template
 if (typeof window !== 'undefined') {
     (window as any).removeBook = removeBook;
+    (window as any).startReading = startReading;
 }
