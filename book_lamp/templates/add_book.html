@@ -14,7 +14,7 @@
             <div class="mb-15">
                 <label for="isbn" class="form-label">ISBN-13</label>
                 <div class="flex gap-05">
-                    <input type="text" id="isbn" name="isbn" placeholder="9780000000000" required autofocus
+                    <input type="text" id="isbn" name="isbn" value="{{ isbn or '' }}" placeholder="9780000000000" autofocus
                         class="form-input-large flex-grow">
                     <button type="button" id="scan-barcode-btn" class="btn btn-outline hidden no-feedback" title="Scan Barcode">
                         <span class="feature-icon" style="font-size: 1.2rem; margin-bottom: 0;">📷</span>
@@ -28,11 +28,66 @@
                 <button type="button" id="stop-scan-btn" class="btn btn-outline w-full no-feedback">Cancel Scan</button>
             </div>
 
-            <div class="flex gap-1">
+            <div id="manual-entry-section" class="{% if not show_manual %}hidden{% endif %} border-top pt-15 mt-15">
+                <h3 class="mb-1">Manual Details</h3>
+                <div class="mb-15">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" id="title" name="title" class="form-input-large" placeholder="Book Title">
+                </div>
+                <div class="mb-15">
+                    <label for="author" class="form-label">Author</label>
+                    <input type="text" id="author" name="author" class="form-input-large" placeholder="Author Name">
+                </div>
+                <div class="flex gap-1 mb-15">
+                    <div class="flex-grow">
+                        <label for="publisher" class="form-label">Publisher</label>
+                        <input type="text" id="publisher" name="publisher" class="form-input-large" placeholder="Publisher">
+                    </div>
+                    <div style="width: 120px;">
+                        <label for="publication_year" class="form-label">Year</label>
+                        <input type="number" id="publication_year" name="publication_year" class="form-input-large" placeholder="2024">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-1 mb-1">
                 <button type="submit" class="btn flex-grow">Add Book</button>
                 <a href="{{ url_for('list_books') }}" class="btn btn-outline flex-grow">Cancel</a>
             </div>
+            <button type="button" id="toggle-manual-btn" class="btn btn-outline w-full no-feedback">
+                {% if show_manual %}Use ISBN Lookup{% else %}Enter Manually{% endif %}
+            </button>
         </form>
+
+        <script>
+            document.getElementById('toggle-manual-btn').addEventListener('click', function() {
+                const section = document.getElementById('manual-entry-section');
+                const isHidden = section.classList.contains('hidden');
+                
+                if (isHidden) {
+                    section.classList.remove('hidden');
+                    this.textContent = 'Use ISBN Lookup';
+                    document.getElementById('title').setAttribute('required', '');
+                    document.getElementById('author').setAttribute('required', '');
+                    document.getElementById('isbn').removeAttribute('required');
+                } else {
+                    section.classList.add('hidden');
+                    this.textContent = 'Enter Manually';
+                    document.getElementById('title').removeAttribute('required');
+                    document.getElementById('author').removeAttribute('required');
+                    document.getElementById('isbn').setAttribute('required', '');
+                }
+            });
+
+            // If manual mode is active from server-side, Ensure validation matches
+            {% if show_manual %}
+                document.getElementById('title').setAttribute('required', '');
+                document.getElementById('author').setAttribute('required', '');
+                document.getElementById('isbn').removeAttribute('required');
+            {% else %}
+                document.getElementById('isbn').setAttribute('required', '');
+            {% endif %}
+        </script>
     </div>
 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
