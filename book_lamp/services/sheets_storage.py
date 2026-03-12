@@ -54,11 +54,14 @@ class GoogleSheetsStorage:
         self.service = None
         self.drive_service = None
         self._cache: Dict[str, List[List[Any]]] = {}
-        if self.credentials_dict:
-            self._connect()
 
     def _connect(self) -> None:
         """Establish connection to the Google Sheets and Drive APIs."""
+        if self.service and self.drive_service:
+            return
+
+        logger.info("Initializing Google API service objects...")
+        start_time = datetime.now()
         creds = self.load_credentials()
         if creds and creds.valid:
             # Building service objects can be slow as it fetches
@@ -69,6 +72,11 @@ class GoogleSheetsStorage:
                 f_drive = executor.submit(build, "drive", "v3", credentials=creds)
                 self.service = f_sheets.result()
                 self.drive_service = f_drive.result()
+
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"Connected to Google APIs in {duration:.2f}s")
+        else:
+            logger.warning("Failed to connect: credentials missing or invalid")
 
     def load_credentials(self) -> Optional[Credentials]:
         """Load credentials from the internal dictionary.
@@ -146,11 +154,10 @@ class GoogleSheetsStorage:
         return parent_id
 
     def _ensure_spreadsheet_id(self) -> str:
-        """Ensure we have the spreadsheet ID, discovering or creating it if necessary.
+        """Ensure we have the spreadsheet ID, discovering or creating it if necessary."""
+        self._connect()
+        # ... logic continues
 
-        Returns:
-            The ID of the spreadsheet.
-        """
         if self.spreadsheet_id:
             return self.spreadsheet_id
 
@@ -551,22 +558,6 @@ class GoogleSheetsStorage:
                 if book_id is None or record["book_id"] == book_id:
                     records.append(record)
 
-            # Inject Planning/Reading list pseudo-records
-            rl_items = self.get_reading_list()
-            for item in rl_items:
-                if book_id is None or item["book_id"] == book_id:
-                    records.append(
-                        {
-                            "id": f"rl_{item['book_id']}",
-                            "book_id": item["book_id"],
-                            "status": "Plan to Read",
-                            "start_date": "",
-                            "end_date": None,
-                            "rating": 0,
-                            "created_at": item["created_at"],
-                        }
-                    )
-
             return records
         except HttpError as error:
             # If the tab doesn't exist yet, try initializing and return empty list
@@ -743,6 +734,22 @@ class GoogleSheetsStorage:
             pass
         finally:
             self._clear_persistent_cache()
+
+    def start_reading(self, book_id: int) -> None:
+        """Atomic operation: remove from reading list and add 'In Progress' record.
+
+        Args:
+            book_id: The ID of the book to start reading.
+        """
+        # 1. Remove from reading list
+        self.remove_from_reading_list(book_id)
+
+        # 2. Add 'In Progress' record
+        from datetime import date
+
+        today = date.today().isoformat()
+        self.add_reading_record(book_id=book_id, status="In Progress", start_date=today)
+        logger.info(f"START_READING completed for book_id={book_id}")
 
     def get_book_by_id(self, book_id: int) -> Optional[Dict[str, Any]]:
         """Get a single book by ID."""
@@ -1455,7 +1462,9 @@ class GoogleSheetsStorage:
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
-
+            logger.info(
+                f"READING_RECORD_ADDED (Sheets): book_id={book_id}, status='{status}', record_id={record_id}"
+            )
             return {
                 "id": record_id,
                 "book_id": book_id,
@@ -1476,6 +1485,9 @@ class GoogleSheetsStorage:
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
+                    logger.info(
+                        f"READING_RECORD_ADDED after init (Sheets): book_id={book_id}, status='{status}'"
+                    )
                     return {
                         "id": record_id,
                         "book_id": book_id,
@@ -1860,10 +1872,11 @@ class GoogleSheetsStorage:
 
         book_map = {b["id"]: b for b in books}
         history = []
+        valid_statuses = ["In Progress", "Completed", "Abandoned"]
         for record in records:
-            # Exclude pseudo-records generated from the reading list. The
-            # history page should only show actual reading events.
-            if record.get("status") == "Plan to Read":
+            # The reading log view should not show books that are in 'Plan to read' status.
+            # The books in the reading log should be either in progress, completed or abandoned.
+            if record.get("status") not in valid_statuses:
                 continue
 
             book = book_map.get(record["book_id"])

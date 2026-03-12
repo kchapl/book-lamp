@@ -46,7 +46,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
         "/books", data={"isbn": "9780306406157"}, follow_redirects=True
     )
     assert resp.status_code == 200
-    assert b"Book added successfully" in resp.data
+    assert b"Book added to your reading list." in resp.data
 
     book = storage.get_book_by_isbn("9780306406157")
     assert book["title"] == "Example Book"

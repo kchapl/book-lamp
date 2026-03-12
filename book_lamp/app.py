@@ -107,6 +107,7 @@ def get_storage():
     if is_test_mode():
         return _mock_storage_singleton
     if "storage" not in g:
+        app.logger.info("Initializing storage for request...")
         # Use different sheet names for production and development
         # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
         is_prod = os.environ.get("FLASK_ENV") == "production"
@@ -126,6 +127,7 @@ def get_storage():
 def authorisation_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        app.logger.info(f"AUTHORISATION_CHECK for route: {f.__name__}")
         if not get_storage().is_authorised():
             return redirect(url_for("unauthorised"))
         return f(*args, **kwargs)
@@ -374,6 +376,10 @@ def reading_history():
         session["spreadsheet_id"] = storage.spreadsheet_id
 
     history = storage.get_reading_history()
+    # Get status list for filter dropdown (from all records)
+    all_statuses = sorted(
+        list(set(r.get("status") for r in history if r.get("status")))
+    )
 
     # Filtering
     status_filter = request.args.get("status")
@@ -398,11 +404,6 @@ def reading_history():
         history.sort(key=lambda r: r.get("rating", 0), reverse=True)
     elif sort_by == "title":
         history.sort(key=lambda r: (r.get("book_title") or "").lower())
-
-    # Get status list for filter dropdown (from all records)
-    all_statuses = sorted(
-        list(set(r.get("status") for r in history if r.get("status")))
-    )
 
     return render_template(
         "history.html",
@@ -463,6 +464,24 @@ def remove_from_reading_list(book_id: int):
     return redirect(get_safe_redirect_target("reading_list"))
 
 
+@app.route("/books/<int:book_id>/start-reading", methods=["POST"])
+@authorisation_required
+def start_reading(book_id: int):
+    """Move book from reading list to reading log and set status to 'In Progress'."""
+    app.logger.info(f"START_READING initiation: book_id={book_id}")
+    storage = get_storage()
+    try:
+        storage.start_reading(book_id)
+        flash("Started reading! Book moved to reading log.", "success")
+        app.logger.info(
+            f"START_READING success: book_id={book_id}, new_status='In Progress'"
+        )
+    except Exception as e:
+        app.logger.error(f"START_READING failure: book_id={book_id}, error={str(e)}")
+        flash(f"Error starting reading: {str(e)}", "error")
+    return redirect(get_safe_redirect_target("reading_list"))
+
+
 @app.route("/books/<int:book_id>/add-to-reading-list", methods=["POST"])
 @authorisation_required
 def add_existing_to_reading_list(book_id: int):
@@ -515,6 +534,13 @@ def list_books():
         if record:
             book["latest_status"] = record.get("status")
 
+    # Only show books that have a 'real' status (In Progress, Completed, Abandoned)
+    books = [
+        b
+        for b in books
+        if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
+    ]
+
     return render_template(
         "books.html", books=books, sort_by=sort_by, sort_options=SORT_OPTIONS
     )
@@ -542,6 +568,28 @@ def search_books():
         # If not sorting by relevance, apply the selected sort
         if sort_by != "relevance":
             books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+
+        # Attach latest status
+        latest_records = {}
+        for r in all_records:
+            bid = r.get("book_id")
+            if bid:
+                if bid not in latest_records or r.get(
+                    "start_date", ""
+                ) >= latest_records[bid].get("start_date", ""):
+                    latest_records[bid] = r
+
+        for book in books:
+            record = latest_records.get(book.get("id"))
+            if record:
+                book["latest_status"] = record.get("status")
+
+        # Only show books that have a 'real' status (In Progress, Completed, Abandoned)
+        books = [
+            b
+            for b in books
+            if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
+        ]
 
         return render_template(
             "books.html",
@@ -729,7 +777,12 @@ def collection_stats():
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
-    total_books = len(books)
+    # Core metrics only consider completed books
+    completed_records = [r for r in all_records if r.get("status") == "Completed"]
+    completed_book_ids = {r.get("book_id") for r in completed_records}
+    completed_books = [b for b in books if b.get("id") in completed_book_ids]
+
+    total_books = len(completed_books)
     total_records = len(all_records)
 
     # Average rating - derived from all reading records with a rating > 0
@@ -754,24 +807,20 @@ def collection_stats():
             ].get("start_date", ""):
                 latest_records[bid] = r
 
-    # Status counts - include a 'Not begun' category for books without records
+    # Status counts - only include 'In Progress', 'Completed', and 'Abandoned'
+    allowed_statuses = {"In Progress", "Completed", "Abandoned"}
     statuses = []
     for b in books:
         bid = b.get("id")
         if bid in latest_records:
-            statuses.append(latest_records[bid].get("status", "Unknown"))
-        else:
-            statuses.append("Not begun")
+            status = latest_records[bid].get("status")
+            if status in allowed_statuses:
+                statuses.append(status)
     status_counts = Counter(statuses)
 
     # Top authors (only count books that have been completed)
-    completed_book_ids = {
-        r.get("book_id") for r in all_records if r.get("status") == "Completed"
-    }
     all_authors = []
-    for b in books:
-        if b.get("id") not in completed_book_ids:
-            continue
+    for b in completed_books:
         if b.get("authors"):
             all_authors.extend(b["authors"])
         elif b.get("author"):
@@ -780,9 +829,9 @@ def collection_stats():
     total_authors = len(set(all_authors))
     top_authors = Counter(all_authors).most_common(5)
 
-    # Top publishers
+    # Top publishers (only count books that have been completed)
     all_publishers = []
-    for b in books:
+    for b in completed_books:
         if b.get("publisher"):
             norm_pub = _normalize_publisher(b["publisher"])
             if norm_pub:
@@ -844,7 +893,7 @@ def collection_stats():
     }
 
     dewey_bins = Counter()
-    for b in books:
+    for b in completed_books:
         ddc = b.get("dewey_decimal")
         if ddc:
             # Match first digit of a numeric DDC
@@ -916,14 +965,20 @@ def create_reading_record(book_id: int):
         flash("Status and start date are required.", "error")
         return redirect(url_for("book_detail", book_id=book_id))
 
-    storage.add_reading_record(
-        book_id=book_id,
-        status=status,
-        start_date=start_date,
-        end_date=end_date,
-        rating=rating,
-    )
-    flash("Reading record added.", "success")
+    try:
+        storage.add_reading_record(
+            book_id=book_id,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            rating=rating,
+        )
+        app.logger.info(f"RECORD_CREATED: book_id={book_id}, status='{status}'")
+        flash("Reading record added.", "success")
+    except Exception as e:
+        app.logger.error(f"RECORD_CREATE_FAILED: book_id={book_id}, error={str(e)}")
+        flash(f"Error adding reading record: {str(e)}", "error")
+
     return redirect(url_for("book_detail", book_id=book_id))
 
 
@@ -965,9 +1020,10 @@ def update_reading_record(record_id: int):
             end_date=end_date,
             rating=rating,
         )
+        app.logger.info(f"RECORD_UPDATED: record_id={record_id}, status='{status}'")
         flash("Reading record updated.", "success")
     except Exception as e:
-        app.logger.error(f"Failed to update reading record: {str(e)}")
+        app.logger.error(f"RECORD_UPDATE_FAILED: record_id={record_id}, error={str(e)}")
         flash(f"Error updating record: {str(e)}", "error")
 
     safe_target = _get_safe_redirect_target(request.referrer)
@@ -1000,31 +1056,23 @@ def create_book():
 
     isbn = normalize_isbn(request.form.get("isbn", "") or "")
 
-    add_to_rl = (
-        request.form.get("add_to_reading_list") in ("1", "on", "true")
-        or "add_to_reading_list" in request.form
-        and request.form.get("add_to_reading_list") != "0"
-    )
-
     # Avoid duplicates
     existing = storage.get_book_by_isbn(isbn)
+    # If it exists, we just move it to the reading list
     if existing:
-        if add_to_rl:
-            try:
-                storage.add_to_reading_list(existing["id"])
-                app.logger.info(
-                    f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
-                )
-                flash("Book added to your reading list.", "success")
-            except Exception as e:
-                app.logger.error(
-                    f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
-                    exc_info=True,
-                )
-                flash(f"Error adding to reading list: {str(e)}", "error")
-            return redirect(url_for("reading_list"))
-        flash("This book has already been added.", "info")
-        return redirect(url_for("list_books"))
+        try:
+            storage.add_to_reading_list(existing["id"])
+            app.logger.info(
+                f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
+            )
+            flash("Book moved to your reading list.", "success")
+        except Exception as e:
+            app.logger.error(
+                f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
+                exc_info=True,
+            )
+            flash(f"Error adding to reading list: {str(e)}", "error")
+        return redirect(url_for("reading_list"))
 
     # Lookup via Open Library Books API
     from book_lamp.services.book_lookup import lookup_book_by_isbn13
@@ -1070,30 +1118,34 @@ def create_book():
         edition=data.get("edition"),
         cover_url=data.get("cover_url"),
     )
-    if add_to_rl:
-        try:
-            storage.add_to_reading_list(created_book["id"])
-            app.logger.info(
-                f"Successfully added newly created book (ID: {created_book['id']}, Title: {created_book['title']}) to reading list"
-            )
-            if storage.spreadsheet_id:
-                session["spreadsheet_id"] = storage.spreadsheet_id
-            flash("Book added to reading log and reading list.", "success")
-        except Exception as e:
-            app.logger.error(
-                f"Failed to add newly created book {created_book['id']} to reading list: {str(e)}",
-                exc_info=True,
-            )
-            flash(
-                "Book added to reading log, but failed to add to reading list.",
-                "warning",
-            )
-        return redirect(url_for("reading_list"))
+    app.logger.info(
+        f"BOOK_CREATED: id={created_book['id']}, isbn={isbn}, title='{title}'"
+    )
 
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
-    flash("Book added successfully.", "success")
-    return redirect(url_for("list_books"))
+    # When a new book is added it should go to the reading list
+    # and be in 'plan to read' state.
+    # All new books are added to the reading list by default in 'Plan to Read' state
+    try:
+        storage.add_to_reading_list(created_book["id"])
+        app.logger.info(
+            f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
+        )
+        if storage.spreadsheet_id:
+            session["spreadsheet_id"] = storage.spreadsheet_id
+        flash("Book added to your reading list.", "success")
+    except Exception as e:
+        app.logger.error(
+            f"READING_LIST_ADD_FAILED: id={created_book['id']}, error={str(e)}"
+        )
+        app.logger.error(
+            f"Failed to add newly created book {created_book['id']} to reading list: {str(e)}",
+            exc_info=True,
+        )
+        flash(
+            "Book added, but failed to add to reading list.",
+            "warning",
+        )
+    return redirect(url_for("reading_list"))
 
 
 def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: str):
