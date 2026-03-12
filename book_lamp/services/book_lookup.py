@@ -736,13 +736,17 @@ def lookup_book_by_isbn13(
 
     # Cache whatever we found (even if no cover)
     if len(best) > 1:  # More than just the ISBN
+        if not best.get("title") or not best.get("author"):
+            logger.info(
+                f"ISBN_LOOKUP_FAILED: Missing metadata (title/author) for ISBN {clean_isbn}"
+            )
         cache.set(f"isbn:{clean_isbn}", best)
         logger.debug(
             f"  Cached metadata for {clean_isbn} (has_cover={bool(best.get('thumbnail_url'))})"
         )
         return best
 
-    logger.debug(f"  No data found for ISBN {clean_isbn}")
+    logger.info(f"ISBN_LOOKUP_FAILED: No data found for ISBN {clean_isbn}")
     return None
 
 

@@ -423,7 +423,9 @@ def reading_history():
 @app.route("/books/new", methods=["GET"])
 @authorisation_required
 def new_book_form():
-    return render_template("add_book.html")
+    isbn = request.args.get("isbn", "")
+    show_manual = request.args.get("manual", "0") == "1"
+    return render_template("add_book.html", isbn=isbn, show_manual=show_manual)
 
 
 @app.route("/reading-list", methods=["GET"])
@@ -1055,76 +1057,124 @@ def create_book():
     from book_lamp.utils.books import normalize_isbn
 
     isbn = normalize_isbn(request.form.get("isbn", "") or "")
+    title = request.form.get("title", "").strip()
+    author = request.form.get("author", "").strip()
 
-    # Avoid duplicates
-    existing = storage.get_book_by_isbn(isbn)
-    # If it exists, we just move it to the reading list
-    if existing:
-        try:
-            storage.add_to_reading_list(existing["id"])
-            app.logger.info(
-                f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
-            )
-            flash("Book moved to your reading list.", "success")
-        except Exception as e:
-            app.logger.error(
-                f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
-                exc_info=True,
-            )
-            flash(f"Error adding to reading list: {str(e)}", "error")
-        return redirect(url_for("reading_list"))
+    # Avoid duplicates if ISBN is present
+    if isbn:
+        existing = storage.get_book_by_isbn(isbn)
+        if existing:
+            try:
+                storage.add_to_reading_list(existing["id"])
+                app.logger.info(
+                    f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
+                )
+                flash("Book moved to your reading list.", "success")
+            except Exception as e:
+                app.logger.error(
+                    f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
+                    exc_info=True,
+                )
+                flash(f"Error adding to reading list: {str(e)}", "error")
+            return redirect(url_for("reading_list"))
 
-    # Lookup via Open Library Books API
-    from book_lamp.services.book_lookup import lookup_book_by_isbn13
+    # Manual entry or Lookup?
+    if title and author:
+        # Manual entry path
+        # Try to recover cached cover images from a previous lookup attempt
+        cached_data = {}
+        if isbn and not is_test_mode():
+            from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
-    if is_test_mode() and isbn == TEST_ISBN:
+            try:
+                res = lookup_book_by_isbn13(isbn)
+                if res:
+                    cached_data = res
+            except Exception:
+                pass
+
         data = {
-            "publish_date": "2019-05-02",
-            "thumbnail_url": "http://example.com/thumb.jpg",
+            "title": title,
+            "author": author,
+            "publisher": request.form.get("publisher"),
+            "publish_date": request.form.get("publication_year"),
+            "thumbnail_url": cached_data.get("thumbnail_url"),
+            "cover_url": cached_data.get("cover_url"),
+            "description": request.form.get("description"),
+            "dewey_decimal": request.form.get("dewey_decimal"),
         }
     else:
-        try:
-            data = lookup_book_by_isbn13(isbn)
-        except Exception as exc:  # noqa: BLE001
-            flash(f"Failed to fetch book details: {exc}", "error")
-            return redirect(url_for("list_books"))
+        # Lookup via Open Library Books API
+        from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
-    if not data:
-        flash("No book data found for that ISBN.", "error")
-        return redirect(url_for("list_books"))
+        if is_test_mode() and isbn == TEST_ISBN:
+            data = {
+                "title": "Test Book",
+                "author": "Test Author",
+                "publish_date": "2019-05-02",
+                "thumbnail_url": "http://example.com/thumb.jpg",
+            }
+        else:
+            try:
+                data = lookup_book_by_isbn13(isbn)
+            except Exception as exc:  # noqa: BLE001
+                app.logger.error(f"ISBN lookup failed for {isbn}: {exc}")
+                flash(
+                    f"Lookup failed for ISBN {isbn}. Please enter details manually.",
+                    "info",
+                )
+                return redirect(url_for("new_book_form", isbn=isbn, manual=1))
+
+        if not data:
+            flash(
+                f"No book data found for ISBN {isbn}. You can enter details manually below.",
+                "info",
+            )
+            return redirect(url_for("new_book_form", isbn=isbn, manual=1))
 
     title = data.get("title") or ""
     author = data.get("author") or ""
     publish_date = data.get("publish_date")
-    year = parse_publication_year(publish_date)
+    year = parse_publication_year(str(publish_date) if publish_date else None)
     thumbnail_url = data.get("thumbnail_url")
 
+    # If it was an external lookup and title/author are still missing
     if not title or not author:
-        flash("The external service did not return required fields.", "error")
-        return redirect(url_for("list_books"))
+        # We might have received just a cover, but no title/author metadata
+        app.logger.info(
+            f"ISBN_LOOKUP_FAILED: Missing metadata (title/author) for ISBN {isbn}"
+        )
+        flash(
+            f"No book metadata found for ISBN {isbn}. You can enter details manually below.",
+            "info",
+        )
+        return redirect(url_for("new_book_form", isbn=isbn, manual=1))
 
-    created_book = storage.add_book(
-        isbn13=isbn,
-        title=title[:300],
-        author=author[:200],
-        publication_year=year,
-        thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
-        publisher=data.get("publisher"),
-        description=data.get("description"),
-        dewey_decimal=data.get("dewey_decimal"),
-        language=data.get("language"),
-        page_count=data.get("page_count"),
-        physical_format=data.get("physical_format"),
-        edition=data.get("edition"),
-        cover_url=data.get("cover_url"),
-    )
-    app.logger.info(
-        f"BOOK_CREATED: id={created_book['id']}, isbn={isbn}, title='{title}'"
-    )
+    try:
+        created_book = storage.add_book(
+            isbn13=isbn,
+            title=title[:300],
+            author=author[:200],
+            publication_year=year,
+            thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
+            publisher=data.get("publisher"),
+            description=data.get("description"),
+            dewey_decimal=data.get("dewey_decimal"),
+            language=data.get("language"),
+            page_count=data.get("page_count"),
+            physical_format=data.get("physical_format"),
+            edition=data.get("edition"),
+            cover_url=data.get("cover_url"),
+        )
+        app.logger.info(
+            f"BOOK_CREATED: id={created_book['id']}, isbn={isbn}, title='{title}', manual={bool(request.form.get('title'))}"
+        )
+    except Exception as e:
+        app.logger.error(f"Failed to create book: {str(e)}", exc_info=True)
+        flash(f"Error creating book: {str(e)}", "error")
+        return redirect(url_for("new_book_form", isbn=isbn, manual=1))
 
     # When a new book is added it should go to the reading list
-    # and be in 'plan to read' state.
-    # All new books are added to the reading list by default in 'Plan to Read' state
     try:
         storage.add_to_reading_list(created_book["id"])
         app.logger.info(
@@ -1136,10 +1186,6 @@ def create_book():
     except Exception as e:
         app.logger.error(
             f"READING_LIST_ADD_FAILED: id={created_book['id']}, error={str(e)}"
-        )
-        app.logger.error(
-            f"Failed to add newly created book {created_book['id']} to reading list: {str(e)}",
-            exc_info=True,
         )
         flash(
             "Book added, but failed to add to reading list.",
