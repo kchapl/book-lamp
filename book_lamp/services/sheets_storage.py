@@ -1152,18 +1152,18 @@ class GoogleSheetsStorage:
                     pass
 
         record_values = records_result.get("values", [])
-        existing_record_keys = set()
+        existing_records_by_book = {}
         next_record_id = 1
-        for row in record_values[1:]:
+        for idx, row in enumerate(record_values[1:], start=2):
             if row and len(row) > 4:
-                # Key: (book_id, status, start_date, end_date)
                 try:
                     if row[0]:
                         next_record_id = max(next_record_id, int(float(row[0])) + 1)
                     if row[1]:
                         bid = int(float(row[1]))
-                        key = (bid, row[2], row[3], row[4] if row[4] else None)
-                        existing_record_keys.add(key)
+                        if bid not in existing_records_by_book:
+                            existing_records_by_book[bid] = []
+                        existing_records_by_book[bid].append((idx, row))
                 except (ValueError, IndexError, TypeError):
                     pass
 
@@ -1186,6 +1186,7 @@ class GoogleSheetsStorage:
         books_to_update = []  # list of {"range": ..., "values": [[...]]}
         books_to_append = []
         records_to_append = []
+        records_to_update = []
         authors_to_append = []
         links_to_append = []
         import_count = 0
@@ -1292,54 +1293,93 @@ class GoogleSheetsStorage:
                     existing_links[book_id].add(aid)
 
             if r:
-                # Robust deduplication:
-                # If Completed, match on (book_id, status, end_date) - ignoring start_date
-                # because start_date can shift between 'added' and 'began' in different imports.
-                # If NOT Completed, match on (book_id, status, start_date).
                 is_duplicate = False
+                matched_row_to_update = None
                 r_status = r["status"]
                 r_start = r["start_date"]
-                r_end = r.get("end_date")
+                r_end = r.get("end_date") or ""
 
-                for ek in existing_record_keys:
-                    # ek = (bid, status, start_date, end_date)
-                    if ek[0] == book_id and ek[1] == r_status:
-                        if r_status == "Completed":
-                            if ek[3] == r_end:
-                                is_duplicate = True
-                                break
-                        elif r_status == "In Progress":
-                            # For In Progress, any existing In Progress record for this book is a duplicate.
-                            # This handles start dates shifting between 'added' and 'began'.
+                existing_recs = existing_records_by_book.get(book_id, [])
+
+                for idx, ek_row in existing_recs:
+                    ek_status = ek_row[2] if len(ek_row) > 2 else ""
+                    ek_start = ek_row[3] if len(ek_row) > 3 else ""
+                    ek_end = ek_row[4] if len(ek_row) > 4 else ""
+
+                    # Determine if it's the exact same read attempt
+                    is_same_attempt = False
+                    if ek_start and r_start and ek_start == r_start:
+                        is_same_attempt = True
+                    elif (
+                        r_status == "Completed"
+                        and ek_status == "Completed"
+                        and ek_end
+                        and r_end
+                        and ek_end == r_end
+                    ):
+                        is_same_attempt = True
+                    elif ek_status == "In Progress":
+                        is_same_attempt = True
+
+                    if is_same_attempt:
+                        if (
+                            ek_status == r_status
+                            and ek_start == r_start
+                            and ek_end == r_end
+                        ):
                             is_duplicate = True
-                            break
                         else:
-                            if ek[2] == r_start:
-                                is_duplicate = True
-                                break
+                            matched_row_to_update = (idx, ek_row)
+                        break
 
-                if not is_duplicate:
+                if is_duplicate:
+                    pass
+                elif matched_row_to_update:
+                    idx, ek_row = matched_row_to_update
+                    if idx is not None:
+                        record_id = int(ek_row[0])
+                        rec_created_at = ek_row[6] if len(ek_row) > 6 else created_at
+                        updated_row = [
+                            record_id,
+                            book_id,
+                            r_status,
+                            r_start,
+                            r_end,
+                            r.get("rating") or (ek_row[5] if len(ek_row) > 5 else 0),
+                            rec_created_at,
+                        ]
+                        records_to_update.append(
+                            {
+                                "range": f"ReadingRecords!A{idx}:G{idx}",
+                                "values": [updated_row],
+                            }
+                        )
+
+                        matched_idx = existing_recs.index(matched_row_to_update)
+                        existing_recs[matched_idx] = (idx, updated_row)
+                else:
                     new_rec_row = [
                         next_record_id,
                         book_id,
                         r_status,
                         r_start,
-                        r_end or "",
+                        r_end,
                         r.get("rating") or 0,
                         created_at,
                     ]
                     records_to_append.append(new_rec_row)
+                    existing_recs.append((None, new_rec_row))
+                    existing_records_by_book[book_id] = existing_recs
                     next_record_id += 1
-                    # Add to existing to prevent internal duplicates
-                    existing_record_keys.add((book_id, r_status, r_start, r_end))
 
             import_count += 1
 
         # 3. Execute batch operations
-        if books_to_update:
+        if books_to_update or records_to_update:
+            data = books_to_update + records_to_update
             self.service.spreadsheets().values().batchUpdate(
                 spreadsheetId=sid,
-                body={"valueInputOption": "RAW", "data": books_to_update},
+                body={"valueInputOption": "RAW", "data": data},
             ).execute()
 
         if books_to_append:
