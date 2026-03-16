@@ -157,6 +157,13 @@ def get_app_version():
 
 APP_VERSION = get_app_version()
 
+# Warn early so the operator sees it in the server log without needing to hit a route.
+if not os.environ.get("LLM_API_KEY"):
+    logging.getLogger(__name__).warning(
+        "LLM_API_KEY is not set — AI recommendations will be unavailable. "
+        "Add LLM_API_KEY, LLM_BASE_URL, and LLM_MODEL to your .env file to enable this feature."
+    )
+
 
 @app.context_processor
 def inject_global_vars():

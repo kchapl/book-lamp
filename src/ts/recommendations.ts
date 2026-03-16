@@ -1,3 +1,5 @@
+import { submitPostRequest } from './base-ui.js';
+
 /**
  * Book Recommendations Component
  *
@@ -33,15 +35,24 @@ function buildSkeletonCards(count = 3): string {
 function buildRecCard(rec: Recommendation): string {
     const searchUrl = `https://openlibrary.org/search?q=${encodeURIComponent(rec.isbn13 || rec.title)}`;
     return `
-        <a class="rec-card" href="${searchUrl}" target="_blank" rel="noopener noreferrer"
-           id="rec-card-${rec.id}" aria-label="Recommendation: ${rec.title} by ${rec.author}">
-            <div class="rec-card-inner">
-                <div class="rec-sparkle" aria-hidden="true">✨</div>
-                <h3 class="rec-title">${escapeHtml(rec.title)}</h3>
-                <p class="rec-author">${escapeHtml(rec.author)}</p>
-                <p class="rec-justification">${escapeHtml(rec.justification)}</p>
+        <div class="rec-card rec-card--animate-in" id="rec-card-${rec.id}" aria-label="Recommendation: ${rec.title} by ${rec.author}">
+            <a class="rec-card-content" href="${searchUrl}" target="_blank" rel="noopener noreferrer">
+                <div class="rec-card-inner">
+                    <div class="rec-sparkle" aria-hidden="true">✨</div>
+                    <h3 class="rec-title">${escapeHtml(rec.title)}</h3>
+                    <p class="rec-author">${escapeHtml(rec.author)}</p>
+                    <p class="rec-justification">${escapeHtml(rec.justification)}</p>
+                </div>
+            </a>
+            <div class="rec-actions">
+                <button class="btn btn-small btn-outline w-full add-rec-btn" 
+                        data-isbn="${rec.isbn13 || ''}" 
+                        data-title="${escapeHtml(rec.title)}" 
+                        data-author="${escapeHtml(rec.author)}">
+                    Add to Reading List
+                </button>
             </div>
-        </a>
+        </div>
     `;
 }
 
@@ -79,11 +90,33 @@ async function loadRecommendations(): Promise<void> {
             return;
         }
 
-        // Animate cards in after short delay
+        // Injected HTML for real cards
         grid.innerHTML = data.recommendations.map(buildRecCard).join('');
+        
+        // Add event listeners for the "Add" buttons
+        grid.querySelectorAll<HTMLButtonElement>('.add-rec-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                const b = e.currentTarget as HTMLButtonElement;
+                const isbn = b.getAttribute('data-isbn') || '';
+                const title = b.getAttribute('data-title') || '';
+                const author = b.getAttribute('data-author') || '';
+
+                // Show loading state on button
+                b.classList.add('loading');
+                b.disabled = true;
+
+                // Submit post request to /books
+                submitPostRequest('/books', {
+                    'isbn': isbn,
+                    'title': title,
+                    'author': author
+                });
+            });
+        });
+
+        // Set animation delays
         grid.querySelectorAll<HTMLElement>('.rec-card').forEach((card, i) => {
             card.style.animationDelay = `${i * 80}ms`;
-            card.classList.add('rec-card--animate-in');
         });
 
         if (heading) {

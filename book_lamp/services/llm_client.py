@@ -17,6 +17,10 @@ class LLMClient:
             # We use the OpenAI SDK which is compatible with many providers
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         else:
+            logger.warning(
+                "LLM_API_KEY is not set. AI recommendations will be unavailable. "
+                "Set LLM_API_KEY, LLM_BASE_URL, and LLM_MODEL in your .env file to enable this feature."
+            )
             self.client = None
 
     def generate_recommendations(

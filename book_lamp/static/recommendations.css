@@ -1,0 +1,187 @@
+/* AI Recommendations Section Styles */
+
+#recommendations-section {
+    display: none; /* shown by JS once data is available */
+    margin-top: 3rem;
+    padding-top: 2.5rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.rec-section-header {
+    margin-bottom: 1.5rem;
+}
+
+.rec-section-title {
+    font-family: 'Playfair Display', 'Playfair Fallback', serif;
+    font-size: 1.5rem;
+    margin: 0 0 0.35rem;
+    background: linear-gradient(to right, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.rec-section-subtitle {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.rec-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 640px) {
+    .rec-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Individual recommendation card */
+.rec-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 0;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                border-color 0.2s ease, 
+                box-shadow 0.3s ease;
+    overflow: hidden;
+}
+
+.rec-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(129, 140, 248, 0.5);
+    box-shadow: 0 20px 30px -10px rgba(79, 70, 229, 0.3);
+}
+
+.rec-card-content {
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    flex-grow: 1;
+}
+
+.rec-card-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.rec-sparkle {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.6));
+}
+
+.rec-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.rec-author {
+    font-size: 0.9rem;
+    color: var(--primary-light);
+    margin: 0;
+    font-weight: 500;
+}
+
+.rec-justification {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0.5rem 0 0;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.rec-actions {
+    padding: 1.25rem;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.add-rec-btn {
+    font-size: 0.85rem !important;
+    text-transform: none;
+    padding: 0.75rem !important;
+    border-radius: 12px !important;
+}
+
+.add-rec-btn:active {
+    transform: scale(0.96);
+}
+
+/* Entrance animation */
+@keyframes rec-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.rec-card--animate-in {
+    animation: rec-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Skeleton loader */
+.rec-card--skeleton {
+    pointer-events: none;
+    cursor: default;
+}
+
+.rec-card--skeleton:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--glass-border);
+}
+
+@keyframes rec-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.rec-skeleton-title,
+.rec-skeleton-author,
+.rec-skeleton-text {
+    border-radius: 6px;
+    background: linear-gradient(90deg,
+        rgba(255,255,255,0.04) 25%,
+        rgba(255,255,255,0.09) 50%,
+        rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: rec-shimmer 1.5s infinite;
+}
+
+.rec-skeleton-title {
+    height: 1rem;
+    width: 75%;
+    margin-bottom: 0.5rem;
+}
+
+.rec-skeleton-author {
+    height: 0.75rem;
+    width: 50%;
+    margin-bottom: 0.75rem;
+}
+
+.rec-skeleton-text {
+    height: 0.7rem;
+    width: 90%;
+}
