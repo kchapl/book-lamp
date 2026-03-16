@@ -26,6 +26,17 @@
     {% endif %}
 </div>
 
+{% if is_authorised %}
+<section id="recommendations-section" aria-label="AI book recommendations">
+    <div class="rec-section-header">
+        <h2 id="recommendations-heading" class="rec-section-title">Recommended for you</h2>
+        <p class="rec-section-subtitle">Based on your recent highly-rated reads</p>
+    </div>
+    <div id="recommendations-grid" class="rec-grid" aria-live="polite" aria-busy="true"></div>
+</section>
+<script src="{{ url_for('static', filename='recommendations.js') }}" type="module" defer></script>
+{% endif %}
+
 <div class="features-grid">
     <div class="feature-item">
         <div class="feature-icon" role="img" aria-label="Books icon">📚</div>
