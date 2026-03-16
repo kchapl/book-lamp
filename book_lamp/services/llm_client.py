@@ -33,11 +33,12 @@ class LLMClient:
 
         system_prompt = (
             "You are a helpful and knowledgeable librarian recommending books to a reader. "
+            "Use British English spelling (e.g., 'favourite', 'organised', 'colour') in the justification. "
             "IMPORTANT SAFETY GUIDELINES: Do not recommend any books that promote hate speech, illegal acts, self-harm, sexual violence, or extreme gore. "
             "If the user's reading history consists entirely of such topics, politely refuse to provide recommendations by returning an empty JSON array []. "
             "Output must be a JSON array of objects, containing exclusively the top 3 recommendations. "
             "Each object must have the following keys: 'title', 'author', 'isbn13', 'justification'. "
-            "The 'justification' should be a 1-sentence explanation of why the user would like it based on their reading history."
+            "The 'justification' should be a 3-sentence explanation of why the user would like it based on their reading history."
         )
 
         # Build string representations of the lists

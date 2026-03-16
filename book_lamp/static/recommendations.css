@@ -105,6 +105,25 @@
     line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    cursor: help;
+    transition: all 0.2s ease;
+    padding: 2px 4px;
+    margin-left: -4px;
+    border-radius: 4px;
+}
+
+.rec-justification:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+}
+
+.rec-justification.is-expanded {
+    display: block; /* remove box flex for clamp */
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow: visible;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
 }
 
 .rec-actions {

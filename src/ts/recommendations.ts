@@ -114,6 +114,16 @@ async function loadRecommendations(): Promise<void> {
             });
         });
 
+        // Add event listeners for justification expansion
+        grid.querySelectorAll<HTMLElement>('.rec-justification').forEach((el) => {
+            el.title = 'Click to show full explanation';
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                el.classList.toggle('is-expanded');
+            });
+        });
+
         // Set animation delays
         grid.querySelectorAll<HTMLElement>('.rec-card').forEach((card, i) => {
             card.style.animationDelay = `${i * 80}ms`;
