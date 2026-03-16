@@ -325,32 +325,63 @@ class MockStorage:
             )
 
             if record_data:
-                # Basic dedup check
                 is_duplicate = False
-                for r in self.reading_records:
-                    if (
-                        r["book_id"] == book["id"]
-                        and r["status"] == record_data["status"]
-                    ):
-                        if record_data["status"] == "Completed":
-                            if r.get("end_date") == record_data.get("end_date"):
-                                is_duplicate = True
-                                break
-                        elif record_data["status"] == "In Progress":
-                            is_duplicate = True
-                            break
-                        else:
-                            if r["start_date"] == record_data["start_date"]:
-                                is_duplicate = True
-                                break
+                matched_record = None
 
-                if not is_duplicate:
+                r_status = record_data["status"]
+                r_start = record_data["start_date"]
+                r_end = record_data.get("end_date")
+
+                for r in self.reading_records:
+                    if r["book_id"] == book["id"]:
+                        ek_status = r["status"]
+                        ek_start = r["start_date"]
+                        ek_end = r.get("end_date")
+
+                        is_same_attempt = False
+                        if ek_start and r_start and ek_start == r_start:
+                            is_same_attempt = True
+                        elif (
+                            r_status == "Completed"
+                            and ek_status == "Completed"
+                            and ek_end
+                            and r_end
+                            and ek_end == r_end
+                        ):
+                            is_same_attempt = True
+                        elif ek_status == "In Progress":
+                            is_same_attempt = True
+
+                        if is_same_attempt:
+                            if (
+                                ek_status == r_status
+                                and ek_start == r_start
+                                and ek_end == r_end
+                            ):
+                                is_duplicate = True
+                            else:
+                                matched_record = r
+                            break
+
+                if is_duplicate:
+                    pass
+                elif matched_record:
+                    matched_record.update(
+                        {
+                            "status": r_status,
+                            "start_date": r_start,
+                            "end_date": r_end,
+                            "rating": record_data.get("rating")
+                            or matched_record.get("rating", 0),
+                        }
+                    )
+                else:
                     self.add_reading_record(
                         book_id=book["id"],
-                        status=record_data["status"],
-                        start_date=record_data["start_date"],
-                        end_date=record_data["end_date"],
-                        rating=record_data["rating"],
+                        status=r_status,
+                        start_date=r_start,
+                        end_date=r_end,
+                        rating=record_data.get("rating") or 0,
                     )
             import_count += 1
         return import_count
