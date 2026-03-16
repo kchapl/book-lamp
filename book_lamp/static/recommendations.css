@@ -114,10 +114,26 @@
 }
 
 .add-rec-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem !important;
     font-size: 0.85rem !important;
-    text-transform: none;
-    padding: 0.75rem !important;
-    border-radius: 12px !important;
+    font-weight: 600 !important;
+    background: transparent !important;
+    border: 1px solid var(--primary-light) !important;
+    color: var(--primary-light) !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    transition: all 0.2s ease !important;
+}
+
+.add-rec-btn:hover {
+    background: rgba(129, 140, 248, 0.15) !important;
+    color: white !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
 }
 
 .add-rec-btn:active {

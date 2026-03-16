@@ -45,11 +45,11 @@ function buildRecCard(rec: Recommendation): string {
                 </div>
             </a>
             <div class="rec-actions">
-                <button class="btn btn-small btn-outline w-full add-rec-btn" 
+                <button class="btn w-full add-rec-btn" 
                         data-isbn="${rec.isbn13 || ''}" 
                         data-title="${escapeHtml(rec.title)}" 
                         data-author="${escapeHtml(rec.author)}">
-                    Add to Reading List
+                    📋 Add to Reading List
                 </button>
             </div>
         </div>
