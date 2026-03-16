@@ -226,7 +226,14 @@ class GoogleSheetsStorage:
                 return
 
         # Define the ranges we want to fetch
-        tabs = ["Books", "Authors", "BookAuthors", "ReadingRecords", "ReadingList"]
+        tabs = [
+            "Books",
+            "Authors",
+            "BookAuthors",
+            "ReadingRecords",
+            "ReadingList",
+            "Recommendations",
+        ]
         ranges = [f"{tab}!A:P" for tab in tabs]
 
         try:
@@ -732,6 +739,84 @@ class GoogleSheetsStorage:
             ).execute()
         except HttpError:
             pass
+        finally:
+            self._clear_persistent_cache()
+
+    def get_recommendations(self) -> List[Dict[str, Any]]:
+        """Retrieve cached AI recommendations from the Recommendations tab."""
+        try:
+            values = self._get_values("Recommendations", "Recommendations!A:F")
+            if not values or len(values) < 2:
+                return []
+
+            headers = values[0]
+            recs = []
+            for row in values[1:]:
+                if not row or not row[0]:
+                    continue
+                row = row + [""] * (len(headers) - len(row))
+                try:
+                    rec_id = int(float(row[0]))
+                except (ValueError, TypeError):
+                    continue
+
+                recs.append(
+                    {
+                        "id": rec_id,
+                        "title": row[1] if len(row) > 1 else "",
+                        "author": row[2] if len(row) > 2 else "",
+                        "isbn13": row[3] if len(row) > 3 else "",
+                        "justification": row[4] if len(row) > 4 else "",
+                        "created_at": row[5] if len(row) > 5 and row[5] else None,
+                    }
+                )
+            return recs
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return []
+            raise Exception(f"Failed to fetch recommendations: {error}") from error
+
+    def save_recommendations(self, recommendations: List[Dict[str, Any]]) -> None:
+        """Cache AI recommendations into the Recommendations tab, replacing any previous ones."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+
+            # Clear existing recommendations
+            self.service.spreadsheets().values().clear(
+                spreadsheetId=sid, range="Recommendations!A2:Z"
+            ).execute()
+
+            if not recommendations:
+                return
+
+            rows = [
+                [
+                    i + 1,
+                    rec.get("title", ""),
+                    rec.get("author", ""),
+                    rec.get("isbn13", ""),
+                    rec.get("justification", ""),
+                    now,
+                ]
+                for i, rec in enumerate(recommendations)
+            ]
+
+            self.service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range="Recommendations!A2",
+                valueInputOption="RAW",
+                body={"values": rows},
+            ).execute()
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                self.save_recommendations(recommendations)
+            else:
+                logger.error(f"Failed to save recommendations: {error}", exc_info=True)
+                raise
         finally:
             self._clear_persistent_cache()
 
@@ -1780,6 +1865,7 @@ class GoogleSheetsStorage:
                 "Authors",
                 "BookAuthors",
                 "ReadingList",
+                "Recommendations",
             ]
             add_requests = []
             for tab in required_tabs:
@@ -1823,6 +1909,14 @@ class GoogleSheetsStorage:
                 "Authors": ["id", "name"],
                 "BookAuthors": ["book_id", "author_id"],
                 "ReadingList": ["book_id", "position", "created_at"],
+                "Recommendations": [
+                    "id",
+                    "title",
+                    "author",
+                    "isbn13",
+                    "justification",
+                    "created_at",
+                ],
             }
 
             for tab, headers in tab_headers.items():

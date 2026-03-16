@@ -5,7 +5,7 @@ import os
 import re
 from collections import Counter
 from functools import wraps
-from typing import Union
+from typing import Union, cast
 from urllib.parse import urlparse
 
 import click  # noqa: E402
@@ -26,6 +26,7 @@ from flask import (  # noqa: E402
 from book_lamp.services import sheets_storage as from_sheets_storage
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
+from book_lamp.services.llm_client import LLMClient
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
@@ -124,6 +125,13 @@ def get_storage():
     return g.storage
 
 
+def get_llm_client() -> LLMClient:
+    """Return a per-request LLMClient singleton (cheap to construct)."""
+    if "llm_client" not in g:
+        g.llm_client = LLMClient()
+    return cast(LLMClient, g.llm_client)
+
+
 def authorisation_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -148,6 +156,13 @@ def get_app_version():
 
 
 APP_VERSION = get_app_version()
+
+# Warn early so the operator sees it in the server log without needing to hit a route.
+if not os.environ.get("LLM_API_KEY"):
+    logging.getLogger(__name__).warning(
+        "LLM_API_KEY is not set — AI recommendations will be unavailable. "
+        "Add LLM_API_KEY, LLM_BASE_URL, and LLM_MODEL to your .env file to enable this feature."
+    )
 
 
 @app.context_processor
@@ -209,6 +224,44 @@ def get_job_status(job_id: str):
         return jsonify({"error": "Job not found"}), 404
 
     return jsonify(job.to_dict())
+
+
+# -----------------------------
+# AI Recommendations
+# -----------------------------
+
+
+@app.route("/api/recommendations", methods=["GET"])
+@authorisation_required
+def api_recommendations():
+    """Return (possibly cached) AI book recommendations as JSON.
+
+    The frontend calls this asynchronously after the dashboard has loaded.
+    Fresh recommendations are generated from recently highly-rated books;
+    results are cached in the Recommendations sheet for up to 7 days.
+    """
+    from book_lamp.services.recommendations import get_or_refresh_recommendations
+
+    storage = get_storage()
+    llm = get_llm_client()
+
+    if not llm.client:
+        return (
+            jsonify({"recommendations": [], "error": "LLM_API_KEY not configured"}),
+            200,
+        )
+
+    try:
+        recs = get_or_refresh_recommendations(storage, llm)
+        return jsonify({"recommendations": recs})
+    except Exception:
+        app.logger.exception("Failed to generate recommendations")
+        return (
+            jsonify(
+                {"recommendations": [], "error": "Failed to generate recommendations"}
+            ),
+            200,
+        )
 
 
 @app.route("/")
@@ -1251,7 +1304,7 @@ def fetch_missing_data():
     )
 
     flash(
-        "Refreshing library catalog: Fetching metadata and covers in the background.",
+        "Refreshing reading log catalogue: Fetching metadata and covers in the background.",
         "info",
     )
     return redirect(url_for("list_books", job_id=job_id))
@@ -1343,7 +1396,7 @@ def import_books():
         )
 
         flash(
-            "Library import in progress: Processing and enriching your reading history.",
+            "Reading log import in progress: Processing and enriching your reading history.",
             "info",
         )
         return redirect(url_for("list_books", job_id=job_id))

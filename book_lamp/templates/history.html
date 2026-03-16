@@ -5,6 +5,7 @@
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='books.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='recommendations.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -187,6 +188,17 @@
     </div>
     {% endif %}
 </div>
+
+{% if is_authorised %}
+<section id="recommendations-section" aria-label="AI book recommendations">
+    <div class="rec-section-header">
+        <h2 id="recommendations-heading" class="rec-section-title">Recommended for you</h2>
+        <p class="rec-section-subtitle">Based on your recent highly-rated reads</p>
+    </div>
+    <div id="recommendations-grid" class="rec-grid" aria-live="polite" aria-busy="true"></div>
+</section>
+<script src="{{ url_for('static', filename='recommendations.js') }}" type="module" defer></script>
+{% endif %}
 
 <script src="{{ url_for('static', filename='reading-records.js') }}" type="module" defer></script>
 {% endblock %}
