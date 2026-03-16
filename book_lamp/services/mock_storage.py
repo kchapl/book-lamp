@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class MockStorage:
         self.books: list[dict[str, Any]] = []
         self.reading_records: list[dict[str, Any]] = []
         self.reading_list: list[dict[str, Any]] = []
+        self.recommendations: list[dict[str, Any]] = []
         self.next_book_id = 1
         self.next_record_id = 1
         self._authorised = False  # Default to False for security and testing
@@ -401,3 +403,22 @@ class MockStorage:
         from book_lamp.services.search import search_books
 
         return search_books(self.books, self.reading_records, query)
+
+    def get_recommendations(self) -> list[dict[str, Any]]:
+        """Return cached recommendations."""
+        return list(self.recommendations)
+
+    def save_recommendations(self, recommendations: list[dict[str, Any]]) -> None:
+        """Persist recommendations, replacing any existing ones."""
+        now = datetime.now(timezone.utc).isoformat()
+        self.recommendations = [
+            {
+                "id": i + 1,
+                "title": rec.get("title", ""),
+                "author": rec.get("author", ""),
+                "isbn13": rec.get("isbn13", ""),
+                "justification": rec.get("justification", ""),
+                "created_at": now,
+            }
+            for i, rec in enumerate(recommendations)
+        ]
