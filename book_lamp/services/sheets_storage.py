@@ -1740,6 +1740,7 @@ class GoogleSheetsStorage:
                 "Authors",
                 "BookAuthors",
                 "ReadingList",
+                "Recommendations",
             ]
             add_requests = []
             for tab in required_tabs:
@@ -1783,6 +1784,14 @@ class GoogleSheetsStorage:
                 "Authors": ["id", "name"],
                 "BookAuthors": ["book_id", "author_id"],
                 "ReadingList": ["book_id", "position", "created_at"],
+                "Recommendations": [
+                    "id",
+                    "title",
+                    "author",
+                    "isbn13",
+                    "justification",
+                    "created_at",
+                ],
             }
 
             for tab, headers in tab_headers.items():
