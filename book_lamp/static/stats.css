@@ -109,6 +109,13 @@
     background: #ef4444;
 }
 
+/* Rating Distribution Bars */
+.rating-bar {
+    background: #fbbf24 !important;
+    border-radius: 4px;
+    height: 100%;
+}
+
 .status-dot.not-begun {
     background: #6b7280;
 }
@@ -367,6 +374,10 @@
     color: var(--text-muted);
     font-weight: 600;
     text-align: center;
+}
+
+.gap-025 {
+    gap: 0.25rem;
 }
 
 .stats-footer {

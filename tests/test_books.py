@@ -216,3 +216,33 @@ def test_books_dewey_filter(authenticated_client):
     assert "Science Book" not in html
     assert "Literature Book" in html
     assert "800 Lit" in html
+
+
+def test_books_rating_filter(authenticated_client):
+    """Test filtering books bookshelf by rating."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="401", title="5 Star Book", author="A1")
+    b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
+
+    # b1 rated 5
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 rated 4
+    storage.add_reading_record(
+        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
+    )
+
+    # Filter bookshelf by rating 5
+    resp = authenticated_client.get("/books?rating=5")
+    html = resp.data.decode("utf-8")
+    assert "5 Star Book" in html
+    assert "4 Star Book" not in html
+    assert "5 ★" in html
+
+    # Filter bookshelf by rating 4
+    resp = authenticated_client.get("/books?rating=4")
+    html = resp.data.decode("utf-8")
+    assert "5 Star Book" not in html
+    assert "4 Star Book" in html
+    assert "4 ★" in html

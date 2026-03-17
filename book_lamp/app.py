@@ -641,6 +641,17 @@ def list_books():
 
         month_name = calendar.month_name[int(month_filter)]
 
+    # Filtering by rating
+    rating_filter = request.args.get("rating")
+    if rating_filter and rating_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                if str(record.get("rating")) == rating_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
     # Filtering by dewey
     dewey_filter = request.args.get("dewey")
     DEWEY_LABELS = {
@@ -677,6 +688,7 @@ def list_books():
         current_month=month_filter,
         current_month_name=month_name,
         current_dewey=dewey_filter,
+        current_rating=rating_filter,
         current_dewey_name=dewey_name,
     )
 
@@ -953,6 +965,19 @@ def collection_stats():
                 statuses.append(status)
     status_counts = Counter(statuses)
 
+    # Rating Distribution (only from completed records)
+    rating_counts = Counter()
+    for r in all_records:
+        if r.get("status") == "Completed":
+            try:
+                r_val = int(r.get("rating", 0))
+                if 1 <= r_val <= 5:
+                    rating_counts[r_val] += 1
+            except (ValueError, TypeError):
+                continue
+
+    rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
+
     # Top authors (only count books that have been completed)
     all_authors = []
     for b in completed_books:
@@ -1055,6 +1080,7 @@ def collection_stats():
         total_records=total_records,
         avg_rating=avg_rating,
         status_counts=status_counts,
+        rating_distribution=rating_distribution,
         top_authors=top_authors,
         top_publishers=top_publishers,
         dewey_distribution=dewey_distribution,

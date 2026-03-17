@@ -57,6 +57,31 @@
         </div>
     </div>
 
+    <!-- Rating Distribution -->
+    <div class="chart-card">
+        <h2>Rating Distribution</h2>
+        <div class="progress-container">
+            {% for stars, count in rating_distribution %}
+            <div class="progress-row">
+                <div class="label-group" style="width: 80px;">
+                    <span class="status-name">
+                        <a href="{{ url_for('list_books', rating=stars) }}" class="flex-center gap-025">
+                            {{ stars }} ★
+                        </a>
+                    </span>
+                </div>
+                <div class="bar-wrapper">
+                    <a href="{{ url_for('list_books', rating=stars) }}" aria-label="View books with {{ stars }} stars">
+                        <div class="bar rating-bar"
+                            style="--bar-width: {{ (count / total_books * 100)|round if total_books > 0 else 0 }}%; background: #fbbf24;"></div>
+                    </a>
+                </div>
+                <div class="count">{{ count }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <!-- Top Authors -->
     <div class="chart-card">
         <h2>Top Authors</h2>
