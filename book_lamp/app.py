@@ -882,7 +882,7 @@ def collection_stats():
             all_authors.append(b["author"])
 
     total_authors = len(set(all_authors))
-    top_authors = Counter(all_authors).most_common(5)
+    top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]
 
     # Top publishers (only count books that have been completed)
     all_publishers = []
@@ -891,7 +891,9 @@ def collection_stats():
             norm_pub = _normalize_publisher(b["publisher"])
             if norm_pub:
                 all_publishers.append(norm_pub)
-    top_publishers = Counter(all_publishers).most_common(5)
+    top_publishers = sorted(
+        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
+    )[:5]
 
     # Completed Books by Year and Month
     completed_records = [

@@ -152,3 +152,38 @@ def test_delete_reading_record(authenticated_client):
     )
     assert response.status_code == 200
     assert len(storage.get_reading_records()) == 0
+
+
+def test_stats_top_authors_sorting(authenticated_client):
+    """Stats page should sort top authors by count (desc) then by name (asc)."""
+    storage = get_storage()
+    # Rowling and Bryson both have 2 completed books
+    # Rowling is added first to possibly ensure she came first in Counter
+    storage.add_book(isbn13="1", title="R1", author="Rowling")
+    storage.add_book(isbn13="2", title="R2", author="Rowling")
+    storage.add_book(isbn13="3", title="B1", author="Bryson")
+    storage.add_book(isbn13="4", title="B2", author="Bryson")
+    # Tolkien has 3 completed books
+    storage.add_book(isbn13="5", title="T1", author="Tolkien")
+    storage.add_book(isbn13="6", title="T2", author="Tolkien")
+    storage.add_book(isbn13="7", title="T3", author="Tolkien")
+
+    for book in storage.get_all_books():
+        storage.add_reading_record(book["id"], "Completed", "2023-01-01", "2023-01-10")
+
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+
+    # Expected order: Tolkien (3), Bryson (2), Rowling (2)
+    # Bryson should come before Rowling because of alphabetical name sort (secondary sort)
+    tolkien_index = html.find("Tolkien")
+    bryson_index = html.find("Bryson")
+    rowling_index = html.find("Rowling")
+
+    assert tolkien_index != -1
+    assert bryson_index != -1
+    assert rowling_index != -1
+    assert tolkien_index < bryson_index
+    assert (
+        bryson_index < rowling_index
+    ), "Bryson (B) should come before Rowling (R) for the same count"
