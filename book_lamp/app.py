@@ -616,13 +616,9 @@ def list_books():
         filtered_books = []
         for b in books:
             record = latest_records.get(b.get("id"))
-            if record:
-                # If they completed it in the filtered year, or if they started it in the filtered year and didn't complete it.
+            if record and record.get("status") == "Completed":
                 end_date = record.get("end_date")
-                start_date = record.get("start_date")
-                if (end_date and end_date[:4] == year_filter) or (
-                    not end_date and start_date and start_date[:4] == year_filter
-                ):
+                if end_date and end_date[:4] == year_filter:
                     filtered_books.append(b)
         books = filtered_books
 
@@ -633,13 +629,9 @@ def list_books():
         filtered_books = []
         for b in books:
             record = latest_records.get(b.get("id"))
-            if record:
+            if record and record.get("status") == "Completed":
                 end_date = record.get("end_date")
-                start_date = record.get("start_date")
-                # Use completion date month, or start date month if not completed.
                 if end_date and end_date[5:7] == month_idx:
-                    filtered_books.append(b)
-                elif not end_date and start_date and start_date[5:7] == month_idx:
                     filtered_books.append(b)
         books = filtered_books
 
@@ -651,16 +643,6 @@ def list_books():
 
     # Filtering by dewey
     dewey_filter = request.args.get("dewey")
-    if dewey_filter:
-        filtered_books = []
-        for b in books:
-            ddc = b.get("dewey_decimal")
-            if ddc:
-                match = re.search(r"\b(\d)", str(ddc))
-                if match and match.group(1) == dewey_filter:
-                    filtered_books.append(b)
-        books = filtered_books
-
     DEWEY_LABELS = {
         "0": "000 General",
         "1": "100 Philo",
@@ -673,7 +655,18 @@ def list_books():
         "8": "800 Lit",
         "9": "900 Hist",
     }
-    dewey_name = DEWEY_LABELS.get(dewey_filter)
+    if dewey_filter:
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                ddc = b.get("dewey_decimal")
+                if ddc:
+                    match = re.search(r"\b(\d)", str(ddc))
+                    if match and match.group(1) == dewey_filter:
+                        filtered_books.append(b)
+        books = filtered_books
+    dewey_name = DEWEY_LABELS.get(dewey_filter) if dewey_filter else None
 
     return render_template(
         "books.html",

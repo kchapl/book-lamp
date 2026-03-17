@@ -128,6 +128,12 @@ def test_books_year_filter(authenticated_client):
     assert "2024" in html
     assert "Books completed in" in html
 
+    # Add an 'In Progress' book started in 2024 to ensure it's excluded
+    b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
+    resp = authenticated_client.get("/books?year=2024")
+    assert "2024 In Progress" not in resp.data.decode("utf-8")
+
     # Filter bookshelf by year 2023
     resp = authenticated_client.get("/books?year=2023")
     html = resp.data.decode("utf-8")
@@ -159,6 +165,12 @@ def test_books_month_filter(authenticated_client):
     assert "February Book" not in html
     assert "January" in html
 
+    # Add an 'In Progress' book started in January to ensure it's excluded
+    b3 = storage.add_book(isbn13="203", title="January In Progress", author="A3")
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-05")
+    resp = authenticated_client.get("/books?month=1")
+    assert "January In Progress" not in resp.data.decode("utf-8")
+
     # Filter bookshelf by month 2 (February)
     resp = authenticated_client.get("/books?month=2")
     html = resp.data.decode("utf-8")
@@ -189,6 +201,14 @@ def test_books_dewey_filter(authenticated_client):
     assert "Science Book" in html
     assert "Literature Book" not in html
     assert "500 Sci" in html
+
+    # Add an 'In Progress' science book to ensure it's excluded
+    b3 = storage.add_book(
+        isbn13="303", title="Science In Progress", author="A3", dewey_decimal="505.5"
+    )
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
+    resp = authenticated_client.get("/books?dewey=5")
+    assert "Science In Progress" not in resp.data.decode("utf-8")
 
     # Filter bookshelf by Dewey digit 8 (Literature)
     resp = authenticated_client.get("/books?dewey=8")
