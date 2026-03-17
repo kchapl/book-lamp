@@ -140,15 +140,17 @@
     <div class="chart-card wide">
         <h2>Books read by subject (Dewey Decimal)</h2>
         <div class="dewey-grid">
-            {% for category, count in dewey_distribution.items() %}
+            {% for digit, label, count in dewey_distribution %}
             <div class="dewey-item">
-                <div class="dewey-bar-container">
-                    <div class="dewey-bar"
-                        style="--bar-height: {{ (count / max_dewey_count * 100)|round if max_dewey_count > 0 else 0 }}%;">
-                        <span class="count-tooltip">{{ count }}</span>
+                <a href="{{ url_for('list_books', dewey=digit) }}" class="bar-link" aria-label="View books in category {{ label }}">
+                    <div class="dewey-bar-container">
+                        <div class="dewey-bar"
+                            style="--bar-height: {{ (count / max_dewey_count * 100)|round if max_dewey_count > 0 else 0 }}%;">
+                            <span class="count-tooltip">{{ count }}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="dewey-label">{{ category }}</div>
+                </a>
+                <div class="dewey-label">{{ label }}</div>
             </div>
             {% endfor %}
         </div>

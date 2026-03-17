@@ -649,6 +649,32 @@ def list_books():
 
         month_name = calendar.month_name[int(month_filter)]
 
+    # Filtering by dewey
+    dewey_filter = request.args.get("dewey")
+    if dewey_filter:
+        filtered_books = []
+        for b in books:
+            ddc = b.get("dewey_decimal")
+            if ddc:
+                match = re.search(r"\b(\d)", str(ddc))
+                if match and match.group(1) == dewey_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    DEWEY_LABELS = {
+        "0": "000 General",
+        "1": "100 Philo",
+        "2": "200 Rel",
+        "3": "300 Soc Sci",
+        "4": "400 Lang",
+        "5": "500 Sci",
+        "6": "600 Tech",
+        "7": "700 Arts",
+        "8": "800 Lit",
+        "9": "900 Hist",
+    }
+    dewey_name = DEWEY_LABELS.get(dewey_filter)
+
     return render_template(
         "books.html",
         books=books,
@@ -657,6 +683,8 @@ def list_books():
         current_year=year_filter,
         current_month=month_filter,
         current_month_name=month_name,
+        current_dewey=dewey_filter,
+        current_dewey_name=dewey_name,
     )
 
 
@@ -1018,11 +1046,14 @@ def collection_stats():
                 digit = match.group(1)
                 dewey_bins[DEWEY_LABELS.get(digit, "Other")] += 1
 
-    # Ensure all labels present for chart
-    dewey_distribution = {label: dewey_bins[label] for label in DEWEY_LABELS.values()}
-    max_dewey_count = (
-        max(dewey_distribution.values()) if dewey_distribution.values() else 1
-    )
+    # Ensure all labels present for chart (keeping digit as key for linking)
+    dewey_distribution = [
+        (digit, label, dewey_bins[label]) for digit, label in DEWEY_LABELS.items()
+    ]
+    # Sort by digit
+    dewey_distribution.sort(key=lambda x: x[0])
+
+    max_dewey_count = max(dewey_bins.values()) if dewey_bins.values() else 1
 
     return render_template(
         "stats.html",

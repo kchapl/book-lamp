@@ -165,3 +165,34 @@ def test_books_month_filter(authenticated_client):
     assert "January Book" not in html
     assert "February Book" in html
     assert "February" in html
+
+
+def test_books_dewey_filter(authenticated_client):
+    """Test filtering books bookshelf by Dewey Decimal category."""
+    storage = get_storage()
+    # 500 range (Science)
+    b1 = storage.add_book(
+        isbn13="301", title="Science Book", author="A1", dewey_decimal="501.1"
+    )
+    # 800 range (Literature)
+    b2 = storage.add_book(
+        isbn13="302", title="Literature Book", author="A2", dewey_decimal="823.9"
+    )
+
+    # Give them statuses so they show up in the library
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15")
+    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15")
+
+    # Filter bookshelf by Dewey digit 5 (Science)
+    resp = authenticated_client.get("/books?dewey=5")
+    html = resp.data.decode("utf-8")
+    assert "Science Book" in html
+    assert "Literature Book" not in html
+    assert "500 Sci" in html
+
+    # Filter bookshelf by Dewey digit 8 (Literature)
+    resp = authenticated_client.get("/books?dewey=8")
+    html = resp.data.decode("utf-8")
+    assert "Science Book" not in html
+    assert "Literature Book" in html
+    assert "800 Lit" in html
