@@ -36,10 +36,13 @@
         </div>
         <button type="submit" class="btn btn-search">🔍 Search</button>
     </form>
-    {% if search_query or current_year or current_month or current_dewey or current_rating %}
+    {% if search_query or current_year or current_month or current_dewey or current_rating or current_status %}
     <div class="search-results-badge mt-1 pt-075 flex-center gap-1">
         {% if search_query %}
         <span><strong>Search results for:</strong> "{{ search_query }}"</span>
+        {% endif %}
+        {% if current_status %}
+        <span><strong>Status:</strong> {{ current_status }}</span>
         {% endif %}
         {% if current_year %}
         <span><strong>Books completed in </strong> {{ current_year }}</span>
@@ -68,6 +71,9 @@
         style="display: inline-block;" id="sort-form">
         {% if search_query %}
         <input type="hidden" name="q" value="{{ search_query }}">
+        {% endif %}
+        {% if current_status %}
+        <input type="hidden" name="status" value="{{ current_status }}">
         {% endif %}
         {% if current_year %}
         <input type="hidden" name="year" value="{{ current_year }}">

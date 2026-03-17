@@ -246,3 +246,33 @@ def test_books_rating_filter(authenticated_client):
     assert "5 Star Book" not in html
     assert "4 Star Book" in html
     assert "4 ★" in html
+
+
+def test_books_status_filter(authenticated_client):
+    """Test filtering books bookshelf by status."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="501", title="In Progress Book", author="A1")
+    b2 = storage.add_book(isbn13="502", title="Completed Book", author="A2")
+
+    # b1 in progress
+    storage.add_reading_record(b1["id"], "In Progress", "2024-01-01")
+    # b2 completed
+    storage.add_reading_record(
+        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+
+    # Filter bookshelf by status "In Progress"
+    resp = authenticated_client.get("/books?status=In+Progress")
+    html = resp.data.decode("utf-8")
+    assert "In Progress Book" in html
+    assert "Completed Book" not in html
+    assert "Status:" in html
+    assert "In Progress" in html
+
+    # Filter bookshelf by status "Completed"
+    resp = authenticated_client.get("/books?status=Completed")
+    html = resp.data.decode("utf-8")
+    assert "In Progress Book" not in html
+    assert "Completed Book" in html
+    assert "Status:" in html
+    assert "Completed" in html

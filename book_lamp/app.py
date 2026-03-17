@@ -610,6 +610,10 @@ def list_books():
         if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
     ]
 
+    status_filter = request.args.get("status")
+    if status_filter:
+        books = [b for b in books if b.get("latest_status") == status_filter]
+
     # Filtering by year
     year_filter = request.args.get("year")
     if year_filter and year_filter.isdigit():
@@ -689,6 +693,7 @@ def list_books():
         current_month_name=month_name,
         current_dewey=dewey_filter,
         current_rating=rating_filter,
+        current_status=status_filter,
         current_dewey_name=dewey_name,
     )
 
