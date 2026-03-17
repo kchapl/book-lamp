@@ -626,12 +626,37 @@ def list_books():
                     filtered_books.append(b)
         books = filtered_books
 
+    # Filtering by month
+    month_filter = request.args.get("month")
+    if month_filter and month_filter.isdigit():
+        month_idx = f"{int(month_filter):02d}"
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record:
+                end_date = record.get("end_date")
+                start_date = record.get("start_date")
+                # Use completion date month, or start date month if not completed.
+                if end_date and end_date[5:7] == month_idx:
+                    filtered_books.append(b)
+                elif not end_date and start_date and start_date[5:7] == month_idx:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    month_name = None
+    if month_filter and month_filter.isdigit():
+        import calendar
+
+        month_name = calendar.month_name[int(month_filter)]
+
     return render_template(
         "books.html",
         books=books,
         sort_by=sort_by,
         sort_options=SORT_OPTIONS,
         current_year=year_filter,
+        current_month=month_filter,
+        current_month_name=month_name,
     )
 
 
@@ -959,12 +984,12 @@ def collection_stats():
             if month_idx.isdigit():
                 monthly_counts[month_idx] += 1
 
-    # Map to month names
+    # Map to month names and indices for linking
     ordered_months = []
     for i in range(1, 13):
-        idx = f"{i:02d}"
+        idx_str = f"{i:02d}"
         name = calendar.month_name[i][:3]
-        ordered_months.append((name, monthly_counts[idx]))
+        ordered_months.append((i, name, monthly_counts[idx_str]))
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
     avg_month_count = sum(monthly_counts.values()) / 12

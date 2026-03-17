@@ -135,3 +135,33 @@ def test_books_year_filter(authenticated_client):
     assert "2023 Book" in html
     assert "2023" in html
     assert "Books completed in" in html
+
+
+def test_books_month_filter(authenticated_client):
+    """Test filtering books bookshelf by month completed."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="201", title="January Book", author="A1")
+    b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
+
+    # b1 completed in January (any year)
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 completed in February (any year)
+    storage.add_reading_record(
+        b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4
+    )
+
+    # Filter bookshelf by month 1 (January)
+    resp = authenticated_client.get("/books?month=1")
+    html = resp.data.decode("utf-8")
+    assert "January Book" in html
+    assert "February Book" not in html
+    assert "January" in html
+
+    # Filter bookshelf by month 2 (February)
+    resp = authenticated_client.get("/books?month=2")
+    html = resp.data.decode("utf-8")
+    assert "January Book" not in html
+    assert "February Book" in html
+    assert "February" in html
