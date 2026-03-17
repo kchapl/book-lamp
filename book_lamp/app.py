@@ -444,6 +444,19 @@ def reading_history():
         min_rating = int(min_rating)
         history = [r for r in history if r.get("rating", 0) >= min_rating]
 
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        history = [
+            r
+            for r in history
+            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
+            or (
+                not r.get("end_date")
+                and r.get("start_date")
+                and r.get("start_date")[:4] == year_filter
+            )
+        ]
+
     # Sorting
     sort_by = request.args.get("sort", "date_desc")
 
@@ -464,6 +477,7 @@ def reading_history():
         statuses=all_statuses,
         current_status=status_filter,
         current_rating=min_rating,
+        current_year=year_filter,
         current_sort=sort_by,
     )
 
@@ -596,8 +610,28 @@ def list_books():
         if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
     ]
 
+    # Filtering by year
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record:
+                # If they completed it in the filtered year, or if they started it in the filtered year and didn't complete it.
+                end_date = record.get("end_date")
+                start_date = record.get("start_date")
+                if (end_date and end_date[:4] == year_filter) or (
+                    not end_date and start_date and start_date[:4] == year_filter
+                ):
+                    filtered_books.append(b)
+        books = filtered_books
+
     return render_template(
-        "books.html", books=books, sort_by=sort_by, sort_options=SORT_OPTIONS
+        "books.html",
+        books=books,
+        sort_by=sort_by,
+        sort_options=SORT_OPTIONS,
+        current_year=year_filter,
     )
 
 

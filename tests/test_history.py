@@ -187,3 +187,27 @@ def test_stats_top_authors_sorting(authenticated_client):
     assert (
         bryson_index < rowling_index
     ), "Bryson (B) should come before Rowling (R) for the same count"
+
+
+def test_reading_history_year_filter(authenticated_client):
+    """Test filtering reading history by year."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="1", title="2024 Book", author="A1")
+    b2 = storage.add_book(isbn13="2", title="2023 Book", author="A2")
+
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    storage.add_reading_record(
+        b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
+    )
+
+    # Filter by year 2024
+    response = authenticated_client.get("/history?year=2024")
+    assert b"2024 Book" in response.data
+    assert b"2023 Book" not in response.data
+
+    # Filter by year 2023
+    response = authenticated_client.get("/history?year=2023")
+    assert b"2024 Book" not in response.data
+    assert b"2023 Book" in response.data

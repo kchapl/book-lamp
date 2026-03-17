@@ -285,6 +285,11 @@
     height: 250px;
 }
 
+.bar-link {
+    display: contents;
+    cursor: pointer;
+}
+
 .timeline-item,
 .dewey-item {
     flex: 1;

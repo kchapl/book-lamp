@@ -91,7 +91,7 @@
 
     <!-- Yearly and Monthly Activity -->
     <div class="chart-card">
-        <h2>Books finished by year</h2>
+        <h2>Books completed by year</h2>
         <div class="timeline-grid">
             <div class="marker-line"
                 style="--marker-bottom: {{ (avg_year_count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
@@ -99,12 +99,14 @@
             </div>
             {% for year, count in yearly_counts %}
             <div class="timeline-item">
-                <div class="timeline-bar-container">
-                    <div class="timeline-bar"
-                        style="--bar-height: {{ (count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
-                        <span class="count-tooltip">{{ count }}</span>
+                <a href="{{ url_for('list_books', year=year) }}" class="bar-link" aria-label="View books completed in {{ year }}">
+                    <div class="timeline-bar-container">
+                        <div class="timeline-bar"
+                            style="--bar-height: {{ (count / max_year_count * 100)|round if max_year_count > 0 else 0 }}%;">
+                            <span class="count-tooltip">{{ count }}</span>
+                        </div>
                     </div>
-                </div>
+                </a>
                 <div class="timeline-label">{{ year }}</div>
             </div>
             {% endfor %}
@@ -112,7 +114,7 @@
     </div>
 
     <div class="chart-card">
-        <h2>Books finished by month</h2>
+        <h2>Books completed by month</h2>
         <div class="timeline-grid">
             <div class="marker-line"
                 style="--marker-bottom: {{ (avg_month_count / max_month_count * 100)|round if max_month_count > 0 else 0 }}%;">

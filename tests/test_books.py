@@ -103,3 +103,35 @@ def test_books_page_buttons_have_no_inline_styles(authenticated_client):
     fetch_tag = _opening_tag_for_text(html, "Fetch missing data")
     assert fetch_tag is not None
     assert "style=" not in fetch_tag
+
+
+def test_books_year_filter(authenticated_client):
+    """Test filtering books bookshelf by year completed."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="101", title="2024 Book", author="A1")
+    b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
+
+    # b1 completed in 2024
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 completed in 2023
+    storage.add_reading_record(
+        b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
+    )
+
+    # Filter bookshelf by year 2024
+    resp = authenticated_client.get("/books?year=2024")
+    html = resp.data.decode("utf-8")
+    assert "2024 Book" in html
+    assert "2023 Book" not in html
+    assert "2024" in html
+    assert "Books completed in" in html
+
+    # Filter bookshelf by year 2023
+    resp = authenticated_client.get("/books?year=2023")
+    html = resp.data.decode("utf-8")
+    assert "2024 Book" not in html
+    assert "2023 Book" in html
+    assert "2023" in html
+    assert "Books completed in" in html
