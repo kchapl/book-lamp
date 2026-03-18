@@ -12,11 +12,6 @@
     <div class="publisher-stats">
         {{ books|length }} book{% if books|length != 1 %}s{% endif %} in your reading log
     </div>
-    <div class="mt-15">
-        <a href="{{ url_for('list_books') }}" class="back-btn-pill">
-            ← Back to Books
-        </a>
-    </div>
 </div>
 
 {% if books %}

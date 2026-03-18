@@ -103,3 +103,176 @@ def test_books_page_buttons_have_no_inline_styles(authenticated_client):
     fetch_tag = _opening_tag_for_text(html, "Fetch missing data")
     assert fetch_tag is not None
     assert "style=" not in fetch_tag
+
+
+def test_books_year_filter(authenticated_client):
+    """Test filtering books bookshelf by year completed."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="101", title="2024 Book", author="A1")
+    b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
+
+    # b1 completed in 2024
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 completed in 2023
+    storage.add_reading_record(
+        b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
+    )
+
+    # Filter bookshelf by year 2024
+    resp = authenticated_client.get("/books?year=2024")
+    html = resp.data.decode("utf-8")
+    assert "2024 Book" in html
+    assert "2023 Book" not in html
+    assert "2024" in html
+    assert "Books completed in" in html
+
+    # Add an 'In Progress' book started in 2024 to ensure it's excluded
+    b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
+    resp = authenticated_client.get("/books?year=2024")
+    assert "2024 In Progress" not in resp.data.decode("utf-8")
+
+    # Filter bookshelf by year 2023
+    resp = authenticated_client.get("/books?year=2023")
+    html = resp.data.decode("utf-8")
+    assert "2024 Book" not in html
+    assert "2023 Book" in html
+    assert "2023" in html
+    assert "Books completed in" in html
+
+
+def test_books_month_filter(authenticated_client):
+    """Test filtering books bookshelf by month completed."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="201", title="January Book", author="A1")
+    b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
+
+    # b1 completed in January (any year)
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 completed in February (any year)
+    storage.add_reading_record(
+        b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4
+    )
+
+    # Filter bookshelf by month 1 (January)
+    resp = authenticated_client.get("/books?month=1")
+    html = resp.data.decode("utf-8")
+    assert "January Book" in html
+    assert "February Book" not in html
+    assert "January" in html
+
+    # Add an 'In Progress' book started in January to ensure it's excluded
+    b3 = storage.add_book(isbn13="203", title="January In Progress", author="A3")
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-05")
+    resp = authenticated_client.get("/books?month=1")
+    assert "January In Progress" not in resp.data.decode("utf-8")
+
+    # Filter bookshelf by month 2 (February)
+    resp = authenticated_client.get("/books?month=2")
+    html = resp.data.decode("utf-8")
+    assert "January Book" not in html
+    assert "February Book" in html
+    assert "February" in html
+
+
+def test_books_dewey_filter(authenticated_client):
+    """Test filtering books bookshelf by Dewey Decimal category."""
+    storage = get_storage()
+    # 500 range (Science)
+    b1 = storage.add_book(
+        isbn13="301", title="Science Book", author="A1", dewey_decimal="501.1"
+    )
+    # 800 range (Literature)
+    b2 = storage.add_book(
+        isbn13="302", title="Literature Book", author="A2", dewey_decimal="823.9"
+    )
+
+    # Give them statuses so they show up in the library
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15")
+    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15")
+
+    # Filter bookshelf by Dewey digit 5 (Science)
+    resp = authenticated_client.get("/books?dewey=5")
+    html = resp.data.decode("utf-8")
+    assert "Science Book" in html
+    assert "Literature Book" not in html
+    assert "500 Sci" in html
+
+    # Add an 'In Progress' science book to ensure it's excluded
+    b3 = storage.add_book(
+        isbn13="303", title="Science In Progress", author="A3", dewey_decimal="505.5"
+    )
+    storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
+    resp = authenticated_client.get("/books?dewey=5")
+    assert "Science In Progress" not in resp.data.decode("utf-8")
+
+    # Filter bookshelf by Dewey digit 8 (Literature)
+    resp = authenticated_client.get("/books?dewey=8")
+    html = resp.data.decode("utf-8")
+    assert "Science Book" not in html
+    assert "Literature Book" in html
+    assert "800 Lit" in html
+
+
+def test_books_rating_filter(authenticated_client):
+    """Test filtering books bookshelf by rating."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="401", title="5 Star Book", author="A1")
+    b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
+
+    # b1 rated 5
+    storage.add_reading_record(
+        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+    # b2 rated 4
+    storage.add_reading_record(
+        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
+    )
+
+    # Filter bookshelf by rating 5
+    resp = authenticated_client.get("/books?rating=5")
+    html = resp.data.decode("utf-8")
+    assert "5 Star Book" in html
+    assert "4 Star Book" not in html
+    assert "5 ★" in html
+
+    # Filter bookshelf by rating 4
+    resp = authenticated_client.get("/books?rating=4")
+    html = resp.data.decode("utf-8")
+    assert "5 Star Book" not in html
+    assert "4 Star Book" in html
+    assert "4 ★" in html
+
+
+def test_books_status_filter(authenticated_client):
+    """Test filtering books bookshelf by status."""
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="501", title="In Progress Book", author="A1")
+    b2 = storage.add_book(isbn13="502", title="Completed Book", author="A2")
+
+    # b1 in progress
+    storage.add_reading_record(b1["id"], "In Progress", "2024-01-01")
+    # b2 completed
+    storage.add_reading_record(
+        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
+    )
+
+    # Filter bookshelf by status "In Progress"
+    resp = authenticated_client.get("/books?status=In+Progress")
+    html = resp.data.decode("utf-8")
+    assert "In Progress Book" in html
+    assert "Completed Book" not in html
+    assert "Status:" in html
+    assert "In Progress" in html
+
+    # Filter bookshelf by status "Completed"
+    resp = authenticated_client.get("/books?status=Completed")
+    html = resp.data.decode("utf-8")
+    assert "In Progress Book" not in html
+    assert "Completed Book" in html
+    assert "Status:" in html
+    assert "Completed" in html

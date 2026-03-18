@@ -10,10 +10,16 @@
 
 {% block content %}
 <div class="history-header">
-    <h1>Reading History</h1>
+    <h1>Reading History {% if current_year %}: {{ current_year }}{% endif %}</h1>
+    {% if current_year %}
+    <a href="{{ url_for('reading_history', status=current_status, min_rating=current_rating, sort=current_sort) }}" class="btn-clear-filter">Show All Years ✕</a>
+    {% endif %}
 </div>
 
 <form class="history-controls" method="GET" action="{{ url_for('reading_history') }}">
+    {% if current_year %}
+    <input type="hidden" name="year" value="{{ current_year }}">
+    {% endif %}
     <div class="filter-group">
         <label for="status">Status:</label>
         <select name="status" id="status" onchange="this.form.submit()">
