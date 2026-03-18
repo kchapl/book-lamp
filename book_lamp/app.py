@@ -444,6 +444,19 @@ def reading_history():
         min_rating = int(min_rating)
         history = [r for r in history if r.get("rating", 0) >= min_rating]
 
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        history = [
+            r
+            for r in history
+            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
+            or (
+                not r.get("end_date")
+                and r.get("start_date")
+                and r.get("start_date")[:4] == year_filter
+            )
+        ]
+
     # Sorting
     sort_by = request.args.get("sort", "date_desc")
 
@@ -464,6 +477,7 @@ def reading_history():
         statuses=all_statuses,
         current_status=status_filter,
         current_rating=min_rating,
+        current_year=year_filter,
         current_sort=sort_by,
     )
 
@@ -596,8 +610,91 @@ def list_books():
         if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
     ]
 
+    status_filter = request.args.get("status")
+    if status_filter:
+        books = [b for b in books if b.get("latest_status") == status_filter]
+
+    # Filtering by year
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[:4] == year_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    # Filtering by month
+    month_filter = request.args.get("month")
+    if month_filter and month_filter.isdigit():
+        month_idx = f"{int(month_filter):02d}"
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[5:7] == month_idx:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    month_name = None
+    if month_filter and month_filter.isdigit():
+        import calendar
+
+        month_name = calendar.month_name[int(month_filter)]
+
+    # Filtering by rating
+    rating_filter = request.args.get("rating")
+    if rating_filter and rating_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                if str(record.get("rating")) == rating_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    # Filtering by dewey
+    dewey_filter = request.args.get("dewey")
+    DEWEY_LABELS = {
+        "0": "000 General",
+        "1": "100 Philo",
+        "2": "200 Rel",
+        "3": "300 Soc Sci",
+        "4": "400 Lang",
+        "5": "500 Sci",
+        "6": "600 Tech",
+        "7": "700 Arts",
+        "8": "800 Lit",
+        "9": "900 Hist",
+    }
+    if dewey_filter:
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                ddc = b.get("dewey_decimal")
+                if ddc:
+                    match = re.search(r"\b(\d)", str(ddc))
+                    if match and match.group(1) == dewey_filter:
+                        filtered_books.append(b)
+        books = filtered_books
+    dewey_name = DEWEY_LABELS.get(dewey_filter) if dewey_filter else None
+
     return render_template(
-        "books.html", books=books, sort_by=sort_by, sort_options=SORT_OPTIONS
+        "books.html",
+        books=books,
+        sort_by=sort_by,
+        sort_options=SORT_OPTIONS,
+        current_year=year_filter,
+        current_month=month_filter,
+        current_month_name=month_name,
+        current_dewey=dewey_filter,
+        current_rating=rating_filter,
+        current_status=status_filter,
+        current_dewey_name=dewey_name,
     )
 
 
@@ -873,6 +970,19 @@ def collection_stats():
                 statuses.append(status)
     status_counts = Counter(statuses)
 
+    # Rating Distribution (only from completed records)
+    rating_counts = Counter()
+    for r in all_records:
+        if r.get("status") == "Completed":
+            try:
+                r_val = int(r.get("rating", 0))
+                if 1 <= r_val <= 5:
+                    rating_counts[r_val] += 1
+            except (ValueError, TypeError):
+                continue
+
+    rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
+
     # Top authors (only count books that have been completed)
     all_authors = []
     for b in completed_books:
@@ -882,7 +992,7 @@ def collection_stats():
             all_authors.append(b["author"])
 
     total_authors = len(set(all_authors))
-    top_authors = Counter(all_authors).most_common(5)
+    top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]
 
     # Top publishers (only count books that have been completed)
     all_publishers = []
@@ -891,7 +1001,9 @@ def collection_stats():
             norm_pub = _normalize_publisher(b["publisher"])
             if norm_pub:
                 all_publishers.append(norm_pub)
-    top_publishers = Counter(all_publishers).most_common(5)
+    top_publishers = sorted(
+        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
+    )[:5]
 
     # Completed Books by Year and Month
     completed_records = [
@@ -923,12 +1035,12 @@ def collection_stats():
             if month_idx.isdigit():
                 monthly_counts[month_idx] += 1
 
-    # Map to month names
+    # Map to month names and indices for linking
     ordered_months = []
     for i in range(1, 13):
-        idx = f"{i:02d}"
+        idx_str = f"{i:02d}"
         name = calendar.month_name[i][:3]
-        ordered_months.append((name, monthly_counts[idx]))
+        ordered_months.append((i, name, monthly_counts[idx_str]))
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
     avg_month_count = sum(monthly_counts.values()) / 12
@@ -957,11 +1069,14 @@ def collection_stats():
                 digit = match.group(1)
                 dewey_bins[DEWEY_LABELS.get(digit, "Other")] += 1
 
-    # Ensure all labels present for chart
-    dewey_distribution = {label: dewey_bins[label] for label in DEWEY_LABELS.values()}
-    max_dewey_count = (
-        max(dewey_distribution.values()) if dewey_distribution.values() else 1
-    )
+    # Ensure all labels present for chart (keeping digit as key for linking)
+    dewey_distribution = [
+        (digit, label, dewey_bins[label]) for digit, label in DEWEY_LABELS.items()
+    ]
+    # Sort by digit
+    dewey_distribution.sort(key=lambda x: x[0])
+
+    max_dewey_count = max(dewey_bins.values()) if dewey_bins.values() else 1
 
     return render_template(
         "stats.html",
@@ -970,6 +1085,7 @@ def collection_stats():
         total_records=total_records,
         avg_rating=avg_rating,
         status_counts=status_counts,
+        rating_distribution=rating_distribution,
         top_authors=top_authors,
         top_publishers=top_publishers,
         dewey_distribution=dewey_distribution,
