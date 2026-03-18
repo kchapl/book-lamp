@@ -36,7 +36,7 @@
         </div>
         <button type="submit" class="btn btn-search">🔍 Search</button>
     </form>
-    {% if search_query or current_year or current_month or current_dewey or current_rating or current_status %}
+    {% if search_query or current_year or current_month or current_category or current_rating or current_status %}
     <div class="search-results-badge mt-1 pt-075 flex-center gap-1">
         {% if search_query %}
         <span><strong>Search results for:</strong> "{{ search_query }}"</span>
@@ -50,8 +50,8 @@
         {% if current_month_name %}
         <span><strong>Books completed in </strong> {{ current_month_name }}</span>
         {% endif %}
-        {% if current_dewey_name %}
-        <span><strong>Subject:</strong> {{ current_dewey_name }}</span>
+        {% if current_category %}
+        <span><strong>Category:</strong> {{ current_category }}</span>
         {% endif %}
         {% if current_rating %}
         <span><strong>Rating:</strong> {{ current_rating }} ★</span>
@@ -81,8 +81,8 @@
         {% if current_month %}
         <input type="hidden" name="month" value="{{ current_month }}">
         {% endif %}
-        {% if current_dewey %}
-        <input type="hidden" name="dewey" value="{{ current_dewey }}">
+        {% if current_category %}
+        <input type="hidden" name="category" value="{{ current_category }}">
         {% endif %}
         {% if current_rating %}
         <input type="hidden" name="rating" value="{{ current_rating }}">
@@ -96,6 +96,17 @@
             {% endfor %}
         </select>
     </form>
+    
+    {% if categories %}
+    <form method="get" action="{{ url_for('list_books') }}" style="display: inline-block;">
+        <select name="category" onchange="this.form.submit()">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -137,7 +148,7 @@
             </div>
             {% endif %}
             <div class="book-meta-summary">
-                {% if book.publication_year or book.publisher or book.dewey_decimal %}
+                {% if book.publication_year or book.publisher or book.bisac_category %}
                 {% if book.publication_year %}
                 <div class="year">{{ book.publication_year }}</div>
                 {% endif %}
@@ -151,8 +162,8 @@
                         book.publisher|normalize_pub }}</a>
                 </div>
                 {% endif %}
-                {% if book.dewey_decimal %}
-                <div class="dewey">{{ book.dewey_decimal }}</div>
+                {% if book.bisac_category %}
+                <div class="category-tag">{{ book.bisac_category }}</div>
                 {% endif %}
                 {% endif %}
             </div>

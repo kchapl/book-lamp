@@ -29,7 +29,7 @@ class GoogleSheetsStorage:
     """Adapter for storing book data in Google Sheets.
 
     Expected sheet structure:
-    - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at, publisher, description, series, dewey_decimal
+    - 'Books' tab: id, isbn13, title, author, publication_year, thumbnail_url, created_at, publisher, description, series, bisac_category
     - 'ReadingRecords' tab: id, book_id, status, start_date, end_date, rating, created_at
     - 'Authors' tab: id, name
     - 'BookAuthors' tab: book_id, author_id
@@ -482,7 +482,7 @@ class GoogleSheetsStorage:
                     "publisher": row[7] if len(row) > 7 else None,
                     "description": row[8] if len(row) > 8 else None,
                     "series": row[9] if len(row) > 9 else None,
-                    "dewey_decimal": row[10] if len(row) > 10 else None,
+                    "bisac_category": row[10] if len(row) > 10 else None,
                     "language": row[11] if len(row) > 11 else None,
                     "page_count": page_count,
                     "physical_format": row[13] if len(row) > 13 else None,
@@ -865,7 +865,7 @@ class GoogleSheetsStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -892,7 +892,7 @@ class GoogleSheetsStorage:
             publisher if publisher else "",
             description if description else "",
             series if series else "",
-            dewey_decimal if dewey_decimal else "",
+            bisac_category if bisac_category else "",
             language if language else "",
             page_count if page_count else "",
             physical_format if physical_format else "",
@@ -923,7 +923,7 @@ class GoogleSheetsStorage:
                 "publisher": publisher,
                 "description": description,
                 "series": series,
-                "dewey_decimal": dewey_decimal,
+                "bisac_category": bisac_category,
                 "language": language,
                 "page_count": page_count,
                 "physical_format": physical_format,
@@ -957,7 +957,7 @@ class GoogleSheetsStorage:
                         "publisher": publisher,
                         "description": description,
                         "series": series,
-                        "dewey_decimal": dewey_decimal,
+                        "bisac_category": bisac_category,
                         "language": language,
                         "page_count": page_count,
                         "physical_format": physical_format,
@@ -981,7 +981,7 @@ class GoogleSheetsStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -1020,7 +1020,7 @@ class GoogleSheetsStorage:
         existing_publisher = None
         existing_description = None
         existing_series = None
-        existing_dewey = None
+        existing_bisac = None
         existing_cover_url = None
         existing_language = None
         existing_page_count = None
@@ -1035,7 +1035,7 @@ class GoogleSheetsStorage:
                 existing_publisher = row[7] if len(row) > 7 else None
                 existing_description = row[8] if len(row) > 8 else None
                 existing_series = row[9] if len(row) > 9 else None
-                existing_dewey = row[10] if len(row) > 10 else None
+                existing_bisac = row[10] if len(row) > 10 else None
                 existing_language = row[11] if len(row) > 11 else None
                 existing_page_count = row[12] if len(row) > 12 else None
                 existing_physical_format = row[13] if len(row) > 13 else None
@@ -1057,8 +1057,8 @@ class GoogleSheetsStorage:
             description = existing_description
         if not series and existing_series:
             series = existing_series
-        if not dewey_decimal and existing_dewey:
-            dewey_decimal = existing_dewey
+        if not bisac_category and existing_bisac:
+            bisac_category = existing_bisac
         if not language and existing_language:
             language = existing_language
         if not page_count and existing_page_count:
@@ -1081,7 +1081,7 @@ class GoogleSheetsStorage:
             publisher if publisher else "",
             description if description else "",
             series if series else "",
-            dewey_decimal if dewey_decimal else "",
+            bisac_category if bisac_category else "",
             language if language else "",
             page_count if page_count else "",
             physical_format if physical_format else "",
@@ -1113,7 +1113,7 @@ class GoogleSheetsStorage:
                 "publisher": publisher,
                 "description": description,
                 "series": series,
-                "dewey_decimal": dewey_decimal,
+                "bisac_category": bisac_category,
                 "language": language,
                 "page_count": page_count,
                 "physical_format": physical_format,
@@ -1136,7 +1136,7 @@ class GoogleSheetsStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -1156,7 +1156,7 @@ class GoogleSheetsStorage:
                 publisher=publisher,
                 description=description,
                 series=series,
-                dewey_decimal=dewey_decimal,
+                bisac_category=bisac_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -1173,7 +1173,7 @@ class GoogleSheetsStorage:
                 publisher=publisher,
                 description=description,
                 series=series,
-                dewey_decimal=dewey_decimal,
+                bisac_category=bisac_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -1301,7 +1301,7 @@ class GoogleSheetsStorage:
                     row_data[8] if len(row_data) > 8 else ""
                 )
                 ser = b.get("series") or (row_data[9] if len(row_data) > 9 else "")
-                ddc = b.get("dewey_decimal") or (
+                bisac = b.get("bisac_category") or (
                     row_data[10] if len(row_data) > 10 else ""
                 )
                 lang = b.get("language") or (row_data[11] if len(row_data) > 11 else "")
@@ -1323,7 +1323,7 @@ class GoogleSheetsStorage:
                     pub,
                     desc,
                     ser,
-                    ddc,
+                    bisac,
                     lang,
                     pc,
                     pf,
@@ -1348,7 +1348,7 @@ class GoogleSheetsStorage:
                     b.get("publisher") or "",
                     b.get("description") or "",
                     b.get("series") or "",
-                    b.get("dewey_decimal") or "",
+                    b.get("bisac_category") or "",
                     b.get("language") or "",
                     b.get("page_count") or "",
                     b.get("physical_format") or "",
@@ -1890,7 +1890,7 @@ class GoogleSheetsStorage:
                     "publisher",
                     "description",
                     "series",
-                    "dewey_decimal",
+                    "bisac_category",
                     "language",
                     "page_count",
                     "physical_format",

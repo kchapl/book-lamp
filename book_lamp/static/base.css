@@ -184,6 +184,32 @@ nav {
     outline-offset: 2px;
 }
 
+.btn-outline-primary {
+    background: transparent;
+    border: 1px solid var(--primary-light);
+    color: var(--primary-light);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.btn-outline-primary:hover {
+    background: rgba(129, 140, 248, 0.1);
+    border-color: white;
+    color: white;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.85rem !important;
+}
+
 .alert {
     padding: 1rem 1.5rem;
     border-radius: 12px;

@@ -1,6 +1,6 @@
 .stats-header {
     margin-bottom: 3rem;
-    text-align: center;
+    gap: 1.5rem;
 }
 
 .stats-grid {
@@ -241,9 +241,9 @@
     font-size: 0.9rem;
 }
 
-/* Timeline & Dewey Grids */
+/* Timeline & Category Grids */
 .timeline-grid,
-.dewey-grid {
+.category-grid {
     display: flex;
     justify-content: space-between;
     height: 180px;
@@ -288,7 +288,7 @@
     opacity: 1;
 }
 
-.dewey-grid {
+.category-grid {
     height: 250px;
 }
 
@@ -298,7 +298,7 @@
 }
 
 .timeline-item,
-.dewey-item {
+.category-item {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -307,7 +307,7 @@
 }
 
 .timeline-bar-container,
-.dewey-bar-container {
+.category-bar-container {
     flex-grow: 1;
     width: 100%;
     display: flex;
@@ -317,7 +317,7 @@
 }
 
 .timeline-bar,
-.dewey-bar {
+.category-bar {
     width: 80%;
     /* Set final height directly; animate with scaleY to avoid layout shift */
     height: var(--bar-height, 0%);
@@ -334,7 +334,7 @@
 }
 
 .timeline-bar:hover,
-.dewey-bar:hover {
+.category-bar:hover {
     filter: brightness(1.2);
 }
 
@@ -357,7 +357,7 @@
 }
 
 .timeline-bar:hover .count-tooltip,
-.dewey-bar:hover .count-tooltip {
+.category-bar:hover .count-tooltip {
     opacity: 1;
 }
 
@@ -368,7 +368,7 @@
 }
 
 .timeline-label,
-.dewey-label {
+.category-label {
     margin-top: 1rem;
     font-size: 0.7rem;
     color: var(--text-muted);
@@ -395,11 +395,11 @@
         grid-column: span 1;
     }
 
-    .dewey-grid {
+    .category-grid {
         gap: 0.5rem;
     }
 
-    .dewey-label {
+    .category-label {
         font-size: 0.6rem;
     }
 }

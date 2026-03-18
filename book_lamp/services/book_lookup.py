@@ -103,9 +103,8 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         publisher_name = first_pub.get("name")
 
     description = data.get("notes")
-    classifications = data.get("classifications") or {}
-    dewey_list = classifications.get("dewey_decimal_class") or []
-    dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
+    subjects = data.get("subjects") or []
+    bisac = subjects[0] if subjects and isinstance(subjects, list) else None
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -134,7 +133,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
             html.unescape(publisher_name) if publisher_name else publisher_name
         ),
         "description": html.unescape(description) if description else description,
-        "dewey_decimal": dewey,
+        "bisac_category": bisac,
         "page_count": page_count,
         "language": language,
         "physical_format": physical_format,
@@ -482,6 +481,9 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "page_count": info.get("pageCount"),
         "language": info.get("language"),
         "physical_format": info.get("printType"),
+        "bisac_category": (
+            ", ".join(info.get("categories", [])) if info.get("categories") else None
+        ),
     }
 
 
@@ -553,7 +555,7 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             "cover_url": cover_url,
             "publisher": None,
             "description": html.unescape(description) if description else description,
-            "dewey_decimal": None,
+            "bisac_category": None,
             "page_count": None,
             "language": None,
             "physical_format": "Ebook",
@@ -760,7 +762,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
         "cover_url": None,
         "publisher": None,
         "description": None,
-        "dewey_decimal": None,
+        "bisac_category": None,
         "page_count": None,
         "language": None,
         "physical_format": None,
@@ -778,6 +780,14 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
 
     def is_empty(value):
         return value is None or (isinstance(value, str) and not value.strip())
+
+    def needs_update(field, current_val):
+        # Special case for BISAC transition: allow updating if current value is numeric
+        if field == "bisac_category" and not is_empty(current_val):
+            # If it looks like a Dewey code (only digits/dots/spaces), mark as updateable
+            if all(c.isdigit() or c in ". " for c in str(current_val)):
+                return True
+        return is_empty(current_val)
 
     candidates = []
     for b in books:
@@ -798,9 +808,10 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "publication_year",
                 "publisher",
                 "description",
+                "bisac_category",
                 "cover_url",
             ]
-            if is_empty(b.get(f))
+            if needs_update(f, b.get(f))
         ]
 
         if missing_fields or not has_cover:
@@ -878,7 +889,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "author": "author",
                 "publisher": "publisher",
                 "description": "description",
-                "dewey_decimal": "dewey_decimal",
+                "bisac_category": "bisac_category",
                 "language": "language",
                 "page_count": "page_count",
                 "physical_format": "physical_format",
@@ -886,7 +897,9 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
             }
 
             for target, source_field in field_map.items():
-                if is_empty(book_item.get(target)) and info.get(source_field):
+                if needs_update(target, book_item.get(target)) and info.get(
+                    source_field
+                ):
                     val = info[source_field]
                     # Specific handling for strings/lengths
                     if isinstance(val, str):

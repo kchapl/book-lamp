@@ -158,12 +158,12 @@ def sort_by_year(
     return sorted(books, key=sort_key, reverse=reverse)
 
 
-def sort_by_dewey_decimal(
+def sort_by_category(
     books: List[Dict[str, Any]], reverse: bool = False
 ) -> List[Dict[str, Any]]:
-    """Sort books by Dewey Decimal Classification.
+    """Sort books by BISAC Category.
 
-    Groups books by subject matter. Secondary sort: by title within same classification.
+    Groups books by genre. Secondary sort: by title within same category.
 
     Args:
         books: List of book dictionaries.
@@ -173,18 +173,10 @@ def sort_by_dewey_decimal(
         Sorted list of books.
     """
 
-    def sort_key(book: Dict[str, Any]) -> Tuple[float, str]:
-        ddc = book.get("dewey_decimal") or ""
-        if ddc:
-            try:
-                # Convert to float for proper numeric sorting
-                ddc_float = float(ddc)
-            except (ValueError, TypeError):
-                ddc_float = 9999.0  # Put unclassified at end
-        else:
-            ddc_float = 9999.0  # Put unclassified at end
+    def sort_key(book: Dict[str, Any]) -> Tuple[str, str]:
+        bisac = book.get("bisac_category") or ""
         title = _normalise_title_for_sort(book.get("title", "") or "")
-        return (ddc_float, title)
+        return (bisac.lower(), title)
 
     return sorted(books, key=sort_key, reverse=reverse)
 
@@ -269,7 +261,7 @@ SORT_OPTIONS: Dict[str, Tuple[str, SortFunction]] = {
     "author": ("Author (A-Z)", sort_by_author),
     "title": ("Title (A-Z)", sort_by_title),
     "year": ("Publication year", sort_by_year),
-    "dewey": ("Dewey Decimal", sort_by_dewey_decimal),
+    "category": ("Category (A-Z)", sort_by_category),
 }
 
 
@@ -283,7 +275,7 @@ def sort_books(
 
     Args:
         books: List of book dictionaries to sort.
-        sort_by: Sort method key (one of: reading_date, date_added, author, title, year, dewey).
+        sort_by: Sort method key (one of: reading_date, date_added, author, title, year, category).
         reading_records: Optional list of reading records (required for reading_date sort).
         reverse: Whether to reverse sort order. If None, uses method default.
 

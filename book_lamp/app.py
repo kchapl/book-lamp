@@ -414,6 +414,34 @@ def init_sheets_command():
     click.echo("Google Sheets initialized successfully.")
 
 
+@app.cli.command("backfill-bisac")
+def backfill_bisac_command():
+    """Enhance existing books with BISAC categories."""
+    if is_test_mode():
+        click.echo("Running in test mode with mock storage.")
+
+    from book_lamp.services.book_lookup import enhance_books_batch
+
+    storage = get_storage()
+    books = storage.get_all_books()
+
+    click.echo(f"Starting BISAC backfill for {len(books)} books...")
+    updated = enhance_books_batch(books)
+
+    # Persist updates
+    for book in books:
+        if book.get("bisac_category"):
+            storage.update_book(
+                book_id=book["id"],
+                isbn13=book["isbn13"],
+                title=book["title"],
+                author=book["author"],
+                bisac_category=book["bisac_category"],
+            )
+
+    click.echo(f"Finished backfill. Updated {updated} books.")
+
+
 # -----------------------------
 # Reading History feature
 # -----------------------------
@@ -656,32 +684,25 @@ def list_books():
                     filtered_books.append(b)
         books = filtered_books
 
-    # Filtering by dewey
-    dewey_filter = request.args.get("dewey")
-    DEWEY_LABELS = {
-        "0": "000 General",
-        "1": "100 Philo",
-        "2": "200 Rel",
-        "3": "300 Soc Sci",
-        "4": "400 Lang",
-        "5": "500 Sci",
-        "6": "600 Tech",
-        "7": "700 Arts",
-        "8": "800 Lit",
-        "9": "900 Hist",
-    }
-    if dewey_filter:
+    # Filtering by category
+    category_filter = request.args.get("category")
+    if category_filter:
         filtered_books = []
         for b in books:
-            record = latest_records.get(b.get("id"))
-            if record and record.get("status") == "Completed":
-                ddc = b.get("dewey_decimal")
-                if ddc:
-                    match = re.search(r"\b(\d)", str(ddc))
-                    if match and match.group(1) == dewey_filter:
-                        filtered_books.append(b)
+            bisac = b.get("bisac_category")
+            if bisac and category_filter.lower() in str(bisac).lower():
+                filtered_books.append(b)
         books = filtered_books
-    dewey_name = DEWEY_LABELS.get(dewey_filter) if dewey_filter else None
+
+    # Extract all top-level categories for the filter dropdown
+    all_categories = set()
+    for b in storage.get_all_books():
+        bisac = b.get("bisac_category")
+        if bisac:
+            # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
+            top_level = str(bisac).split("/")[0].strip()
+            all_categories.add(top_level)
+    sorted_categories = sorted(list(all_categories))
 
     return render_template(
         "books.html",
@@ -691,10 +712,10 @@ def list_books():
         current_year=year_filter,
         current_month=month_filter,
         current_month_name=month_name,
-        current_dewey=dewey_filter,
+        current_category=category_filter,
         current_rating=rating_filter,
         current_status=status_filter,
-        current_dewey_name=dewey_name,
+        categories=sorted_categories,
     )
 
 
@@ -1045,38 +1066,18 @@ def collection_stats():
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
     avg_month_count = sum(monthly_counts.values()) / 12
 
-    # Dewey Distribution
-    DEWEY_LABELS = {
-        "0": "000 General",
-        "1": "100 Philo",
-        "2": "200 Rel",
-        "3": "300 Soc Sci",
-        "4": "400 Lang",
-        "5": "500 Sci",
-        "6": "600 Tech",
-        "7": "700 Arts",
-        "8": "800 Lit",
-        "9": "900 Hist",
-    }
-
-    dewey_bins = Counter()
+    # Category Distribution
+    category_bins = Counter()
     for b in completed_books:
-        ddc = b.get("dewey_decimal")
-        if ddc:
-            # Match first digit of a numeric DDC
-            match = re.search(r"\b(\d)", str(ddc))
-            if match:
-                digit = match.group(1)
-                dewey_bins[DEWEY_LABELS.get(digit, "Other")] += 1
+        bisac = b.get("bisac_category")
+        if bisac:
+            # Group by top-level category
+            label = str(bisac).split("/")[0].strip()
+            category_bins[label] += 1
 
-    # Ensure all labels present for chart (keeping digit as key for linking)
-    dewey_distribution = [
-        (digit, label, dewey_bins[label]) for digit, label in DEWEY_LABELS.items()
-    ]
-    # Sort by digit
-    dewey_distribution.sort(key=lambda x: x[0])
-
-    max_dewey_count = max(dewey_bins.values()) if dewey_bins.values() else 1
+    # Sort categories by count (descending)
+    category_distribution = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
+    max_category_count = max(category_bins.values()) if category_bins else 1
 
     return render_template(
         "stats.html",
@@ -1088,8 +1089,8 @@ def collection_stats():
         rating_distribution=rating_distribution,
         top_authors=top_authors,
         top_publishers=top_publishers,
-        dewey_distribution=dewey_distribution,
-        max_dewey_count=max_dewey_count,
+        category_distribution=category_distribution,
+        max_category_count=max_category_count,
         yearly_counts=sorted_years,
         max_year_count=max_year_count,
         avg_year_count=avg_year_count,
@@ -1270,7 +1271,7 @@ def create_book():
             "thumbnail_url": cached_data.get("thumbnail_url"),
             "cover_url": cached_data.get("cover_url"),
             "description": request.form.get("description"),
-            "dewey_decimal": request.form.get("dewey_decimal"),
+            "bisac_category": request.form.get("bisac_category"),
         }
     else:
         # Lookup via Open Library Books API
@@ -1328,7 +1329,7 @@ def create_book():
             thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
             publisher=data.get("publisher"),
             description=data.get("description"),
-            dewey_decimal=data.get("dewey_decimal"),
+            bisac_category=data.get("bisac_category"),
             language=data.get("language"),
             page_count=data.get("page_count"),
             physical_format=data.get("physical_format"),
@@ -1420,10 +1421,33 @@ def fetch_missing_data():
     )
 
     flash(
-        "Refreshing reading log catalogue: Fetching metadata and covers in the background.",
+        "Refreshing reading log catalogue: Fetching metadata, covers, and categorisation in the background.",
         "info",
     )
     return redirect(url_for("list_books", job_id=job_id))
+
+
+@app.route("/stats/backfill-categories")
+@authorisation_required
+def fetch_missing_categories():
+    """Trigger backfill of BISAC categories from the stats page."""
+    job_queue = get_job_queue()
+    credentials_dict = session.get("credentials")
+    is_prod = os.environ.get("FLASK_ENV") == "production"
+    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
+
+    job_id = job_queue.submit_job(
+        "backfill_bisac",
+        _background_fetch_missing_data,  # Reusing the background fetcher which now includes categories
+        credentials_dict,
+        sheet_name,
+    )
+
+    flash(
+        "Book categorisation started in the background. Your charts will update as data is found.",
+        "info",
+    )
+    return redirect(url_for("collection_stats", job_id=job_id))
 
 
 @app.route("/books/import", methods=["GET"])
@@ -1536,7 +1560,7 @@ def edit_book(book_id: int):
     publisher = request.form.get("publisher", "").strip()
     description = request.form.get("description", "").strip()
     series = request.form.get("series", "").strip()
-    dewey_decimal = request.form.get("dewey_decimal", "").strip()
+    bisac_category = request.form.get("bisac_category", "").strip()
 
     # Basic validation
     if not title or not author:
@@ -1569,7 +1593,7 @@ def edit_book(book_id: int):
             publisher=(publisher if publisher else None),
             description=(description if description else None),
             series=(series if series else None),
-            dewey_decimal=(dewey_decimal if dewey_decimal else None),
+            bisac_category=(bisac_category if bisac_category else None),
             cover_url=(cover_url if cover_url else None),
         )
         flash("Book updated successfully.", "success")

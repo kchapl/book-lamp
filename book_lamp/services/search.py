@@ -33,7 +33,7 @@ def calculate_relevance_score(
         "series": 6.0,
         "publisher": 4.0,
         "description": 2.0,
-        "dewey_decimal": 3.0,
+        "bisac_category": 7.0,
         "publication_year": 3.0,
         "id": 10.0,  # strong match if user searches for specific ID
         "created_at": 1.0,
