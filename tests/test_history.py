@@ -103,10 +103,10 @@ def test_stats_status_links(authenticated_client):
     resp = authenticated_client.get("/stats")
     html = resp.data.decode("utf-8")
     # Each status row now has two links (label + bar)
-    assert html.count('href="/history?status=Completed"') >= 2
-    assert html.count('href="/history?status=In+Progress"') >= 2
+    assert html.count('href="/books?status=Completed"') >= 2
+    assert html.count('href="/books?status=In+Progress"') >= 2
     # clicking one of the links still works
-    resp2 = authenticated_client.get("/history?status=Completed")
+    resp2 = authenticated_client.get("/books?status=Completed")
     assert b"Book One" in resp2.data
     assert b"Book Two" not in resp2.data
 
