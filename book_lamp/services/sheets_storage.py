@@ -25,6 +25,27 @@ SCOPES = [
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_for_sheets(value: Any) -> str:
+    """Convert any value to a string safe for Google Sheets.
+
+    Rejects complex types (dicts, lists, objects) and returns empty string instead.
+    This prevents struct_value errors when complex objects are accidentally passed.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    # Reject complex types (dict, list, etc) by returning empty string
+    logger.warning(
+        f"Filtering out complex type {type(value).__name__} in sheet data: {value}"
+    )
+    return ""
+
+
 class GoogleSheetsStorage:
     """Adapter for storing book data in Google Sheets.
 
@@ -1292,32 +1313,48 @@ class GoogleSheetsStorage:
                 book_id = int(row_data[0])
 
                 # Preserve existing fields if missing in new data
-                thumb = b.get("thumbnail_url") or (
+                thumb = _sanitize_for_sheets(b.get("thumbnail_url")) or (
                     row_data[5] if len(row_data) > 5 else ""
                 )
                 cat = row_data[6] if len(row_data) > 6 else created_at
-                pub = b.get("publisher") or (row_data[7] if len(row_data) > 7 else "")
-                desc = b.get("description") or (
+                pub = _sanitize_for_sheets(b.get("publisher")) or (
+                    row_data[7] if len(row_data) > 7 else ""
+                )
+                desc = _sanitize_for_sheets(b.get("description")) or (
                     row_data[8] if len(row_data) > 8 else ""
                 )
-                ser = b.get("series") or (row_data[9] if len(row_data) > 9 else "")
-                bisac = b.get("bisac_category") or (
+                ser = _sanitize_for_sheets(b.get("series")) or (
+                    row_data[9] if len(row_data) > 9 else ""
+                )
+                bisac = _sanitize_for_sheets(b.get("bisac_category")) or (
                     row_data[10] if len(row_data) > 10 else ""
                 )
-                lang = b.get("language") or (row_data[11] if len(row_data) > 11 else "")
-                pc = b.get("page_count") or (row_data[12] if len(row_data) > 12 else "")
-                pf = b.get("physical_format") or (
+                lang = _sanitize_for_sheets(b.get("language")) or (
+                    row_data[11] if len(row_data) > 11 else ""
+                )
+                pc = _sanitize_for_sheets(b.get("page_count")) or (
+                    row_data[12] if len(row_data) > 12 else ""
+                )
+                pf = _sanitize_for_sheets(b.get("physical_format")) or (
                     row_data[13] if len(row_data) > 13 else ""
                 )
-                ed = b.get("edition") or (row_data[14] if len(row_data) > 14 else "")
-                cu = b.get("cover_url") or (row_data[15] if len(row_data) > 15 else "")
+                ed = _sanitize_for_sheets(b.get("edition")) or (
+                    row_data[14] if len(row_data) > 14 else ""
+                )
+                cu = _sanitize_for_sheets(b.get("cover_url")) or (
+                    row_data[15] if len(row_data) > 15 else ""
+                )
 
                 new_row = [
                     book_id,
                     isbn,
-                    b["title"],
-                    b["author"],
-                    b["publication_year"] if b["publication_year"] else "",
+                    _sanitize_for_sheets(b["title"]),
+                    _sanitize_for_sheets(b["author"]),
+                    (
+                        _sanitize_for_sheets(b["publication_year"])
+                        if b.get("publication_year")
+                        else ""
+                    ),
                     thumb,
                     cat,
                     pub,
@@ -1340,20 +1377,24 @@ class GoogleSheetsStorage:
                 new_row = [
                     book_id,
                     isbn,
-                    b["title"],
-                    b["author"],
-                    b["publication_year"] if b["publication_year"] else "",
-                    b.get("thumbnail_url") or "",
+                    _sanitize_for_sheets(b["title"]),
+                    _sanitize_for_sheets(b["author"]),
+                    (
+                        _sanitize_for_sheets(b.get("publication_year"))
+                        if b.get("publication_year")
+                        else ""
+                    ),
+                    _sanitize_for_sheets(b.get("thumbnail_url")) or "",
                     created_at,
-                    b.get("publisher") or "",
-                    b.get("description") or "",
-                    b.get("series") or "",
-                    b.get("bisac_category") or "",
-                    b.get("language") or "",
-                    b.get("page_count") or "",
-                    b.get("physical_format") or "",
-                    b.get("edition") or "",
-                    b.get("cover_url") or "",
+                    _sanitize_for_sheets(b.get("publisher")) or "",
+                    _sanitize_for_sheets(b.get("description")) or "",
+                    _sanitize_for_sheets(b.get("series")) or "",
+                    _sanitize_for_sheets(b.get("bisac_category")) or "",
+                    _sanitize_for_sheets(b.get("language")) or "",
+                    _sanitize_for_sheets(b.get("page_count")) or "",
+                    _sanitize_for_sheets(b.get("physical_format")) or "",
+                    _sanitize_for_sheets(b.get("edition")) or "",
+                    _sanitize_for_sheets(b.get("cover_url")) or "",
                 ]
                 books_to_append.append(new_row)
 

@@ -104,7 +104,20 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     description = data.get("notes")
     subjects = data.get("subjects") or []
-    bisac = subjects[0] if subjects and isinstance(subjects, list) else None
+    # Extract the name from the first subject if it's a dict, otherwise use it as-is
+    # Ensure we always return a string or None, never a complex object
+    bisac = None
+    if subjects and isinstance(subjects, list):
+        first_subject = subjects[0]
+        if isinstance(first_subject, dict):
+            # Extract the "name" field from subject dict
+            bisac = first_subject.get("name")
+            # If name is also a dict (shouldn't happen, but be defensive), stringify it partially
+            if isinstance(bisac, dict) and "name" in bisac:
+                bisac = bisac.get("name")
+        elif isinstance(first_subject, str):
+            bisac = first_subject.strip() if first_subject else None
+        # If it's some other type, bisac stays None
 
     # Edition info
     page_count = data.get("number_of_pages")

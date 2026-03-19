@@ -1071,9 +1071,15 @@ def collection_stats():
     for b in completed_books:
         bisac = b.get("bisac_category")
         if bisac:
+            # Ensure bisac is a string; if it's a dict despite sanitization, extract the name
+            if isinstance(bisac, dict):
+                bisac = bisac.get("name") or str(bisac)
             # Group by top-level category
-            label = str(bisac).split("/")[0].strip()
-            category_bins[label] += 1
+            bisac_str = str(bisac).strip()
+            if bisac_str:  # Only add if non-empty after stringification
+                label = bisac_str.split("/")[0].strip()
+                if label:  # Only count if label is non-empty
+                    category_bins[label] += 1
 
     # Sort categories by count (descending)
     category_distribution = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
