@@ -127,6 +127,20 @@ class MockStorage:
 
         for book in self.books:
             if book["id"] == book_id:
+                # Mirror BISAC prioritization logic
+                new_bisac = bisac_category
+                existing_bisac = book.get("bisac_category")
+
+                def is_dewey(val):
+                    if not val:
+                        return False
+                    return all(c.isdigit() or c in ". " for c in str(val))
+
+                if new_bisac and not is_dewey(new_bisac):
+                    final_bisac: Optional[str] = new_bisac
+                else:
+                    final_bisac = existing_bisac or new_bisac
+
                 book.update(
                     {
                         "isbn13": isbn13,
@@ -138,7 +152,7 @@ class MockStorage:
                         "publisher": publisher or book.get("publisher"),
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
-                        "bisac_category": bisac_category or book.get("bisac_category"),
+                        "bisac_category": final_bisac,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
                         "physical_format": physical_format

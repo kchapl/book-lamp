@@ -1390,7 +1390,8 @@ def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: st
         )
 
         # enhance_books_batch updates in-place and returns count
-        updated_count = enhance_books_batch(books)
+        # Pass force_refresh=True because we want to update categories for all books
+        updated_count = enhance_books_batch(books, force_refresh=True)
 
         # Always save books back to storage to preserve any existing metadata
         items_to_update = [{"book": b, "record": None} for b in books]

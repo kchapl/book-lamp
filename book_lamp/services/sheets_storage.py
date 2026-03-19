@@ -1326,9 +1326,22 @@ class GoogleSheetsStorage:
                 ser = _sanitize_for_sheets(b.get("series")) or (
                     row_data[9] if len(row_data) > 9 else ""
                 )
-                bisac = _sanitize_for_sheets(b.get("bisac_category")) or (
-                    row_data[10] if len(row_data) > 10 else ""
-                )
+
+                # Special handling for bisac_category:
+                # Prioritize new value if it's not empty AND not a Dewey code
+                new_bisac = _sanitize_for_sheets(b.get("bisac_category"))
+                existing_bisac = row_data[10] if len(row_data) > 10 else ""
+
+                def is_dewey(val):
+                    if not val:
+                        return False
+                    return all(c.isdigit() or c in ". " for c in str(val))
+
+                if new_bisac and not is_dewey(new_bisac):
+                    bisac = new_bisac
+                else:
+                    bisac = existing_bisac or new_bisac
+
                 lang = _sanitize_for_sheets(b.get("language")) or (
                     row_data[11] if len(row_data) > 11 else ""
                 )

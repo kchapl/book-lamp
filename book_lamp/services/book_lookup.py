@@ -252,11 +252,14 @@ def _lookup_open_library_search(
     return None
 
 
-def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+def lookup_books_batch(
+    isbn13_list: List[str], force_refresh: bool = False
+) -> Dict[str, Optional[Dict[str, Any]]]:
     """Lookup metadata for multiple books via cache or Open Library in batches.
 
     Args:
         isbn13_list: List of ISBN-13 strings.
+        force_refresh: If True, bypass the cache and fetch fresh data from the API.
 
     Returns:
         Dict mapping ISBN13 -> metadata dict (or None if not found).
@@ -270,10 +273,10 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
     unique_isbns = list(set(normalize_isbn(isbn) for isbn in isbn13_list))
     cache = get_cache()
 
-    # 1. Check cache first
+    # 1. Check cache first (unless force_refresh is True)
     remaining_isbns = []
     for isbn in unique_isbns:
-        cached = cache.get(f"isbn:{isbn}")
+        cached = cache.get(f"isbn:{isbn}") if not force_refresh else None
         if cached:
             results[isbn] = cached
         else:
@@ -672,17 +675,21 @@ def _merge_metadata(
 
 
 def lookup_book_by_isbn13(
-    isbn13: str, title: Optional[str] = None, author: Optional[str] = None
+    isbn13: str,
+    title: Optional[str] = None,
+    author: Optional[str] = None,
+    force_refresh: bool = False,
 ) -> Optional[Dict[str, Optional[Any]]]:
     """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
     cache = get_cache()
 
     # 0. Check Cache - return if cover found OR if we're not doing a search refinement
-    cached = cache.get(f"isbn:{clean_isbn}")
-    if cached and (cached.get("thumbnail_url") or not title):
-        logger.debug(f"Cache hit for ISBN {clean_isbn}")
-        return cast(Dict[str, Any], cached)
+    if not force_refresh:
+        cached = cache.get(f"isbn:{clean_isbn}")
+        if cached and (cached.get("thumbnail_url") or not title):
+            logger.debug(f"Cache hit for ISBN {clean_isbn}")
+            return cast(Dict[str, Any], cached)
 
     best: Dict[str, Any] = {"isbn13": clean_isbn}
     if title:
@@ -783,7 +790,9 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     }
 
 
-def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> int:
+def enhance_books_batch(
+    books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False
+) -> int:
     """Enhance a list of books with missing metadata/covers in parallel.
 
     Updates the books list in-place.
@@ -795,6 +804,12 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
         return value is None or (isinstance(value, str) and not value.strip())
 
     def needs_update(field, current_val):
+        # If forcing refresh, we consider almost everything updateable
+        if force_refresh:
+            # For BISAC transition, we especially want to update if it's currently Dewey
+            # OR if we just want the latest from API
+            return True
+
         # Special case for BISAC transition: allow updating if current value is numeric
         if field == "bisac_category" and not is_empty(current_val):
             # If it looks like a Dewey code (only digits/dots/spaces), mark as updateable
@@ -810,6 +825,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
 
         # Consider a book a candidate if it has an ISBN and is missing cover/thumbnail
         # OR if it's missing any other key metadata
+        # OR if we're forcing a refresh
         has_cover = b.get("cover_url") or b.get("thumbnail_url")
 
         missing_fields = [
@@ -827,9 +843,13 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
             if needs_update(f, b.get(f))
         ]
 
-        if missing_fields or not has_cover:
+        if force_refresh or missing_fields or not has_cover:
             candidates.append(b)
-            if not has_cover:
+            if force_refresh:
+                logger.debug(
+                    f"Candidate book (force refresh): {b.get('title', 'Unknown')}"
+                )
+            elif not has_cover:
                 logger.debug(f"Candidate book (no cover): {b.get('title', 'Unknown')}")
             else:
                 logger.debug(
@@ -851,7 +871,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
         if len(all_isbns) > 5
         else f"Performing batch lookup for ISBNs: {all_isbns}"
     )
-    batch_results = lookup_books_batch(all_isbns)
+    batch_results = lookup_books_batch(all_isbns, force_refresh=force_refresh)
 
     found_count = sum(1 for v in batch_results.values() if v is not None)
     logger.info(f"Batch lookup returned data for {found_count}/{len(all_isbns)} books")
@@ -878,6 +898,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                     isbn,
                     title=book_item.get("title"),
                     author=book_item.get("author"),
+                    force_refresh=force_refresh,
                 )
                 if deep_info:
                     # Merge: deep lookup enriches batch data
