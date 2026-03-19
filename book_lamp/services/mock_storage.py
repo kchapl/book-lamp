@@ -73,6 +73,8 @@ class MockStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -95,6 +97,8 @@ class MockStorage:
             "description": description,
             "series": series,
             "bisac_category": bisac_category,
+            "bisac_main_category": bisac_main_category,
+            "bisac_sub_category": bisac_sub_category,
             "language": language,
             "page_count": page_count,
             "physical_format": physical_format,
@@ -117,6 +121,8 @@ class MockStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -138,8 +144,20 @@ class MockStorage:
 
                 if new_bisac and not is_dewey(new_bisac):
                     final_bisac: Optional[str] = new_bisac
+                    final_bisac_main: Optional[str] = bisac_main_category or book.get(
+                        "bisac_main_category"
+                    )
+                    final_bisac_sub: Optional[str] = bisac_sub_category or book.get(
+                        "bisac_sub_category"
+                    )
                 else:
                     final_bisac = existing_bisac or new_bisac
+                    final_bisac_main = (
+                        book.get("bisac_main_category") or bisac_main_category
+                    )
+                    final_bisac_sub = (
+                        book.get("bisac_sub_category") or bisac_sub_category
+                    )
 
                 book.update(
                     {
@@ -153,6 +171,8 @@ class MockStorage:
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
                         "bisac_category": final_bisac,
+                        "bisac_main_category": final_bisac_main,
+                        "bisac_sub_category": final_bisac_sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
                         "physical_format": physical_format
@@ -175,6 +195,8 @@ class MockStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -194,6 +216,8 @@ class MockStorage:
                 description=description,
                 series=series,
                 bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -211,6 +235,8 @@ class MockStorage:
                 description=description,
                 series=series,
                 bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -330,6 +356,8 @@ class MockStorage:
                 description=book_data.get("description"),
                 series=book_data.get("series"),
                 bisac_category=book_data.get("bisac_category"),
+                bisac_main_category=book_data.get("bisac_main_category"),
+                bisac_sub_category=book_data.get("bisac_sub_category"),
                 language=book_data.get("language"),
                 page_count=book_data.get("page_count"),
                 physical_format=book_data.get("physical_format"),

@@ -109,3 +109,34 @@ def isbn13_to_isbn10(isbn13: str) -> Optional[str]:
         return clean[3:13]
 
     return None
+
+
+def parse_bisac_category(bisac: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Split a BISAC category string into (main_category, sub_category).
+
+    Handles formats like:
+    - 'FICTION / Science Fiction / General' -> ('FICTION', 'Science Fiction / General')
+    - 'Fiction, History' -> ('Fiction', 'History')
+    - '823.914' (Dewey) -> ('823.914', None)
+    """
+    if not bisac:
+        return None, None
+
+    bisac_str = str(bisac).strip()
+    if not bisac_str:
+        return None, None
+
+    # Standard BISAC uses ' / ' or '/'
+    if " / " in bisac_str:
+        parts = bisac_str.split(" / ", 1)
+        return parts[0].strip(), parts[1].strip()
+    if "/" in bisac_str:
+        parts = bisac_str.split("/", 1)
+        return parts[0].strip(), parts[1].strip()
+
+    # Google Books often uses comma separation for multiple categories
+    if "," in bisac_str:
+        parts = bisac_str.split(",", 1)
+        return parts[0].strip(), parts[1].strip()
+
+    return bisac_str, None

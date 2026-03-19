@@ -28,6 +28,8 @@ def test_enhance_books_replaces_dewey_with_bisac(mock_storage):
             "title": "Test Book",
             "author": "Test Author",
             "bisac_category": "FICTION / General",
+            "bisac_main_category": "FICTION",
+            "bisac_sub_category": "General",
             "thumbnail_url": "http://example.com/cover.jpg",
         }
     }
@@ -47,6 +49,8 @@ def test_enhance_books_replaces_dewey_with_bisac(mock_storage):
     assert updated_count == 1
     updated_book = mock_storage.get_book_by_id(book["id"])
     assert updated_book["bisac_category"] == "FICTION / General"
+    assert updated_book["bisac_main_category"] == "FICTION"
+    assert updated_book["bisac_sub_category"] == "General"
 
 
 def test_enhance_books_preserves_bisac(mock_storage):
@@ -56,6 +60,8 @@ def test_enhance_books_preserves_bisac(mock_storage):
         title="BISAC Book",
         author="Author",
         bisac_category="HISTORY / Ancient / General",
+        bisac_main_category="HISTORY",
+        bisac_sub_category="Ancient / General",
     )
 
     books = [book]
@@ -65,7 +71,9 @@ def test_enhance_books_preserves_bisac(mock_storage):
         "9780000000002": {
             "title": "BISAC Book",
             "author": "Author",
-            "bisac_category": "NEW CATEGORY",
+            "bisac_category": "NEW CATEGORY / Sub",
+            "bisac_main_category": "NEW CATEGORY",
+            "bisac_sub_category": "Sub",
             "thumbnail_url": "http://example.com/cover.jpg",
         }
     }
@@ -80,7 +88,8 @@ def test_enhance_books_preserves_bisac(mock_storage):
 
     # Verify: Should favor the new non-Dewey category
     updated_book = mock_storage.get_book_by_id(book["id"])
-    assert updated_book["bisac_category"] == "NEW CATEGORY"
+    assert updated_book["bisac_category"] == "NEW CATEGORY / Sub"
+    assert updated_book["bisac_main_category"] == "NEW CATEGORY"
 
 
 def test_is_dewey_logic_in_storage(mock_storage):

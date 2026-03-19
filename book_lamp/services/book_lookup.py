@@ -102,6 +102,8 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         first_pub = publisher_list[0] or {}
         publisher_name = first_pub.get("name")
 
+    from book_lamp.utils.books import parse_bisac_category
+
     description = data.get("notes")
     subjects = data.get("subjects") or []
     # Extract the name from the first subject if it's a dict, otherwise use it as-is
@@ -118,6 +120,8 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         elif isinstance(first_subject, str):
             bisac = first_subject.strip() if first_subject else None
         # If it's some other type, bisac stays None
+
+    main_cat, sub_cat = parse_bisac_category(bisac)
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -147,6 +151,8 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         ),
         "description": html.unescape(description) if description else description,
         "bisac_category": bisac,
+        "bisac_main_category": main_cat,
+        "bisac_sub_category": sub_cat,
         "page_count": page_count,
         "language": language,
         "physical_format": physical_format,
@@ -486,6 +492,11 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         image_links.get("thumbnail") or image_links.get("smallThumbnail")
     )
 
+    from book_lamp.utils.books import parse_bisac_category
+
+    bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
+    main_cat, sub_cat = parse_bisac_category(bisac)
+
     return {
         "title": html.unescape(info.get("title", "")),
         "author": ", ".join(info.get("authors", [])) if info.get("authors") else None,
@@ -497,9 +508,9 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "page_count": info.get("pageCount"),
         "language": info.get("language"),
         "physical_format": info.get("printType"),
-        "bisac_category": (
-            ", ".join(info.get("categories", [])) if info.get("categories") else None
-        ),
+        "bisac_category": bisac,
+        "bisac_main_category": main_cat,
+        "bisac_sub_category": sub_cat,
     }
 
 
@@ -572,6 +583,8 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             "publisher": None,
             "description": html.unescape(description) if description else description,
             "bisac_category": None,
+            "bisac_main_category": None,
+            "bisac_sub_category": None,
             "page_count": None,
             "language": None,
             "physical_format": "Ebook",
@@ -783,6 +796,8 @@ def _empty_result() -> Dict[str, Optional[Any]]:
         "publisher": None,
         "description": None,
         "bisac_category": None,
+        "bisac_main_category": None,
+        "bisac_sub_category": None,
         "page_count": None,
         "language": None,
         "physical_format": None,
@@ -924,6 +939,8 @@ def enhance_books_batch(
                 "publisher": "publisher",
                 "description": "description",
                 "bisac_category": "bisac_category",
+                "bisac_main_category": "bisac_main_category",
+                "bisac_sub_category": "bisac_sub_category",
                 "language": "language",
                 "page_count": "page_count",
                 "physical_format": "physical_format",

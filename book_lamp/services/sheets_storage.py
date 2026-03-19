@@ -504,11 +504,13 @@ class GoogleSheetsStorage:
                     "description": row[8] if len(row) > 8 else None,
                     "series": row[9] if len(row) > 9 else None,
                     "bisac_category": row[10] if len(row) > 10 else None,
-                    "language": row[11] if len(row) > 11 else None,
+                    "bisac_main_category": row[11] if len(row) > 11 else None,
+                    "bisac_sub_category": row[12] if len(row) > 12 else None,
+                    "language": row[13] if len(row) > 13 else None,
                     "page_count": page_count,
-                    "physical_format": row[13] if len(row) > 13 else None,
-                    "edition": row[14] if len(row) > 14 else None,
-                    "cover_url": row[15] if len(row) > 15 and row[15] else None,
+                    "physical_format": row[15] if len(row) > 15 else None,
+                    "edition": row[16] if len(row) > 16 else None,
+                    "cover_url": row[17] if len(row) > 17 and row[17] else None,
                 }
                 books_raw.append(book)
 
@@ -887,6 +889,8 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -914,6 +918,8 @@ class GoogleSheetsStorage:
             description if description else "",
             series if series else "",
             bisac_category if bisac_category else "",
+            bisac_main_category if bisac_main_category else "",
+            bisac_sub_category if bisac_sub_category else "",
             language if language else "",
             page_count if page_count else "",
             physical_format if physical_format else "",
@@ -923,7 +929,7 @@ class GoogleSheetsStorage:
         try:
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:P",
+                range="Books!A:R",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -945,6 +951,8 @@ class GoogleSheetsStorage:
                 "description": description,
                 "series": series,
                 "bisac_category": bisac_category,
+                "bisac_main_category": bisac_main_category,
+                "bisac_sub_category": bisac_sub_category,
                 "language": language,
                 "page_count": page_count,
                 "physical_format": physical_format,
@@ -958,7 +966,7 @@ class GoogleSheetsStorage:
                 try:
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Books!A:P",
+                        range="Books!A:R",
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
@@ -979,6 +987,8 @@ class GoogleSheetsStorage:
                         "description": description,
                         "series": series,
                         "bisac_category": bisac_category,
+                        "bisac_main_category": bisac_main_category,
+                        "bisac_sub_category": bisac_sub_category,
                         "language": language,
                         "page_count": page_count,
                         "physical_format": physical_format,
@@ -1003,6 +1013,8 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -1015,14 +1027,13 @@ class GoogleSheetsStorage:
         sid = self._ensure_spreadsheet_id()
         assert self.service is not None
         clean_isbn_val = normalize_isbn(isbn13)
-        # ... (rest of the logic)
 
         # Get all data to find the row index
         try:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:P")
+                .get(spreadsheetId=sid, range="Books!A:R")
                 .execute()
             )
         except HttpError as error:
@@ -1042,6 +1053,8 @@ class GoogleSheetsStorage:
         existing_description = None
         existing_series = None
         existing_bisac = None
+        existing_bisac_main = None
+        existing_bisac_sub = None
         existing_cover_url = None
         existing_language = None
         existing_page_count = None
@@ -1049,7 +1062,7 @@ class GoogleSheetsStorage:
         existing_edition = None
 
         for idx, row in enumerate(values[1:], start=2):
-            if row and row[0] and int(row[0]) == book_id:
+            if row and row[0] and int(float(row[0])) == book_id:
                 row_index = idx
                 existing_thumbnail = row[5] if len(row) > 5 else None
                 created_at = row[6] if len(row) > 6 else None
@@ -1057,11 +1070,13 @@ class GoogleSheetsStorage:
                 existing_description = row[8] if len(row) > 8 else None
                 existing_series = row[9] if len(row) > 9 else None
                 existing_bisac = row[10] if len(row) > 10 else None
-                existing_language = row[11] if len(row) > 11 else None
-                existing_page_count = row[12] if len(row) > 12 else None
-                existing_physical_format = row[13] if len(row) > 13 else None
-                existing_edition = row[14] if len(row) > 14 else None
-                existing_cover_url = row[15] if len(row) > 15 else None
+                existing_bisac_main = row[11] if len(row) > 11 else None
+                existing_bisac_sub = row[12] if len(row) > 12 else None
+                existing_language = row[13] if len(row) > 13 else None
+                existing_page_count = row[14] if len(row) > 14 else None
+                existing_physical_format = row[15] if len(row) > 15 else None
+                existing_edition = row[16] if len(row) > 16 else None
+                existing_cover_url = row[17] if len(row) > 17 else None
                 break
 
         if row_index is None:
@@ -1070,26 +1085,32 @@ class GoogleSheetsStorage:
         if not created_at:
             created_at = datetime.now(timezone.utc).isoformat()
 
-        if not thumbnail_url and existing_thumbnail:
-            thumbnail_url = existing_thumbnail
-        if not publisher and existing_publisher:
-            publisher = existing_publisher
-        if not description and existing_description:
-            description = existing_description
-        if not series and existing_series:
-            series = existing_series
-        if not bisac_category and existing_bisac:
-            bisac_category = existing_bisac
-        if not language and existing_language:
-            language = existing_language
-        if not page_count and existing_page_count:
-            page_count = existing_page_count
-        if not physical_format and existing_physical_format:
-            physical_format = existing_physical_format
-        if not edition and existing_edition:
-            edition = existing_edition
-        if not cover_url and existing_cover_url:
-            cover_url = existing_cover_url
+        # Update fields only if new values are provided, otherwise keep existing
+        thumbnail_url = thumbnail_url or existing_thumbnail
+        publisher = publisher or existing_publisher
+        description = description or existing_description
+        series = series or existing_series
+
+        def is_dewey(val):
+            if not val:
+                return False
+            return all(c.isdigit() or c in ". " for c in str(val))
+
+        new_bisac = bisac_category
+        if new_bisac and not is_dewey(new_bisac):
+            bisac_category = new_bisac
+            bisac_main_category = bisac_main_category or existing_bisac_main
+            bisac_sub_category = bisac_sub_category or existing_bisac_sub
+        else:
+            bisac_category = existing_bisac or new_bisac
+            bisac_main_category = existing_bisac_main or bisac_main_category
+            bisac_sub_category = existing_bisac_sub or bisac_sub_category
+
+        language = language or existing_language
+        page_count = page_count or existing_page_count
+        physical_format = physical_format or existing_physical_format
+        edition = edition or existing_edition
+        cover_url = cover_url or existing_cover_url
 
         row = [
             book_id,
@@ -1103,6 +1124,8 @@ class GoogleSheetsStorage:
             description if description else "",
             series if series else "",
             bisac_category if bisac_category else "",
+            bisac_main_category if bisac_main_category else "",
+            bisac_sub_category if bisac_sub_category else "",
             language if language else "",
             page_count if page_count else "",
             physical_format if physical_format else "",
@@ -1113,7 +1136,7 @@ class GoogleSheetsStorage:
         try:
             self.service.spreadsheets().values().update(
                 spreadsheetId=sid,
-                range=f"Books!A{row_index}:P{row_index}",
+                range=f"Books!A{row_index}:R{row_index}",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -1135,6 +1158,8 @@ class GoogleSheetsStorage:
                 "description": description,
                 "series": series,
                 "bisac_category": bisac_category,
+                "bisac_main_category": bisac_main_category,
+                "bisac_sub_category": bisac_sub_category,
                 "language": language,
                 "page_count": page_count,
                 "physical_format": physical_format,
@@ -1158,6 +1183,8 @@ class GoogleSheetsStorage:
         description: Optional[str] = None,
         series: Optional[str] = None,
         bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -1178,6 +1205,8 @@ class GoogleSheetsStorage:
                 description=description,
                 series=series,
                 bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -1185,6 +1214,24 @@ class GoogleSheetsStorage:
                 cover_url=cover_url,
             )
         else:
+            return self.add_book(
+                isbn13=isbn13,
+                title=title,
+                author=author,
+                publication_year=publication_year,
+                thumbnail_url=thumbnail_url,
+                publisher=publisher,
+                description=description,
+                series=series,
+                bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
+                language=language,
+                page_count=page_count,
+                physical_format=physical_format,
+                edition=edition,
+                cover_url=cover_url,
+            )
             return self.add_book(
                 isbn13=isbn13,
                 title=title,
@@ -1216,7 +1263,7 @@ class GoogleSheetsStorage:
             books_result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:P")
+                .get(spreadsheetId=sid, range="Books!A:R")
                 .execute()
             )
         except HttpError as e:
@@ -1339,23 +1386,36 @@ class GoogleSheetsStorage:
 
                 if new_bisac and not is_dewey(new_bisac):
                     bisac = new_bisac
+                    # Also use new main/sub if available
+                    bisac_main = _sanitize_for_sheets(b.get("bisac_main_category")) or (
+                        row_data[11] if len(row_data) > 11 else ""
+                    )
+                    bisac_sub = _sanitize_for_sheets(b.get("bisac_sub_category")) or (
+                        row_data[12] if len(row_data) > 12 else ""
+                    )
                 else:
                     bisac = existing_bisac or new_bisac
+                    bisac_main = (row_data[11] if len(row_data) > 11 else "") or (
+                        _sanitize_for_sheets(b.get("bisac_main_category"))
+                    )
+                    bisac_sub = (row_data[12] if len(row_data) > 12 else "") or (
+                        _sanitize_for_sheets(b.get("bisac_sub_category"))
+                    )
 
                 lang = _sanitize_for_sheets(b.get("language")) or (
-                    row_data[11] if len(row_data) > 11 else ""
-                )
-                pc = _sanitize_for_sheets(b.get("page_count")) or (
-                    row_data[12] if len(row_data) > 12 else ""
-                )
-                pf = _sanitize_for_sheets(b.get("physical_format")) or (
                     row_data[13] if len(row_data) > 13 else ""
                 )
-                ed = _sanitize_for_sheets(b.get("edition")) or (
+                pc = _sanitize_for_sheets(b.get("page_count")) or (
                     row_data[14] if len(row_data) > 14 else ""
                 )
-                cu = _sanitize_for_sheets(b.get("cover_url")) or (
+                pf = _sanitize_for_sheets(b.get("physical_format")) or (
                     row_data[15] if len(row_data) > 15 else ""
+                )
+                ed = _sanitize_for_sheets(b.get("edition")) or (
+                    row_data[16] if len(row_data) > 16 else ""
+                )
+                cu = _sanitize_for_sheets(b.get("cover_url")) or (
+                    row_data[17] if len(row_data) > 17 else ""
                 )
 
                 new_row = [
@@ -1374,6 +1434,8 @@ class GoogleSheetsStorage:
                     desc,
                     ser,
                     bisac,
+                    bisac_main,
+                    bisac_sub,
                     lang,
                     pc,
                     pf,
@@ -1381,7 +1443,7 @@ class GoogleSheetsStorage:
                     cu,
                 ]
                 books_to_update.append(
-                    {"range": f"Books!A{row_idx}:P{row_idx}", "values": [new_row]}
+                    {"range": f"Books!A{row_idx}:R{row_idx}", "values": [new_row]}
                 )
             else:
                 # Append new
@@ -1403,6 +1465,8 @@ class GoogleSheetsStorage:
                     _sanitize_for_sheets(b.get("description")) or "",
                     _sanitize_for_sheets(b.get("series")) or "",
                     _sanitize_for_sheets(b.get("bisac_category")) or "",
+                    _sanitize_for_sheets(b.get("bisac_main_category")) or "",
+                    _sanitize_for_sheets(b.get("bisac_sub_category")) or "",
                     _sanitize_for_sheets(b.get("language")) or "",
                     _sanitize_for_sheets(b.get("page_count")) or "",
                     _sanitize_for_sheets(b.get("physical_format")) or "",
@@ -1945,6 +2009,8 @@ class GoogleSheetsStorage:
                     "description",
                     "series",
                     "bisac_category",
+                    "bisac_main_category",
+                    "bisac_sub_category",
                     "language",
                     "page_count",
                     "physical_format",
