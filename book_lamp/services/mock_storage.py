@@ -72,7 +72,9 @@ class MockStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -94,7 +96,9 @@ class MockStorage:
             "publisher": publisher,
             "description": description,
             "series": series,
-            "dewey_decimal": dewey_decimal,
+            "bisac_category": bisac_category,
+            "bisac_main_category": bisac_main_category,
+            "bisac_sub_category": bisac_sub_category,
             "language": language,
             "page_count": page_count,
             "physical_format": physical_format,
@@ -116,7 +120,9 @@ class MockStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -127,6 +133,32 @@ class MockStorage:
 
         for book in self.books:
             if book["id"] == book_id:
+                # Mirror BISAC prioritization logic
+                new_bisac = bisac_category
+                existing_bisac = book.get("bisac_category")
+
+                def is_dewey(val):
+                    if not val:
+                        return False
+                    return all(c.isdigit() or c in ". " for c in str(val))
+
+                if new_bisac and not is_dewey(new_bisac):
+                    final_bisac: Optional[str] = new_bisac
+                    final_bisac_main: Optional[str] = bisac_main_category or book.get(
+                        "bisac_main_category"
+                    )
+                    final_bisac_sub: Optional[str] = bisac_sub_category or book.get(
+                        "bisac_sub_category"
+                    )
+                else:
+                    final_bisac = existing_bisac or new_bisac
+                    final_bisac_main = (
+                        book.get("bisac_main_category") or bisac_main_category
+                    )
+                    final_bisac_sub = (
+                        book.get("bisac_sub_category") or bisac_sub_category
+                    )
+
                 book.update(
                     {
                         "isbn13": isbn13,
@@ -138,7 +170,9 @@ class MockStorage:
                         "publisher": publisher or book.get("publisher"),
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
-                        "dewey_decimal": dewey_decimal or book.get("dewey_decimal"),
+                        "bisac_category": final_bisac,
+                        "bisac_main_category": final_bisac_main,
+                        "bisac_sub_category": final_bisac_sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
                         "physical_format": physical_format
@@ -148,6 +182,7 @@ class MockStorage:
                     }
                 )
                 return book
+        logger.error(f"Book with ID {book_id} not found")
         raise Exception(f"Book with ID {book_id} not found")
 
     def upsert_book(
@@ -160,7 +195,9 @@ class MockStorage:
         publisher: Optional[str] = None,
         description: Optional[str] = None,
         series: Optional[str] = None,
-        dewey_decimal: Optional[str] = None,
+        bisac_category: Optional[str] = None,
+        bisac_main_category: Optional[str] = None,
+        bisac_sub_category: Optional[str] = None,
         language: Optional[str] = None,
         page_count: Optional[int] = None,
         physical_format: Optional[str] = None,
@@ -179,7 +216,9 @@ class MockStorage:
                 publisher=publisher,
                 description=description,
                 series=series,
-                dewey_decimal=dewey_decimal,
+                bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -196,7 +235,9 @@ class MockStorage:
                 publisher=publisher,
                 description=description,
                 series=series,
-                dewey_decimal=dewey_decimal,
+                bisac_category=bisac_category,
+                bisac_main_category=bisac_main_category,
+                bisac_sub_category=bisac_sub_category,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -251,6 +292,7 @@ class MockStorage:
                     f"READING_RECORD_UPDATED: id={record_id}, status_change='{old_status}'->'{status}'"
                 )
                 return record
+        logger.error(f"Reading record with ID {record_id} not found")
         raise Exception(f"Reading record with ID {record_id} not found")
 
     def delete_reading_record(self, record_id: int) -> bool:
@@ -284,6 +326,9 @@ class MockStorage:
         for i, item in enumerate(self.reading_list):
             if item["book_id"] == book_id:
                 self.reading_list.pop(i)
+                logger.info(
+                    f"Successfully removed book {book_id} from reading list (MockStorage)"
+                )
                 break
         # Reassign positions
         for idx, item in enumerate(self.reading_list):
@@ -315,7 +360,9 @@ class MockStorage:
                 publisher=book_data.get("publisher"),
                 description=book_data.get("description"),
                 series=book_data.get("series"),
-                dewey_decimal=book_data.get("dewey_decimal"),
+                bisac_category=book_data.get("bisac_category"),
+                bisac_main_category=book_data.get("bisac_main_category"),
+                bisac_sub_category=book_data.get("bisac_sub_category"),
                 language=book_data.get("language"),
                 page_count=book_data.get("page_count"),
                 physical_format=book_data.get("physical_format"),
@@ -366,6 +413,7 @@ class MockStorage:
                 if is_duplicate:
                     pass
                 elif matched_record:
+                    old_status = matched_record.get("status")
                     matched_record.update(
                         {
                             "status": r_status,
@@ -374,6 +422,10 @@ class MockStorage:
                             "rating": record_data.get("rating")
                             or matched_record.get("rating", 0),
                         }
+                    )
+                    logger.info(
+                        f"READING_RECORD_UPDATED (Mock bulk): id={matched_record['id']}, "
+                        f"status_change='{old_status}'->'{r_status}'"
                     )
                 else:
                     self.add_reading_record(

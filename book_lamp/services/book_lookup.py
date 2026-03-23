@@ -102,10 +102,26 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         first_pub = publisher_list[0] or {}
         publisher_name = first_pub.get("name")
 
+    from book_lamp.utils.books import parse_bisac_category
+
     description = data.get("notes")
-    classifications = data.get("classifications") or {}
-    dewey_list = classifications.get("dewey_decimal_class") or []
-    dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
+    subjects = data.get("subjects") or []
+    # Extract the name from the first subject if it's a dict, otherwise use it as-is
+    # Ensure we always return a string or None, never a complex object
+    bisac = None
+    if subjects and isinstance(subjects, list):
+        first_subject = subjects[0]
+        if isinstance(first_subject, dict):
+            # Extract the "name" field from subject dict
+            bisac = first_subject.get("name")
+            # If name is also a dict (shouldn't happen, but be defensive), stringify it partially
+            if isinstance(bisac, dict) and "name" in bisac:
+                bisac = bisac.get("name")
+        elif isinstance(first_subject, str):
+            bisac = first_subject.strip() if first_subject else None
+        # If it's some other type, bisac stays None
+
+    main_cat, sub_cat = parse_bisac_category(bisac)
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -134,7 +150,9 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
             html.unescape(publisher_name) if publisher_name else publisher_name
         ),
         "description": html.unescape(description) if description else description,
-        "dewey_decimal": dewey,
+        "bisac_category": bisac,
+        "bisac_main_category": main_cat,
+        "bisac_sub_category": sub_cat,
         "page_count": page_count,
         "language": language,
         "physical_format": physical_format,
@@ -240,11 +258,14 @@ def _lookup_open_library_search(
     return None
 
 
-def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, Any]]]:
+def lookup_books_batch(
+    isbn13_list: List[str], force_refresh: bool = False
+) -> Dict[str, Optional[Dict[str, Any]]]:
     """Lookup metadata for multiple books via cache or Open Library in batches.
 
     Args:
         isbn13_list: List of ISBN-13 strings.
+        force_refresh: If True, bypass the cache and fetch fresh data from the API.
 
     Returns:
         Dict mapping ISBN13 -> metadata dict (or None if not found).
@@ -258,10 +279,10 @@ def lookup_books_batch(isbn13_list: List[str]) -> Dict[str, Optional[Dict[str, A
     unique_isbns = list(set(normalize_isbn(isbn) for isbn in isbn13_list))
     cache = get_cache()
 
-    # 1. Check cache first
+    # 1. Check cache first (unless force_refresh is True)
     remaining_isbns = []
     for isbn in unique_isbns:
-        cached = cache.get(f"isbn:{isbn}")
+        cached = cache.get(f"isbn:{isbn}") if not force_refresh else None
         if cached:
             results[isbn] = cached
         else:
@@ -471,6 +492,11 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         image_links.get("thumbnail") or image_links.get("smallThumbnail")
     )
 
+    from book_lamp.utils.books import parse_bisac_category
+
+    bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
+    main_cat, sub_cat = parse_bisac_category(bisac)
+
     return {
         "title": html.unescape(info.get("title", "")),
         "author": ", ".join(info.get("authors", [])) if info.get("authors") else None,
@@ -482,6 +508,9 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "page_count": info.get("pageCount"),
         "language": info.get("language"),
         "physical_format": info.get("printType"),
+        "bisac_category": bisac,
+        "bisac_main_category": main_cat,
+        "bisac_sub_category": sub_cat,
     }
 
 
@@ -553,7 +582,9 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             "cover_url": cover_url,
             "publisher": None,
             "description": html.unescape(description) if description else description,
-            "dewey_decimal": None,
+            "bisac_category": None,
+            "bisac_main_category": None,
+            "bisac_sub_category": None,
             "page_count": None,
             "language": None,
             "physical_format": "Ebook",
@@ -657,17 +688,21 @@ def _merge_metadata(
 
 
 def lookup_book_by_isbn13(
-    isbn13: str, title: Optional[str] = None, author: Optional[str] = None
+    isbn13: str,
+    title: Optional[str] = None,
+    author: Optional[str] = None,
+    force_refresh: bool = False,
 ) -> Optional[Dict[str, Optional[Any]]]:
     """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
     cache = get_cache()
 
     # 0. Check Cache - return if cover found OR if we're not doing a search refinement
-    cached = cache.get(f"isbn:{clean_isbn}")
-    if cached and (cached.get("thumbnail_url") or not title):
-        logger.debug(f"Cache hit for ISBN {clean_isbn}")
-        return cast(Dict[str, Any], cached)
+    if not force_refresh:
+        cached = cache.get(f"isbn:{clean_isbn}")
+        if cached and (cached.get("thumbnail_url") or not title):
+            logger.debug(f"Cache hit for ISBN {clean_isbn}")
+            return cast(Dict[str, Any], cached)
 
     best: Dict[str, Any] = {"isbn13": clean_isbn}
     if title:
@@ -760,7 +795,9 @@ def _empty_result() -> Dict[str, Optional[Any]]:
         "cover_url": None,
         "publisher": None,
         "description": None,
-        "dewey_decimal": None,
+        "bisac_category": None,
+        "bisac_main_category": None,
+        "bisac_sub_category": None,
         "page_count": None,
         "language": None,
         "physical_format": None,
@@ -768,7 +805,9 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     }
 
 
-def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> int:
+def enhance_books_batch(
+    books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False
+) -> int:
     """Enhance a list of books with missing metadata/covers in parallel.
 
     Updates the books list in-place.
@@ -779,6 +818,20 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
     def is_empty(value):
         return value is None or (isinstance(value, str) and not value.strip())
 
+    def needs_update(field, current_val):
+        # If forcing refresh, we consider almost everything updateable
+        if force_refresh:
+            # For BISAC transition, we especially want to update if it's currently Dewey
+            # OR if we just want the latest from API
+            return True
+
+        # Special case for BISAC transition: allow updating if current value is numeric
+        if field == "bisac_category" and not is_empty(current_val):
+            # If it looks like a Dewey code (only digits/dots/spaces), mark as updateable
+            if all(c.isdigit() or c in ". " for c in str(current_val)):
+                return True
+        return is_empty(current_val)
+
     candidates = []
     for b in books:
         if not b.get("isbn13"):
@@ -787,6 +840,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
 
         # Consider a book a candidate if it has an ISBN and is missing cover/thumbnail
         # OR if it's missing any other key metadata
+        # OR if we're forcing a refresh
         has_cover = b.get("cover_url") or b.get("thumbnail_url")
 
         missing_fields = [
@@ -798,14 +852,19 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "publication_year",
                 "publisher",
                 "description",
+                "bisac_category",
                 "cover_url",
             ]
-            if is_empty(b.get(f))
+            if needs_update(f, b.get(f))
         ]
 
-        if missing_fields or not has_cover:
+        if force_refresh or missing_fields or not has_cover:
             candidates.append(b)
-            if not has_cover:
+            if force_refresh:
+                logger.debug(
+                    f"Candidate book (force refresh): {b.get('title', 'Unknown')}"
+                )
+            elif not has_cover:
                 logger.debug(f"Candidate book (no cover): {b.get('title', 'Unknown')}")
             else:
                 logger.debug(
@@ -827,7 +886,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
         if len(all_isbns) > 5
         else f"Performing batch lookup for ISBNs: {all_isbns}"
     )
-    batch_results = lookup_books_batch(all_isbns)
+    batch_results = lookup_books_batch(all_isbns, force_refresh=force_refresh)
 
     found_count = sum(1 for v in batch_results.values() if v is not None)
     logger.info(f"Batch lookup returned data for {found_count}/{len(all_isbns)} books")
@@ -854,6 +913,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                     isbn,
                     title=book_item.get("title"),
                     author=book_item.get("author"),
+                    force_refresh=force_refresh,
                 )
                 if deep_info:
                     # Merge: deep lookup enriches batch data
@@ -878,7 +938,9 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
                 "author": "author",
                 "publisher": "publisher",
                 "description": "description",
-                "dewey_decimal": "dewey_decimal",
+                "bisac_category": "bisac_category",
+                "bisac_main_category": "bisac_main_category",
+                "bisac_sub_category": "bisac_sub_category",
                 "language": "language",
                 "page_count": "page_count",
                 "physical_format": "physical_format",
@@ -886,7 +948,9 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5) -> in
             }
 
             for target, source_field in field_map.items():
-                if is_empty(book_item.get(target)) and info.get(source_field):
+                if needs_update(target, book_item.get(target)) and info.get(
+                    source_field
+                ):
                     val = info[source_field]
                     # Specific handling for strings/lengths
                     if isinstance(val, str):

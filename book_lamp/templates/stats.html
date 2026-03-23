@@ -7,9 +7,17 @@
 {% endblock %}
 
 {% block content %}
-<div class="stats-header">
-    <h1>Reading Statistics</h1>
-    <p class="text-muted">A deep dive into your reading history.</p>
+<div class="stats-header flex-between">
+    <div>
+        <h1>Reading Statistics</h1>
+        <p class="text-muted">A deep dive into your reading history.</p>
+    </div>
+    <div class="stats-actions">
+        <a href="{{ url_for('fetch_missing_categories') }}" class="btn btn-outline-primary btn-sm"
+           title="Find categories for books currently missing them">
+            🏷️ Fetch missing categories
+        </a>
+    </div>
 </div>
 
 <div class="stats-grid">
@@ -161,21 +169,24 @@
         </div>
     </div>
 
-    <!-- Dewey Distribution -->
     <div class="chart-card wide">
-        <h2>Books read by subject (Dewey Decimal)</h2>
-        <div class="dewey-grid">
-            {% for digit, label, count in dewey_distribution %}
-            <div class="dewey-item">
-                <a href="{{ url_for('list_books', dewey=digit) }}" class="bar-link" aria-label="View books in category {{ label }}">
-                    <div class="dewey-bar-container">
-                        <div class="dewey-bar"
-                            style="--bar-height: {{ (count / max_dewey_count * 100)|round if max_dewey_count > 0 else 0 }}%;">
+        <h2>Books read by category (BISAC)</h2>
+        <div class="category-grid">
+            {% for label, count in category_distribution %}
+            <div class="category-item">
+                {% if label != 'Other' %}
+                <a href="{{ url_for('list_books', category=label) }}" class="bar-link" aria-label="View books in category {{ label }}">
+                {% endif %}
+                    <div class="category-bar-container">
+                        <div class="category-bar"
+                            style="--bar-height: {{ (count / max_category_count * 100)|round if max_category_count > 0 else 0 }}%;">
                             <span class="count-tooltip">{{ count }}</span>
                         </div>
                     </div>
+                {% if label != 'Other' %}
                 </a>
-                <div class="dewey-label">{{ label }}</div>
+                {% endif %}
+                <div class="category-label">{{ label }}</div>
             </div>
             {% endfor %}
         </div>

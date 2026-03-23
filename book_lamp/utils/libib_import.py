@@ -179,7 +179,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                     "publisher": publisher,
                     "description": description,
                     "series": series,
-                    "dewey_decimal": dewey_decimal,
+                    "bisac_category": dewey_decimal,
                     "language": language,
                     "page_count": page_count,
                     "physical_format": physical_format,

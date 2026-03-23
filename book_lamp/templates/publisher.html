@@ -44,7 +44,7 @@
                 {% endif %}
             </div>
             <div class="book-meta-summary">
-                {% if book.publication_year or book.publisher or book.dewey_decimal %}
+                {% if book.publication_year or book.publisher or book.bisac_category %}
                 {% if book.publication_year %}
                 <div class="year">{{ book.publication_year }}</div>
                 {% endif %}
@@ -58,8 +58,8 @@
                         book.publisher|normalize_pub }}</a>
                 </div>
                 {% endif %}
-                {% if book.dewey_decimal %}
-                <div class="dewey">{{ book.dewey_decimal }}</div>
+                {% if book.bisac_category %}
+                <div class="category-tag">{{ book.bisac_category }}</div>
                 {% endif %}
                 {% endif %}
             </div>

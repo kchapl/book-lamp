@@ -124,7 +124,7 @@ def test_get_all_books_efficiency():
                     "publisher",
                     "description",
                     "series",
-                    "dewey_decimal",
+                    "bisac_category",
                     "language",
                     "page_count",
                     "physical_format",
