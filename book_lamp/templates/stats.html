@@ -174,14 +174,18 @@
         <div class="category-grid">
             {% for label, count in category_distribution %}
             <div class="category-item">
+                {% if label != 'Other' %}
                 <a href="{{ url_for('list_books', category=label) }}" class="bar-link" aria-label="View books in category {{ label }}">
+                {% endif %}
                     <div class="category-bar-container">
                         <div class="category-bar"
                             style="--bar-height: {{ (count / max_category_count * 100)|round if max_category_count > 0 else 0 }}%;">
                             <span class="count-tooltip">{{ count }}</span>
                         </div>
                     </div>
+                {% if label != 'Other' %}
                 </a>
+                {% endif %}
                 <div class="category-label">{{ label }}</div>
             </div>
             {% endfor %}

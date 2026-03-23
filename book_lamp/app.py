@@ -32,6 +32,7 @@ from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
     is_valid_isbn13,
+    parse_bisac_category,
     parse_publication_year,
     sort_books,
 )
@@ -1069,26 +1070,30 @@ def collection_stats():
     # Category Distribution
     category_bins = Counter()
     for b in completed_books:
-        main_cat = b.get("bisac_main_category")
         bisac = b.get("bisac_category")
-
-        if main_cat:
-            category_bins[str(main_cat).strip()] += 1
-        elif bisac:
-            # Fallback to splitting bisac_category if main_category is missing
-            # Group by top-level category
-            bisac_str = str(bisac).strip()
-            if bisac_str:
-                label = bisac_str.split("/")[0].strip()
-                if not label and "," in bisac_str:
-                    label = bisac_str.split(",")[0].strip()
-
-                if label:
-                    category_bins[label] += 1
+        if bisac:
+            main_cat, _ = parse_bisac_category(bisac)
+            if main_cat:
+                # Normalize (e.g., 'Fiction' vs 'FICTION')
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                category_bins[norm_cat] += 1
 
     # Sort categories by count (descending)
-    category_distribution = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
-    max_category_count = max(category_bins.values()) if category_bins else 1
+    all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
+
+    # Limit to top 10 most common categories to keep the chart reasonable
+    category_distribution = all_categories_sorted[:10]
+
+    # Group others if there are many
+    if len(all_categories_sorted) > 10:
+        other_total = sum(count for label, count in all_categories_sorted[10:])
+        category_distribution.append(("Other", other_total))
+
+    max_category_count = (
+        max(count for label, count in category_distribution)
+        if category_distribution
+        else 1
+    )
 
     return render_template(
         "stats.html",

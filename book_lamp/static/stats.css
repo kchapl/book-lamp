@@ -374,6 +374,13 @@
     color: var(--text-muted);
     font-weight: 600;
     text-align: center;
+    width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .gap-025 {
