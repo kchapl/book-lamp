@@ -182,6 +182,7 @@ class MockStorage:
                     }
                 )
                 return book
+        logger.error(f"Book with ID {book_id} not found")
         raise Exception(f"Book with ID {book_id} not found")
 
     def upsert_book(
@@ -291,6 +292,7 @@ class MockStorage:
                     f"READING_RECORD_UPDATED: id={record_id}, status_change='{old_status}'->'{status}'"
                 )
                 return record
+        logger.error(f"Reading record with ID {record_id} not found")
         raise Exception(f"Reading record with ID {record_id} not found")
 
     def delete_reading_record(self, record_id: int) -> bool:

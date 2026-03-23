@@ -66,9 +66,7 @@ export function initButtonFeedback(): void {
     };
 
     // Attach listeners
-    document.querySelectorAll('form').forEach((f) => {
-        f.addEventListener('submit', handleFormSubmit, { capture: true });
-    });
+    document.addEventListener('submit', handleFormSubmit, { capture: true });
 
     document.body.addEventListener('click', handleBodyClick);
     window.addEventListener('popstate', resetLoadingStates);

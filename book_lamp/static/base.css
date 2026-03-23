@@ -433,21 +433,22 @@ select.edit-input option {
 }
 
 /* Loading and disabled states for CTA buttons/links */
-.btn[disabled],
-.btn:disabled {
+button:disabled,
+.btn:disabled,
+.btn-save:disabled {
     opacity: 0.6;
     cursor: default;
     transform: none;
     pointer-events: none;
 }
 
-.btn.loading {
-    opacity: 0.9;
-    pointer-events: none;
-    transform: none;
+.loading {
+    opacity: 0.9 !important;
+    pointer-events: none !important;
+    transform: none !important;
 }
 
-.btn.loading::after {
+.loading::after {
     content: '';
     display: inline-block;
     width: 16px;
