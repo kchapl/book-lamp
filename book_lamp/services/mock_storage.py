@@ -324,6 +324,9 @@ class MockStorage:
         for i, item in enumerate(self.reading_list):
             if item["book_id"] == book_id:
                 self.reading_list.pop(i)
+                logger.info(
+                    f"Successfully removed book {book_id} from reading list (MockStorage)"
+                )
                 break
         # Reassign positions
         for idx, item in enumerate(self.reading_list):
@@ -408,6 +411,7 @@ class MockStorage:
                 if is_duplicate:
                     pass
                 elif matched_record:
+                    old_status = matched_record.get("status")
                     matched_record.update(
                         {
                             "status": r_status,
@@ -416,6 +420,10 @@ class MockStorage:
                             "rating": record_data.get("rating")
                             or matched_record.get("rating", 0),
                         }
+                    )
+                    logger.info(
+                        f"READING_RECORD_UPDATED (Mock bulk): id={matched_record['id']}, "
+                        f"status_change='{old_status}'->'{r_status}'"
                     )
                 else:
                     self.add_reading_record(

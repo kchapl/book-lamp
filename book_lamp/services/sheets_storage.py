@@ -999,6 +999,7 @@ class GoogleSheetsStorage:
                     raise Exception(
                         f"Failed to add book after initialization: {retry_error}"
                     ) from retry_error
+            logger.error(f"Failed to add book: {error}")
             raise Exception(f"Failed to add book: {error}") from error
         finally:
             self._clear_persistent_cache()
@@ -1172,6 +1173,7 @@ class GoogleSheetsStorage:
             if error.resp.status == 400:
                 self.initialize_sheets()
                 raise Exception("Failed to update book: tab was missing") from error
+            logger.error(f"Failed to update book: {error}")
             raise Exception(f"Failed to update book: {error}") from error
         finally:
             self._clear_persistent_cache()
@@ -1549,6 +1551,10 @@ class GoogleSheetsStorage:
                                     "values": [updated_row],
                                 }
                             )
+                            logger.info(
+                                f"READING_RECORD_UPDATED (Sheets bulk): id={record_id}, "
+                                f"status_change='{ek_row[2] if len(ek_row) > 2 else ''}'->'{r_status}'"
+                            )
 
                             matched_idx = existing_recs.index(matched_row_to_update)
                             existing_recs[matched_idx] = (idx, updated_row)
@@ -1738,6 +1744,8 @@ class GoogleSheetsStorage:
                     raise Exception(
                         f"Failed to add reading record after initialization: {retry_error}"
                     ) from retry_error
+        except HttpError as error:
+            logger.error(f"Failed to add reading record: {error}")
             raise Exception(f"Failed to add reading record: {error}") from error
         finally:
             self._clear_persistent_cache()
@@ -1776,10 +1784,12 @@ class GoogleSheetsStorage:
         row_index = None
         book_id = None
         created_at = None
+        old_status = None  # Initialize old_status
         for idx, row in enumerate(values[1:], start=2):
             if row and row[0] and int(row[0]) == record_id:
                 row_index = idx
                 book_id = int(row[1])
+                old_status = row[2] if len(row) > 2 else ""
                 created_at = row[6] if len(row) > 6 else None
                 break
 
@@ -1823,7 +1833,13 @@ class GoogleSheetsStorage:
                 raise Exception(
                     "Failed to update reading record: tab was missing"
                 ) from error
+            logger.error(f"Failed to update reading record: {error}")
             raise Exception(f"Failed to update reading record: {error}") from error
+        else:
+            logger.info(
+                f"READING_RECORD_UPDATED (Sheets): id={record_id}, "
+                f"status_change='{old_status}'->'{status}'"
+            )
         finally:
             self._clear_persistent_cache()
 
@@ -1881,6 +1897,7 @@ class GoogleSheetsStorage:
             ).execute()
             return True
         except HttpError as error:
+            logger.error(f"Failed to delete reading record: {error}")
             raise Exception(f"Failed to delete reading record: {error}") from error
         finally:
             self._clear_persistent_cache()
