@@ -1,25 +1,89 @@
 :root {
     --primary: #4f46e5;
     --primary-light: #818cf8;
+    
+    /* Default (Light) Theme */
+    --bg: #f8fafc;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --nav-bg: rgba(255, 255, 255, 0.8);
+    --alert-bg: rgba(255, 255, 255, 0.9);
+    --input-bg: rgba(0, 0, 0, 0.03);
+    --modal-bg: rgba(255, 255, 255, 1);
+    --dropdown-bg: #ffffff;
+    --dropdown-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --gradient-1: rgba(99, 102, 241, 0.08);
+    --gradient-2: rgba(236, 72, 153, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0f172a;
+        --card-bg: rgba(30, 41, 59, 0.7);
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --glass: rgba(15, 23, 42, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --nav-bg: rgba(15, 23, 42, 0.8);
+        --alert-bg: rgba(30, 41, 59, 0.8);
+        --input-bg: rgba(255, 255, 255, 0.05);
+        --modal-bg: #1e293b;
+        --dropdown-bg: #1e293b;
+        --dropdown-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        --gradient-1: rgba(99, 102, 241, 0.15);
+        --gradient-2: rgba(236, 72, 153, 0.1);
+    }
+}
+
+[data-theme="light"] {
+    --bg: #f8fafc;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --nav-bg: rgba(255, 255, 255, 0.8);
+    --alert-bg: rgba(255, 255, 255, 0.9);
+    --input-bg: rgba(0, 0, 0, 0.03);
+    --modal-bg: rgba(255, 255, 255, 1);
+    --dropdown-bg: #ffffff;
+    --dropdown-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --gradient-1: rgba(99, 102, 241, 0.08);
+    --gradient-2: rgba(236, 72, 153, 0.05);
+}
+
+[data-theme="dark"] {
     --bg: #0f172a;
     --card-bg: rgba(30, 41, 59, 0.7);
     --text: #f8fafc;
     --text-muted: #94a3b8;
-    --glass: rgba(255, 255, 255, 0.05);
+    --glass: rgba(15, 23, 42, 0.6);
     --glass-border: rgba(255, 255, 255, 0.1);
+    --nav-bg: rgba(15, 23, 42, 0.8);
+    --alert-bg: rgba(30, 41, 59, 0.8);
+    --input-bg: rgba(255, 255, 255, 0.05);
+    --modal-bg: #1e293b;
+    --dropdown-bg: #1e293b;
+    --dropdown-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --gradient-1: rgba(99, 102, 241, 0.15);
+    --gradient-2: rgba(236, 72, 153, 0.1);
 }
 
 body {
     font-family: 'Outfit', 'Outfit Fallback', sans-serif;
     background-color: var(--bg);
     background-image:
-        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.1) 0, transparent 50%);
+        radial-gradient(at 0% 0%, var(--gradient-1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, var(--gradient-2) 0, transparent 50%);
     color: var(--text);
     margin: 0;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -35,7 +99,7 @@ nav {
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem 2rem;
-    background: var(--glass);
+    background: var(--nav-bg);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--glass-border);
     position: sticky;
@@ -45,6 +109,7 @@ nav {
     box-sizing: border-box;
     flex-wrap: wrap;
     gap: 1rem;
+    transition: background-color 0.3s ease;
 }
 
 @media (max-width: 768px) {
@@ -220,8 +285,9 @@ nav {
     gap: 0.75rem;
     backdrop-filter: blur(8px);
     animation: slideDownFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     border: 1px solid var(--glass-border);
+    background: var(--alert-bg);
 }
 
 .alert.info {
@@ -237,9 +303,9 @@ nav {
 }
 
 .alert.error {
-    background: rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
+    color: #ef4444;
 }
 
 @keyframes slideDownFadeIn {
@@ -286,7 +352,7 @@ footer {
 }
 
 .modal-content {
-    background: #1e293b;
+    background: var(--modal-bg);
     padding: 2rem;
     border: 1px solid var(--glass-border);
     border-radius: 24px;
@@ -313,7 +379,7 @@ footer {
     font-size: 1.75rem;
     margin-top: 0;
     margin-bottom: 1rem;
-    color: white;
+    color: var(--text);
 }
 
 .modal-content p {
@@ -405,11 +471,12 @@ select.edit-input {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
-    color: white;
+    color: var(--text);
     font-size: 1rem;
     font-family: inherit;
     box-sizing: border-box;
     min-width: 0;
+    transition: background-color 0.3s ease;
 }
 
 select.edit-input option {
@@ -425,7 +492,7 @@ select.edit-input option {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
-    color: white;
+    color: var(--text);
     font-size: 1rem;
     font-family: inherit;
     resize: vertical;
@@ -609,6 +676,81 @@ button:disabled,
 
 .w-full {
     width: 100%;
+}
+
+/* =============================================================================
+   Settings Dropdown
+   ============================================================================= */
+
+.settings-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.settings-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 1rem);
+    right: 0;
+    background: var(--dropdown-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    min-width: 200px;
+    box-shadow: var(--dropdown-shadow);
+    z-index: 1000;
+    animation: slideUpFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-dropdown.show {
+    display: block;
+}
+
+.settings-dropdown h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.theme-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.theme-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem 0;
+}
+
+.theme-option input {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.theme-option:hover {
+    color: var(--primary);
+}
+
+@keyframes slideUpFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .h-full {

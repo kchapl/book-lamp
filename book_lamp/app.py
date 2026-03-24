@@ -177,10 +177,20 @@ def inject_global_vars():
         else:
             is_auth = True
 
+    # Fetch user theme preference
+    theme = "dark"
+    if is_auth:
+        try:
+            settings = get_storage().get_settings()
+            theme = settings.get("theme", "dark")
+        except Exception:
+            app.logger.warning("Failed to fetch settings for template injection")
+
     return {
         "is_authorised": is_auth,
         "current_year": datetime.datetime.now().year,
         "app_version": getattr(app, "app_version", APP_VERSION),
+        "user_theme": theme,
     }
 
 
@@ -225,6 +235,23 @@ def get_job_status(job_id: str):
         return jsonify({"error": "Job not found"}), 404
 
     return jsonify(job.to_dict())
+
+
+@app.route("/api/settings", methods=["POST"])
+@authorisation_required
+def update_settings():
+    """Update user settings."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    storage = get_storage()
+    for key, value in data.items():
+        if key == "theme" and value not in ["light", "dark", "system"]:
+            continue
+        storage.update_setting(key, str(value))
+
+    return jsonify({"success": True})
 
 
 # -----------------------------

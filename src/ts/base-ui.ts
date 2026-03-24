@@ -113,7 +113,50 @@ export function initBaseUI(): void {
         }
     });
 
-    // 3. Global exposing of functions that might be called from templates
+    // 3. Settings Dropdown Logic
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsDropdown = document.getElementById('settings-dropdown');
+    
+    if (settingsToggle && settingsDropdown) {
+        settingsToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            settingsDropdown.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', (e) => {
+            if (!settingsToggle.contains(e.target as Node) && !settingsDropdown.contains(e.target as Node)) {
+                settingsDropdown.classList.remove('show');
+            }
+        });
+    }
+
+    // 4. Theme Switching Logic
+    const themeRadios = document.querySelectorAll<HTMLInputElement>('input[name="theme"]');
+    themeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            const theme = radio.value;
+            
+            // Apply theme immediately for better UX
+            const html = document.documentElement;
+            if (theme === 'system') {
+                html.setAttribute('data-theme', 'system');
+            } else {
+                html.setAttribute('data-theme', theme);
+            }
+
+            // Persist theme choice to Google Sheets
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ theme: theme }),
+            }).catch(err => console.error('Failed to save theme setting:', err));
+        });
+    });
+
+    // 5. Global exposing of functions that might be called from templates
     // Note: We'll also update the templates to use modern event listeners where possible
     (window as any).showConfirm = showConfirm;
     (window as any).closeModal = closeModal;

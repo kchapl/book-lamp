@@ -24,7 +24,7 @@
 }
 
 .book-card:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--card-bg);
     transform: translateY(-4px);
     border-color: var(--primary-light);
 }
@@ -35,8 +35,8 @@
     height: 180px;
     border-radius: 12px;
     overflow: hidden;
-    background: #1e293b;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    background: var(--input-bg);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -91,7 +91,7 @@
 }
 
 .author-link:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--glass);
 }
 
 .year,
@@ -110,10 +110,10 @@
     font-size: 0.75rem;
     font-weight: 800;
     padding: 2px 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass);
     border-radius: 4px;
     color: var(--primary-light);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
 }
 
 .book-meta-summary {
@@ -153,7 +153,7 @@
 .record-item {
     font-size: 0.95rem;
     padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--glass-border);
 }
 
 .record-item:last-child {
@@ -236,17 +236,17 @@
 .form-group select {
     width: 100%;
     padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     border-radius: 4px;
-    color: white;
+    color: var(--text);
     font-size: 0.95rem;
     box-sizing: border-box;
 }
 
 .form-group select option {
-    background: #1e293b;
-    color: white;
+    background: var(--dropdown-bg);
+    color: var(--text);
     padding: 0.5rem;
 }
 
@@ -292,11 +292,10 @@
 
 /* Sort dropdown styling */
 #sort-select {
-    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
     background: var(--glass);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
-    color: white;
+    color: var(--text);
     font-size: 0.9rem;
     cursor: pointer;
     appearance: none;
@@ -309,8 +308,8 @@
 }
 
 #sort-select option {
-    background: #1e293b;
-    color: #f8fafc;
+    background: var(--dropdown-bg);
+    color: var(--text);
     padding: 0.5rem;
 }
 
@@ -368,7 +367,7 @@
     background: var(--glass);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    color: white;
+    color: var(--text);
     font-size: 0.95rem;
     box-sizing: border-box;
 }
@@ -396,8 +395,8 @@
 }
 
 .clear-search-btn:hover {
-    color: white;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--primary);
+    background: var(--glass);
 }
 
 /* Search form responsive styles */
@@ -492,7 +491,7 @@
 .author-header {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--glass-border);
 }
 
 .author-name {
@@ -577,7 +576,7 @@
 }
 
 .btn-add-rl:hover {
-    background: rgba(129, 140, 248, 0.15);
+    background: var(--primary);
     color: white;
 }
 
@@ -611,7 +610,7 @@
 .publisher-header {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--glass-border);
 }
 
 .publisher-name {
@@ -652,7 +651,7 @@
 
 .draggable-item.dragging {
     opacity: 0.5;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--card-bg);
 }
 
 .drag-handle {
@@ -687,8 +686,8 @@
     height: 450px;
     border-radius: 12px;
     overflow: hidden;
-    background: #1e293b;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    background: var(--input-bg);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 .book-cover img {
@@ -717,7 +716,7 @@
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    color: white;
+    color: var(--text);
     overflow-wrap: break-word;
     word-break: break-word;
 }
@@ -757,7 +756,7 @@
 }
 
 .meta-value {
-    color: white;
+    color: var(--text);
 }
 
 .book-description {
@@ -769,7 +768,7 @@
 .book-description h3 {
     font-size: 1.25rem;
     margin-bottom: 0.75rem;
-    color: white;
+    color: var(--text);
 }
 
 .book-description p {
@@ -789,7 +788,7 @@
 .reading-history-section h2 {
     font-size: 1.75rem;
     margin-bottom: 1.5rem;
-    color: white;
+    color: var(--text);
 }
 
 .back-link {
