@@ -18,6 +18,7 @@ class MockStorage:
         self.reading_records: list[dict[str, Any]] = []
         self.reading_list: list[dict[str, Any]] = []
         self.recommendations: list[dict[str, Any]] = []
+        self.settings: dict[str, str] = {}
         self.next_book_id = 1
         self.next_record_id = 1
         self._authorised = False  # Default to False for security and testing
@@ -505,3 +506,11 @@ class MockStorage:
             }
             for i, rec in enumerate(recommendations)
         ]
+
+    def get_settings(self) -> dict[str, str]:
+        """Return a copy of the mock settings."""
+        return dict(self.settings)
+
+    def update_setting(self, key: str, value: str) -> None:
+        """Update a mock setting."""
+        self.settings[key] = value

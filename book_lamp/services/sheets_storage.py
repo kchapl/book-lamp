@@ -254,8 +254,9 @@ class GoogleSheetsStorage:
             "ReadingRecords",
             "ReadingList",
             "Recommendations",
+            "Settings",
         ]
-        ranges = [f"{tab}!A:P" for tab in tabs]
+        ranges = [f"{tab}!A:P" for tab in tabs if tab != "Settings"] + ["Settings!A:B"]
 
         try:
             logger.info(f"Prefetching data from Google Sheets API for {sid}")
@@ -2003,6 +2004,7 @@ class GoogleSheetsStorage:
                 "BookAuthors",
                 "ReadingList",
                 "Recommendations",
+                "Settings",
             ]
             add_requests = []
             for tab in required_tabs:
@@ -2056,6 +2058,7 @@ class GoogleSheetsStorage:
                     "justification",
                     "created_at",
                 ],
+                "Settings": ["key", "value"],
             }
 
             for tab, headers in tab_headers.items():
@@ -2164,3 +2167,63 @@ class GoogleSheetsStorage:
                 history.append(enriched_record)
 
         return history
+
+    def get_settings(self) -> Dict[str, str]:
+        """Retrieve all settings from the Settings tab."""
+        try:
+            values = self._get_values("Settings", "Settings!A:B")
+            if not values or len(values) < 2:
+                return {}
+
+            settings = {}
+            for row in values[1:]:
+                if row and len(row) >= 2:
+                    settings[row[0]] = row[1]
+            return settings
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                return {}
+            raise Exception(f"Failed to fetch settings: {error}") from error
+
+    def update_setting(self, key: str, value: str) -> None:
+        """Update or create a setting in the Settings tab."""
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        try:
+            values = self._get_values("Settings", "Settings!A:B")
+            row_index = None
+            if values and len(values) > 1:
+                for idx, row in enumerate(values[1:], start=2):
+                    if row and row[0] == key:
+                        row_index = idx
+                        break
+
+            if row_index:
+                # Update existing
+                self.service.spreadsheets().values().update(
+                    spreadsheetId=sid,
+                    range=f"Settings!A{row_index}:B{row_index}",
+                    valueInputOption="RAW",
+                    body={"values": [[key, value]]},
+                ).execute()
+            else:
+                # Append new
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=sid,
+                    range="Settings!A:B",
+                    valueInputOption="RAW",
+                    body={"values": [[key, value]]},
+                ).execute()
+
+            logger.info(f"SETTING_UPDATED: {key}='{value}'")
+        except HttpError as error:
+            if error.resp.status == 400:
+                self.initialize_sheets()
+                # Retry once after initialization
+                self.update_setting(key, value)
+                return
+            raise Exception(f"Failed to update setting: {error}") from error
+        finally:
+            self._clear_persistent_cache()
