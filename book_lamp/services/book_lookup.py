@@ -431,11 +431,16 @@ def lookup_books_by_author(
             if existing is None or year > (existing.get("publication_year") or 0):
                 seen_titles[norm_title] = entry
 
-        books = sorted(
-            seen_titles.values(),
-            key=lambda b: b.get("publication_year") or 0,
-            reverse=True,
-        )
+        # Sort by year (ascending, with 0/None at the end) and then title
+        def sort_key(b):
+            year = b.get("publication_year")
+            # For ascending sort, we want missing years (0) to go to the end.
+            # We can use a large number for missing years if we want them at the end,
+            # but usually they go to the beginning in a simple sort.
+            # Let's stick to standard behavior: 0 comes first.
+            return (year or 0, b.get("title", "").lower())
+
+        books = sorted(seen_titles.values(), key=sort_key)
 
     except Exception as e:
         logger.debug(f"Author books lookup failed for '{author_name}': {e}")
