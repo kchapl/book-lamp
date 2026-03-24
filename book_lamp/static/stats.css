@@ -300,16 +300,17 @@
 .timeline-item,
 .category-item {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    grid-template-rows: 1fr 3.5rem;
+    align-items: end;
+    justify-items: center;
     height: 100%;
 }
 
 .timeline-bar-container,
 .category-bar-container {
-    flex-grow: 1;
     width: 100%;
+    height: 100%;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -369,7 +370,11 @@
 
 .timeline-label,
 .category-label {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
+    height: 3rem;
+    display: flex;
+    align-items: start;
+    justify-content: center;
     font-size: 0.7rem;
     color: var(--text-muted);
     font-weight: 600;
@@ -379,6 +384,7 @@
     overflow-wrap: break-word;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }

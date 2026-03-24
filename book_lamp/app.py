@@ -718,8 +718,15 @@ def list_books():
         filtered_books = []
         for b in books:
             bisac = b.get("bisac_category")
-            if bisac and category_filter.lower() in str(bisac).lower():
-                filtered_books.append(b)
+            if bisac:
+                main_cat, _ = parse_bisac_category(bisac)
+                if main_cat:
+                    # Match normalized top-level category precisely
+                    norm_cat = (
+                        main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                    )
+                    if norm_cat == category_filter:
+                        filtered_books.append(b)
         books = filtered_books
 
     # Extract all top-level categories for the filter dropdown
@@ -727,9 +734,10 @@ def list_books():
     for b in storage.get_all_books():
         bisac = b.get("bisac_category")
         if bisac:
-            # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
-            top_level = str(bisac).split("/")[0].strip()
-            all_categories.add(top_level)
+            main_cat, _ = parse_bisac_category(bisac)
+            if main_cat:
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                all_categories.add(norm_cat)
     sorted_categories = sorted(list(all_categories))
 
     return render_template(
@@ -978,10 +986,22 @@ def collection_stats():
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
 
-    # Core metrics only consider completed books
-    completed_records = [r for r in all_records if r.get("status") == "Completed"]
-    completed_book_ids = {r.get("book_id") for r in completed_records}
-    completed_books = [b for b in books if b.get("id") in completed_book_ids]
+    # Core metrics only consider books whose latest status is 'Completed'
+    # Map book statuses from latest records
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") > latest_records[
+                bid
+            ].get("start_date", ""):
+                latest_records[bid] = r
+
+    completed_books = []
+    for b in books:
+        bid = b.get("id")
+        if latest_records.get(bid, {}).get("status") == "Completed":
+            completed_books.append(b)
 
     total_books = len(completed_books)
     total_records = len(all_records)
@@ -996,17 +1016,6 @@ def collection_stats():
         except (ValueError, TypeError):
             continue
     avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
-
-    # Map book statuses from latest records
-    # Create mapping of book_id to its most recent reading record
-    latest_records = {}
-    for r in all_records:
-        bid = r.get("book_id")
-        if bid:
-            if bid not in latest_records or r.get("start_date", "") > latest_records[
-                bid
-            ].get("start_date", ""):
-                latest_records[bid] = r
 
     # Status counts - only include 'In Progress', 'Completed', and 'Abandoned'
     allowed_statuses = {"In Progress", "Completed", "Abandoned"}
@@ -1094,26 +1103,31 @@ def collection_stats():
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
     avg_month_count = sum(monthly_counts.values()) / 12
 
-    # Category Distribution
+    # Category Distribution (only from books whose latest status is Completed)
     category_bins = Counter()
-    for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                # Normalize (e.g., 'Fiction' vs 'FICTION')
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
+    for b in books:
+        bid = b.get("id")
+        latest = latest_records.get(bid)
+        if latest and latest.get("status") == "Completed":
+            bisac = b.get("bisac_category")
+            if bisac:
+                main_cat, _ = parse_bisac_category(bisac)
+                if main_cat:
+                    # Normalize (e.g., 'Fiction' vs 'FICTION')
+                    norm_cat = (
+                        main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                    )
+                    category_bins[norm_cat] += 1
 
     # Sort categories by count (descending)
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
 
-    # Limit to top 10 most common categories to keep the chart reasonable
-    category_distribution = all_categories_sorted[:10]
+    # Limit to top 15 most common categories to keep the chart reasonable
+    category_distribution = all_categories_sorted[:15]
 
     # Group others if there are many
-    if len(all_categories_sorted) > 10:
-        other_total = sum(count for label, count in all_categories_sorted[10:])
+    if len(all_categories_sorted) > 15:
+        other_total = sum(count for label, count in all_categories_sorted[15:])
         category_distribution.append(("Other", other_total))
 
     max_category_count = (
