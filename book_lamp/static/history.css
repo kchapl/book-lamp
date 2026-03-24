@@ -30,14 +30,14 @@
 
 .history-controls select {
     padding: 0.5rem 2rem 0.5rem 0.75rem;
-    background: var(--bg);
+    background: var(--input-bg);
     border: 1px solid var(--glass-border);
     border-radius: 8px;
-    color: white;
+    color: var(--text);
     font-size: 0.9rem;
     cursor: pointer;
     appearance: none;
-    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234f46e5"><path d="M7 10l5 5 5-5z"/></svg>');
     background-repeat: no-repeat;
     background-position: right 0.5rem center;
     background-size: 1.2em;
@@ -66,8 +66,8 @@
     height: 180px;
     border-radius: 12px;
     overflow: hidden;
-    background: #1e293b;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    background: var(--input-bg);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     display: block;
     text-decoration: none;
     transition: transform 0.2s, box-shadow 0.2s;
@@ -107,7 +107,7 @@
 }
 
 .history-book-title a {
-    color: white;
+    color: var(--text);
     text-decoration: none;
 }
 
@@ -133,7 +133,7 @@
 
 .reading-event {
     padding: 0.75rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--input-bg);
     border-radius: 12px;
     font-size: 0.9rem;
 }

@@ -30,7 +30,7 @@
     font-weight: 700;
     line-height: 1;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to bottom, #fff, #94a3b8);
+    background: linear-gradient(to bottom, var(--primary), var(--primary-light));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -148,7 +148,7 @@
 .bar-wrapper {
     flex-grow: 1;
     height: 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--input-bg);
     border-radius: 6px;
     overflow: hidden;
 }
@@ -202,9 +202,9 @@
     display: flex;
     align-items: center;
     padding: 1rem;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--input-bg);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
 }
 
 .rank {
@@ -259,7 +259,7 @@
     right: 0;
     bottom: var(--marker-bottom, 0%);
     height: 2px;
-    border-top: 2px dashed rgba(255, 255, 255, 0.2);
+    border-top: 2px dashed var(--glass-border);
     z-index: 5;
     pointer-events: all;
     transition: border-color 0.3s;

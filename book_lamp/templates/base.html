@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{ user_theme }}">
 
 <head>
     <meta charset="UTF-8">
@@ -56,6 +56,34 @@
             <span id="connection-status" class="status-dot {{ 'connected' if is_authorised else 'disconnected' }}"
                 title="{{ 'Google Sheets Connected (Click to Disconnect)' if is_authorised else 'Google Sheets Not Connected (Click to Authorise)' }}"
                 data-authorised="{{ 'true' if is_authorised else 'false' }}" onclick="toggleConnection()"></span>
+
+            {% if is_authorised %}
+            <div class="settings-container">
+                <button id="settings-toggle" class="btn-icon" title="Settings" aria-label="Open settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+                <div id="settings-dropdown" class="settings-dropdown">
+                    <h3>Theme</h3>
+                    <div class="theme-options">
+                        <label class="theme-option">
+                            <input type="radio" name="theme" value="light" {{ 'checked' if user_theme == 'light' }}>
+                            <span>Light</span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="theme" value="dark" {{ 'checked' if user_theme == 'dark' }}>
+                            <span>Dark</span>
+                        </label>
+                        <label class="theme-option">
+                            <input type="radio" name="theme" value="system" {{ 'checked' if user_theme == 'system' }}>
+                            <span>System</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </nav>
 
