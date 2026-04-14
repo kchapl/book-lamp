@@ -153,7 +153,7 @@
         </div>
 
         <div id="form-{{ book.id }}" class="add-record-form hidden">
-            <form method="post" action="{{ url_for('create_reading_record', book_id=book.id) }}">
+            <form method="post" action="{{ url_for('history.create_reading_record', book_id=book.id) }}">
                 <div class="form-group">
                     <label for="new_status">Status</label>
                     <select id="new_status" name="status" onchange="updateDateLabels('{{ book.id }}', this.value)"
@@ -197,7 +197,7 @@
             {% set is_real_record = 'rl_' not in record.id|string %}
             <div class="record-item" id="record-{{ record.id }}" data-edit-mode="false">
                 {% if is_real_record %}
-                <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
+                <form method="post" action="{{ url_for('history.update_reading_record', record_id=record.id) }}">
                     {% endif %}
                     <!-- View Mode -->
                     <div class="view-only">
@@ -219,7 +219,7 @@
                                     onclick="setRecordEditMode(this.dataset.recordId, true)" title="Edit Record"
                                     aria-label="Edit Record">✏️</button>
                                 <button type="button" class="btn-icon btn-icon-delete" data-record-id="{{ record.id }}"
-                                    data-delete-url="{{ url_for('delete_reading_record', record_id=record.id) }}"
+                                    data-delete-url="{{ url_for('history.delete_reading_record', record_id=record.id) }}"
                                     onclick="deleteRecord(this.dataset.recordId, this.dataset.deleteUrl)"
                                     title="Delete Record" aria-label="Delete Record">🗑️</button>
                                 {% endif %}

@@ -13,7 +13,7 @@
         <p class="text-muted">A deep dive into your reading history.</p>
     </div>
     <div class="stats-actions">
-        <a href="{{ url_for('fetch_missing_categories') }}" class="btn btn-outline-primary btn-sm"
+        <a href="{{ url_for('stats.fetch_missing_categories') }}" class="btn btn-outline-primary btn-sm"
            title="Find categories for books currently missing them">
             🏷️ Fetch missing categories
         </a>
@@ -175,7 +175,7 @@
             {% for label, count in category_distribution %}
             <div class="category-item">
                 {% if label != 'Other' %}
-                <a href="{{ url_for('list_books', category=label) }}" class="bar-link" aria-label="View books in category {{ label }}">
+                <a href="{{ url_for('list_books', category=label, status='Completed') }}" class="bar-link" aria-label="View completed books in category {{ label }}">
                 {% endif %}
                     <div class="category-bar-container">
                         <div class="category-bar"

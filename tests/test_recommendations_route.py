@@ -21,10 +21,11 @@ def test_mode(monkeypatch):
 
 def _authorise(app):
     """Flip MockStorage into the authorised state."""
-    from book_lamp.app import _mock_storage_singleton
+    from book_lamp.web.common import get_test_storage_singleton
 
-    _mock_storage_singleton.set_authorised(True)
-    return _mock_storage_singleton
+    storage = get_test_storage_singleton()
+    storage.set_authorised(True)
+    return storage
 
 
 def test_recommendations_returns_empty_when_no_llm_key(client, monkeypatch):
@@ -58,7 +59,7 @@ def test_recommendations_returns_cached_recs(client, monkeypatch):
         }
     ]
 
-    with patch("book_lamp.app.get_llm_client") as mock_get_llm:
+    with patch("book_lamp.routes.recommendations.get_llm_client") as mock_get_llm:
         mock_llm = MagicMock()
         mock_llm.client = MagicMock()  # Simulate a configured client
         mock_get_llm.return_value = mock_llm

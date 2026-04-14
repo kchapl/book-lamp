@@ -117,6 +117,7 @@ def parse_bisac_category(bisac: Optional[str]) -> tuple[Optional[str], Optional[
     Handles formats like:
     - 'FICTION / Science Fiction / General' -> ('FICTION', 'Science Fiction / General')
     - 'Fiction, History' -> ('Fiction', 'History')
+    - 'London (England) -- History' -> ('London (England)', 'History')
     - '823.914' (Dewey) -> ('823.914', None)
     """
     if not bisac:
@@ -132,6 +133,14 @@ def parse_bisac_category(bisac: Optional[str]) -> tuple[Optional[str], Optional[
         return parts[0].strip(), parts[1].strip()
     if "/" in bisac_str:
         parts = bisac_str.split("/", 1)
+        return parts[0].strip(), parts[1].strip()
+
+    # Open Library often uses '--' for subject sub-divisions
+    if " -- " in bisac_str:
+        parts = bisac_str.split(" -- ", 1)
+        return parts[0].strip(), parts[1].strip()
+    if "--" in bisac_str:
+        parts = bisac_str.split("--", 1)
         return parts[0].strip(), parts[1].strip()
 
     # Google Books often uses comma separation for multiple categories

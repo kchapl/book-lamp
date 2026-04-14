@@ -35,15 +35,15 @@ def test_stats_category_limit(client, authenticated_client):
     resp = authenticated_client.get("/stats")
     assert resp.status_code == 200
 
-    # Check that we only have 11 categories shown (10 + Other)
+    # Check that we only have 16 categories shown (15 + Other)
     # The count should appear for each category
     html = resp.data.decode()
 
     # "Other" should be present because we added 20 categories
     assert "Other" in html
 
-    # Check that there are 11 category-label items
-    assert html.count('class="category-label"') == 11
+    # Check that there are 16 category-label items
+    assert html.count('class="category-label"') == 16
 
     # Check normalization: 'FICTION' should become 'Fiction'
     # Add 5 books to Fiction to make it a top category

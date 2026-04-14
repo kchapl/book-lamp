@@ -1,12 +1,7 @@
-import calendar
 import datetime
 import logging
 import os
-import re
-from collections import Counter
-from functools import wraps
-from typing import Union, cast
-from urllib.parse import urlparse
+from typing import Union
 
 import click  # noqa: E402
 from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
@@ -14,7 +9,6 @@ from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
     flash,
-    g,
     jsonify,
     redirect,
     render_template,
@@ -23,10 +17,12 @@ from flask import (  # noqa: E402
     url_for,
 )
 
+from book_lamp.routes.history import history_bp
+from book_lamp.routes.recommendations import recommendations_bp
+from book_lamp.routes.stats import stats_bp
 from book_lamp.services import sheets_storage as from_sheets_storage
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
-from book_lamp.services.llm_client import LLMClient
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
@@ -38,31 +34,18 @@ from book_lamp.utils import (
 )
 from book_lamp.utils.libib_import import parse_libib_csv
 from book_lamp.utils.protobuf_patch import apply_patch
+from book_lamp.web.common import (
+    _background_fetch_missing_data,
+    _normalize_publisher,
+    authorisation_required,
+    get_safe_redirect_target,
+    get_storage,
+    get_test_storage_singleton,
+    is_test_mode,
+)
 
 # Apply security patch for CVE-2026-0994
 apply_patch()
-
-
-def get_safe_redirect_target(fallback_endpoint: str) -> str:
-    """
-    Return a safe redirect target derived from the request referrer.
-
-    If the referrer is an absolute URL, only accept it if it points to the
-    same host as the current request. Otherwise, or if no referrer is set,
-    fall back to the URL for the given endpoint.
-    """
-    referrer = request.referrer
-    if referrer:
-        # Normalize backslashes, which some browsers treat like forward slashes
-        normalized = referrer.replace("\\", "/")
-        parsed = urlparse(normalized)
-        # Accept relative URLs (no scheme and no netloc)
-        if not parsed.scheme and not parsed.netloc:
-            return normalized
-        # Accept absolute URLs that point to this host using http/https
-        if parsed.scheme in ("http", "https") and parsed.netloc == request.host:
-            return normalized
-    return url_for(fallback_endpoint)
 
 
 load_dotenv()
@@ -88,60 +71,6 @@ app = Flask(__name__)
 # tests to behave as if they were running in production.  Using a helper
 # function avoids that race entirely.
 TEST_ISBN = "9780000000000"
-
-
-def is_test_mode() -> bool:
-    """Return True when the application is running under the test harness.
-
-    The environment variable is used throughout the codebase; previously
-    a module‑level constant read it once at import time.  That made tests
-    unreliable when the variable was changed after import.
-    """
-    return os.environ.get("TEST_MODE", "0") == "1"
-
-
-# Global singleton for test mode only
-_mock_storage_singleton = MockStorage()
-
-
-def get_storage():
-    """Get the appropriate storage backend for the current request context."""
-    if is_test_mode():
-        return _mock_storage_singleton
-    if "storage" not in g:
-        app.logger.info("Initializing storage for request...")
-        # Use different sheet names for production and development
-        # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
-        is_prod = os.environ.get("FLASK_ENV") == "production"
-        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
-        # Initialize implementation with credentials from session
-        credentials = session.get("credentials")
-        spreadsheet_id = session.get("spreadsheet_id")
-        g.storage = GoogleSheetsStorage(
-            sheet_name=sheet_name,
-            credentials_dict=credentials,
-            spreadsheet_id=spreadsheet_id,
-        )
-    return g.storage
-
-
-def get_llm_client() -> LLMClient:
-    """Return a per-request LLMClient singleton (cheap to construct)."""
-    if "llm_client" not in g:
-        g.llm_client = LLMClient()
-    return cast(LLMClient, g.llm_client)
-
-
-def authorisation_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        app.logger.info(f"AUTHORISATION_CHECK for route: {f.__name__}")
-        if not get_storage().is_authorised():
-            return redirect(url_for("unauthorised"))
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 
 def get_app_version():
@@ -194,32 +123,6 @@ def inject_global_vars():
     }
 
 
-def _normalize_publisher(name: str) -> str:
-    if not name:
-        return ""
-    # Remove common corporate suffixes
-    suffixes = [
-        r"\bbooks\b",
-        r"\blimited\b",
-        r"\bltd\.?\b",
-        r"\binc\.?\b",
-        r"\bllc\b",
-        r"\bpublishers?\b",
-        r"\bpublishing\b",
-        r"\bpress\b",
-        r"\bgroup\b",
-        r"\bcompany\b",
-        r"\bco\.?\b",
-    ]
-    pattern = re.compile("|".join(suffixes), flags=re.IGNORECASE)
-    cleaned = pattern.sub("", name)
-    cleaned = re.sub(r"[,.;:]", "", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if not cleaned:
-        return name.strip()
-    return cleaned
-
-
 @app.template_filter("normalize_pub")
 def normalize_pub_filter(s):
     return _normalize_publisher(s)
@@ -252,44 +155,6 @@ def update_settings():
         storage.update_setting(key, str(value))
 
     return jsonify({"success": True})
-
-
-# -----------------------------
-# AI Recommendations
-# -----------------------------
-
-
-@app.route("/api/recommendations", methods=["GET"])
-@authorisation_required
-def api_recommendations():
-    """Return (possibly cached) AI book recommendations as JSON.
-
-    The frontend calls this asynchronously after the dashboard has loaded.
-    Fresh recommendations are generated from recently highly-rated books;
-    results are cached in the Recommendations sheet for up to 7 days.
-    """
-    from book_lamp.services.recommendations import get_or_refresh_recommendations
-
-    storage = get_storage()
-    llm = get_llm_client()
-
-    if not llm.client:
-        return (
-            jsonify({"recommendations": [], "error": "LLM_API_KEY not configured"}),
-            200,
-        )
-
-    try:
-        recs = get_or_refresh_recommendations(storage, llm)
-        return jsonify({"recommendations": recs})
-    except Exception:
-        app.logger.exception("Failed to generate recommendations")
-        return (
-            jsonify(
-                {"recommendations": [], "error": "Failed to generate recommendations"}
-            ),
-            200,
-        )
 
 
 @app.route("/")
@@ -468,74 +333,6 @@ def backfill_bisac_command():
             )
 
     click.echo(f"Finished backfill. Updated {updated} books.")
-
-
-# -----------------------------
-# Reading History feature
-# -----------------------------
-
-
-@app.route("/history", methods=["GET"])
-@authorisation_required
-def reading_history():
-    """Show detailed reading history as a chronological list of individual events."""
-    storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
-
-    history = storage.get_reading_history()
-    # Get status list for filter dropdown (from all records)
-    all_statuses = sorted(
-        list(set(r.get("status") for r in history if r.get("status")))
-    )
-
-    # Filtering
-    status_filter = request.args.get("status")
-    if status_filter:
-        history = [r for r in history if r.get("status") == status_filter]
-
-    min_rating = request.args.get("min_rating")
-    if min_rating and min_rating.isdigit():
-        min_rating = int(min_rating)
-        history = [r for r in history if r.get("rating", 0) >= min_rating]
-
-    year_filter = request.args.get("year")
-    if year_filter and year_filter.isdigit():
-        history = [
-            r
-            for r in history
-            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
-            or (
-                not r.get("end_date")
-                and r.get("start_date")
-                and r.get("start_date")[:4] == year_filter
-            )
-        ]
-
-    # Sorting
-    sort_by = request.args.get("sort", "date_desc")
-
-    if sort_by == "date_desc":
-        history.sort(
-            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
-        )
-    elif sort_by == "date_asc":
-        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
-    elif sort_by == "rating_desc":
-        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
-    elif sort_by == "title":
-        history.sort(key=lambda r: (r.get("book_title") or "").lower())
-
-    return render_template(
-        "history.html",
-        history=history,
-        statuses=all_statuses,
-        current_status=status_filter,
-        current_rating=min_rating,
-        current_year=year_filter,
-        current_sort=sort_by,
-    )
 
 
 # -----------------------------
@@ -718,8 +515,15 @@ def list_books():
         filtered_books = []
         for b in books:
             bisac = b.get("bisac_category")
-            if bisac and category_filter.lower() in str(bisac).lower():
-                filtered_books.append(b)
+            if bisac:
+                main_cat, _ = parse_bisac_category(bisac)
+                if main_cat:
+                    # Match normalized top-level category precisely
+                    norm_cat = (
+                        main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                    )
+                    if norm_cat == category_filter:
+                        filtered_books.append(b)
         books = filtered_books
 
     # Extract all top-level categories for the filter dropdown
@@ -727,9 +531,10 @@ def list_books():
     for b in storage.get_all_books():
         bisac = b.get("bisac_category")
         if bisac:
-            # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
-            top_level = str(bisac).split("/")[0].strip()
-            all_categories.add(top_level)
+            main_cat, _ = parse_bisac_category(bisac)
+            if main_cat:
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                all_categories.add(norm_cat)
     sorted_categories = sorted(list(all_categories))
 
     return render_template(
@@ -967,182 +772,6 @@ def publisher_page(publisher_slug: str):
     )
 
 
-@app.route("/stats", methods=["GET"])
-@authorisation_required
-def collection_stats():
-    storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
-
-    books = storage.get_all_books()
-    all_records = storage.get_reading_records()
-
-    # Core metrics only consider completed books
-    completed_records = [r for r in all_records if r.get("status") == "Completed"]
-    completed_book_ids = {r.get("book_id") for r in completed_records}
-    completed_books = [b for b in books if b.get("id") in completed_book_ids]
-
-    total_books = len(completed_books)
-    total_records = len(all_records)
-
-    # Average rating - derived from all reading records with a rating > 0
-    valid_ratings = []
-    for r in all_records:
-        rating_val = r.get("rating")
-        try:
-            if rating_val and int(rating_val) > 0:
-                valid_ratings.append(int(rating_val))
-        except (ValueError, TypeError):
-            continue
-    avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
-
-    # Map book statuses from latest records
-    # Create mapping of book_id to its most recent reading record
-    latest_records = {}
-    for r in all_records:
-        bid = r.get("book_id")
-        if bid:
-            if bid not in latest_records or r.get("start_date", "") > latest_records[
-                bid
-            ].get("start_date", ""):
-                latest_records[bid] = r
-
-    # Status counts - only include 'In Progress', 'Completed', and 'Abandoned'
-    allowed_statuses = {"In Progress", "Completed", "Abandoned"}
-    statuses = []
-    for b in books:
-        bid = b.get("id")
-        if bid in latest_records:
-            status = latest_records[bid].get("status")
-            if status in allowed_statuses:
-                statuses.append(status)
-    status_counts = Counter(statuses)
-
-    # Rating Distribution (only from completed records)
-    rating_counts = Counter()
-    for r in all_records:
-        if r.get("status") == "Completed":
-            try:
-                r_val = int(r.get("rating", 0))
-                if 1 <= r_val <= 5:
-                    rating_counts[r_val] += 1
-            except (ValueError, TypeError):
-                continue
-
-    rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
-
-    # Top authors (only count books that have been completed)
-    all_authors = []
-    for b in completed_books:
-        if b.get("authors"):
-            all_authors.extend(b["authors"])
-        elif b.get("author"):
-            all_authors.append(b["author"])
-
-    total_authors = len(set(all_authors))
-    top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]
-
-    # Top publishers (only count books that have been completed)
-    all_publishers = []
-    for b in completed_books:
-        if b.get("publisher"):
-            norm_pub = _normalize_publisher(b["publisher"])
-            if norm_pub:
-                all_publishers.append(norm_pub)
-    top_publishers = sorted(
-        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
-    )[:5]
-
-    # Completed Books by Year and Month
-    completed_records = [
-        r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
-    ]
-
-    # Yearly counts
-    yearly_counts = Counter()
-    for r in completed_records:
-        date_str = r.get("end_date", "")
-        if date_str and len(date_str) >= 4:
-            year = date_str[:4]
-            if year.isdigit():
-                yearly_counts[year] += 1
-
-    # Sort years numerically
-    sorted_years = sorted(yearly_counts.items())
-    max_year_count = max(yearly_counts.values()) if yearly_counts else 1
-    avg_year_count = (
-        sum(yearly_counts.values()) / len(yearly_counts) if yearly_counts else 0
-    )
-
-    # Monthly counts (seasonal distribution)
-    monthly_counts = Counter()
-    for r in completed_records:
-        date_str = r.get("end_date", "")
-        if date_str and len(date_str) >= 7:
-            month_idx = date_str[5:7]
-            if month_idx.isdigit():
-                monthly_counts[month_idx] += 1
-
-    # Map to month names and indices for linking
-    ordered_months = []
-    for i in range(1, 13):
-        idx_str = f"{i:02d}"
-        name = calendar.month_name[i][:3]
-        ordered_months.append((i, name, monthly_counts[idx_str]))
-
-    max_month_count = max(monthly_counts.values()) if monthly_counts else 1
-    avg_month_count = sum(monthly_counts.values()) / 12
-
-    # Category Distribution
-    category_bins = Counter()
-    for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                # Normalize (e.g., 'Fiction' vs 'FICTION')
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
-
-    # Sort categories by count (descending)
-    all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
-
-    # Limit to top 10 most common categories to keep the chart reasonable
-    category_distribution = all_categories_sorted[:10]
-
-    # Group others if there are many
-    if len(all_categories_sorted) > 10:
-        other_total = sum(count for label, count in all_categories_sorted[10:])
-        category_distribution.append(("Other", other_total))
-
-    max_category_count = (
-        max(count for label, count in category_distribution)
-        if category_distribution
-        else 1
-    )
-
-    return render_template(
-        "stats.html",
-        total_books=total_books,
-        total_authors=total_authors,
-        total_records=total_records,
-        avg_rating=avg_rating,
-        status_counts=status_counts,
-        rating_distribution=rating_distribution,
-        top_authors=top_authors,
-        top_publishers=top_publishers,
-        category_distribution=category_distribution,
-        max_category_count=max_category_count,
-        yearly_counts=sorted_years,
-        max_year_count=max_year_count,
-        avg_year_count=avg_year_count,
-        monthly_counts=ordered_months,
-        max_month_count=max_month_count,
-        avg_month_count=avg_month_count,
-    )
-
-
 @app.route("/books/<int:book_id>", methods=["GET"])
 @authorisation_required
 def book_detail(book_id: int):
@@ -1165,102 +794,6 @@ def book_detail(book_id: int):
     return render_template(
         "book_detail.html", book=book, today=today, is_planned=is_planned
     )
-
-
-@app.route("/books/<int:book_id>/reading-records", methods=["POST"])
-@authorisation_required
-def create_reading_record(book_id: int):
-    storage = get_storage()
-    status = request.form.get("status")
-    start_date = request.form.get("start_date")
-    end_date = request.form.get("end_date")
-    rating = int(request.form.get("rating", 0))
-
-    if not status or not start_date:
-        flash("Status and start date are required.", "error")
-        return redirect(url_for("book_detail", book_id=book_id))
-
-    try:
-        storage.add_reading_record(
-            book_id=book_id,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-            rating=rating,
-        )
-        app.logger.info(f"RECORD_CREATED: book_id={book_id}, status='{status}'")
-        flash("Reading record added.", "success")
-    except Exception as e:
-        app.logger.error(f"RECORD_CREATE_FAILED: book_id={book_id}, error={str(e)}")
-        flash(f"Error adding reading record: {str(e)}", "error")
-
-    return redirect(url_for("book_detail", book_id=book_id))
-
-
-def _get_safe_redirect_target(target: str | None) -> str | None:
-    """
-    Return a safe redirect target derived from user-controlled input.
-
-    Only relative URLs (no scheme, no netloc) are allowed. Backslashes are
-    stripped to avoid alternative path separators being interpreted by browsers.
-    """
-    if not target:
-        return None
-    cleaned = target.replace("\\", "")
-    parsed = urlparse(cleaned)
-    if parsed.scheme or parsed.netloc:
-        return None
-    return cleaned
-
-
-@app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
-@authorisation_required
-def update_reading_record(record_id: int):
-    storage = get_storage()
-    status = request.form.get("status")
-    start_date = request.form.get("start_date")
-    end_date = request.form.get("end_date")
-    rating = int(request.form.get("rating", 0))
-
-    if not status or not start_date:
-        flash("Status and start date are required.", "error")
-        safe_target = _get_safe_redirect_target(request.referrer)
-        return redirect(safe_target or url_for("reading_history"))
-
-    try:
-        storage.update_reading_record(
-            record_id=record_id,
-            status=status,
-            start_date=start_date,
-            end_date=end_date,
-            rating=rating,
-        )
-        app.logger.info(f"RECORD_UPDATED: record_id={record_id}, status='{status}'")
-        flash("Reading record updated.", "success")
-    except Exception as e:
-        app.logger.error(f"RECORD_UPDATE_FAILED: record_id={record_id}, error={str(e)}")
-        flash(f"Error updating record: {str(e)}", "error")
-
-    safe_target = _get_safe_redirect_target(request.referrer)
-    return redirect(safe_target or url_for("reading_history"))
-
-
-@app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
-@authorisation_required
-def delete_reading_record(record_id: int):
-    storage = get_storage()
-    try:
-        success = storage.delete_reading_record(record_id)
-        if success:
-            flash("Reading record deleted.", "success")
-        else:
-            flash("Reading record not found.", "error")
-    except Exception as e:
-        app.logger.error(f"Failed to delete reading record: {str(e)}")
-        flash(f"Error deleting record: {str(e)}", "error")
-
-    safe_target = _get_safe_redirect_target(request.referrer)
-    return redirect(safe_target or url_for("reading_history"))
 
 
 @app.route("/books", methods=["POST"])
@@ -1407,43 +940,9 @@ def create_book():
     return redirect(url_for("reading_list"))
 
 
-def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: str):
-    """Background task: bulk fetch missing data (covers, metadata) for all books."""
-    from book_lamp.services.book_lookup import enhance_books_batch
-
-    try:
-        # Create storage with passed credentials (outside request context)
-        storage: Union[MockStorage, GoogleSheetsStorage]
-        if is_test_mode():
-            storage = _mock_storage_singleton
-        else:
-            storage = GoogleSheetsStorage(
-                sheet_name=sheet_name, credentials_dict=credentials_dict
-            )
-
-        books = storage.get_all_books()
-        app.logger.info(
-            f"Background job {job_id}: checking {len(books)} books for missing data..."
-        )
-
-        # enhance_books_batch updates in-place and returns count
-        # Pass force_refresh=True because we want to update categories for all books
-        updated_count = enhance_books_batch(books, force_refresh=True)
-
-        # Always save books back to storage to preserve any existing metadata
-        items_to_update = [{"book": b, "record": None} for b in books]
-        storage.bulk_import(items_to_update)
-
-        result_msg = (
-            f"Found and updated missing data for {updated_count} book(s)."
-            if updated_count > 0
-            else "No missing data found to update."
-        )
-        app.logger.info(f"Background job {job_id}: completed - {result_msg}")
-        return result_msg
-    except Exception:
-        app.logger.exception(f"Background job {job_id} failed")
-        raise
+app.register_blueprint(history_bp)
+app.register_blueprint(recommendations_bp)
+app.register_blueprint(stats_bp)
 
 
 @app.route("/books/fetch-covers", methods=["POST"])
@@ -1471,29 +970,6 @@ def fetch_missing_data():
     return redirect(url_for("list_books", job_id=job_id))
 
 
-@app.route("/stats/backfill-categories")
-@authorisation_required
-def fetch_missing_categories():
-    """Trigger backfill of BISAC categories from the stats page."""
-    job_queue = get_job_queue()
-    credentials_dict = session.get("credentials")
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
-    job_id = job_queue.submit_job(
-        "backfill_bisac",
-        _background_fetch_missing_data,  # Reusing the background fetcher which now includes categories
-        credentials_dict,
-        sheet_name,
-    )
-
-    flash(
-        "Book categorisation started in the background. Your charts will update as data is found.",
-        "info",
-    )
-    return redirect(url_for("collection_stats", job_id=job_id))
-
-
 @app.route("/books/import", methods=["GET"])
 @authorisation_required
 def import_books_form():
@@ -1510,7 +986,7 @@ def _background_import_books(
         # Create storage with passed credentials (outside request context)
         storage: Union[MockStorage, GoogleSheetsStorage]
         if is_test_mode():
-            storage = _mock_storage_singleton
+            storage = get_test_storage_singleton()
         else:
             storage = GoogleSheetsStorage(
                 sheet_name=sheet_name, credentials_dict=credentials_dict
