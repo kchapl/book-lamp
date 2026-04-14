@@ -117,7 +117,10 @@ def get_cache() -> Union[SQLiteCache, NoOpCache]:
     global _cache_instance
     if _cache_instance is None:
         # Disable cache in test mode to avoid cross-test contamination
-        if os.environ.get("TEST_MODE") == "1":
+        if (
+            os.environ.get("TEST_MODE") == "1"
+            or os.environ.get("ASYNC_SQLITE_STORAGE") == "1"
+        ):
             return NoOpCache()
         _cache_instance = SQLiteCache()
     return _cache_instance

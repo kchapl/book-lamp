@@ -158,10 +158,64 @@ export function initBaseUI(): void {
 
     // 5. Global exposing of functions that might be called from templates
     // Note: We'll also update the templates to use modern event listeners where possible
+    initSyncHealthBadge();
     (window as any).showConfirm = showConfirm;
     (window as any).closeModal = closeModal;
     (window as any).submitPostRequest = submitPostRequest;
     (window as any).toggleConnection = toggleConnection;
+}
+
+function initSyncHealthBadge(): void {
+    const badge = document.getElementById('sync-health-badge');
+    const statusDot = document.getElementById('connection-status');
+    if (!badge || !statusDot) return;
+
+    const isAuthorised = statusDot.getAttribute('data-authorised') === 'true';
+    if (!isAuthorised) {
+        badge.classList.add('hidden');
+        return;
+    }
+
+    const render = (mode: 'ok' | 'warning' | 'error', text: string): void => {
+        badge.classList.remove('hidden', 'sync-ok', 'sync-warning', 'sync-error');
+        if (mode === 'ok') badge.classList.add('sync-ok');
+        if (mode === 'warning') badge.classList.add('sync-warning');
+        if (mode === 'error') badge.classList.add('sync-error');
+        badge.textContent = text;
+    };
+
+    const poll = async (): Promise<void> => {
+        try {
+            const resp = await fetch('/api/sync/diagnostics');
+            if (!resp.ok) {
+                badge.classList.add('hidden');
+                return;
+            }
+
+            const data = await resp.json();
+            if (!data || data.enabled === false) {
+                badge.classList.add('hidden');
+                return;
+            }
+
+            const failed = Number(data?.outbox?.failed ?? 0);
+            const pending = Number(data?.outbox?.pending ?? 0);
+            if (failed > 0) {
+                render('error', `Sync issues: ${failed}`);
+            } else if (pending > 0) {
+                render('warning', `Syncing ${pending}`);
+            } else {
+                render('ok', 'Synced');
+            }
+        } catch {
+            badge.classList.add('hidden');
+        }
+    };
+
+    void poll();
+    window.setInterval(() => {
+        void poll();
+    }, 15000);
 }
 
 // Auto-init for consistency
