@@ -56,6 +56,7 @@
             <span id="connection-status" class="status-dot {{ 'connected' if is_authorised else 'disconnected' }}"
                 title="{{ 'Google Sheets Connected (Click to Disconnect)' if is_authorised else 'Google Sheets Not Connected (Click to Authorise)' }}"
                 data-authorised="{{ 'true' if is_authorised else 'false' }}" onclick="toggleConnection()"></span>
+            <span id="sync-health-badge" class="sync-health-badge hidden" aria-live="polite"></span>
 
             {% if is_authorised %}
             <div class="settings-container">

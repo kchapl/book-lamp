@@ -24,6 +24,7 @@ from flask import (  # noqa: E402
 )
 
 from book_lamp.services import sheets_storage as from_sheets_storage
+from book_lamp.services.async_sqlite_storage import AsyncSQLiteStorage
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.llm_client import LLMClient
@@ -102,12 +103,24 @@ def is_test_mode() -> bool:
 
 # Global singleton for test mode only
 _mock_storage_singleton = MockStorage()
+_async_storage_singleton: AsyncSQLiteStorage | None = None
 
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
+    global _async_storage_singleton
     if is_test_mode():
         return _mock_storage_singleton
+    if os.environ.get("ASYNC_SQLITE_STORAGE", "0") == "1":
+        if _async_storage_singleton is None:
+            is_prod = os.environ.get("FLASK_ENV") == "production"
+            sheet_name = "BookLampData" if is_prod else "DevBookLampData"
+            _async_storage_singleton = AsyncSQLiteStorage(sheet_name=sheet_name)
+        _async_storage_singleton.configure_remote(
+            credentials_dict=session.get("credentials"),
+            spreadsheet_id=session.get("spreadsheet_id"),
+        )
+        return _async_storage_singleton
     if "storage" not in g:
         app.logger.info("Initializing storage for request...")
         # Use different sheet names for production and development
@@ -252,6 +265,18 @@ def update_settings():
         storage.update_setting(key, str(value))
 
     return jsonify({"success": True})
+
+
+@app.route("/api/sync/diagnostics", methods=["GET"])
+@authorisation_required
+def sync_diagnostics():
+    """Return async sync diagnostics when SQLite async storage is enabled."""
+    storage = get_storage()
+    if isinstance(storage, AsyncSQLiteStorage) or hasattr(
+        storage, "get_sync_diagnostics"
+    ):
+        return jsonify(storage.get_sync_diagnostics())
+    return jsonify({"enabled": False, "message": "Async SQLite storage is disabled"})
 
 
 # -----------------------------
