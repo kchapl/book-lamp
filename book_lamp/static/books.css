@@ -12,21 +12,22 @@
 }
 
 .book-card {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    padding: 1.25rem;
+    background: var(--surface-low);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 2rem;
     display: flex;
-    gap: 1.25rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 2rem;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .book-card:hover {
-    background: var(--card-bg);
+    background: var(--surface-high);
     transform: translateY(-4px);
-    border-color: var(--primary-light);
+    box-shadow: 0 20px 40px rgba(27, 28, 25, 0.08);
 }
 
 .thumb-container {
@@ -60,7 +61,7 @@
 }
 
 .title {
-    font-family: 'Playfair Display', 'Playfair Fallback', serif;
+    font-family: 'Manrope', 'Manrope Fallback', sans-serif;
     font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
@@ -97,23 +98,16 @@
 .year,
 .isbn,
 .category-tag {
-    color: var(--text-muted);
-    font-size: 0.85rem;
+    color: var(--on-secondary-container);
+    font-size: 0.75rem;
+    font-weight: 600;
     margin-bottom: 0.25rem;
-    display: flex;
+    background: var(--secondary-container);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-}
-
-.category-tag::before {
-    content: "🏷️";
-    font-size: 0.75rem;
-    font-weight: 800;
-    padding: 2px 6px;
-    background: var(--glass);
-    border-radius: 4px;
-    color: var(--primary-light);
-    border: 1px solid var(--glass-border);
 }
 
 .book-meta-summary {
@@ -145,9 +139,8 @@
 }
 
 .reading-history {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--glass-border);
+    margin-top: 2rem;
+    padding-top: 2rem;
 }
 
 .record-item {
@@ -235,13 +228,14 @@
 .form-group input,
 .form-group select {
     width: 100%;
-    padding: 6px 10px;
-    background: var(--input-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: 4px;
+    padding: 8px 12px;
+    background: var(--surface-highest);
+    border: none;
+    border-radius: var(--radius-sm);
     color: var(--text);
     font-size: 0.95rem;
     box-sizing: border-box;
+    transition: background-color 0.2s;
 }
 
 .form-group select option {
@@ -291,32 +285,31 @@
 }
 
 /* Sort dropdown styling */
-#sort-select {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
+#sort-select,
+#category-select {
+    background: var(--surface-high);
+    border: none;
+    border-radius: var(--radius-pill);
+    padding: 0.6rem 2.5rem 0.6rem 1.25rem;
     color: var(--text);
     font-size: 0.9rem;
+    font-weight: 500;
     cursor: pointer;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23003331"><path d="M7 10l5 5 5-5z"/></svg>');
     background-repeat: no-repeat;
-    background-position: right 0.5rem center;
+    background-position: right 1rem center;
     background-size: 1.2em;
+    transition: background-color 0.2s;
 }
 
-#sort-select option {
-    background: var(--dropdown-bg);
-    color: var(--text);
-    padding: 0.5rem;
-}
-
-#sort-select:focus {
-    outline: 2px solid var(--primary-light);
+#sort-select:focus,
+#category-select:focus {
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
-    border-color: var(--primary-light);
+    background-color: var(--surface-highest);
 }
 
 .btn-small {
@@ -363,13 +356,14 @@
 
 .search-input {
     width: 100%;
-    padding: 0.75rem 1rem;
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
+    padding: 0.85rem 1.25rem;
+    background: var(--surface-high);
+    border: none;
+    border-radius: var(--radius-pill);
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: 1rem;
     box-sizing: border-box;
+    transition: background-color 0.2s;
 }
 
 .search-input.has-query {
@@ -672,12 +666,12 @@
 
 .book-detail-header {
     display: flex;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    padding: 2rem;
+    gap: 3rem;
+    margin-bottom: 3rem;
+    background: var(--surface-low);
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 3rem;
 }
 
 .book-cover {
@@ -712,7 +706,7 @@
 }
 
 .book-title {
-    font-family: 'Playfair Display', 'Playfair Fallback', serif;
+    font-family: 'Manrope', 'Manrope Fallback', sans-serif;
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
@@ -864,7 +858,7 @@
 
 .reading-list-item-title {
     margin: 0 0 0.25rem 0;
-    font-family: 'Playfair Display', 'Playfair Fallback', serif;
+    font-family: 'Manrope', 'Manrope Fallback', sans-serif;
 }
 
 /* Generic Flex/Grid Layouts for Books */

@@ -99,7 +99,7 @@
     
     {% if categories %}
     <form method="get" action="{{ url_for('list_books') }}" style="display: inline-block;">
-        <select name="category" onchange="this.form.submit()">
+        <select name="category" id="category-select" onchange="this.form.submit()">
             <option value="">All Categories</option>
             {% for cat in categories %}
             <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>

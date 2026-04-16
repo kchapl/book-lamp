@@ -10,31 +10,35 @@
     margin-bottom: 3rem;
 }
 
+
+
 .stat-card {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    padding: 2rem;
+    background: var(--surface-low);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 2.5rem;
     text-align: center;
-    transition: transform 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .stat-card:hover {
     transform: translateY(-5px);
-    border-color: var(--primary-light);
+    background: var(--surface-high);
 }
 
 .stat-value {
-    font-family: 'Playfair Display', 'Playfair Fallback', serif;
+    font-family: 'Manrope', 'Manrope Fallback', sans-serif;
     font-size: 3.5rem;
     font-weight: 700;
     line-height: 1;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to bottom, var(--primary), var(--primary-light));
+    background: linear-gradient(135deg, var(--primary), var(--primary-container));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
 }
+
+
 
 .stat-label {
     color: var(--text-muted);
@@ -52,10 +56,10 @@
 }
 
 .chart-card {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    padding: 2rem;
+    background: var(--surface-low);
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 2.5rem;
 }
 
 .chart-card.wide {
@@ -164,15 +168,15 @@
 }
 
 .bar.completed {
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background: linear-gradient(90deg, var(--primary), var(--primary-container));
 }
 
 .bar.in-progress {
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    background: linear-gradient(90deg, var(--tertiary), #693b22);
 }
 
 .bar.abandoned {
-    background: linear-gradient(90deg, #ef4444, #f87171);
+    background: var(--text-muted);
 }
 
 .bar.not-begun {
@@ -202,9 +206,9 @@
     display: flex;
     align-items: center;
     padding: 1rem;
-    background: var(--input-bg);
-    border-radius: 12px;
-    border: 1px solid var(--glass-border);
+    background: var(--surface-high);
+    border-radius: var(--radius-sm);
+    border: none;
 }
 
 .rank {
@@ -220,6 +224,8 @@
     font-weight: 700;
     margin-right: 1.25rem;
 }
+
+
 
 .item-name {
     flex-grow: 1;
@@ -252,6 +258,8 @@
     padding-top: 2rem;
     position: relative;
 }
+
+
 
 .marker-line {
     position: absolute;
