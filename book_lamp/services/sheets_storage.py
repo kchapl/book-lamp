@@ -256,7 +256,14 @@ class GoogleSheetsStorage:
             "Recommendations",
             "Settings",
         ]
-        ranges = [f"{tab}!A:P" for tab in tabs if tab != "Settings"] + ["Settings!A:B"]
+        ranges = []
+        for tab in tabs:
+            if tab == "Books":
+                ranges.append("Books!A:S")
+            elif tab == "Settings":
+                ranges.append("Settings!A:B")
+            else:
+                ranges.append(f"{tab}!A:P")
 
         try:
             logger.info(f"Prefetching data from Google Sheets API for {sid}")
@@ -463,7 +470,7 @@ class GoogleSheetsStorage:
     def get_all_books(self) -> List[Dict[str, Any]]:
         """Retrieve all books from the Books tab."""
         try:
-            values = self._get_values("Books", "Books!A:P")
+            values = self._get_values("Books", "Books!A:S")
             if not values or len(values) < 2:
                 return []
 
@@ -473,7 +480,7 @@ class GoogleSheetsStorage:
                 if not row or len(row) < 3 or not row[0] or not row[2]:
                     # Skip empty rows or rows without ID or Title
                     continue
-                # Pad row to match header length (now 16 columns)
+                # Pad row to match header length (now 19 columns)
                 row = row + [""] * (len(headers) - len(row))
                 try:
                     # Handle potential float IDs like "1.0"
@@ -495,12 +502,12 @@ class GoogleSheetsStorage:
 
                 book = {
                     "id": book_id,
-                    "isbn13": row[1],
-                    "title": row[2],
-                    "author": row[3],
+                    "isbn13": row[1] if len(row) > 1 else "",
+                    "title": row[2] if len(row) > 2 else "",
+                    "author": row[3] if len(row) > 3 else "",
                     "publication_year": pub_year,
-                    "thumbnail_url": row[5] if row[5] else None,
-                    "created_at": row[6] if row[6] else None,
+                    "thumbnail_url": row[5] if len(row) > 5 and row[5] else None,
+                    "created_at": row[6] if len(row) > 6 and row[6] else None,
                     "publisher": row[7] if len(row) > 7 else None,
                     "description": row[8] if len(row) > 8 else None,
                     "series": row[9] if len(row) > 9 else None,
@@ -512,6 +519,7 @@ class GoogleSheetsStorage:
                     "physical_format": row[15] if len(row) > 15 else None,
                     "edition": row[16] if len(row) > 16 else None,
                     "cover_url": row[17] if len(row) > 17 and row[17] else None,
+                    "broad_category": row[18] if len(row) > 18 else None,
                 }
                 books_raw.append(book)
 
@@ -571,7 +579,7 @@ class GoogleSheetsStorage:
                     book_id_val = int(float(row[1]))
                     rating = (
                         int(float(row[5]))
-                        if row[5] and str(row[5]).replace(".", "").isdigit()
+                        if len(row) > 5 and row[5] and str(row[5]).replace(".", "").isdigit()
                         else 0
                     )
                 except (ValueError, TypeError):
@@ -580,11 +588,11 @@ class GoogleSheetsStorage:
                 record = {
                     "id": record_id,
                     "book_id": book_id_val,
-                    "status": row[2],
-                    "start_date": row[3],
-                    "end_date": row[4] if row[4] else None,
+                    "status": row[2] if len(row) > 2 else "",
+                    "start_date": row[3] if len(row) > 3 else "",
+                    "end_date": row[4] if len(row) > 4 and row[4] else None,
                     "rating": rating,
-                    "created_at": row[6] if row[6] else None,
+                    "created_at": row[6] if len(row) > 6 and row[6] else None,
                 }
                 if book_id is None or record["book_id"] == book_id:
                     records.append(record)
@@ -897,6 +905,7 @@ class GoogleSheetsStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book to the Books tab."""
         from book_lamp.utils.books import normalize_isbn
@@ -926,11 +935,12 @@ class GoogleSheetsStorage:
             physical_format if physical_format else "",
             edition if edition else "",
             cover_url if cover_url else "",
+            broad_category if broad_category else "",
         ]
         try:
             self.service.spreadsheets().values().append(
                 spreadsheetId=sid,
-                range="Books!A:R",
+                range="Books!A:S",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -959,6 +969,7 @@ class GoogleSheetsStorage:
                 "physical_format": physical_format,
                 "edition": edition,
                 "cover_url": cover_url,
+                "broad_category": broad_category,
             }
         except HttpError as error:
             if error.resp.status == 400:
@@ -967,7 +978,7 @@ class GoogleSheetsStorage:
                 try:
                     self.service.spreadsheets().values().append(
                         spreadsheetId=sid,
-                        range="Books!A:R",
+                        range="Books!A:S",
                         valueInputOption="RAW",
                         body={"values": [row]},
                     ).execute()
@@ -995,6 +1006,7 @@ class GoogleSheetsStorage:
                         "physical_format": physical_format,
                         "edition": edition,
                         "cover_url": cover_url,
+                        "broad_category": broad_category,
                     }
                 except HttpError as retry_error:
                     raise Exception(
@@ -1024,6 +1036,7 @@ class GoogleSheetsStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Update an existing book in the Books tab."""
         from book_lamp.utils.books import normalize_isbn
@@ -1037,7 +1050,7 @@ class GoogleSheetsStorage:
             result = (
                 self.service.spreadsheets()
                 .values()
-                .get(spreadsheetId=sid, range="Books!A:R")
+                .get(spreadsheetId=sid, range="Books!A:S")
                 .execute()
             )
         except HttpError as error:
@@ -1081,6 +1094,7 @@ class GoogleSheetsStorage:
                 existing_physical_format = row[15] if len(row) > 15 else None
                 existing_edition = row[16] if len(row) > 16 else None
                 existing_cover_url = row[17] if len(row) > 17 else None
+                existing_broad_category = row[18] if len(row) > 18 else None
                 break
 
         if row_index is None:
@@ -1115,6 +1129,7 @@ class GoogleSheetsStorage:
         physical_format = physical_format or existing_physical_format
         edition = edition or existing_edition
         cover_url = cover_url or existing_cover_url
+        broad_category = broad_category or existing_broad_category
 
         row = [
             book_id,
@@ -1135,12 +1150,13 @@ class GoogleSheetsStorage:
             physical_format if physical_format else "",
             edition if edition else "",
             cover_url if cover_url else "",
+            broad_category if broad_category else "",
         ]
 
         try:
             self.service.spreadsheets().values().update(
                 spreadsheetId=sid,
-                range=f"Books!A{row_index}:R{row_index}",
+                range=f"Books!A{row_index}:S{row_index}",
                 valueInputOption="RAW",
                 body={"values": [row]},
             ).execute()
@@ -1169,6 +1185,7 @@ class GoogleSheetsStorage:
                 "physical_format": physical_format,
                 "edition": edition,
                 "cover_url": cover_url,
+                "broad_category": broad_category,
             }
         except HttpError as error:
             if error.resp.status == 400:
@@ -1176,6 +1193,73 @@ class GoogleSheetsStorage:
                 raise Exception("Failed to update book: tab was missing") from error
             logger.error(f"Failed to update book: {error}")
             raise Exception(f"Failed to update book: {error}") from error
+        finally:
+            self._clear_persistent_cache()
+
+    def batch_update_broad_categories(self, updates: List[Dict[str, Any]]) -> int:
+        """Batch update broad categories for multiple books to avoid rate limits."""
+        if not updates:
+            return 0
+
+        sid = self._ensure_spreadsheet_id()
+        assert self.service is not None
+
+        # 1. Fetch current data to find row indices
+        try:
+            result = (
+                self.service.spreadsheets()
+                .values()
+                .get(spreadsheetId=sid, range="Books!A:S")
+                .execute()
+            )
+            values = result.get("values", [])
+            if not values:
+                return 0
+
+            # Map book_id to (row_data, row_index)
+            existing_books = {}
+            for idx, row in enumerate(values[1:], start=2):
+                if row and row[0]:
+                    try:
+                        bid = int(float(row[0]))
+                        existing_books[bid] = (row, idx)
+                    except (ValueError, TypeError):
+                        continue
+
+            # 2. Prepare batch update data
+            batch_data = []
+            count = 0
+            for update in updates:
+                bid = update["id"]
+                if bid in existing_books:
+                    row_data, row_idx = existing_books[bid]
+                    
+                    # Pad row if needed
+                    row = row_data + [""] * (19 - len(row_data))
+                    
+                    # Update column S (index 18)
+                    row[18] = update["broad_category"]
+                    
+                    batch_data.append({
+                        "range": f"Books!A{row_idx}:S{row_idx}",
+                        "values": [row]
+                    })
+                    count += 1
+
+            # 3. Execute batch update
+            if batch_data:
+                self.service.spreadsheets().values().batchUpdate(
+                    spreadsheetId=sid,
+                    body={
+                        "valueInputOption": "RAW",
+                        "data": batch_data
+                    }
+                ).execute()
+
+            return count
+        except HttpError as error:
+            logger.error(f"Failed to batch update broad categories: {error}")
+            raise Exception(f"Failed to batch update broad categories: {error}") from error
         finally:
             self._clear_persistent_cache()
 
@@ -1197,6 +1281,7 @@ class GoogleSheetsStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a new book or update an existing one if ISBN matches."""
         existing = self.get_book_by_isbn(isbn13)
@@ -1219,6 +1304,7 @@ class GoogleSheetsStorage:
                 physical_format=physical_format,
                 edition=edition,
                 cover_url=cover_url,
+                broad_category=broad_category,
             )
         else:
             return self.add_book(
@@ -1238,6 +1324,7 @@ class GoogleSheetsStorage:
                 physical_format=physical_format,
                 edition=edition,
                 cover_url=cover_url,
+                broad_category=broad_category,
             )
 
     def bulk_import(self, items: List[Dict[str, Any]]) -> int:
@@ -1255,7 +1342,7 @@ class GoogleSheetsStorage:
                 books_result = (
                     self.service.spreadsheets()
                     .values()
-                    .get(spreadsheetId=sid, range="Books!A:R")
+                    .get(spreadsheetId=sid, range="Books!A:S")
                     .execute()
                 )
             except HttpError as e:
@@ -1409,6 +1496,9 @@ class GoogleSheetsStorage:
                     cu = _sanitize_for_sheets(b.get("cover_url")) or (
                         row_data[17] if len(row_data) > 17 else ""
                     )
+                    bc = _sanitize_for_sheets(b.get("broad_category")) or (
+                        row_data[18] if len(row_data) > 18 else ""
+                    )
 
                     new_row = [
                         book_id,
@@ -1433,9 +1523,10 @@ class GoogleSheetsStorage:
                         pf,
                         ed,
                         cu,
+                        bc,
                     ]
                     books_to_update.append(
-                        {"range": f"Books!A{row_idx}:R{row_idx}", "values": [new_row]}
+                        {"range": f"Books!A{row_idx}:S{row_idx}", "values": [new_row]}
                     )
                 else:
                     # Append new
@@ -1464,6 +1555,7 @@ class GoogleSheetsStorage:
                         _sanitize_for_sheets(b.get("physical_format")) or "",
                         _sanitize_for_sheets(b.get("edition")) or "",
                         _sanitize_for_sheets(b.get("cover_url")) or "",
+                        _sanitize_for_sheets(b.get("broad_category")) or "",
                     ]
                     books_to_append.append(new_row)
 
@@ -2037,6 +2129,7 @@ class GoogleSheetsStorage:
                     "physical_format",
                     "edition",
                     "cover_url",
+                    "broad_category",
                 ],
                 "ReadingRecords": [
                     "id",
