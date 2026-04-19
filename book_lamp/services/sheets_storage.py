@@ -548,7 +548,7 @@ class GoogleSheetsStorage:
                 if book_id in book_authors_map:
                     b["authors"] = book_authors_map[book_id]
                 else:
-                    author: str = b["author]
+                    author: str = b["author"]
                     b["authors"] = split_authors(author)
                 final_books.append(b)
 
