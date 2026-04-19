@@ -1,4 +1,3 @@
-import pytest
 from book_lamp.utils.books import resolve_broad_category
 
 def test_resolve_broad_category_dewey():
