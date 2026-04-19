@@ -33,7 +33,6 @@ from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
     is_valid_isbn13,
-    parse_bisac_category,
     parse_publication_year,
     sort_books,
 )
