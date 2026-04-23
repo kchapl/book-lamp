@@ -33,7 +33,6 @@ from book_lamp.services.sheets_storage import GoogleSheetsStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
     is_valid_isbn13,
-    parse_bisac_category,
     parse_publication_year,
     sort_books,
 )
@@ -456,14 +455,14 @@ def authorize():
 
 @app.cli.command("init-sheets")
 def init_sheets_command():
-    """Initialize Google Sheets with required tabs and headers."""
+    """Initialise Google Sheets with required tabs and headers."""
     if is_test_mode():
         click.echo("Not available in test mode.")
         return
 
     # Note: This will likely fail in CLI since there is no session
     # A robust CLI would need a way to input a token manually
-    get_storage().initialize_sheets()
+    get_storage().initialise_sheets()
     click.echo("Google Sheets initialized successfully.")
 
 
@@ -493,6 +492,38 @@ def backfill_bisac_command():
             )
 
     click.echo(f"Finished backfill. Updated {updated} books.")
+
+
+@app.cli.command("backfill-broad-categories")
+def backfill_broad_categories_command():
+    """Enhance existing books with broad categories."""
+    if is_test_mode():
+        click.echo("Running in test mode with mock storage.")
+
+    from book_lamp.utils.books import resolve_broad_category
+
+    storage = get_storage()
+    books = storage.get_all_books()
+
+    click.echo(f"Starting broad category backfill for {len(books)} books...")
+    count = 0
+    for book in books:
+        # Resolve from existing BISAC or other fields
+        # Note: We don't have Dewey or Subjects in the Sheets storage yet for old books
+        broad_cat = resolve_broad_category(
+            bisac=book.get("bisac_category"),
+        )
+        if broad_cat:
+            storage.update_book(
+                book_id=book["id"],
+                isbn13=book["isbn13"],
+                title=book["title"],
+                author=book["author"],
+                broad_category=broad_cat,
+            )
+            count += 1
+
+    click.echo(f"Finished backfill. Updated {count} books.")
 
 
 # -----------------------------
@@ -742,19 +773,26 @@ def list_books():
     if category_filter:
         filtered_books = []
         for b in books:
+            broad_cat = b.get("broad_category")
             bisac = b.get("bisac_category")
-            if bisac and category_filter.lower() in str(bisac).lower():
+            if (broad_cat and category_filter.lower() in broad_cat.lower()) or (
+                bisac and category_filter.lower() in str(bisac).lower()
+            ):
                 filtered_books.append(b)
         books = filtered_books
 
     # Extract all top-level categories for the filter dropdown
     all_categories = set()
     for b in storage.get_all_books():
-        bisac = b.get("bisac_category")
-        if bisac:
-            # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
-            top_level = str(bisac).split("/")[0].strip()
-            all_categories.add(top_level)
+        broad_cat = b.get("broad_category")
+        if broad_cat:
+            all_categories.add(broad_cat)
+        else:
+            bisac = b.get("bisac_category")
+            if bisac:
+                # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
+                top_level = str(bisac).split("/")[0].strip()
+                all_categories.add(top_level)
     sorted_categories = sorted(list(all_categories))
 
     return render_template(
@@ -1122,13 +1160,22 @@ def collection_stats():
     # Category Distribution
     category_bins = Counter()
     for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                # Normalize (e.g., 'Fiction' vs 'FICTION')
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
+        broad_cat = b.get("broad_category")
+        if broad_cat:
+            category_bins[broad_cat] += 1
+        else:
+            # Fallback for books without broad_category
+            bisac = b.get("bisac_category")
+            if bisac:
+                from book_lamp.utils.books import parse_bisac_category
+
+                main_cat, _ = parse_bisac_category(bisac)
+                if main_cat:
+                    # Normalize (e.g., 'Fiction' vs 'FICTION')
+                    norm_cat = (
+                        main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                    )
+                    category_bins[norm_cat] += 1
 
     # Sort categories by count (descending)
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
@@ -1683,6 +1730,53 @@ def delete_book(book_id: int):
     else:
         flash("Book deleted.", "success")
     return redirect(url_for("list_books"))
+
+
+@app.route("/admin/backfill-categories")
+@authorisation_required
+def backfill_categories_route():
+    """Trigger the broad category backfill from the web UI."""
+    from book_lamp.utils.books import resolve_broad_category
+
+    storage = get_storage()
+    books = storage.get_all_books()
+
+    app.logger.info(f"Starting broad category backfill for {len(books)} books...")
+    updates_to_make = []
+
+    for book in books:
+        if not book.get("broad_category") or book.get("broad_category") == "Other":
+            # Resolve from existing BISAC or other fields
+            broad_cat = resolve_broad_category(
+                bisac=book.get("bisac_category"),
+            )
+            if broad_cat and broad_cat != "Other":
+                updates_to_make.append({"id": book["id"], "broad_category": broad_cat})
+
+    count = 0
+    if updates_to_make:
+        if hasattr(storage, "batch_update_broad_categories"):
+            count = storage.batch_update_broad_categories(updates_to_make)
+        else:
+            # Fallback for other storage types
+            for update in updates_to_make:
+                storage.update_book(
+                    book_id=update["id"],
+                    # We need other fields for update_book, so this fallback is actually tricky
+                    # But all our main storages have the batch method now.
+                    **{
+                        k: v
+                        for k, v in [b for b in books if b["id"] == update["id"]][
+                            0
+                        ].items()
+                        if k != "broad_category"
+                    },
+                    broad_category=update["broad_category"],
+                )
+                count += 1
+
+    app.logger.info(f"Finished backfill. Updated {count} books.")
+    return f"Backfill complete! Updated {count} books via batch update."
 
 
 # -----------------------------

@@ -9,6 +9,7 @@ from book_lamp.services.cache import get_cache
 from book_lamp.utils.books import (
     isbn13_to_isbn10,
     normalize_isbn,
+    resolve_broad_category,
 )
 
 logger = logging.getLogger("book_lamp")
@@ -105,23 +106,27 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
     from book_lamp.utils.books import parse_bisac_category
 
     description = data.get("notes")
-    subjects = data.get("subjects") or []
-    # Extract the name from the first subject if it's a dict, otherwise use it as-is
-    # Ensure we always return a string or None, never a complex object
-    bisac = None
-    if subjects and isinstance(subjects, list):
-        first_subject = subjects[0]
-        if isinstance(first_subject, dict):
-            # Extract the "name" field from subject dict
-            bisac = first_subject.get("name")
-            # If name is also a dict (shouldn't happen, but be defensive), stringify it partially
-            if isinstance(bisac, dict) and "name" in bisac:
-                bisac = bisac.get("name")
-        elif isinstance(first_subject, str):
-            bisac = first_subject.strip() if first_subject else None
-        # If it's some other type, bisac stays None
+    subjects_raw = data.get("subjects") or []
+    subjects_list = []
+    if isinstance(subjects_raw, list):
+        for s in subjects_raw:
+            if isinstance(s, dict) and "name" in s:
+                subjects_list.append(s["name"])
+            elif isinstance(s, str):
+                subjects_list.append(s)
 
+    bisac = subjects_list[0] if subjects_list else None
     main_cat, sub_cat = parse_bisac_category(bisac)
+
+    # Dewey
+    classifications = data.get("classifications") or {}
+    dewey_list = classifications.get("dewey_decimal_class") or []
+    dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
+
+    # Resolve broad category
+    broad_cat = resolve_broad_category(
+        bisac=bisac, dewey=dewey, subjects=subjects_list
+    )
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -153,6 +158,8 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
         "bisac_sub_category": sub_cat,
+        "broad_category": broad_cat,
+        "dewey_decimal": dewey,
         "page_count": page_count,
         "language": language,
         "physical_format": physical_format,
@@ -494,8 +501,12 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
 
     from book_lamp.utils.books import parse_bisac_category
 
-    bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
+    bisac_list = info.get("categories", [])
+    bisac = ", ".join(bisac_list) if bisac_list else None
     main_cat, sub_cat = parse_bisac_category(bisac)
+
+    # Resolve broad category
+    broad_cat = resolve_broad_category(bisac=bisac, subjects=bisac_list)
 
     return {
         "title": html.unescape(info.get("title", "")),
@@ -511,6 +522,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
         "bisac_sub_category": sub_cat,
+        "broad_category": broad_cat,
     }
 
 
@@ -798,6 +810,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
         "bisac_category": None,
         "bisac_main_category": None,
         "bisac_sub_category": None,
+        "broad_category": None,
         "page_count": None,
         "language": None,
         "physical_format": None,
@@ -853,6 +866,7 @@ def enhance_books_batch(
                 "publisher",
                 "description",
                 "bisac_category",
+                "broad_category",
                 "cover_url",
             ]
             if needs_update(f, b.get(f))
@@ -941,6 +955,7 @@ def enhance_books_batch(
                 "bisac_category": "bisac_category",
                 "bisac_main_category": "bisac_main_category",
                 "bisac_sub_category": "bisac_sub_category",
+                "broad_category": "broad_category",
                 "language": "language",
                 "page_count": "page_count",
                 "physical_format": "physical_format",

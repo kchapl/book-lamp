@@ -224,3 +224,8 @@ dist/
 
 # Lighthouse CI
 .lighthouseci/
+
+# Swarm communication
+progress.md
+findings.md
+task_plan.md

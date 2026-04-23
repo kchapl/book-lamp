@@ -1,0 +1,8 @@
+agents:
+- role: Architect
+  task: Design system structure following Python/TypeScript conventions in GEMINI.md.
+- role: Coder
+  task: Implement logic using Python for backend and TypeScript for frontend.
+- role: Tester
+  task: Write Pytest unit tests for backend and Vitest for frontend components.
+mission: fix obvious problems with this repo

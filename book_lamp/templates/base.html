@@ -9,12 +9,12 @@
     <title>{% block title %}Book Lamp{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=optional" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=optional"></noscript>
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@400;600;700&display=swap"></noscript>
     <style>
         /* Fallback font metric overrides to minimise CLS during font swap */
         @font-face {
-            font-family: 'Outfit Fallback';
+            font-family: 'Manrope Fallback';
             src: local('Arial');
             size-adjust: 100%;
             ascent-override: 96%;
@@ -23,8 +23,8 @@
         }
 
         @font-face {
-            font-family: 'Playfair Fallback';
-            src: local('Georgia');
+            font-family: 'Inter Fallback';
+            src: local('Arial');
             size-adjust: 97%;
             ascent-override: 93%;
             descent-override: 25%;
@@ -32,7 +32,11 @@
         }
 
         body {
-            font-family: 'Outfit', 'Outfit Fallback', sans-serif;
+            font-family: 'Inter', 'Inter Fallback', sans-serif;
+        }
+
+        h1, h2, h3, h4, .logo, .display-font {
+            font-family: 'Manrope', 'Manrope Fallback', sans-serif;
         }
     </style>
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
