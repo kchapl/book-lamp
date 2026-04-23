@@ -455,14 +455,14 @@ def authorize():
 
 @app.cli.command("init-sheets")
 def init_sheets_command():
-    """Initialize Google Sheets with required tabs and headers."""
+    """Initialise Google Sheets with required tabs and headers."""
     if is_test_mode():
         click.echo("Not available in test mode.")
         return
 
     # Note: This will likely fail in CLI since there is no session
     # A robust CLI would need a way to input a token manually
-    get_storage().initialize_sheets()
+    get_storage().initialise_sheets()
     click.echo("Google Sheets initialized successfully.")
 
 
@@ -1743,7 +1743,7 @@ def backfill_categories_route():
 
     app.logger.info(f"Starting broad category backfill for {len(books)} books...")
     updates_to_make = []
-    
+
     for book in books:
         if not book.get("broad_category") or book.get("broad_category") == "Other":
             # Resolve from existing BISAC or other fields
@@ -1751,10 +1751,7 @@ def backfill_categories_route():
                 bisac=book.get("bisac_category"),
             )
             if broad_cat and broad_cat != "Other":
-                updates_to_make.append({
-                    "id": book["id"],
-                    "broad_category": broad_cat
-                })
+                updates_to_make.append({"id": book["id"], "broad_category": broad_cat})
 
     count = 0
     if updates_to_make:
@@ -1767,8 +1764,14 @@ def backfill_categories_route():
                     book_id=update["id"],
                     # We need other fields for update_book, so this fallback is actually tricky
                     # But all our main storages have the batch method now.
-                    **{k: v for k, v in [b for b in books if b["id"] == update["id"]][0].items() if k != "broad_category"},
-                    broad_category=update["broad_category"]
+                    **{
+                        k: v
+                        for k, v in [b for b in books if b["id"] == update["id"]][
+                            0
+                        ].items()
+                        if k != "broad_category"
+                    },
+                    broad_category=update["broad_category"],
                 )
                 count += 1
 
