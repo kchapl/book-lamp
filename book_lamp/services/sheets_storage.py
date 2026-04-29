@@ -542,15 +542,16 @@ class GoogleSheetsStorage:
 
             final_books = []
             for b in books_raw:
-                book_id = int(b["id"])
+                book_id_val = b.get("id")
+                if book_id_val is None:
+                    continue
+                book_id = int(str(book_id_val))
                 # If we have individual authors in BookAuthors, use them.
                 # Otherwise, split the legacy 'author' string.
                 if book_id in book_authors_map:
                     b["authors"] = book_authors_map[book_id]
                 else:
-                    author_val = b.get("author", "")
-                    assert isinstance(author_val, str)
-                    b["authors"] = split_authors(author_val)
+                    b["authors"] = split_authors(str(b.get("author", "")))
                 final_books.append(b)
 
             return final_books
