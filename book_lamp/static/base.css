@@ -2,6 +2,7 @@
     /* Brand Colors */
     --primary: #003331;
     --primary-container: #004b49;
+    --primary-light: #006663;
     --secondary: #516160;
     --secondary-container: #d2e3e2;
     --on-secondary-container: #566665;
@@ -19,8 +20,23 @@
     --text: #1b1c19;
     --text-muted: #3f4948;
     --on-primary: #ffffff;
+    --accent-light: #7c3aed;
+    --publisher-gradient-1: #059669;
+    --publisher-gradient-2: #047857;
+    --bar-month-1: #2563eb;
+    --bar-month-2: #3b82f6;
+    --rating-bar-bg: #d97706;
+    --sync-ok: #059669;
+    --sync-warning: #b45309;
+    --sync-error: #b91c1c;
+
+    /* Alert Colors (Light Theme Defaults) */
+    --alert-info-text: #1d4ed8;
+    --alert-success-text: #047857;
+    --alert-error-text: #b91c1c;
     
     --glass-bg: rgba(250, 249, 243, 0.82);
+    --glass: rgba(250, 249, 243, 0.82);
     --glass-blur: 20px;
     --glass-border: rgba(191, 200, 199, 0.2);
     
@@ -45,7 +61,24 @@
         --surface-lowest: #0e0f0d;
         --surface-dim: #0e0f0d;
         
+        --primary-light: #4fd0cc;
+        --accent-light: #c084fc;
+        --publisher-gradient-1: #34d399;
+        --publisher-gradient-2: #10b981;
+        --bar-month-1: #3b82f6;
+        --bar-month-2: #60a5fa;
+        --rating-bar-bg: #fbbf24;
+        --sync-ok: #10b981;
+        --sync-warning: #f59e0b;
+        --sync-error: #ef4444;
+
+        /* Alert Colors (Dark Theme) */
+        --alert-info-text: #93c5fd;
+        --alert-success-text: #6ee7b7;
+        --alert-error-text: #f87171;
+
         --glass-bg: rgba(27, 28, 25, 0.85);
+        --glass: rgba(27, 28, 25, 0.85);
         --text: #e3e3dd;
         --text-muted: #bfc8c7;
         --input-bg: #2d302c;
@@ -58,6 +91,20 @@
 [data-theme="light"] {
     --bg: #faf9f3;
     --surface: #faf9f3;
+    --primary-light: #006663;
+    --accent-light: #7c3aed;
+    --publisher-gradient-1: #059669;
+    --publisher-gradient-2: #047857;
+    --bar-month-1: #2563eb;
+    --bar-month-2: #3b82f6;
+    --rating-bar-bg: #d97706;
+    --sync-ok: #059669;
+    --sync-warning: #b45309;
+    --sync-error: #b91c1c;
+    --alert-info-text: #1d4ed8;
+    --alert-success-text: #047857;
+    --alert-error-text: #b91c1c;
+    --glass: rgba(250, 249, 243, 0.82);
 }
 
 [data-theme="dark"] {
@@ -69,7 +116,22 @@
     --surface-lowest: #0e0f0d;
     --surface-dim: #0e0f0d;
     
+    --primary-light: #4fd0cc;
+    --accent-light: #c084fc;
+    --publisher-gradient-1: #34d399;
+    --publisher-gradient-2: #10b981;
+    --bar-month-1: #3b82f6;
+    --bar-month-2: #60a5fa;
+    --rating-bar-bg: #fbbf24;
+    --sync-ok: #10b981;
+    --sync-warning: #f59e0b;
+    --sync-error: #ef4444;
+    --alert-info-text: #93c5fd;
+    --alert-success-text: #6ee7b7;
+    --alert-error-text: #f87171;
+
     --glass-bg: rgba(27, 28, 25, 0.85);
+    --glass: rgba(27, 28, 25, 0.85);
     --text: #e3e3dd;
     --text-muted: #bfc8c7;
     --input-bg: #2d302c;
@@ -189,12 +251,12 @@ nav {
 }
 
 .status-dot.connected {
-    background: #10b981;
+    background: var(--sync-ok);
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
 .status-dot.disconnected {
-    background: #ef4444;
+    background: var(--sync-error);
     box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
@@ -210,17 +272,17 @@ nav {
 }
 
 .sync-health-badge.sync-ok {
-    color: #10b981;
+    color: var(--sync-ok);
     border-color: rgba(16, 185, 129, 0.35);
 }
 
 .sync-health-badge.sync-warning {
-    color: #f59e0b;
+    color: var(--sync-warning);
     border-color: rgba(245, 158, 11, 0.35);
 }
 
 .sync-health-badge.sync-error {
-    color: #ef4444;
+    color: var(--sync-error);
     border-color: rgba(239, 68, 68, 0.35);
 }
 
@@ -295,9 +357,9 @@ nav {
 }
 
 .btn-outline-primary:hover {
-    background: rgba(129, 140, 248, 0.1);
-    border-color: white;
-    color: white;
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-primary);
 }
 
 .btn-sm {
@@ -322,19 +384,19 @@ nav {
 .alert.info {
     background: rgba(59, 130, 246, 0.15);
     border-color: rgba(59, 130, 246, 0.3);
-    color: #93c5fd;
+    color: var(--alert-info-text);
 }
 
 .alert.success {
     background: rgba(16, 185, 129, 0.15);
     border-color: rgba(16, 185, 129, 0.3);
-    color: #6ee7b7;
+    color: var(--alert-success-text);
 }
 
 .alert.error {
     background: rgba(239, 68, 68, 0.1);
     border-color: rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    color: var(--alert-error-text);
 }
 
 @keyframes slideDownFadeIn {
@@ -451,17 +513,17 @@ footer {
 
 .btn-icon:hover {
     background: var(--glass);
-    color: white;
+    color: var(--primary);
 }
 
 .btn-icon-delete:hover {
     background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
+    color: var(--alert-error-text);
 }
 
 .btn-save {
-    background: #10b981;
-    color: white;
+    background: var(--primary);
+    color: var(--on-primary);
     border: none;
     padding: 0.5rem 1.25rem;
     border-radius: 8px;
@@ -472,12 +534,12 @@ footer {
 }
 
 .btn-save:hover {
-    background: #059669;
+    background: var(--primary-container);
 }
 
 .btn-cancel {
     background: transparent;
-    color: white;
+    color: var(--text);
     border: 1px solid var(--glass-border);
     padding: 0.5rem 1.25rem;
     border-radius: 8px;
@@ -930,7 +992,7 @@ button:disabled,
     border-radius: 12px;
     border: none;
     background: var(--surface-highest);
-    color: white;
+    color: var(--text);
     font-size: 1.1rem;
     box-sizing: border-box;
     outline: none;
@@ -984,11 +1046,11 @@ button:disabled,
 }
 
 .info-box-title-blue {
-    color: #60a5fa;
+    color: #1d4ed8;
 }
 
 .info-box-title-purple {
-    color: #c084fc;
+    color: #7c3aed;
 }
 
 .info-list {
@@ -1005,7 +1067,7 @@ button:disabled,
     background: rgba(255, 255, 255, 0.05);
     border: 1px dashed var(--glass-border);
     border-radius: 12px;
-    color: white;
+    color: var(--text);
     cursor: pointer;
 }
 
@@ -1049,7 +1111,7 @@ button:disabled,
 
 /* Unauthorised page */
 .text-error {
-    color: #fca5a5;
+    color: var(--alert-error-text);
 }
 
 /* =============================================================================

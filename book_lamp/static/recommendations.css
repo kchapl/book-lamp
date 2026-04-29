@@ -147,10 +147,10 @@
 }
 
 .add-rec-btn:hover {
-    background: rgba(129, 140, 248, 0.15) !important;
-    color: white !important;
+    background: var(--primary-light) !important;
+    color: var(--on-primary) !important;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 51, 49, 0.2);
 }
 
 .add-rec-btn:active {

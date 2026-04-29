@@ -115,7 +115,7 @@
 
 /* Rating Distribution Bars */
 .rating-bar {
-    background: #fbbf24 !important;
+    background: var(--rating-bar-bg) !important;
     border-radius: 4px;
     height: 100%;
 }
@@ -338,7 +338,7 @@
 }
 
 .timeline-bar.month {
-    background: linear-gradient(to top, #3b82f6, #60a5fa);
+    background: linear-gradient(to top, var(--bar-month-1), var(--bar-month-2));
 }
 
 .timeline-bar:hover,

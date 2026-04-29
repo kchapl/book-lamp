@@ -327,10 +327,6 @@
     font-weight: 600;
 }
 
-.btn-outline-primary:hover {
-    background: rgba(129, 140, 248, 0.08);
-}
-
 /* Search button modifier */
 .btn-search {
     padding: 0.6rem 1rem;
@@ -492,7 +488,7 @@
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--primary-light), #c084fc);
+    background: linear-gradient(135deg, var(--primary-light), var(--accent-light));
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -527,12 +523,13 @@
 
 /* Unread book cards */
 .book-card--unread {
-    opacity: 0.55;
+    opacity: 0.85;
     transition: opacity 0.3s, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s;
+    background: var(--surface-highest);
 }
 
 .book-card--unread:hover {
-    opacity: 0.9;
+    opacity: 1;
     transform: translateY(-4px);
     border-color: var(--primary-light);
 }
@@ -611,7 +608,7 @@
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, #34d399, #10b981);
+    background: linear-gradient(135deg, var(--publisher-gradient-1), var(--publisher-gradient-2));
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
