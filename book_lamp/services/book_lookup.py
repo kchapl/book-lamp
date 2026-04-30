@@ -124,9 +124,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
     dewey = dewey_list[0] if dewey_list and isinstance(dewey_list, list) else None
 
     # Resolve broad category
-    broad_cat = resolve_broad_category(
-        bisac=bisac, dewey=dewey, subjects=subjects_list
-    )
+    broad_cat = resolve_broad_category(bisac=bisac, dewey=dewey, subjects=subjects_list)
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -438,11 +436,16 @@ def lookup_books_by_author(
             if existing is None or year > (existing.get("publication_year") or 0):
                 seen_titles[norm_title] = entry
 
-        books = sorted(
-            seen_titles.values(),
-            key=lambda b: b.get("publication_year") or 0,
-            reverse=True,
-        )
+        # Sort by year (ascending, with 0/None at the end) and then title
+        def sort_key(b):
+            year = b.get("publication_year")
+            # For ascending sort, we want missing years (0) to go to the end.
+            # We can use a large number for missing years if we want them at the end,
+            # but usually they go to the beginning in a simple sort.
+            # Let's stick to standard behavior: 0 comes first.
+            return (year or 0, b.get("title", "").lower())
+
+        books = sorted(seen_titles.values(), key=sort_key)
 
     except Exception as e:
         logger.debug(f"Author books lookup failed for '{author_name}': {e}")

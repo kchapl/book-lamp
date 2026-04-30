@@ -83,8 +83,8 @@ def test_author_page_reading_list_flag(authenticated_client):
     assert "Pride and Prejudice" in html
 
 
-def test_author_page_sorts_by_pub_year_desc(authenticated_client):
-    """Owned books are sorted by publication year, newest first."""
+def test_author_page_sorts_by_pub_year_asc(authenticated_client):
+    """Owned books are sorted by publication year, oldest first."""
     from book_lamp.app import get_storage
 
     storage = get_storage()
@@ -104,8 +104,34 @@ def test_author_page_sorts_by_pub_year_desc(authenticated_client):
     resp = authenticated_client.get("/author/jane-austen")
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
-    # Emma (1815) should appear before Sense and Sensibility (1811)
-    assert html.index("Emma") < html.index("Sense and Sensibility")
+    # Sense and Sensibility (1811) should appear before Emma (1815)
+    assert html.index("Sense and Sensibility") < html.index("Emma")
+
+
+def test_author_page_sorts_by_title_when_year_same(authenticated_client):
+    """Books with the same publication year are sorted alphabetically by title."""
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    # Both published in 1814
+    storage.add_book(
+        isbn13="9780141439519",
+        title="Mansfield Park",
+        author="Jane Austen",
+        publication_year=1814,
+    )
+    storage.add_book(
+        isbn13="9780141439510",
+        title="Northanger Abbey",
+        author="Jane Austen",
+        publication_year=1814,
+    )
+
+    resp = authenticated_client.get("/author/jane-austen")
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+    # Mansfield Park should appear before Northanger Abbey (alphabetical)
+    assert html.index("Mansfield Park") < html.index("Northanger Abbey")
 
 
 def test_author_page_no_duplicate_books(authenticated_client):
