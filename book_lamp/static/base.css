@@ -6,7 +6,8 @@
     --secondary: #516160;
     --secondary-container: #d2e3e2;
     --on-secondary-container: #566665;
-    --tertiary: #49220a;
+    --logo-gradient-1: #003331;
+    --logo-gradient-2: #004b49;
     
     /* Default (Light) Theme - "The Modern Scholar" */
     --bg: #faf9f3;
@@ -71,6 +72,8 @@
         --sync-ok: #10b981;
         --sync-warning: #f59e0b;
         --sync-error: #ef4444;
+        --logo-gradient-1: #4fd0cc;
+        --logo-gradient-2: #0ea5e9;
 
         /* Alert Colors (Dark Theme) */
         --alert-info-text: #93c5fd;
@@ -220,7 +223,7 @@ nav {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.02em;
-    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -287,7 +290,7 @@ nav {
 }
 
 .btn {
-    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
     color: var(--on-primary);
     border: none;
     padding: 0.7rem 1.75rem;

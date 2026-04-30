@@ -1349,19 +1349,23 @@ def create_book():
     if isbn:
         existing = storage.get_book_by_isbn(isbn)
         if existing:
-            try:
-                storage.add_to_reading_list(existing["id"])
-                app.logger.info(
-                    f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
-                )
-                flash("Book moved to your reading list.", "success")
-            except Exception as e:
-                app.logger.error(
-                    f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
-                    exc_info=True,
-                )
-                flash(f"Error adding to reading list: {str(e)}", "error")
-            return redirect(url_for("reading_list"))
+            if request.form.get("add_to_reading_list"):
+                try:
+                    storage.add_to_reading_list(existing["id"])
+                    app.logger.info(
+                        f"Successfully added existing book (ID: {existing['id']}, ISBN: {isbn}) to reading list"
+                    )
+                    flash("Book moved to your reading list.", "success")
+                except Exception as e:
+                    app.logger.error(
+                        f"Failed to add existing book {existing['id']} (ISBN: {isbn}) to reading list: {str(e)}",
+                        exc_info=True,
+                    )
+                    flash(f"Error adding to reading list: {str(e)}", "error")
+                return redirect(url_for("reading_list"))
+            else:
+                flash("Book already exists.", "info")
+                return redirect(url_for("list_books"))
 
     # Manual entry or Lookup?
     if title and author:
@@ -1459,23 +1463,24 @@ def create_book():
         flash(f"Error creating book: {str(e)}", "error")
         return redirect(url_for("new_book_form", isbn=isbn, manual=1))
 
-    # When a new book is added it should go to the reading list
-    try:
-        storage.add_to_reading_list(created_book["id"])
-        app.logger.info(
-            f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
-        )
-        if storage.spreadsheet_id:
-            session["spreadsheet_id"] = storage.spreadsheet_id
-        flash("Book added to your reading list.", "success")
-    except Exception as e:
-        app.logger.error(
-            f"READING_LIST_ADD_FAILED: id={created_book['id']}, error={str(e)}"
-        )
-        flash(
-            "Book added, but failed to add to reading list.",
-            "warning",
-        )
+    # When a new book is added it should go to the reading list if requested
+    if request.form.get("add_to_reading_list"):
+        try:
+            storage.add_to_reading_list(created_book["id"])
+            app.logger.info(
+                f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
+            )
+            if storage.spreadsheet_id:
+                session["spreadsheet_id"] = storage.spreadsheet_id
+            flash("Book added to your reading list.", "success")
+        except Exception as e:
+            app.logger.error(
+                f"READING_LIST_ADD_FAILED: id={created_book['id']}, error={str(e)}"
+            )
+            flash(
+                "Book added, but failed to add to reading list.",
+                "warning",
+            )
     return redirect(url_for("reading_list"))
 
 
@@ -1677,6 +1682,10 @@ def edit_book(book_id: int):
     description = request.form.get("description", "").strip()
     series = request.form.get("series", "").strip()
     bisac_category = request.form.get("bisac_category", "").strip()
+    language = request.form.get("language", "").strip()
+    page_count_str = request.form.get("page_count", "").strip()
+    physical_format = request.form.get("physical_format", "").strip()
+    edition = request.form.get("edition", "").strip()
 
     # Basic validation
     if not title or not author:
@@ -1698,6 +1707,13 @@ def edit_book(book_id: int):
         except ValueError:
             pass
 
+    page_count = None
+    if page_count_str:
+        try:
+            page_count = int(page_count_str)
+        except ValueError:
+            pass
+
     try:
         storage.update_book(
             book_id=book_id,
@@ -1711,6 +1727,10 @@ def edit_book(book_id: int):
             series=(series if series else None),
             bisac_category=(bisac_category if bisac_category else None),
             cover_url=(cover_url if cover_url else None),
+            language=(language if language else None),
+            page_count=page_count,
+            physical_format=(physical_format if physical_format else None),
+            edition=(edition if edition else None),
         )
         flash("Book updated successfully.", "success")
     except Exception as e:

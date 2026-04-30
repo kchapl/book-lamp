@@ -12,7 +12,7 @@
 
         <form method="post" action="{{ url_for('create_book') }}">
             <div class="mb-15">
-                <label for="isbn" class="form-label">ISBN-13</label>
+                <label for="isbn" class="form-label">🆔 ISBN-13</label>
                 <div class="flex gap-05">
                     <input type="text" id="isbn" name="isbn" value="{{ isbn or '' }}" placeholder="9780000000000" autofocus
                         class="form-input-large flex-grow">
@@ -40,11 +40,11 @@
                 </div>
                 <div class="flex gap-1 mb-15">
                     <div class="flex-grow">
-                        <label for="publisher" class="form-label">Publisher</label>
+                        <label for="publisher" class="form-label">🏢 Publisher</label>
                         <input type="text" id="publisher" name="publisher" class="form-input-large" placeholder="Publisher">
                     </div>
                     <div style="width: 120px;">
-                        <label for="publication_year" class="form-label">Year</label>
+                        <label for="publication_year" class="form-label">📅 Year</label>
                         <input type="number" id="publication_year" name="publication_year" class="form-input-large" placeholder="2024">
                     </div>
                 </div>

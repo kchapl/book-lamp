@@ -15,7 +15,7 @@
     font-size: 1.5rem;
     font-weight: 700;
     margin: 0 0 0.35rem;
-    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -138,7 +138,7 @@
     padding: 0.6rem 1.5rem !important;
     font-size: 0.85rem !important;
     font-weight: 600 !important;
-    background: linear-gradient(135deg, var(--primary), var(--primary-container)) !important;
+    background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2)) !important;
     color: var(--on-primary) !important;
     border: none !important;
     border-radius: var(--radius-pill) !important;

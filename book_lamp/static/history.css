@@ -132,9 +132,22 @@
 
 .reading-event {
     padding: 1.25rem;
-    background: var(--surface-highest);
-    border-radius: var(--radius-sm);
+    background: var(--surface-dim);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
     font-size: 0.95rem;
+}
+
+.event-dates span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface-high);
+    border: 1px solid var(--glass-border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 .event-meta {

@@ -109,7 +109,8 @@ async function loadRecommendations(): Promise<void> {
                 submitPostRequest('/books', {
                     'isbn': isbn,
                     'title': title,
-                    'author': author
+                    'author': author,
+                    'add_to_reading_list': '1'
                 });
             });
         });

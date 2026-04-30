@@ -32,7 +32,7 @@
     font-weight: 700;
     line-height: 1;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

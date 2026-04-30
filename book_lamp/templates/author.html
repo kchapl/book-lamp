@@ -54,26 +54,26 @@
                 <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
                     class="author-link">{{ book.author }}</a>
                 {% endif %}
-            </div>
             <div class="book-meta-summary">
-                {% if book.publication_year or book.publisher or book.bisac_category %}
-                {% if book.publication_year %}
-                <div class="year">{{ book.publication_year }}</div>
-                {% endif %}
-                {% if book.isbn13 %}
-                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
-                {% endif %}
-                {% if book.publisher %}
-                <div class="year">
-                    <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
-                        class="publisher-link">{{
-                        book.publisher|normalize_pub }}</a>
-                </div>
-                {% endif %}
-                {% if book.bisac_category %}
-                <div class="category-tag">{{ book.bisac_category }}</div>
-                {% endif %}
-                {% endif %}
+            {% if book.publication_year or book.publisher or book.bisac_category %}
+            {% if book.publication_year %}
+            <div class="year" title="Publication Year">📅 {{ book.publication_year }}</div>
+            {% endif %}
+            {% if book.isbn13 %}
+            <div class="isbn" title="ISBN-13">🆔 {{ book.isbn13 }}</div>
+            {% endif %}
+            {% if book.publisher %}
+            <div class="year" title="Publisher">
+                🏢 <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                    class="publisher-link">{{
+                    book.publisher|normalize_pub }}</a>
+            </div>
+            {% endif %}
+            {% if book.bisac_category %}
+            <div class="category-tag" title="Category">🏷️ {{ book.bisac_category }}</div>
+            {% endif %}
+            {% endif %}
+            </div>
                 {% if book.description %}
                 <p class="book-description-snippet">{{ book.description }}</p>
                 {% endif %}
@@ -114,26 +114,26 @@
                 <a href="{{ url_for('author_page', author_slug=book.author|lower|replace(' ', '-')) }}"
                     class="author-link">{{ book.author }}</a>
                 {% endif %}
-            </div>
             <div class="book-meta-summary">
-                {% if book.publication_year or book.publisher or book.bisac_category %}
-                {% if book.publication_year %}
-                <div class="year">{{ book.publication_year }}</div>
-                {% endif %}
-                {% if book.isbn13 %}
-                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
-                {% endif %}
-                {% if book.publisher %}
-                <div class="year">
-                    <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
-                        class="publisher-link">{{
-                        book.publisher|normalize_pub }}</a>
-                </div>
-                {% endif %}
-                {% if book.bisac_category %}
-                <div class="category-tag">{{ book.bisac_category }}</div>
-                {% endif %}
-                {% endif %}
+            {% if book.publication_year or book.publisher or book.bisac_category %}
+            {% if book.publication_year %}
+            <div class="year" title="Publication Year">📅 {{ book.publication_year }}</div>
+            {% endif %}
+            {% if book.isbn13 %}
+            <div class="isbn" title="ISBN-13">🆔 {{ book.isbn13 }}</div>
+            {% endif %}
+            {% if book.publisher %}
+            <div class="year" title="Publisher">
+                🏢 <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                    class="publisher-link">{{
+                    book.publisher|normalize_pub }}</a>
+            </div>
+            {% endif %}
+            {% if book.bisac_category %}
+            <div class="category-tag" title="Category">🏷️ {{ book.bisac_category }}</div>
+            {% endif %}
+            {% endif %}
+            </div>
                 {% if book.description %}
                 <p class="book-description-snippet">{{ book.description }}</p>
                 {% endif %}
@@ -168,13 +168,13 @@
             <div class="author">{{ book.author }}</div>
             <div class="book-meta-summary">
                 {% if book.publication_year %}
-                <div class="year">{{ book.publication_year }}</div>
+                <div class="year" title="Publication Year">📅 {{ book.publication_year }}</div>
                 {% endif %}
                 {% if book.isbn13 %}
-                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                <div class="isbn" title="ISBN-13">🆔 {{ book.isbn13 }}</div>
                 {% endif %}
                 {% if book.publisher %}
-                <div class="year">{{ book.publisher }}</div>
+                <div class="year" title="Publisher">🏢 {{ book.publisher }}</div>
                 {% endif %}
             </div>
             {% if book.isbn13 %}
