@@ -884,20 +884,17 @@ def author_page(author_slug: str):
     read_books = [b for b in author_books if not b["in_reading_list"]]
     reading_list_books = [b for b in author_books if b["in_reading_list"]]
 
-    # Sort each category by reverse publication date
-    def get_pub_year(b: dict) -> int:
+    # Sort each category by publication year (oldest first) then title
+    def sort_key(b):
         py = b.get("publication_year")
-        if not py:
-            return 0
-        if isinstance(py, int):
-            return py
         try:
-            return int(str(py))
+            year = int(py) if py else 0
         except (ValueError, TypeError):
-            return 0
+            year = 0
+        return (year, (b.get("title") or "").lower())
 
-    read_books.sort(key=get_pub_year, reverse=True)
-    reading_list_books.sort(key=get_pub_year, reverse=True)
+    read_books.sort(key=sort_key)
+    reading_list_books.sort(key=sort_key)
 
     # 2. Fetch the full bibliography from Open Library (skipped in TEST_MODE)
     unread_books: list[dict] = []
@@ -971,19 +968,16 @@ def publisher_page(publisher_slug: str):
                 publisher_books.append(book)
                 display_publisher_name = norm_pub
 
-    # Sort books by reverse publication date
-    def get_pub_year(b):
+    # Sort books by publication year (oldest first) then title
+    def sort_key(b):
         py = b.get("publication_year")
-        if not py:
-            return 0
-        if isinstance(py, int):
-            return py
         try:
-            return int(str(py))
+            year = int(py) if py else 0
         except (ValueError, TypeError):
-            return 0
+            year = 0
+        return (year, (b.get("title") or "").lower())
 
-    publisher_books.sort(key=get_pub_year, reverse=True)
+    publisher_books.sort(key=sort_key)
 
     return render_template(
         "publisher.html",
