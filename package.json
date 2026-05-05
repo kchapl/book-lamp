@@ -14,13 +14,13 @@
         "lighthouse:fast:report": "npm run lighthouse:fast; npm run lighthouse:report"
     },
     "devDependencies": {
-        "@lhci/cli": "^0.15.1",
-        "@vitest/coverage-v8": "^3.0.0",
-        "jsdom": "^26.0.0",
-        "typescript": "^5.0.0",
-        "vitest": "^3.0.0"
+        "@lhci/cli": "0.15.1",
+        "@vitest/coverage-v8": "3.2.4",
+        "jsdom": "26.1.0",
+        "typescript": "5.9.3",
+        "vitest": "3.2.4"
     },
     "dependencies": {
-        "html5-qrcode": "^2.3.8"
+        "html5-qrcode": "2.3.8"
     }
 }

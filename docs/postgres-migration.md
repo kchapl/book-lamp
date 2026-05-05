@@ -4,7 +4,7 @@
 **Confirmed:** 2026-05-04
 
 Replace the Google Sheets data store with a shared PostgreSQL database (Neon
-in production, Docker locally). Remove all caching, async-sync, and OAuth
+in production, Podman locally). Remove all caching, async-sync, and OAuth
 redirect infrastructure that existed solely to work around Sheets latency.
 
 ---
@@ -31,7 +31,7 @@ redirect infrastructure that existed solely to work around Sheets latency.
 | Caching | `SQLiteCache` (15-min TTL) | Removed |
 | Async sync layer | `AsyncSQLiteStorage` + outbox | Removed |
 | SQLite state | `SQLiteStateStore` | Removed |
-| Local dev DB | none | Docker Compose (Postgres 16) |
+| Local dev DB | none | Podman Compose (Postgres 16) |
 | Prod DB | none | Neon serverless Postgres |
 | Schema migrations | none | Alembic |
 | Test storage | `MockStorage` (in-memory) | `MockStorage` (unchanged) |
@@ -48,15 +48,15 @@ and tests pass.
 
 ### Step 1 — Add infrastructure files
 
-**Commit message:** `chore: add Docker Compose and Alembic scaffold`
+**Commit message:** `chore: add Podman Compose and Alembic scaffold`
 
 **Files to create:**
 
-**`docker-compose.yml`** (project root):
+**`compose.yaml`** (project root):
 ```yaml
 services:
   db:
-    image: postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
     environment:
       POSTGRES_DB: book_lamp_dev
       POSTGRES_USER: book_lamp
@@ -91,8 +91,8 @@ GOOGLE_CLIENT_SECRET=...
 ```
 
 **Review checklist:**
-- [ ] `docker compose up -d` starts the container without errors
-- [ ] `docker compose ps` shows the `db` container as healthy
+- [ ] `podman-compose up -d` starts the container without errors
+- [ ] `podman-compose ps` shows the `db` container as healthy
 - [ ] `.env.example` has no `GOOGLE_CLIENT_SECRET`
 
 ---
@@ -103,9 +103,9 @@ GOOGLE_CLIENT_SECRET=...
 
 **`pyproject.toml` — add to `[tool.poetry.dependencies]`:**
 ```toml
-psycopg = {extras = ["binary"], version = "^3.2"}
-psycopg-pool = "^3.2"
-alembic = "^1.13"
+psycopg = {extras = ["binary"], version = "3.3.4"}
+psycopg-pool = "3.3.1"
+alembic = "1.13.0"
 ```
 
 **`pyproject.toml` — remove from `[tool.poetry.dependencies]`:**
@@ -119,12 +119,13 @@ protobuf = ">=6.33.4"
 
 **`pyproject.toml` — keep:**
 ```toml
-google-auth = "^2.23.0"   # still needed for One Tap JWT verification
+google-auth = "2.43.0"   # still needed for One Tap JWT verification
 ```
 
 **`pyproject.toml` — add to `[tool.poetry.group.dev.dependencies]`:**
 ```toml
-pytest-docker = "^3.1"
+pytest = "8.3.4"
+pytest-docker = "3.1.1"
 ```
 
 Run:
@@ -282,7 +283,7 @@ def downgrade() -> None:
 ```
 
 **Review checklist:**
-- [ ] `docker compose up -d` running
+- [ ] `podman-compose up -d` running
 - [ ] `DATABASE_URL=... poetry run alembic upgrade head` applies without errors
 - [ ] All 8 tables exist: `\dt` in `psql` confirms them
 - [ ] `DATABASE_URL=... poetry run alembic downgrade base` removes all tables cleanly
@@ -314,7 +315,7 @@ Key design points:
 **Review checklist:**
 - [ ] `poetry run mypy book_lamp/services/pg_storage.py` passes
 - [ ] `poetry run pytest` (existing suite) still passes — nothing is wired up yet
-- [ ] Manual smoke test: start Docker DB, run migration, call `get_all_books()`
+- [ ] Manual smoke test: start Podman DB, run migration, call `get_all_books()`
       from a `poetry run python` shell → returns `[]` (empty DB)
 
 ---
@@ -339,7 +340,7 @@ All writes use explicit transactions (`with pool.connection() as conn: conn.auto
 **Review checklist:**
 - [ ] `poetry run mypy book_lamp/services/pg_storage.py` passes
 - [ ] `poetry run pytest` (existing suite) still passes
-- [ ] Manual smoke test against Docker DB: add a book, read it back, update it,
+- [ ] Manual smoke test against Podman DB: add a book, read it back, update it,
       delete it — results match expectations
 
 ---
@@ -351,7 +352,7 @@ All writes use explicit transactions (`with pool.connection() as conn: conn.auto
 Create `tests/test_pg_storage.py`.
 
 The test module uses `pytest-docker` to spin up the Postgres container defined
-in `docker-compose.yml`, runs `alembic upgrade head`, then exercises
+in `compose.yaml`, runs `alembic upgrade head`, then exercises
 `PostgresStorage`.
 
 Coverage required:
@@ -371,7 +372,7 @@ Also create `tests/test_one_tap_auth.py`:
 - `POST /api/auth/google` where verify raises `ValueError` → 401
 
 **Review checklist:**
-- [ ] `docker compose up -d` running
+- [ ] `podman-compose up -d` running
 - [ ] `DATABASE_URL=... poetry run pytest tests/test_pg_storage.py -v` passes
 - [ ] `poetry run pytest tests/test_one_tap_auth.py -v` passes (uses `MockStorage`)
 - [ ] All existing tests still pass
@@ -555,7 +556,7 @@ Remove from `app.py`:
 **Review checklist:**
 - [ ] `poetry run pytest` (full suite) passes — existing unit tests still use `MockStorage`
 - [ ] `poetry run mypy book_lamp/app.py` passes
-- [ ] Manual test: start Docker DB + run app; sign in via One Tap; `/books` loads data from Postgres
+- [ ] Manual test: start Podman DB + run app; sign in via One Tap; `/books` loads data from Postgres
 - [ ] `grep -r spreadsheet_id book_lamp/` returns nothing
 - [ ] `grep -r credentials book_lamp/` returns nothing
 
@@ -680,10 +681,10 @@ poetry install
 **Commit message:** `docs: update agent context for postgres architecture`
 
 Update `GEMINI.md`:
-- Change "Core Technologies" to reflect `psycopg3`, `alembic`, `Docker`.
+- Change "Core Technologies" to reflect `psycopg3`, `alembic`, `Podman`.
 - Remove Google API client libraries from the list.
 - Update "Google Sheets Integration" section — replace with "PostgreSQL Integration".
-- Update "Initial Setup" to reference `docker compose up -d` and
+- Update "Initial Setup" to reference `podman-compose up -d` and
   `alembic upgrade head`.
 - Update "Required Environment Variables" to remove `GOOGLE_CLIENT_SECRET`.
 
@@ -779,7 +780,7 @@ Step 11 is the point of no return — after that, Sheets code is gone.
 
 | File | Step |
 |---|---|
-| `docker-compose.yml` | 1 |
+| `compose.yaml` | 1 |
 | `alembic/` (directory) | 3 |
 | `alembic/versions/0001_initial_schema.py` | 3 |
 | `book_lamp/services/pg_storage.py` | 4–5 |
