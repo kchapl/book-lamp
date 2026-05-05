@@ -7,8 +7,11 @@ to find and manage the specific spreadsheet across sessions. No broader access i
 
 ## Setup
 
-1. Install backend dependencies: `poetry install`
-2. Install frontend dependencies: `npm install`
+This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python, Node, Poetry).
+
+1. Install tools: `mise install`
+2. Install backend dependencies: `poetry install`
+3. Install frontend dependencies: `npm install`
 3. Compile TypeScript: `npm run build`
 4. Create `.env` file with required variables:
    ```

@@ -20,11 +20,14 @@
 ## Building and Running
 
 ### Prerequisites
-- **mise** (recommended for managing Python/Node/Poetry versions).
-- **Google Cloud Console Project:** Required for OAuth credentials (Client ID and Secret).
+- **mise**: (Required) This project uses `mise` to manage Python, Node, and Poetry versions. Ensure it is installed and configured.
 
 ### Initial Setup
-1. **Install Dependencies:**
+1. **Install Tools:**
+   ```bash
+   mise install
+   ```
+2. **Install Dependencies:**
    ```bash
    poetry install
    npm install

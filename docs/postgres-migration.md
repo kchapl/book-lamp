@@ -7,6 +7,9 @@ Replace the Google Sheets data store with a shared PostgreSQL database (Neon
 in production, Podman locally). Remove all caching, async-sync, and OAuth
 redirect infrastructure that existed solely to work around Sheets latency.
 
+> [!NOTE]
+> This project uses **mise** for tool management. Ensure `mise install` has been run and tools are in your PATH before executing migration steps.
+
 ---
 
 ## Design Decisions (all confirmed)
