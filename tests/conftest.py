@@ -42,6 +42,7 @@ def client(app):
 def authenticated_client(client):
     """Client with active session."""
     with client.session_transaction() as sess:
+        sess["user_id"] = "1"  # Use string ID as stored in session
         sess["user_email"] = "user@example.com"
         sess["user_name"] = "Test User"
     return client
@@ -52,15 +53,40 @@ def _storage_reset(app):
     """Reset mock storage before each test."""
     with app.app_context():
         from book_lamp.app import get_storage
+        from book_lamp.services.pg_storage import PostgresStorage
 
         storage = get_storage()
 
-        if hasattr(storage, "books"):
+        if isinstance(storage, PostgresStorage):
+            # PostgresStorage is reset in its own integration tests.
+            # For general app tests, we might want to avoid wiping the whole DB
+            # if we are using a persistent test DB, but usually we want a clean state.
+            pass
+        elif hasattr(storage, "books"):
             storage.books = []
             storage.reading_records = []
             storage.reading_list = []
             storage.next_book_id = 1
             storage.next_record_id = 1
+
         if hasattr(storage, "set_authorised"):
             storage.set_authorised(True)
         yield
+
+
+@pytest.fixture(scope="session")
+def docker_compose_command():
+    """Use podman-compose if available, otherwise fallback to docker-compose."""
+    import subprocess
+
+    try:
+        subprocess.run(["podman-compose", "--version"], capture_output=True, check=True)
+        return "podman-compose"
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "docker-compose"
+
+
+@pytest.fixture(scope="session")
+def docker_compose_file(pytestconfig):
+    """Return the path to the compose file."""
+    return os.path.join(str(pytestconfig.rootdir), "compose.yaml")

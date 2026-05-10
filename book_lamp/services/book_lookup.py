@@ -1,11 +1,10 @@
 import html
 import logging
 import re
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional
 
 import requests
 
-from book_lamp.services.cache import get_cache
 from book_lamp.utils.books import (
     isbn13_to_isbn10,
     normalize_isbn,
@@ -277,24 +276,8 @@ def lookup_books_batch(
 
     # Deduplicate and normalize
     unique_isbns = list(set(normalize_isbn(isbn) for isbn in isbn13_list))
-    cache = get_cache()
-
-    # 1. Check cache first (unless force_refresh is True)
-    remaining_isbns = []
-    for isbn in unique_isbns:
-        cached = cache.get(f"isbn:{isbn}") if not force_refresh else None
-        if cached:
-            results[isbn] = cached
-        else:
-            remaining_isbns.append(isbn)
-
-    if not remaining_isbns:
-        logger.debug(f"All {len(unique_isbns)} ISBNs found in cache")
-        return results
-
-    logger.debug(
-        f"Batch lookup for {len(unique_isbns)} unique ISBNs ({len(remaining_isbns)} not in cache)"
-    )
+    remaining_isbns = unique_isbns
+    logger.debug(f"Batch lookup for {len(unique_isbns)} unique ISBNs")
 
     # 2. Process remaining in chunks of 50
     chunk_size = 50
@@ -325,8 +308,7 @@ def lookup_books_batch(
                 if key in payload:
                     data = _parse_open_library_data(payload[key])
                     results[isbn] = data
-                    cache.set(f"isbn:{isbn}", data)
-                    logger.debug(f"  Found and cached data for ISBN {isbn}")
+
                 else:
                     results[isbn] = None
                     logger.debug(f"  No data for ISBN {isbn}")
@@ -355,13 +337,8 @@ def lookup_books_by_author(
         List of book dicts with keys: title, author, publication_year,
         thumbnail_url, isbn13, publisher, description.
     """
-    cache = get_cache()
-    cache_key = f"author_books:{author_name.lower().strip()}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cast(List[Dict[str, Any]], cached)
-
     session = _get_session()
+
     params: Dict[str, str] = {
         "author": author_name,
         "limit": str(min(max_results, 100)),
@@ -445,8 +422,6 @@ def lookup_books_by_author(
     except Exception as e:
         logger.debug(f"Author books lookup failed for '{author_name}': {e}")
 
-    # Cache for 24 hours (86400s); author bibliographies rarely change
-    cache.set(cache_key, books, ttl=86400)
     return books
 
 
@@ -700,16 +675,8 @@ def lookup_book_by_isbn13(
 ) -> Optional[Dict[str, Optional[Any]]]:
     """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
-    cache = get_cache()
-
-    # 0. Check Cache - return if cover found OR if we're not doing a search refinement
-    if not force_refresh:
-        cached = cache.get(f"isbn:{clean_isbn}")
-        if cached and (cached.get("thumbnail_url") or not title):
-            logger.debug(f"Cache hit for ISBN {clean_isbn}")
-            return cast(Dict[str, Any], cached)
-
     best: Dict[str, Any] = {"isbn13": clean_isbn}
+
     if title:
         best["title"] = title
     if author:
@@ -721,7 +688,6 @@ def lookup_book_by_isbn13(
     best = _merge_metadata(best, _lookup_google_books(clean_isbn))
 
     if best.get("thumbnail_url"):
-        cache.set(f"isbn:{clean_isbn}", best)
         return best
 
     # 2. Direct Cover Lookups
@@ -730,21 +696,18 @@ def lookup_book_by_isbn13(
     if ol_direct:
         best["thumbnail_url"] = ol_direct
         best["cover_url"] = ol_direct.replace("-M.jpg", "-L.jpg")
-        cache.set(f"isbn:{clean_isbn}", best)
         return best
 
     prh_cover = _lookup_penguin_cover(clean_isbn)
     if prh_cover:
         best["thumbnail_url"] = prh_cover
         best["cover_url"] = prh_cover
-        cache.set(f"isbn:{clean_isbn}", best)
         return best
 
     amazon_cover = _lookup_amazon_cover(clean_isbn)
     if amazon_cover:
         best["thumbnail_url"] = amazon_cover
         best["cover_url"] = amazon_cover
-        cache.set(f"isbn:{clean_isbn}", best)
         return best
 
     # 3. Search Fallbacks (Crucial for missing covers on specific editions)
@@ -757,33 +720,21 @@ def lookup_book_by_isbn13(
         ol_search = _lookup_open_library_search(search_title, search_author)
         best = _merge_metadata(best, ol_search)
         if best.get("thumbnail_url"):
-            cache.set(f"isbn:{clean_isbn}", best)
             return best
 
         # Google Books search
         gb_search = _lookup_google_books_search(search_title, search_author)
         best = _merge_metadata(best, gb_search)
         if best.get("thumbnail_url"):
-            cache.set(f"isbn:{clean_isbn}", best)
             return best
 
         # iTunes search
         it_search = _lookup_itunes_search(search_title, search_author)
         best = _merge_metadata(best, it_search)
         if best.get("thumbnail_url"):
-            cache.set(f"isbn:{clean_isbn}", best)
             return best
 
-    # Cache whatever we found (even if no cover)
     if len(best) > 1:  # More than just the ISBN
-        if not best.get("title") or not best.get("author"):
-            logger.info(
-                f"ISBN_LOOKUP_FAILED: Missing metadata (title/author) for ISBN {clean_isbn}"
-            )
-        cache.set(f"isbn:{clean_isbn}", best)
-        logger.debug(
-            f"  Cached metadata for {clean_isbn} (has_cover={bool(best.get('thumbnail_url'))})"
-        )
         return best
 
     logger.info(f"ISBN_LOOKUP_FAILED: No data found for ISBN {clean_isbn}")

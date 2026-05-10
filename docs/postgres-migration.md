@@ -94,9 +94,10 @@ GOOGLE_CLIENT_SECRET=...
 ```
 
 **Review checklist:**
-- [ ] `podman-compose up -d` starts the container without errors
-- [ ] `podman-compose ps` shows the `db` container as healthy
-- [ ] `.env.example` has no `GOOGLE_CLIENT_SECRET`
+- [x] `podman-compose up -d` starts the container without errors
+- [x] `podman-compose ps` shows the `db` container as healthy
+- [x] `.env.example` has no `GOOGLE_CLIENT_SECRET`
+
 
 ---
 
@@ -138,10 +139,11 @@ poetry install
 ```
 
 **Review checklist:**
-- [ ] `poetry install` completes without errors
-- [ ] `import psycopg` works in a `poetry run python -c` check
-- [ ] `poetry run alembic --version` prints a version
-- [ ] `poetry run pytest --collect-only` still collects all existing tests
+- [x] `poetry install` completes without errors
+- [x] `import psycopg` works in a `poetry run python -c` check
+- [x] `poetry run alembic --version` prints a version
+- [x] `poetry run pytest --collect-only` still collects all existing tests
+
 
 ---
 
@@ -286,10 +288,11 @@ def downgrade() -> None:
 ```
 
 **Review checklist:**
-- [ ] `podman-compose up -d` running
-- [ ] `DATABASE_URL=... poetry run alembic upgrade head` applies without errors
-- [ ] All 8 tables exist: `\dt` in `psql` confirms them
-- [ ] `DATABASE_URL=... poetry run alembic downgrade base` removes all tables cleanly
+- [x] `podman-compose up -d` running
+- [x] `DATABASE_URL=... poetry run alembic upgrade head` applies without errors
+- [x] All 8 tables exist: `\dt` in `psql` confirms them
+- [x] `DATABASE_URL=... poetry run alembic downgrade base` removes all tables cleanly
+
 
 ---
 
@@ -316,10 +319,11 @@ Key design points:
   construction).
 
 **Review checklist:**
-- [ ] `poetry run mypy book_lamp/services/pg_storage.py` passes
-- [ ] `poetry run pytest` (existing suite) still passes — nothing is wired up yet
-- [ ] Manual smoke test: start Podman DB, run migration, call `get_all_books()`
+- [x] `poetry run mypy book_lamp/services/pg_storage.py` passes
+- [x] `poetry run pytest` (existing suite) still passes — nothing is wired up yet
+- [x] Manual smoke test: start Podman DB, run migration, call `get_all_books()`
       from a `poetry run python` shell → returns `[]` (empty DB)
+
 
 ---
 
@@ -341,10 +345,11 @@ Implement all **write** methods in `pg_storage.py`:
 All writes use explicit transactions (`with pool.connection() as conn: conn.autocommit = False`).
 
 **Review checklist:**
-- [ ] `poetry run mypy book_lamp/services/pg_storage.py` passes
-- [ ] `poetry run pytest` (existing suite) still passes
-- [ ] Manual smoke test against Podman DB: add a book, read it back, update it,
+- [x] `poetry run mypy book_lamp/services/pg_storage.py` passes
+- [x] `poetry run pytest` (existing suite) still passes
+- [x] Manual smoke test against Podman DB: add a book, read it back, update it,
       delete it — results match expectations
+
 
 ---
 
@@ -375,10 +380,11 @@ Also create `tests/test_one_tap_auth.py`:
 - `POST /api/auth/google` where verify raises `ValueError` → 401
 
 **Review checklist:**
-- [ ] `podman-compose up -d` running
-- [ ] `DATABASE_URL=... poetry run pytest tests/test_pg_storage.py -v` passes
-- [ ] `poetry run pytest tests/test_one_tap_auth.py -v` passes (uses `MockStorage`)
-- [ ] All existing tests still pass
+- [x] `podman-compose up -d` running
+- [x] `DATABASE_URL=... poetry run pytest tests/test_pg_storage.py -v` passes
+- [x] `poetry run pytest tests/test_one_tap_auth.py -v` passes (uses `MockStorage`)
+- [x] All existing tests still pass
+
 
 ---
 
@@ -431,9 +437,10 @@ Remove from `app.py`:
 - The validation block that raises `ValueError` for missing client secret
 
 **Review checklist:**
-- [ ] `poetry run mypy book_lamp/app.py` passes
-- [ ] `poetry run pytest tests/test_one_tap_auth.py -v` passes
-- [ ] No `authlib` import anywhere in the codebase (`grep -r authlib book_lamp/`)
+- [x] `poetry run mypy book_lamp/app.py` passes
+- [x] `poetry run pytest tests/test_one_tap_auth.py -v` passes
+- [x] No `authlib` import anywhere in the codebase (`grep -r authlib book_lamp/`)
+
 
 ---
 
@@ -497,11 +504,12 @@ Remove:
 Update `/logout` to simply `session.clear()`.
 
 **Review checklist:**
-- [ ] `npm run build` succeeds with no TS errors
-- [ ] Home page renders without any reference to Google Sheets
-- [ ] "Sign in with Google" button appears on the home page
-- [ ] `/connect` and `/authorize` URLs return 404
-- [ ] `poetry run pytest` passes
+- [x] `npm run build` succeeds with no TS errors
+- [x] Home page renders without any reference to Google Sheets
+- [x] "Sign in with Google" button appears on the home page
+- [x] `/connect` and `/authorize` URLs return 404
+- [x] `poetry run pytest` passes
+
 
 ---
 
@@ -557,11 +565,12 @@ Remove from `app.py`:
   session rather than checking `credentials`
 
 **Review checklist:**
-- [ ] `poetry run pytest` (full suite) passes — existing unit tests still use `MockStorage`
-- [ ] `poetry run mypy book_lamp/app.py` passes
-- [ ] Manual test: start Podman DB + run app; sign in via One Tap; `/books` loads data from Postgres
-- [ ] `grep -r spreadsheet_id book_lamp/` returns nothing
-- [ ] `grep -r credentials book_lamp/` returns nothing
+- [x] `poetry run pytest` (full suite) passes — existing unit tests still use `MockStorage`
+- [x] `poetry run mypy book_lamp/app.py` passes
+- [x] Manual test: start Podman DB + run app; sign in via One Tap; `/books` loads data from Postgres
+- [x] `grep -r spreadsheet_id book_lamp/` returns nothing
+- [x] `grep -r credentials book_lamp/` returns nothing
+
 
 ---
 
@@ -588,12 +597,14 @@ def authenticated_client(client):
 - Update `_storage_reset` fixture if it references `user_email` session key.
 
 **Review checklist:**
-- [ ] `poetry run pytest` (full suite) passes
-- [ ] No test references `spreadsheet_id` or `credentials` session keys
+- [x] `poetry run pytest` (full suite) passes
+- [x] No test references `spreadsheet_id` or `credentials` session keys
+
 
 ---
 
-### Step 11 — Delete Sheets, cache, and async-sync files
+### Step 11 — Delete Sheets, cache, and async-sync files [DONE]
+
 
 **Commit message:** `refactor: delete sheets storage, cache, and async-sync infrastructure`
 
@@ -617,8 +628,10 @@ def authenticated_client(client):
 `credentials.json`).
 
 **Review checklist:**
-- [ ] `poetry run pytest` (full suite) passes
-- [ ] `poetry run mypy book_lamp/` passes with no new errors
+- [x] `poetry run pytest` (full suite) passes
+
+- [x] `poetry run mypy book_lamp/` passes with no new errors
+
 - [ ] `grep -r "sheets_storage\|async_sqlite\|sqlite_state\|cache\.py\|protobuf_patch" book_lamp/` returns nothing
 - [ ] `grep -r "from authlib" book_lamp/` returns nothing
 - [ ] `grep -r "google-api-python-client\|google-auth-oauthlib" pyproject.toml` returns nothing

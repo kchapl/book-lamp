@@ -9,7 +9,6 @@ from typing import Union, cast
 from urllib.parse import urlparse
 
 import click  # noqa: E402
-from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
 from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
@@ -23,13 +22,11 @@ from flask import (  # noqa: E402
     url_for,
 )
 
-from book_lamp.services import sheets_storage as from_sheets_storage
-from book_lamp.services.async_sqlite_storage import AsyncSQLiteStorage
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.llm_client import LLMClient
 from book_lamp.services.mock_storage import MockStorage
-from book_lamp.services.sheets_storage import GoogleSheetsStorage
+from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
     is_valid_isbn13,
@@ -38,10 +35,6 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.libib_import import parse_libib_csv
-from book_lamp.utils.protobuf_patch import apply_patch
-
-# Apply security patch for CVE-2026-0994
-apply_patch()
 
 
 def get_safe_redirect_target(fallback_endpoint: str) -> str:
@@ -103,40 +96,21 @@ def is_test_mode() -> bool:
 
 # Global singleton for test mode only
 _mock_storage_singleton = MockStorage()
-_async_storage_singleton: AsyncSQLiteStorage | None = None
 
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
-    global _async_storage_singleton
     if is_test_mode():
         return _mock_storage_singleton
-    if os.environ.get("ASYNC_SQLITE_STORAGE", "0") == "1":
-        if _async_storage_singleton is None:
-            is_prod = os.environ.get("FLASK_ENV") == "production"
-            sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-            _async_storage_singleton = AsyncSQLiteStorage(sheet_name=sheet_name)
-        _async_storage_singleton.configure_remote(
-            credentials_dict=session.get("credentials"),
-            spreadsheet_id=session.get("spreadsheet_id"),
-        )
-        return _async_storage_singleton
-    if "storage" not in g:
-        app.logger.info("Initializing storage for request...")
-        # Use different sheet names for production and development
-        # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
-        is_prod = os.environ.get("FLASK_ENV") == "production"
-        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
 
-        # Initialize implementation with credentials from session
-        credentials = session.get("credentials")
-        spreadsheet_id = session.get("spreadsheet_id")
-        g.storage = GoogleSheetsStorage(
-            sheet_name=sheet_name,
-            credentials_dict=credentials,
-            spreadsheet_id=spreadsheet_id,
-        )
-    return g.storage
+    user_id = session.get("user_id")
+    if user_id:
+        from book_lamp.services.pg_storage import PostgresStorage
+
+        return PostgresStorage(user_id=user_id)
+
+    # Return a non-authorised storage if not logged in
+    return _mock_storage_singleton
 
 
 def get_llm_client() -> LLMClient:
@@ -181,29 +155,15 @@ if not os.environ.get("LLM_API_KEY"):
 
 @app.context_processor
 def inject_global_vars():
-    # Use a fast check for the template context to avoid redundant storage creation
-    is_auth = False
-    if "credentials" in session:
-        # In test mode, we might want to still call is_authorised
-        if is_test_mode():
-            is_auth = get_storage().is_authorised()
-        else:
-            is_auth = True
-
-    # Fetch user theme preference
-    theme = "dark"
-    if is_auth:
-        try:
-            settings = get_storage().get_settings()
-            theme = settings.get("theme", "dark")
-        except Exception:
-            app.logger.warning("Failed to fetch settings for template injection")
+    """Inject variables into all templates."""
+    is_auth = get_storage().is_authorised()
+    user_name = session.get("user_name")
 
     return {
         "is_authorised": is_auth,
+        "user_name": user_name,
         "current_year": datetime.datetime.now().year,
         "app_version": getattr(app, "app_version", APP_VERSION),
-        "user_theme": theme,
     }
 
 
@@ -267,15 +227,45 @@ def update_settings():
     return jsonify({"success": True})
 
 
+@app.route("/api/auth/google", methods=["POST"])
+def google_one_tap_login():
+    """Verify a Google One Tap credential JWT and create a session."""
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    # Note: We allow this in test mode so we can test the logic with mocks.
+    # The real Google verify will be mocked in tests.
+
+    data = request.get_json(silent=True) or {}
+    credential = data.get("credential")
+    if not credential:
+        return jsonify({"error": "Missing credential"}), 400
+
+    try:
+        id_info = id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            app.config["GOOGLE_CLIENT_ID"],
+        )
+        email = id_info["email"]
+        name = id_info.get("name", "")
+
+        from book_lamp.services.pg_storage import PostgresStorage
+
+        user_id = PostgresStorage.upsert_user(email=email, name=name)
+        session["user_id"] = user_id
+        session["user_email"] = email
+
+        return jsonify({"ok": True})
+    except ValueError:
+        app.logger.exception("One Tap credential verification failed")
+        return jsonify({"error": "Invalid credential"}), 401
+
+
 @app.route("/api/sync/diagnostics", methods=["GET"])
 @authorisation_required
 def sync_diagnostics():
-    """Return async sync diagnostics when SQLite async storage is enabled."""
-    storage = get_storage()
-    if isinstance(storage, AsyncSQLiteStorage) or hasattr(
-        storage, "get_sync_diagnostics"
-    ):
-        return jsonify(storage.get_sync_diagnostics())
+    """Return sync diagnostics (legacy, now disabled)."""
     return jsonify({"enabled": False, "message": "Async SQLite storage is disabled"})
 
 
@@ -336,10 +326,8 @@ def unauthorised():
 
 @app.route("/logout")
 def logout():
-    if is_test_mode():
-        return redirect(url_for("test_disconnect"))
     session.clear()
-    flash("Google Sheets disconnected.", "info")
+    flash("Successfully signed out.", "info")
     return redirect(url_for("home"))
 
 
@@ -351,12 +339,8 @@ def favicon():
 # Secret key for session management
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-# Google OAuth configuration
+# Google OAuth configuration (One Tap only needs Client ID)
 app.config["GOOGLE_CLIENT_ID"] = os.environ.get("GOOGLE_CLIENT_ID")
-app.config["GOOGLE_CLIENT_SECRET"] = os.environ.get("GOOGLE_CLIENT_SECRET")
-app.config["GOOGLE_DISCOVERY_URL"] = (
-    "https://accounts.google.com/.well-known/openid-configuration"
-)
 
 # Validate OAuth configuration (skip in test mode)
 if not is_test_mode():
@@ -366,105 +350,6 @@ if not is_test_mode():
             "Please set it in your .env file. "
             "Get credentials from https://console.cloud.google.com/"
         )
-    if not app.config["GOOGLE_CLIENT_SECRET"]:
-        raise ValueError(
-            "GOOGLE_CLIENT_SECRET environment variable is required. "
-            "Please set it in your .env file. "
-            "Get credentials from https://console.cloud.google.com/"
-        )
-
-oauth = OAuth(app)
-if not is_test_mode():
-    oauth.register(
-        name="google",
-        client_id=app.config["GOOGLE_CLIENT_ID"],
-        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
-        server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-        client_kwargs={
-            "scope": " ".join(from_sheets_storage.SCOPES)
-        },  # drive.file only
-    )
-
-
-@app.route("/connect")
-def connect():
-    if is_test_mode():
-        return redirect(url_for("test_connect"))
-
-    try:
-        if (
-            "CODESPACE_NAME" in os.environ
-            and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
-        ):
-            codespace_name = os.environ["CODESPACE_NAME"]
-            domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
-            redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
-        else:
-            redirect_uri = url_for("authorize", _external=True)
-
-        app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
-        # Request offline access to get a refresh token
-        return oauth.google.authorize_redirect(
-            redirect_uri, access_type="offline", prompt="consent"
-        )
-    except Exception:
-        app.logger.exception("OAuth authorisation initiation failed")
-        return (
-            "<h1>Authorisation Error</h1>"
-            "<p>Failed to initiate Google authorisation.</p>"
-            "<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
-            "<a href='/'>Go back</a>"
-        ), 500
-
-
-@app.route("/authorize")
-def authorize():
-    try:
-        token = oauth.google.authorize_access_token()
-        app.logger.info("OAuth token received successfully")
-
-        # Save the token for GoogleSheetsStorage
-        if not is_test_mode():
-            # Bridging Authlib token to Google-auth format.
-            # Client ID and secret are NOT saved - they're read from env vars for security.
-            creds_data = {
-                "token": token.get("access_token"),
-                "refresh_token": token.get("refresh_token"),
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "scopes": from_sheets_storage.SCOPES,  # drive.file only
-            }
-            if token.get("expires_at"):
-                creds_data["expiry"] = (
-                    datetime.datetime.fromtimestamp(
-                        token["expires_at"], tz=datetime.timezone.utc
-                    )
-                    .isoformat()
-                    .replace("+00:00", "Z")
-                )
-
-            # Save credentials to session for this user
-            session["credentials"] = creds_data
-
-        flash("Google Sheets access authorised!", "success")
-        return redirect(url_for("home"))
-    except Exception:
-        app.logger.exception("Failed to authorise access token")
-        return (
-            "<h1>Authorisation Error</h1><p>Failed to complete Google authorisation.</p><a href='/'>Go back</a>"
-        ), 401
-
-
-@app.cli.command("init-sheets")
-def init_sheets_command():
-    """Initialize Google Sheets with required tabs and headers."""
-    if is_test_mode():
-        click.echo("Not available in test mode.")
-        return
-
-    # Note: This will likely fail in CLI since there is no session
-    # A robust CLI would need a way to input a token manually
-    get_storage().initialize_sheets()
-    click.echo("Google Sheets initialized successfully.")
 
 
 @app.cli.command("backfill-bisac")
@@ -505,9 +390,6 @@ def backfill_bisac_command():
 def reading_history():
     """Show detailed reading history as a chronological list of individual events."""
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     history = storage.get_reading_history()
     # Get status list for filter dropdown (from all records)
@@ -580,9 +462,6 @@ def new_book_form():
 @authorisation_required
 def reading_list():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     rl_items = storage.get_reading_list()
     books = []
@@ -639,8 +518,7 @@ def add_existing_to_reading_list(book_id: int):
     try:
         storage.add_to_reading_list(book_id)
         app.logger.info(f"Successfully added book ID {book_id} to reading list")
-        if storage.spreadsheet_id:
-            session["spreadsheet_id"] = storage.spreadsheet_id
+
         flash("Added to reading list.", "success")
     except Exception as e:
         app.logger.error(
@@ -654,9 +532,6 @@ def add_existing_to_reading_list(book_id: int):
 @authorisation_required
 def list_books():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
@@ -843,9 +718,6 @@ def author_page(author_slug: str):
     """
 
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     all_user_books = storage.get_all_books()
     rl_items = storage.get_reading_list()
@@ -947,9 +819,6 @@ def author_page(author_slug: str):
 @authorisation_required
 def publisher_page(publisher_slug: str):
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
 
@@ -990,9 +859,6 @@ def publisher_page(publisher_slug: str):
 @authorisation_required
 def collection_stats():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
@@ -1412,8 +1278,7 @@ def create_book():
         app.logger.info(
             f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
         )
-        if storage.spreadsheet_id:
-            session["spreadsheet_id"] = storage.spreadsheet_id
+
         flash("Book added to your reading list.", "success")
     except Exception as e:
         app.logger.error(
@@ -1426,19 +1291,17 @@ def create_book():
     return redirect(url_for("reading_list"))
 
 
-def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: str):
+def _background_fetch_missing_data(job_id: str, user_id: int):
     """Background task: bulk fetch missing data (covers, metadata) for all books."""
     from book_lamp.services.book_lookup import enhance_books_batch
 
     try:
-        # Create storage with passed credentials (outside request context)
-        storage: Union[MockStorage, GoogleSheetsStorage]
+        # Create storage (outside request context)
+        storage: Union[MockStorage, PostgresStorage]
         if is_test_mode():
             storage = _mock_storage_singleton
         else:
-            storage = GoogleSheetsStorage(
-                sheet_name=sheet_name, credentials_dict=credentials_dict
-            )
+            storage = PostgresStorage(user_id=user_id)
 
         books = storage.get_all_books()
         app.logger.info(
@@ -1470,17 +1333,10 @@ def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: st
 def fetch_missing_data():
     """Queue background job to fetch missing data (covers, metadata) for all books."""
     job_queue = get_job_queue()
-
-    # Capture request-context data before submitting to background thread
-    credentials_dict = session.get("credentials")
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
     job_id = job_queue.submit_job(
         "fetch_missing_data",
         _background_fetch_missing_data,
-        credentials_dict,
-        sheet_name,
+        session["user_id"],
     )
 
     flash(
@@ -1495,15 +1351,10 @@ def fetch_missing_data():
 def fetch_missing_categories():
     """Trigger backfill of BISAC categories from the stats page."""
     job_queue = get_job_queue()
-    credentials_dict = session.get("credentials")
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
     job_id = job_queue.submit_job(
         "backfill_bisac",
         _background_fetch_missing_data,  # Reusing the background fetcher which now includes categories
-        credentials_dict,
-        sheet_name,
+        session["user_id"],
     )
 
     flash(
@@ -1520,20 +1371,18 @@ def import_books_form():
 
 
 def _background_import_books(
-    job_id: str, content: str, fetch_metadata: bool, credentials_dict, sheet_name: str
+    job_id: str, content: str, fetch_metadata: bool, user_id: int
 ):
     """Background task: import books from Libib CSV."""
     app.logger.info(f"Background job {job_id}: parsing CSV content...")
 
     try:
-        # Create storage with passed credentials (outside request context)
-        storage: Union[MockStorage, GoogleSheetsStorage]
+        # Create storage (outside request context)
+        storage: Union[MockStorage, PostgresStorage]
         if is_test_mode():
             storage = _mock_storage_singleton
         else:
-            storage = GoogleSheetsStorage(
-                sheet_name=sheet_name, credentials_dict=credentials_dict
-            )
+            storage = PostgresStorage(user_id=user_id)
 
         items = parse_libib_csv(content)
         app.logger.info(f"Background job {job_id}: parsed {len(items)} items from CSV")
@@ -1583,19 +1432,15 @@ def import_books():
         content = file.read().decode("utf-8")
         fetch_metadata = request.form.get("fetch_metadata") == "on"
 
-        # Capture request-context data before submitting to background thread
-        credentials_dict = session.get("credentials")
-        is_prod = os.environ.get("FLASK_ENV") == "production"
-        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
         # Queue the import job
+        job_queue = get_job_queue()
+
         job_id = job_queue.submit_job(
             "import_books",
             _background_import_books,
             content,
             fetch_metadata,
-            credentials_dict,
-            sheet_name,
+            session["user_id"],
         )
 
         flash(
