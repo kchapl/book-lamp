@@ -24,14 +24,14 @@
         </p>
     </div>
     
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <div id="g_id_onload"
-         data-client_id="{{ config['GOOGLE_CLIENT_ID'] }}"
-         data-callback="handleOneTapCredential"
-         data-auto_prompt="false">
-    </div>
-    <div class="g_id_signin" data-type="standard"></div>
+    <script>
+        // Make Google Client ID available to JavaScript
+        window.GOOGLE_CLIENT_ID = "{{ config['GOOGLE_CLIENT_ID'] }}";
+    </script>
     <script src="{{ url_for('static', filename='one_tap.js') }}" type="module" defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <div id="g_id_onload"></div>
+    <div class="g_id_signin" data-type="standard"></div>
     {% endif %}
 </div>
 
