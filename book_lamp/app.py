@@ -109,7 +109,19 @@ def get_storage():
 
         return PostgresStorage(user_id=user_id)
 
-    # Return a non-authorised storage if not logged in
+    # In production, authentication is required - no bypass allowed
+    if os.environ.get("FLASK_ENV") == "production":
+        # Return a storage that will always fail authorization checks
+        from book_lamp.services.mock_storage import MockStorage
+
+        unauthed = MockStorage()
+        unauthed.set_authorised(False)
+        app.logger.warning(
+            "Unauthenticated access attempted in production - no bypass allowed"
+        )
+        return unauthed
+
+    # In development, return mock storage for better UX
     return _mock_storage_singleton
 
 
@@ -124,7 +136,20 @@ def authorisation_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         app.logger.info(f"AUTHORISATION_CHECK for route: {f.__name__}")
+
+        # In production, always require valid user_id in session
+        if os.environ.get("FLASK_ENV") == "production":
+            user_id = session.get("user_id")
+            if not user_id:
+                app.logger.warning(
+                    f"Production authorization failed for {f.__name__}: no user_id in session"
+                )
+                return redirect(url_for("unauthorised"))
+
         if not get_storage().is_authorised():
+            app.logger.warning(
+                f"Authorization failed for {f.__name__}: storage not authorised"
+            )
             return redirect(url_for("unauthorised"))
         return f(*args, **kwargs)
 
@@ -233,6 +258,10 @@ def google_one_tap_login():
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
 
+    # In production, ensure this is the only authentication method
+    if os.environ.get("FLASK_ENV") == "production":
+        app.logger.info("Production Google One Tap authentication attempt")
+
     # Note: We allow this in test mode so we can test the logic with mocks.
     # The real Google verify will be mocked in tests.
 
@@ -256,9 +285,14 @@ def google_one_tap_login():
         session["user_id"] = user_id
         session["user_email"] = email
 
+        if os.environ.get("FLASK_ENV") == "production":
+            app.logger.info(f"Production authentication successful for user: {email}")
+
         return jsonify({"ok": True})
-    except ValueError:
-        app.logger.exception("One Tap credential verification failed")
+    except ValueError as e:
+        app.logger.exception(f"One Tap credential verification failed: {e}")
+        if os.environ.get("FLASK_ENV") == "production":
+            app.logger.warning(f"Production authentication failure: {e}")
         return jsonify({"error": "Invalid credential"}), 401
 
 
@@ -349,6 +383,12 @@ if not is_test_mode():
             "GOOGLE_CLIENT_ID environment variable is required. "
             "Please set it in your .env file. "
             "Get credentials from https://console.cloud.google.com/"
+        )
+
+    # In production, enforce that Google One Tap is the only authentication method
+    if os.environ.get("FLASK_ENV") == "production":
+        app.logger.info(
+            "Production mode: Google One Tap authentication is required with no bypasses"
         )
 
 
