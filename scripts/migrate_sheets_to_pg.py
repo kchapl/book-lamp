@@ -7,14 +7,18 @@ import os
 import sys
 from typing import Any, List, cast
 
+from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from book_lamp.services.pg_storage import PostgresStorage
+
+# Load environment variables from .env file
+load_dotenv()
+
 # Add the parent directory to the path so we can import book_lamp modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from book_lamp.services.pg_storage import PostgresStorage
 
 
 def get_google_service(service_name: str, service_version: str) -> Any:
