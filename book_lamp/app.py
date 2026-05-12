@@ -110,7 +110,7 @@ def get_storage():
         return PostgresStorage(user_id=user_id)
 
     # In production, authentication is required - no bypass allowed
-    if os.environ.get("FLASK_ENV") == "production":
+    if os.environ.get("FLASK_DEBUG") != "1":
         # Return a storage that will always fail authorization checks
         from book_lamp.services.mock_storage import MockStorage
 
@@ -138,7 +138,7 @@ def authorisation_required(f):
         app.logger.info(f"AUTHORISATION_CHECK for route: {f.__name__}")
 
         # In production, always require valid user_id in session
-        if os.environ.get("FLASK_ENV") == "production":
+        if os.environ.get("FLASK_DEBUG") != "1":
             user_id = session.get("user_id")
             if not user_id:
                 app.logger.warning(
@@ -158,7 +158,7 @@ def authorisation_required(f):
 
 def get_app_version():
     """Get the application version based on environment."""
-    if os.environ.get("FLASK_ENV") == "production":
+    if os.environ.get("FLASK_DEBUG") != "1":
         # Check for common deployment commit hash environment variables
         for env_var in ["RENDER_GIT_COMMIT", "GIT_COMMIT", "HEROKU_SLUG_COMMIT"]:
             val = os.environ.get(env_var)
@@ -259,7 +259,7 @@ def google_one_tap_login():
     from google.oauth2 import id_token
 
     # In production, ensure this is the only authentication method
-    if os.environ.get("FLASK_ENV") == "production":
+    if os.environ.get("FLASK_DEBUG") != "1":
         app.logger.info("Production Google One Tap authentication attempt")
 
     # Note: We allow this in test mode so we can test the logic with mocks.
@@ -285,13 +285,13 @@ def google_one_tap_login():
         session["user_id"] = user_id
         session["user_email"] = email
 
-        if os.environ.get("FLASK_ENV") == "production":
+        if os.environ.get("FLASK_DEBUG") != "1":
             app.logger.info(f"Production authentication successful for user: {email}")
 
         return jsonify({"ok": True})
     except ValueError as e:
         app.logger.exception(f"One Tap credential verification failed: {e}")
-        if os.environ.get("FLASK_ENV") == "production":
+        if os.environ.get("FLASK_DEBUG") != "1":
             app.logger.warning(f"Production authentication failure: {e}")
         return jsonify({"error": "Invalid credential"}), 401
 
@@ -386,7 +386,7 @@ if not is_test_mode():
         )
 
     # In production, enforce that Google One Tap is the only authentication method
-    if os.environ.get("FLASK_ENV") == "production":
+    if os.environ.get("FLASK_DEBUG") != "1":
         app.logger.info(
             "Production mode: Google One Tap authentication is required with no bypasses"
         )

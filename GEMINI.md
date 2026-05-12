@@ -35,7 +35,7 @@
 2. **Configure Environment:**
    Create a `.env` file based on `.env.example`:
    ```env
-   FLASK_ENV=development
+   FLASK_DEBUG=True
    SECRET_KEY=your_secret_key
    DATABASE_URL=postgresql://localhost/booklamp
    GOOGLE_CLIENT_ID=optional_oauth_client_id

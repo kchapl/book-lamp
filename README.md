@@ -15,7 +15,7 @@ This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python,
 3. Compile TypeScript: `npm run build`
 4. Create `.env` file with required variables:
    ```
-   FLASK_ENV=development
+   FLASK_DEBUG=True
    GOOGLE_CLIENT_ID=your_oauth_client_id
    GOOGLE_CLIENT_SECRET=your_oauth_client_secret
 

@@ -679,7 +679,7 @@ poetry install
 |---|---|
 | `DATABASE_URL` | Postgres connection string (Neon in prod) |
 | `SECRET_KEY` | Flask session key |
-| `FLASK_ENV` | Set to `production` |
+| `FLASK_DEBUG` | Set to `False` (production) |
 | `GOOGLE_CLIENT_ID` | Google One Tap JWT audience |
 | `LLM_API_KEY` | Optional — AI recommendations |
 
