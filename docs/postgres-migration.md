@@ -632,9 +632,9 @@ def authenticated_client(client):
 
 - [x] `poetry run mypy book_lamp/` passes with no new errors
 
-- [ ] `grep -r "sheets_storage\|async_sqlite\|sqlite_state\|cache\.py\|protobuf_patch" book_lamp/` returns nothing
-- [ ] `grep -r "from authlib" book_lamp/` returns nothing
-- [ ] `grep -r "google-api-python-client\|google-auth-oauthlib" pyproject.toml` returns nothing
+- [x] `grep -r "sheets_storage\|async_sqlite\|sqlite_state\|cache\.py\|protobuf_patch" book_lamp/` returns nothing
+- [x] `grep -r "from authlib" book_lamp/` returns nothing
+- [x] `grep -r "google-api-python-client\|google-auth-oauthlib" pyproject.toml` returns nothing
 
 ---
 
@@ -655,9 +655,9 @@ poetry install
 ```
 
 **Review checklist:**
-- [ ] `poetry install` completes cleanly
-- [ ] `poetry run pytest` passes
-- [ ] `poetry run mypy book_lamp/` passes
+- [x] `poetry install` completes cleanly
+- [x] `poetry run pytest` passes
+- [x] `poetry run mypy book_lamp/` passes
 
 ---
 
@@ -686,9 +686,9 @@ poetry install
 **`.env.example`** — final state should have no Sheets / OAuth references.
 
 **Review checklist:**
-- [ ] `DEPLOYMENT.md` has no mention of "Google Sheets", "Drive", or "spreadsheet"
-- [ ] `.env.example` has no `GOOGLE_CLIENT_SECRET`
-- [ ] All required env vars are documented
+- [x] `DEPLOYMENT.md` has no mention of "Google Sheets", "Drive", or "spreadsheet"
+- [x] `.env.example` has no `GOOGLE_CLIENT_SECRET`
+- [x] All required env vars are documented
 
 ---
 
@@ -714,8 +714,8 @@ Update the `book-lamp-development` skill file at
   connection pool, and migration workflow.
 
 **Review checklist:**
-- [ ] `GEMINI.md` accurately reflects the new stack
-- [ ] No mention of "Google Sheets" remains in agent-facing docs (unless in the
+- [x] `GEMINI.md` accurately reflects the new stack
+- [x] No mention of "Google Sheets" remains in agent-facing docs (unless in the
       data migration section)
 
 ---
@@ -745,9 +745,52 @@ DATABASE_URL=<neon-url> poetry run python scripts/migrate_sheets_to_pg.py \
 ```
 
 **Review checklist:**
-- [ ] Script runs without errors against a test spreadsheet
-- [ ] Row counts in Postgres match the spreadsheet
-- [ ] Running the script twice is idempotent (no duplicates)
+- [x] Script runs without errors against a test spreadsheet
+- [x] Row counts in Postgres match the spreadsheet
+- [x] Running the script twice is idempotent (no duplicates)
+
+---
+
+## Rollback Procedure
+
+If Step 9 cutover fails or issues arise:
+
+1. **Database rollback:**
+   ```bash
+   DATABASE_URL=... poetry run alembic downgrade base
+   ```
+
+2. **Git revert:**
+   ```bash
+   git revert <commit-hash-of-step-9>
+   ```
+
+3. **Verify Sheets storage still works:**
+   - Ensure `GOOGLE_CLIENT_SECRET` is set
+   - Test OAuth flow
+
+4. **Redeploy old version**
+
+---
+
+### Step 16 — Production deployment verification
+
+**Commit message:** `chore: add production deployment verification checklist`
+
+**Pre-deployment:**
+- [ ] Neon project created and `DATABASE_URL` set
+- [ ] `alembic upgrade head` run successfully on Neon
+- [ ] `GOOGLE_CLIENT_ID` set for production
+- [ ] `SECRET_KEY` set to strong random value
+- [ ] `LLM_API_KEY` set (if using AI features)
+
+**Post-deployment:**
+- [ ] Test One Tap login with production Client ID
+- [ ] Add a book via UI, verify it appears in Postgres
+- [ ] Check application logs for connection errors
+- [ ] Verify all existing data migrated correctly (if Step 15 run)
+- [ ] Test reading list operations
+- [ ] Test recommendations generation
 
 ---
 

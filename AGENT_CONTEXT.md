@@ -8,9 +8,9 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **User-centric**: Optimize for reliability and maintainability before micro-optimizations.
 
 ### Architecture
-- **Google Sheets storage**: All data stored in Google Sheets tabs (no database).
-- **Google OAuth**: Authentication via Google with allowlist-based access control.
-- **Effectful boundaries**: Google Sheets API access isolated in adapter layer.
+- **PostgreSQL storage**: All data stored in PostgreSQL tables managed by Alembic.
+- **Google One Tap**: Optional authentication via Google One Tap (no OAuth flow).
+- **Effectful boundaries**: PostgreSQL access isolated in adapter layer.
 - **Environment variables**: Use environment variables for sensitive data (e.g., API keys, OAuth secrets).
 - Be consistent with the 12-factor app methodology.
 
@@ -18,7 +18,7 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **Single responsibility**: Each module/class/function should do one thing well.
 - **Pure vs. effectful code separation**:
   - Put domain logic in pure, deterministic functions (no I/O, no globals, no time randomness).
-  - Isolate effects (Sheets API, network, filesystem, environment, time) at the edges behind small adapters.
+  - Isolate effects (PostgreSQL, network, filesystem, environment, time) at the edges behind small adapters.
   - Dependency-inject effectful collaborators into pure logic; do not import effects deep into the domain.
 - **Explicit contracts**: Use clear function signatures, docstrings, and precise naming.
 - **Composition first**: Prefer composing small functions over inheritance-heavy designs.
@@ -46,26 +46,26 @@ This file provides shared context and guardrails for Cursor and other AI agents 
   - **HTML**: Templates should focus on structure and Jinja2 logic. Logic should be extracted to modules.
 - **Structure**:
   - Keep Flask routes thin; delegate to services/use-cases (pure where possible).
-  - Use adapters/gateways for Google Sheets and external APIs; keep their interfaces narrow.
-  - No database models; data is plain dictionaries from Sheets adapter.
+  - Use adapters/gateways for PostgreSQL and external APIs; keep their interfaces narrow.
+  - No database models; data is plain dictionaries from Postgres adapter.
 
 ### Testing policy
 - **All new features must be unit tested.**
   - Test pure functions with table-driven tests; aim for high coverage of branches.
-  - Mock only process boundaries (Sheets API, network, time). Avoid mocking internal pure helpers.
+  - Mock only process boundaries (PostgreSQL, network, time). Avoid mocking internal pure helpers.
   - Add regression tests for every bug fix.
-  - TEST_MODE uses mock in-memory storage instead of Google Sheets.
+  - TEST_MODE uses mock in-memory storage instead of PostgreSQL.
 - Prefer fast, deterministic tests; avoid sleeps and real network calls.
 
 ### Effects and boundaries
 - Centralize configuration (e.g., `python-dotenv`) and avoid reading env vars deep in code.
 - Time, UUIDs, randomness: pass in suppliers/factories rather than calling globally.
-- Google Sheets: use GoogleSheetsStorage adapter; keep all API calls in that module.
+- PostgreSQL: use PostgresStorage adapter; keep all database calls in that module.
 
 ### Security and reliability
 - Validate and sanitize all external inputs (requests, env vars, web forms).
 - **No Regex Search**: Do not allow unsanitized user input in regular expressions. To prevent ReDoS (Regular Expression Denial of Service), user search inputs must be escaped or regex capabilities disabled entirely for end-users.
-- **Protobuf Security Patch**: A monkeypatch is applied in `app.py` (via `book_lamp/utils/protobuf_patch.py`) to fix CVE-2026-0994 (recursion depth bypass in `google.protobuf.json_format.ParseDict`). Ensure this patch remains at the application entrypoint until the upstream library is updated to a non-vulnerable version (>6.33.4).
+- **Database Security**: Use parameterized queries and proper connection pooling. Validate all inputs before database operations.
 - Never log secrets. Use structured, levelled logging.
 - Keep dependencies minimal; respect pinned versions managed by Poetry.
 - Never commit tokens or credentials to version control.
