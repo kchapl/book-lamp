@@ -10,7 +10,7 @@ Set the following environment variables in your Render web service:
 |----------|-------------|
 | `DATABASE_URL` | PostgreSQL connection string from Neon |
 | `SECRET_KEY` | Flask session secret (generate with `python -c "import secrets; print(secrets.token_hex(32))"` ) |
-| `FLASK_DEBUG` | Set to `False` for production deployment (set to `True` for development) |
+| `FLASK_DEBUG` | Set to `False` for production deployment (set to `True` for development debugging - doesn't affect authentication) |
 | `GOOGLE_CLIENT_ID` | Google One Tap Client ID (optional, for login) |
 | `LLM_API_KEY` | OpenAI API key (optional, for AI features) |
 
