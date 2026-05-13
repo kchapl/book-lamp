@@ -54,7 +54,6 @@ def get_pool() -> ConnectionPool:
             min_size=min(2, pool_size),
             max_size=pool_size,
             timeout=NEON_CONNECTION_TIMEOUT,
-            max_loading=5,
             max_idle=60,
         )
         logger.info(f"PostgreSQL connection pool initialized (size={pool_size})")
