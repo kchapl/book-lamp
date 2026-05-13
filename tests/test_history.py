@@ -31,7 +31,7 @@ def test_get_reading_history_populated(authenticated_client):
     assert response.status_code == 200
     html = response.data.decode("utf-8")
     assert "Pride and Prejudice" in html
-    assert "Completed: 2023-01-15" in html
+    assert "✅ 2023-01-15" in html
     assert "Plan to Read" not in html
 
 

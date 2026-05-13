@@ -43,7 +43,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
     mock_session.head.return_value = MockResp()
 
     resp = authenticated_client.post(
-        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+        "/books", data={"isbn": "9780306406157", "add_to_reading_list": "on"}, follow_redirects=True
     )
     assert resp.status_code == 200
     assert b"Book added to your reading list." in resp.data
@@ -126,7 +126,7 @@ def test_books_year_filter(authenticated_client):
     assert "2024 Book" in html
     assert "2023 Book" not in html
     assert "2024" in html
-    assert "Books completed in" in html
+    assert "📅 2024" in html
 
     # Add an 'In Progress' book started in 2024 to ensure it's excluded
     b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
@@ -140,7 +140,7 @@ def test_books_year_filter(authenticated_client):
     assert "2024 Book" not in html
     assert "2023 Book" in html
     assert "2023" in html
-    assert "Books completed in" in html
+    assert "📅 2023" in html
 
 
 def test_books_month_filter(authenticated_client):
@@ -200,7 +200,7 @@ def test_books_category_filter(authenticated_client):
     html = resp.data.decode("utf-8")
     assert "Science Book" in html
     assert "Literature Book" not in html
-    assert "Category:" in html
+    assert "🏷️ Science" in html
     assert "Science" in html
 
     # Add an 'In Progress' science book to ensure it's excluded (status filter is implicit in year/month but explicit in dewey)
@@ -268,7 +268,7 @@ def test_books_status_filter(authenticated_client):
     html = resp.data.decode("utf-8")
     assert "In Progress Book" in html
     assert "Completed Book" not in html
-    assert "Status:" in html
+    assert "📊 In Progress" in html
     assert "In Progress" in html
 
     # Filter bookshelf by status "Completed"
@@ -276,5 +276,5 @@ def test_books_status_filter(authenticated_client):
     html = resp.data.decode("utf-8")
     assert "In Progress Book" not in html
     assert "Completed Book" in html
-    assert "Status:" in html
+    assert "📊 Completed" in html
     assert "Completed" in html

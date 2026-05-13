@@ -39,22 +39,22 @@
     {% if search_query or current_year or current_month or current_category or current_rating or current_status %}
     <div class="search-results-badge mt-1 pt-075 flex-center gap-1">
         {% if search_query %}
-        <span><strong>Search results for:</strong> "{{ search_query }}"</span>
+        <span title="Search Query">🔍 "{{ search_query }}"</span>
         {% endif %}
         {% if current_status %}
-        <span><strong>Status:</strong> {{ current_status }}</span>
+        <span title="Status">📊 {{ current_status }}</span>
         {% endif %}
         {% if current_year %}
-        <span><strong>Books completed in </strong> {{ current_year }}</span>
+        <span title="Year">📅 {{ current_year }}</span>
         {% endif %}
         {% if current_month_name %}
-        <span><strong>Books completed in </strong> {{ current_month_name }}</span>
+        <span title="Month">📅 {{ current_month_name }}</span>
         {% endif %}
         {% if current_category %}
-        <span><strong>Category:</strong> {{ current_category }}</span>
+        <span title="Category">🏷️ {{ current_category }}</span>
         {% endif %}
         {% if current_rating %}
-        <span><strong>Rating:</strong> {{ current_rating }} ★</span>
+        <span title="Rating">⭐ {{ current_rating }} ★</span>
         {% endif %}
         <span class="text-muted ml-auto">{{ books|length }} result{% if books|length != 1
             %}s{% endif %} found</span>
@@ -99,7 +99,7 @@
     
     {% if categories %}
     <form method="get" action="{{ url_for('list_books') }}" style="display: inline-block;">
-        <select name="category" onchange="this.form.submit()">
+        <select name="category" id="category-select" onchange="this.form.submit()">
             <option value="">All Categories</option>
             {% for cat in categories %}
             <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
@@ -150,20 +150,20 @@
             <div class="book-meta-summary">
                 {% if book.publication_year or book.publisher or book.bisac_category %}
                 {% if book.publication_year %}
-                <div class="year">{{ book.publication_year }}</div>
+                <div class="year" title="Publication Year">📅 {{ book.publication_year }}</div>
                 {% endif %}
                 {% if book.isbn13 %}
-                <div class="isbn">ISBN-13: {{ book.isbn13 }}</div>
+                <div class="isbn" title="ISBN-13">🆔 {{ book.isbn13 }}</div>
                 {% endif %}
                 {% if book.publisher %}
-                <div class="year">
-                    <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
+                <div class="year" title="Publisher">
+                    🏢 <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
                         class="publisher-link">{{
                         book.publisher|normalize_pub }}</a>
                 </div>
                 {% endif %}
                 {% if book.bisac_category %}
-                <div class="category-tag">{{ book.bisac_category }}</div>
+                <div class="category-tag" title="Category">🏷️ {{ book.bisac_category }}</div>
                 {% endif %}
                 {% endif %}
             </div>

@@ -140,3 +140,140 @@ def parse_bisac_category(bisac: Optional[str]) -> tuple[Optional[str], Optional[
         return parts[0].strip(), parts[1].strip()
 
     return bisac_str, None
+
+
+def resolve_broad_category(
+    bisac: Optional[str] = None,
+    dewey: Optional[str] = None,
+    subjects: Optional[list[str]] = None,
+) -> str:
+    """
+    Resolve a standardized broad category from various metadata inputs.
+    Prioritizes: 1. DDC (most objective), 2. BISAC, 3. Subject keywords.
+    """
+
+    def clean(s: Optional[str]) -> str:
+        return s.strip().upper() if s else ""
+
+    # 1. Handle Dewey Decimal Classification (DDC)
+    if dewey:
+        # Extract the first 3 digits
+        match = re.search(r"(\d{3})", dewey)
+        if match:
+            code = int(match.group(1))
+            if dewey.startswith(("004", "005", "006")):
+                return "Technology & Engineering"
+            if 0 <= code <= 99:
+                return "Reference & General"
+            if 100 <= code <= 299:
+                return "Philosophy & Religion"
+            if 300 <= code <= 399:
+                return "Social Sciences"
+            if 400 <= code <= 499:
+                return "Literature & Language"
+            if 500 <= code <= 599:
+                return "Science & Nature"
+            if 600 <= code <= 699:
+                if 610 <= code <= 619:
+                    return "Health & Wellness"
+                return "Technology & Engineering"
+            if 700 <= code <= 799:
+                return "Arts & Design"
+            if 800 <= code <= 899:
+                return "Literature & Language"
+            if code == 920:
+                return "Biography & Memoir"
+            if 910 <= code <= 919:
+                return "Travel & Geography"
+            if 900 <= code <= 999:
+                return "History"
+
+    # 2. Handle BISAC
+    from book_lamp.utils.books import parse_bisac_category
+
+    main_bisac, _ = parse_bisac_category(bisac)
+    main_bisac = clean(main_bisac)
+
+    bisac_map = {
+        "FICTION": "Fiction",
+        "BIOGRAPHY & AUTOBIOGRAPHY": "Biography & Memoir",
+        "HISTORY": "History",
+        "PHILOSOPHY": "Philosophy & Religion",
+        "RELIGION": "Philosophy & Religion",
+        "SCIENCE": "Science & Nature",
+        "NATURE": "Science & Nature",
+        "COMPUTERS": "Technology & Engineering",
+        "TECHNOLOGY & ENGINEERING": "Technology & Engineering",
+        "SOCIAL SCIENCE": "Social Sciences",
+        "POLITICAL SCIENCE": "Social Sciences",
+        "ECONOMICS": "Social Sciences",  # Could be Business & Finance, but often academic
+        "ART": "Arts & Design",
+        "DESIGN": "Arts & Design",
+        "MUSIC": "Arts & Design",
+        "ARCHITECTURE": "Arts & Design",
+        "POETRY": "Literature & Language",
+        "LITERARY CRITICISM": "Literature & Language",
+        "DRAMA": "Literature & Language",
+        "LANGUAGE ARTS & DISCIPLINES": "Literature & Language",
+        "COOKING": "Health & Wellness",
+        "HEALTH & FITNESS": "Health & Wellness",
+        "SELF-HELP": "Health & Wellness",
+        "PSYCHOLOGY": "Philosophy & Religion",
+        "TRAVEL": "Travel & Geography",
+        "BUSINESS & ECONOMICS": "Business & Finance",
+        "JUVENILE FICTION": "Children & Young Adult",
+        "JUVENILE NONFICTION": "Children & Young Adult",
+        "YOUNG ADULT FICTION": "Children & Young Adult",
+        "YOUNG ADULT NONFICTION": "Children & Young Adult",
+        "REFERENCE": "Reference & General",
+    }
+
+    if main_bisac in bisac_map:
+        return bisac_map[main_bisac]
+
+    # 3. Handle Subject Keywords
+    all_subjects = [clean(s) for s in (subjects or [])]
+    if bisac:
+        all_subjects.append(clean(bisac))
+
+    keyword_map = {
+        "FICTION": "Fiction",
+        "BIOGRAPHY": "Biography & Memoir",
+        "MEMOIR": "Biography & Memoir",
+        "AUTOBIOGRAPHY": "Biography & Memoir",
+        "HISTORY": "History",
+        "PHILOSOPHY": "Philosophy & Religion",
+        "RELIGION": "Philosophy & Religion",
+        "SCIENCE": "Science & Nature",
+        "NATURE": "Science & Nature",
+        "TECHNOLOGY": "Technology & Engineering",
+        "ENGINEERING": "Technology & Engineering",
+        "COMPUTER": "Technology & Engineering",
+        "SOCIAL SCIENCE": "Social Sciences",
+        "POLITICS": "Social Sciences",
+        "SOCIOLOGY": "Social Sciences",
+        "ART": "Arts & Design",
+        "MUSIC": "Arts & Design",
+        "DESIGN": "Arts & Design",
+        "POETRY": "Literature & Language",
+        "LITERATURE": "Literature & Language",
+        "CLASSICS": "Literature & Language",
+        "COOKING": "Health & Wellness",
+        "HEALTH": "Health & Wellness",
+        "SELF-HELP": "Health & Wellness",
+        "TRAVEL": "Travel & Geography",
+        "GEOGRAPHY": "Travel & Geography",
+        "BUSINESS": "Business & Finance",
+        "FINANCE": "Business & Finance",
+        "ECONOMY": "Business & Finance",
+        "CHILDREN": "Children & Young Adult",
+        "YOUNG ADULT": "Children & Young Adult",
+        "JUVENILE": "Children & Young Adult",
+    }
+
+    for subject in all_subjects:
+        for kw, cat in keyword_map.items():
+            if kw in subject:
+                return cat
+
+    return "Other"

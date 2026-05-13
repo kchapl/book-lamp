@@ -116,13 +116,13 @@
                                 </div>
                             </div>
                             <div class="event-dates text-xs">
-                                {% if record.end_date %}
-                                Completed: {{ record.end_date }}
+                                {% if record.status == 'Completed' and record.end_date %}
+                                <span title="Completed">✅ {{ record.end_date }}</span>
                                 {% elif record.start_date %}
-                                Began: {{ record.start_date }}
+                                <span title="Began">🚀 {{ record.start_date }}</span>
                                 {% endif %}
                                 {% if record.status == 'Abandoned' and record.end_date %}
-                                (Abandoned: {{ record.end_date }})
+                                <span title="Abandoned">❌ {{ record.end_date }}</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -132,7 +132,7 @@
                         <div class="edit-only edit-form-container">
                             <div class="edit-form-grid">
                                 <div class="form-group edit-form-field">
-                                    <label class="meta-label" for="edit_status_{{ record.id }}">Status</label>
+                                    <label class="meta-label" for="edit_status_{{ record.id }}" title="Status">📊</label>
                                     <select id="edit_status_{{ record.id }}" name="status" class="edit-input"
                                         onchange="updateRecordDateLabels('{{ record.id }}', this.value)" required>
                                         <option value="In Progress" {% if record.status=='In Progress' %}selected{%
@@ -144,7 +144,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group edit-form-field">
-                                    <label class="meta-label" for="edit_rating_{{ record.id }}">Rating</label>
+                                    <label class="meta-label" for="edit_rating_{{ record.id }}" title="Rating">⭐</label>
                                     <select id="edit_rating_{{ record.id }}" name="rating" class="edit-input">
                                         <option value="0" {% if record.rating==0 %}selected{% endif %}>No Rating
                                         </option>
@@ -156,17 +156,14 @@
                                     </select>
                                 </div>
                                 <div class="form-group edit-form-field">
-                                    <label class="meta-label" for="edit_start_date_{{ record.id }}">Start Date</label>
+                                    <label class="meta-label" for="edit_start_date_{{ record.id }}" title="Start Date">🚀</label>
                                     <input type="date" id="edit_start_date_{{ record.id }}" name="start_date"
                                         class="edit-input" value="{{ record.start_date }}" required>
                                 </div>
                                 <div class="form-group edit-form-field {{ 'hidden' if record.status == 'In Progress' else '' }}"
                                     id="record-end-date-group-{{ record.id }}">
                                     <label id="record-end-date-label-{{ record.id }}" class="meta-label"
-                                        for="edit_end_date_{{ record.id }}">
-                                        {% if record.status == 'Completed' %}Completion Date{% elif record.status ==
-                                        'Abandoned' %}Abandoned Date{% else %}End Date{% endif %}
-                                    </label>
+                                        for="edit_end_date_{{ record.id }}" title="End Date">✅</label>
                                     <input type="date" id="edit_end_date_{{ record.id }}" name="end_date"
                                         class="edit-input" value="{{ record.end_date or '' }}" {% if record.status
                                         !='In Progress' %}required{% endif %}>

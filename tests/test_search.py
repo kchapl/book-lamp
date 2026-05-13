@@ -1,6 +1,7 @@
 """Tests for the search service and route."""
 
 from book_lamp.services.search import calculate_relevance_score, search_books
+from book_lamp.app import get_storage
 
 
 def test_search_books_by_title():
@@ -109,11 +110,15 @@ def test_search_with_series():
 
 def test_search_route_with_query(authenticated_client):
     """Test search route with a valid query."""
+    storage = get_storage()
     # Add a test book
-    authenticated_client.post("/books", data={"isbn": "9780000000000"})
-    response = authenticated_client.get("/books/search?q=test", follow_redirects=True)
+    book = storage.add_book(isbn13="9780000000000", title="Test Book", author="Test Author")
+    # Add a reading record so it appears in search results
+    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    response = authenticated_client.get("/books/search?q=Test", follow_redirects=True)
     assert response.status_code == 200
-    assert b"Search results" in response.data
+    # The book should appear in the search results
+    assert b"Test Book" in response.data
 
 
 def test_search_route_with_empty_query(authenticated_client):

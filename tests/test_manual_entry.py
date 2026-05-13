@@ -28,6 +28,7 @@ def test_manual_entry_success(client):
             "author": "Manual Author",
             "publisher": "Manual Publisher",
             "publication_year": "2024",
+            "add_to_reading_list": "on",
         },
         follow_redirects=True,
     )
@@ -66,7 +67,7 @@ def test_manual_entry_duplicate_isbn(client):
     # Try to add same ISBN manually
     response = client.post(
         "/books",
-        data={"isbn": "9781234567890", "title": "Second Entry", "author": "Author Two"},
+        data={"isbn": "9781234567890", "title": "Second Entry", "author": "Author Two", "add_to_reading_list": "on"},
         follow_redirects=True,
     )
 

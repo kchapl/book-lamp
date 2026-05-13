@@ -81,6 +81,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> dict[str, Any]:
         from book_lamp.utils.authors import split_authors
         from book_lamp.utils.books import normalize_isbn
@@ -105,6 +106,7 @@ class MockStorage:
             "physical_format": physical_format,
             "edition": edition,
             "cover_url": cover_url,
+            "broad_category": broad_category,
         }
         self.books.append(book)
         self.next_book_id += 1
@@ -129,6 +131,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> dict[str, Any]:
         from book_lamp.utils.authors import split_authors
 
@@ -180,11 +183,25 @@ class MockStorage:
                         or book.get("physical_format"),
                         "edition": edition or book.get("edition"),
                         "cover_url": cover_url or book.get("cover_url"),
+                        "broad_category": broad_category or book.get("broad_category"),
                     }
                 )
                 return book
         logger.error(f"Book with ID {book_id} not found")
         raise Exception(f"Book with ID {book_id} not found")
+
+    def batch_update_broad_categories(self, updates: list[dict[str, Any]]) -> int:
+        """Batch update broad categories for multiple books."""
+        count = 0
+        for update in updates:
+            bid = update["id"]
+            cat = update["broad_category"]
+            for book in self.books:
+                if book["id"] == bid:
+                    book["broad_category"] = cat
+                    count += 1
+                    break
+        return count
 
     def upsert_book(
         self,
@@ -204,6 +221,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        broad_category: Optional[str] = None,
     ) -> dict[str, Any]:
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -225,6 +243,7 @@ class MockStorage:
                 physical_format=physical_format,
                 edition=edition,
                 cover_url=cover_url,
+                broad_category=broad_category,
             )
         else:
             return self.add_book(
@@ -244,6 +263,7 @@ class MockStorage:
                 physical_format=physical_format,
                 edition=edition,
                 cover_url=cover_url,
+                broad_category=broad_category,
             )
 
     def add_reading_record(
@@ -370,6 +390,7 @@ class MockStorage:
                 edition=book_data.get("edition"),
                 thumbnail_url=book_data.get("thumbnail_url"),
                 cover_url=book_data.get("cover_url"),
+                broad_category=book_data.get("broad_category"),
             )
 
             if record_data:

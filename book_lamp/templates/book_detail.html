@@ -37,12 +37,13 @@
             <div class="book-info">
                 <h1 class="book-title view-only">{{ book.title }}</h1>
                 <div class="edit-only mb-1">
-                    <label class="meta-label" for="edit_title">Title</label>
+                    <label class="meta-label" for="edit_title" title="Title">📕</label>
                     <input type="text" id="edit_title" name="title" class="edit-input" value="{{ book.title }}"
                         required>
                 </div>
 
                 <div class="book-author view-only">
+                    <span title="Author">👤</span>
                     {% if book.authors %}
                     {% for author in book.authors %}
                     <a href="{{ url_for('author_page', author_slug=author|lower|replace(' ', '-')) }}"
@@ -56,20 +57,20 @@
                     {% endif %}
                 </div>
                 <div class="edit-only mb-15">
-                    <label class="meta-label" for="edit_author">Author(s) (comma separated)</label>
+                    <label class="meta-label" for="edit_author" title="Author">👤</label>
                     <input type="text" id="edit_author" name="author" class="edit-input" value="{{ book.author }}"
                         required>
                 </div>
 
                 <div class="book-meta">
-                    <div class="meta-item">
-                        <label class="meta-label" for="edit_publication_year">Year:</label>
+                    <div class="meta-item {% if not book.publication_year %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_publication_year" title="Publication Year">📅</label>
                         <span class="meta-value view-only">{{ book.publication_year or '' }}</span>
                         <input type="number" id="edit_publication_year" name="publication_year"
-                            class="edit-input edit-only" value="{{ book.publication_year or '' }}">
+                            class="edit-input edit-only" value="{{ book.publication_year or '' }}" placeholder="Year">
                     </div>
-                    <div class="meta-item">
-                        <label class="meta-label" for="edit_publisher">Publisher:</label>
+                    <div class="meta-item {% if not book.publisher %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_publisher" title="Publisher">🏢</label>
                         <span class="meta-value view-only">
                             {% if book.publisher %}
                             <a href="{{ url_for('publisher_page', publisher_slug=book.publisher|normalize_pub|lower|replace(' ', '-')) }}"
@@ -80,35 +81,59 @@
                             {% endif %}
                         </span>
                         <input type="text" id="edit_publisher" name="publisher" class="edit-input edit-only"
-                            value="{{ book.publisher or '' }}">
+                            value="{{ book.publisher or '' }}" placeholder="Publisher">
                     </div>
-                    <div class="meta-item">
-                        <label class="meta-label" for="edit_isbn13">ISBN:</label>
+                    <div class="meta-item {% if not book.isbn13 %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_isbn13" title="ISBN-13">🆔</label>
                         <span class="meta-value view-only">{{ book.isbn13 or '' }}</span>
                         <input type="text" id="edit_isbn13" name="isbn13" class="edit-input edit-only"
-                            value="{{ book.isbn13 or '' }}">
+                            value="{{ book.isbn13 or '' }}" placeholder="ISBN-13">
                     </div>
-                    <div class="meta-item">
-                        <label class="meta-label" for="edit_series">Series:</label>
+                    <div class="meta-item {% if not book.series %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_series" title="Series">📚</label>
                         <span class="meta-value view-only">{{ book.series or '' }}</span>
                         <input type="text" id="edit_series" name="series" class="edit-input edit-only"
-                            value="{{ book.series or '' }}">
+                            value="{{ book.series or '' }}" placeholder="Series">
                     </div>
-                    <div class="meta-item">
-                        <label class="meta-label" for="edit_bisac_category">Category:</label>
+                    <div class="meta-item {% if not book.bisac_category %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_bisac_category" title="Category">🏷️</label>
                         <span class="meta-value view-only">{{ book.bisac_category or '' }}</span>
                         <input type="text" id="edit_bisac_category" name="bisac_category" class="edit-input edit-only"
-                            value="{{ book.bisac_category or '' }}">
+                            value="{{ book.bisac_category or '' }}" placeholder="Category">
+                    </div>
+                    <div class="meta-item {% if not book.language %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_language" title="Language">🌐</label>
+                        <span class="meta-value view-only">{{ book.language or '' }}</span>
+                        <input type="text" id="edit_language" name="language" class="edit-input edit-only"
+                            value="{{ book.language or '' }}" placeholder="Language">
+                    </div>
+                    <div class="meta-item {% if not book.page_count %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_page_count" title="Page Count">📄</label>
+                        <span class="meta-value view-only">{{ book.page_count or '' }}</span>
+                        <input type="number" id="edit_page_count" name="page_count" class="edit-input edit-only"
+                            value="{{ book.page_count or '' }}" placeholder="Page Count">
+                    </div>
+                    <div class="meta-item {% if not book.physical_format %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_physical_format" title="Physical Format">📖</label>
+                        <span class="meta-value view-only">{{ book.physical_format or '' }}</span>
+                        <input type="text" id="edit_physical_format" name="physical_format" class="edit-input edit-only"
+                            value="{{ book.physical_format or '' }}" placeholder="Format (e.g. Paperback)">
+                    </div>
+                    <div class="meta-item {% if not book.edition %}edit-only{% endif %}">
+                        <label class="meta-label" for="edit_edition" title="Edition">🔢</label>
+                        <span class="meta-value view-only">{{ book.edition or '' }}</span>
+                        <input type="text" id="edit_edition" name="edition" class="edit-input edit-only"
+                            value="{{ book.edition or '' }}" placeholder="Edition">
                     </div>
                 </div>
 
                 <div class="book-description">
-                    <h3 class="view-only">Description</h3>
+                    <h3 class="view-only" title="Description">📝</h3>
                     <p class="view-only">{{ book.description or '' }}</p>
                     <div class="edit-only">
-                        <label class="meta-label" for="edit_description">Description</label>
+                        <label class="meta-label" for="edit_description" title="Description">📝</label>
                         <textarea id="edit_description" name="description"
-                            class="edit-textarea">{{ book.description or '' }}</textarea>
+                            class="edit-textarea" placeholder="Description">{{ book.description or '' }}</textarea>
                     </div>
                 </div>
 
@@ -155,7 +180,7 @@
         <div id="form-{{ book.id }}" class="add-record-form hidden">
             <form method="post" action="{{ url_for('create_reading_record', book_id=book.id) }}">
                 <div class="form-group">
-                    <label for="new_status">Status</label>
+                    <label for="new_status" title="Status">📊</label>
                     <select id="new_status" name="status" onchange="updateDateLabels('{{ book.id }}', this.value)"
                         required>
                         <option value="In Progress">In Progress</option>
@@ -164,15 +189,15 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="new_start_date">Start Date</label>
+                    <label for="new_start_date" title="Start Date">🚀</label>
                     <input type="date" id="new_start_date" name="start_date" value="{{ today }}" required>
                 </div>
                 <div class="form-group hidden" id="end-date-group-{{ book.id }}">
-                    <label id="end-date-label-{{ book.id }}" for="new_end_date">End Date</label>
+                    <label id="end-date-label-{{ book.id }}" for="new_end_date" title="End Date">✅</label>
                     <input type="date" id="new_end_date" name="end_date">
                 </div>
                 <div class="form-group hidden" id="rating-group-{{ book.id }}">
-                    <label for="new_rating">Rating (1-5)</label>
+                    <label for="new_rating" title="Rating">⭐</label>
                     <select id="new_rating" name="rating">
                         <option value="0">No Rating</option>
                         <option value="1">1 Star</option>
@@ -227,12 +252,12 @@
                         </div>
                         <div class="record-dates">
                             {% if record.start_date %}
-                            <span class="record-date-item">Began: {{ record.start_date }}</span>
+                            <span class="record-date-item" title="Began">🚀 {{ record.start_date }}</span>
                             {% endif %}
                             {% if record.status == 'Completed' and record.end_date %}
-                            <span class="record-date-item">Completed: {{ record.end_date }}</span>
+                            <span class="record-date-item" title="Completed">✅ {{ record.end_date }}</span>
                             {% elif record.status == 'Abandoned' and record.end_date %}
-                            <span class="record-date-item">Abandoned: {{ record.end_date }}</span>
+                            <span class="record-date-item" title="Abandoned">❌ {{ record.end_date }}</span>
                             {% endif %}
                         </div>
                     </div>
@@ -242,7 +267,7 @@
                     <div class="edit-only edit-form-container">
                         <div class="edit-form-grid">
                             <div class="form-group edit-form-field">
-                                <label class="meta-label" for="edit_status_{{ record.id }}">Status</label>
+                                <label class="meta-label" for="edit_status_{{ record.id }}" title="Status">📊</label>
                                 <select id="edit_status_{{ record.id }}" name="status" class="edit-input"
                                     onchange="updateRecordDateLabels('{{ record.id }}', this.value)" required>
                                     <option value="In Progress" {% if record.status=='In Progress' %}selected{% endif
@@ -255,7 +280,7 @@
                             </div>
                             <div class="form-group edit-form-field {{ 'hidden' if record.status != 'Completed' else '' }}"
                                 id="record-rating-group-{{ record.id }}">
-                                <label class="meta-label" for="edit_rating_{{ record.id }}">Rating</label>
+                                <label class="meta-label" for="edit_rating_{{ record.id }}" title="Rating">⭐</label>
                                 <select id="edit_rating_{{ record.id }}" name="rating" class="edit-input">
                                     <option value="0" {% if record.rating==0 %}selected{% endif %}>No Rating</option>
                                     <option value="1" {% if record.rating==1 %}selected{% endif %}>1 Star</option>
@@ -266,17 +291,14 @@
                                 </select>
                             </div>
                             <div class="form-group edit-form-field">
-                                <label class="meta-label" for="edit_start_date_{{ record.id }}">Start Date</label>
+                                <label class="meta-label" for="edit_start_date_{{ record.id }}" title="Start Date">🚀</label>
                                 <input type="date" id="edit_start_date_{{ record.id }}" name="start_date"
                                     class="edit-input" value="{{ record.start_date }}" required>
                             </div>
                             <div class="form-group edit-form-field {{ 'hidden' if record.status == 'In Progress' else '' }}"
                                 id="record-end-date-group-{{ record.id }}">
                                 <label id="record-end-date-label-{{ record.id }}" class="meta-label"
-                                    for="edit_end_date_{{ record.id }}">
-                                    {% if record.status == 'Completed' %}Completion Date{% elif record.status ==
-                                    'Abandoned' %}Abandoned Date{% else %}End Date{% endif %}
-                                </label>
+                                    for="edit_end_date_{{ record.id }}" title="End Date">✅</label>
                                 <input type="date" id="edit_end_date_{{ record.id }}" name="end_date" class="edit-input"
                                     value="{{ record.end_date or '' }}" {% if record.status !='In Progress' %}required{%
                                     endif %}>
