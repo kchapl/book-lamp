@@ -1,8 +1,11 @@
 import logging
 import os
-from typing import Any, Dict, Optional, cast
+import time
+from functools import wraps
+from typing import Any, Callable, Dict, Optional, cast
 
 import psycopg
+from psycopg import OperationalError
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -11,8 +14,27 @@ from book_lamp.utils.books import normalize_isbn
 
 logger = logging.getLogger(__name__)
 
+# Neon serverless has strict connection limits (typically 10)
+NEON_DEFAULT_POOL_SIZE = 10
+LOCAL_DEFAULT_POOL_SIZE = 20
+NEON_CONNECTION_TIMEOUT = 10
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 1  # seconds
+
 # Global connection pool initialized from environment
 _pool: Optional[ConnectionPool] = None
+
+
+def is_neon_url(db_url: str) -> bool:
+    """Detect if the database URL is from Neon (serverless PostgreSQL)."""
+    return "neon.tech" in db_url or "neon.database" in db_url
+
+
+def get_pool_size(db_url: str) -> int:
+    """Determine appropriate pool size based on database type."""
+    if is_neon_url(db_url):
+        return NEON_DEFAULT_POOL_SIZE
+    return LOCAL_DEFAULT_POOL_SIZE
 
 
 def get_pool() -> ConnectionPool:
@@ -21,9 +43,58 @@ def get_pool() -> ConnectionPool:
         db_url = os.environ.get("DATABASE_URL")
         if not db_url:
             raise ValueError("DATABASE_URL environment variable is not set")
+
+        pool_size = get_pool_size(db_url)
+
         # Use dict_row by default for all connections from this pool
-        _pool = ConnectionPool(conninfo=db_url, kwargs={"row_factory": dict_row})
+        # Configure for Neon serverless limits with timeout
+        _pool = ConnectionPool(
+            conninfo=db_url,
+            kwargs={"row_factory": dict_row},
+            min_size=min(2, pool_size),
+            max_size=pool_size,
+            timeout=NEON_CONNECTION_TIMEOUT,
+            max_loading=5,
+            max_idle=60,
+        )
+        logger.info(f"PostgreSQL connection pool initialized (size={pool_size})")
     return _pool
+
+
+def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator for retrying database operations with exponential backoff.
+
+    Handles Neon 'too many connections' errors and transient failures.
+    """
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        last_exception: Optional[Exception] = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except OperationalError as e:
+                last_exception = e
+                error_msg = str(e).lower()
+                # Check for retryable errors
+                is_retryable = (
+                    "too many connections" in error_msg
+                    or "connection" in error_msg and "timeout" in error_msg
+                    or "pool" in error_msg
+                )
+                if not is_retryable or attempt == MAX_RETRIES - 1:
+                    raise
+                wait_time = RETRY_BACKOFF_BASE * (2**attempt)
+                logger.warning(
+                    f"Database operation failed (attempt {attempt + 1}/{MAX_RETRIES}), "
+                    f"retrying in {wait_time}s: {e}"
+                )
+                time.sleep(wait_time)
+            except Exception:
+                raise
+        raise last_exception if last_exception else OperationalError("Max retries exceeded")
+
+    return wrapper
 
 
 class PostgresStorage:
@@ -39,19 +110,38 @@ class PostgresStorage:
         """Postgres users are considered authorised if we have their user_id."""
         return True
 
-    def get_all_books(self) -> list[dict[str, Any]]:
-        """Return all books known to the system.
-        Note: In the new multi-user model, we return books and join with authors.
+    def health_check(self) -> bool:
+        """Verify database connectivity.
+
+        Returns True if the database is reachable, False otherwise.
         """
+        try:
+            with self.pool.connection() as conn:
+                conn.execute("SELECT 1").fetchone()
+            return True
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+
+    @with_retry
+
+    def get_all_books(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
+        """Return all books known to the system for a given user.
+
+        In multi-user model, returns only books the user has interacted with via reading_records.
+        If user_id is provided, uses that; otherwise uses the instance user_id.
+        """
+        effective_user_id = user_id or self.user_id
         query = """
-            SELECT b.*, array_agg(a.name) as author_names
+            SELECT DISTINCT b.*, array_agg(a.name) as author_names
             FROM books b
+            JOIN reading_records rr ON b.id = rr.book_id AND rr.user_id = %s
             LEFT JOIN book_authors ba ON b.id = ba.book_id
             LEFT JOIN authors a ON ba.author_id = a.id
             GROUP BY b.id
         """
         with self.pool.connection() as conn:
-            rows = conn.execute(query).fetchall()
+            rows = conn.execute(query, [effective_user_id]).fetchall()
             books = []
             for row_raw in rows:
                 book = cast(Dict[str, Any], row_raw)
@@ -169,7 +259,7 @@ class PostgresStorage:
     def search(self, query: str) -> list[dict[str, Any]]:
         """Search across all book data fields."""
         # We delegate to the pure search function for now, same as MockStorage
-        all_books = self.get_all_books()
+        all_books = self.get_all_books(self.user_id)
         # MockStorage search also needs reading_records to attach status
         all_records = self.get_reading_records()
         from book_lamp.services.search import search_books

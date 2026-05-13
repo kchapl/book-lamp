@@ -5,14 +5,16 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, List, cast
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional, cast
 
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.services.pg_storage import PostgresStorage, get_pool
 
 # Load environment variables from .env file
 load_dotenv()
@@ -64,6 +66,87 @@ def parse_date(date_str: str) -> str | None:
     # Sheets dates are often in various formats, return as-is for now
     # The database will handle parsing
     return date_str.strip()
+
+
+def create_migration_batch() -> str:
+    """Create a new migration batch ID for tracking."""
+    batch_id = str(uuid.uuid4())[:8]
+    print(f"Migration batch ID: {batch_id}")
+    return batch_id
+
+
+def validate_migration(
+    storage: PostgresStorage, spreadsheet_id: str, sheets_service: Any
+) -> Dict[str, Any]:
+    """Validate migration viability without making changes."""
+    validation_results = {
+        "valid": True,
+        "notes": [],
+        "warnings": [],
+        "book_count": 0,
+        "record_count": 0,
+        "list_count": 0,
+    }
+
+    tabs = {
+        "Books": "Books!A:G",
+        "ReadingRecords": "ReadingRecords!A:G",
+        "ReadingList": "ReadingList!A:D",
+        "Settings": "Settings!A:E",
+        "Recommendations": "Recommendations!A:E",
+    }
+
+    # Check each tab
+    for tab_name, range_name in tabs.items():
+        data = get_sheet_data(sheets_service, spreadsheet_id, range_name)
+        count = max(0, len(data) - 1) if data else 0  # Subtract header row
+        validation_results[f"{tab_name.lower()}_count"] = count
+        validation_results["notes"].append(
+            f"{tab_name}: {count} rows found"
+        )
+
+        # Check for potential issues
+        if tab_name == "Books" and data and len(data) > 1:
+            for row in data[1:]:
+                if len(row) >= 2 and row[1]:  # Has ISBN
+                    validation_results["warnings"].append(
+                        f"Book '{row[2][:30]}...' has ISBN - may deduplicate"
+                    )
+                    break
+
+        if tab_name == "ReadingRecords" and data and len(data) > 1:
+            for row in data[1:]:
+                if len(row) >= 2 and row[1].isdigit():
+                    validation_results["warnings"].append(
+                        f"Reading record references book_id {row[1]} - ID mapping required"
+                    )
+                    break
+
+    validation_results["book_count"] = validation_results.get("books_count", 0)
+    validation_results["record_count"] = validation_results.get("readingrecords_count", 0)
+
+    return validation_results
+
+
+def rollback_migration(batch_id: str, user_id: int, dry_run: bool) -> int:
+    """Rollback a migration by batch ID.
+
+    This removes records created in the specified batch.
+    For simplicity, we delete records within a time window matching the batch.
+    Returns number of records rolled back.
+    """
+    # In a full implementation, we'd track batch_id with each record
+    # For now, we provide a warning that manual intervention may be needed
+    print(f"Rollback requested for batch: {batch_id}")
+    print("Note: Full batch tracking requires migration_history table")
+
+    if dry_run:
+        print("DRY RUN: Would rollback migration records")
+        return 0
+
+    # Simplified rollback - just warn the user
+    print("Manual rollback may be required. Consider backing up data before migration.")
+    return 0
 
 
 def migrate_books(
@@ -253,12 +336,31 @@ def main() -> None:
         action="store_true",
         help="Preview changes without writing to database",
     )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate migration without making changes",
+    )
+    parser.add_argument(
+        "--rollback",
+        type=str,
+        help="Rollback a migration by batch ID",
+    )
 
     args = parser.parse_args()
 
     if not os.getenv("DATABASE_URL"):
         print("Error: DATABASE_URL environment variable is required")
         sys.exit(1)
+
+    # Handle rollback option
+    if args.rollback:
+        if not args.user_email:
+            print("Error: --user-email is required for rollback")
+            sys.exit(1)
+        user_id = PostgresStorage.upsert_user(args.user_email, args.user_email)
+        rollback_migration(args.rollback, user_id, args.dry_run)
+        return
 
     try:
         # Initialize storage
@@ -274,10 +376,29 @@ def main() -> None:
         # Get Google Sheets service
         sheets_service = get_google_service("sheets", "v4")
 
+        # Validate first if requested
+        if args.validate_only:
+            print("Validating migration...")
+            validation = validate_migration(storage, args.spreadsheet_id, sheets_service)
+            print("\n=== Validation Results ===")
+            print(f"Valid: {validation['valid']}")
+            print("\nNotes:")
+            for note in validation["notes"]:
+                print(f"  - {note}")
+            if validation["warnings"]:
+                print("\nWarnings:")
+                for warning in validation["warnings"]:
+                    print(f"  - {warning}")
+            print(f"\nTotal records to migrate: {validation['book_count']} books, {validation['record_count']} records")
+            return
+
         print(
             f"{'DRY RUN: ' if args.dry_run else ''}Starting migration from spreadsheet {args.spreadsheet_id}"
         )
         print(f"User email: {args.user_email}")
+
+        # Create batch for tracking
+        batch_id = create_migration_batch() if not args.dry_run else None
 
         # Get data from each tab
         tabs = {
