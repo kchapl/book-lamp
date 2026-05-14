@@ -309,6 +309,10 @@ def migrate_reading_list(
         if dry_run:
             print(f"DRY RUN: Would add book {book_id} to reading list")
         else:
+            # Check if book exists before adding to reading list
+            if not storage.get_book_by_id(book_id):
+                print(f"SKIP: Book {book_id} not found in books table")
+                continue
             storage.add_to_reading_list(book_id)
             list_added += 1
 
