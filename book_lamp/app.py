@@ -489,13 +489,16 @@ def reading_list():
     storage = get_storage()
 
     rl_items = storage.get_reading_list()
+    # Extract books directly from reading_list query (already joined with books table)
     books = []
-
-    all_books = storage.get_all_books()
-    book_map = {b["id"]: b for b in all_books}
     for item in rl_items:
-        if item["book_id"] in book_map:
-            books.append(book_map[item["book_id"]])
+        book = {
+            "id": item["book_id"],
+            "title": item["title"],
+            "author": item["author"],
+            "thumbnail_url": item.get("thumbnail_url"),
+        }
+        books.append(book)
 
     return render_template("reading_list.html", books=books)
 
