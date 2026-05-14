@@ -977,7 +977,7 @@ def collection_stats():
     for r in completed_records:
         date_val = r.get("end_date")
         if date_val:
-            if isinstance(date_val, datetime):
+            if isinstance(date_val, datetime.date):
                 year = str(date_val.year)
             elif isinstance(date_val, str) and len(date_val) >= 4:
                 year = date_val[:4]
