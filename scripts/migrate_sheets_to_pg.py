@@ -207,6 +207,17 @@ def migrate_reading_records(
     records_added = 0
 
     # Expected headers: id, book_id, status, start_date, end_date, rating, created_at
+    # Verify headers match expected columns
+    if rows and len(rows[0]) >= 2:
+        headers = [h.strip().lower() for h in rows[0]]
+        print(f"  ReadingRecords headers: {headers}")
+
+        # Validate expected columns exist
+        expected = ["id", "book_id", "status"]
+        for col in expected:
+            if col not in headers:
+                print(f"  WARNING: Expected column '{col}' not found in headers")
+
     for row in rows[1:]:
         if len(row) < 3 or not row[2]:  # Skip rows without status
             continue
