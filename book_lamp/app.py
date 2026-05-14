@@ -479,7 +479,8 @@ def reading_history():
 def new_book_form():
     isbn = request.args.get("isbn", "")
     show_manual = request.args.get("manual", "0") == "1"
-    return render_template("add_book.html", isbn=isbn, show_manual=show_manual)
+    add_to_reading_list = request.args.get("add_to_reading_list", "0") == "1"
+    return render_template("add_book.html", isbn=isbn, show_manual=show_manual, add_to_reading_list=add_to_reading_list)
 
 
 @app.route("/reading-list", methods=["GET"])
@@ -1270,7 +1271,7 @@ def create_book():
             f"No book metadata found for ISBN {isbn}. You can enter details manually below.",
             "info",
         )
-        return redirect(url_for("new_book_form", isbn=isbn, manual=1))
+        return redirect(url_for("new_book_form", isbn=isbn, manual=1, add_to_reading_list=1))
 
     try:
         created_book = storage.add_book(
@@ -1297,13 +1298,16 @@ def create_book():
         return redirect(url_for("new_book_form", isbn=isbn, manual=1))
 
     # When a new book is added it should go to the reading list
+    # Check if form requests add_to_reading_list (from author page "Add to Reading List" button)
+    add_to_reading_list = request.form.get("add_to_reading_list") == "1"
     try:
         storage.add_to_reading_list(created_book["id"])
         app.logger.info(
             f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
         )
 
-        flash("Book added to your reading list.", "success")
+        if add_to_reading_list:
+            flash("Book added to your reading list.", "success")
     except Exception as e:
         app.logger.error(
             f"READING_LIST_ADD_FAILED: id={created_book['id']}, error={str(e)}"

@@ -11,6 +11,9 @@
         </p>
 
         <form method="post" action="{{ url_for('create_book') }}">
+            {% if add_to_reading_list %}
+            <input type="hidden" name="add_to_reading_list" value="1">
+            {% endif %}
             <div class="mb-15">
                 <label for="isbn" class="form-label">ISBN-13</label>
                 <div class="flex gap-05">
