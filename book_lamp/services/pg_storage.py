@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import time
@@ -176,7 +177,15 @@ class PostgresStorage:
 
         with self.pool.connection() as conn:
             rows = conn.execute(query, params).fetchall()
-            return [dict(row) for row in rows]
+            records = []
+            for row in rows:
+                record = dict(row)
+                # Convert date objects to ISO strings
+                for date_field in ("start_date", "end_date", "created_at"):
+                    if isinstance(record.get(date_field), datetime.date):
+                        record[date_field] = record[date_field].isoformat()
+                records.append(record)
+            return records
 
     def get_book_by_id(self, book_id: int) -> Optional[dict[str, Any]]:
         query = """
