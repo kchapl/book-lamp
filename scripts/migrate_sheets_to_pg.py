@@ -232,6 +232,8 @@ def migrate_books(
                 edition=book_data["edition"],
                 cover_url=book_data["cover_url"],
             )
+            if book_data["description"]:
+                print(f"  Added description for: {book_data['title'][:30]}...")
 
         books_added += 1
 
