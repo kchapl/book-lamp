@@ -89,7 +89,7 @@ def validate_migration(
     }
 
     tabs = {
-        "Books": "Books!A:G",
+        "Books": "Books!A:S",
         "ReadingRecords": "ReadingRecords!A:G",
         "ReadingList": "ReadingList!A:D",
         "Settings": "Settings!A:E",
@@ -159,18 +159,48 @@ def migrate_books(
     books_added = 0
 
     # Expected headers: id, isbn13, title, author, publication_year, thumbnail_url, created_at
+    # Map columns by header name
+    if rows and len(rows[0]) >= 2:
+        headers = [h.strip().lower() for h in rows[0]]
+        print(f"  Books headers: {headers}")
+
+        col_map = {name: idx for idx, name in enumerate(headers)}
+    else:
+        col_map = {}
+
     for row in rows[1:]:
-        if len(row) < 6 or not row[2]:  # Skip rows without title
+        if len(row) < 3 or len(row) <= col_map.get("title", 2):
+            continue
+
+        title_col = col_map.get("title", 2)
+        if not row[title_col]:
             continue
 
         book_data = {
-            "isbn13": row[1] if len(row) > 1 and row[1] else None,
-            "title": row[2],
-            "author": row[3] if len(row) > 3 and row[3] else None,
+            "isbn13": row[col_map.get("isbn13", 1)] if len(row) > col_map.get("isbn13", 1) else None,
+            "title": row[title_col],
+            "author": row[col_map.get("author", 3)] if len(row) > col_map.get("author", 3) else None,
             "publication_year": (
-                int(row[4]) if len(row) > 4 and row[4].isdigit() else None
+                int(row[col_map.get("publication_year", 4)])
+                if len(row) > col_map.get("publication_year", 4) and row[col_map.get("publication_year", 4)]
+                else None
             ),
-            "thumbnail_url": row[5] if len(row) > 5 and row[5] else None,
+            "thumbnail_url": row[col_map.get("thumbnail_url", 5)] if len(row) > col_map.get("thumbnail_url", 5) else None,
+            "publisher": row[col_map.get("publisher", 6)] if len(row) > col_map.get("publisher", 6) else None,
+            "description": row[col_map.get("description", 8)] if len(row) > col_map.get("description", 8) else None,
+            "series": row[col_map.get("series", 9)] if len(row) > col_map.get("series", 9) else None,
+            "bisac_category": row[col_map.get("bisac_category", 10)] if len(row) > col_map.get("bisac_category", 10) else None,
+            "bisac_main_category": row[col_map.get("bisac_main_category", 11)] if len(row) > col_map.get("bisac_main_category", 11) else None,
+            "bisac_sub_category": row[col_map.get("bisac_sub_category", 12)] if len(row) > col_map.get("bisac_sub_category", 12) else None,
+            "language": row[col_map.get("language", 13)] if len(row) > col_map.get("language", 13) else None,
+            "page_count": (
+                int(row[col_map.get("page_count", 14)])
+                if len(row) > col_map.get("page_count", 14) and row[col_map.get("page_count", 14)]
+                else None
+            ),
+            "physical_format": row[col_map.get("physical_format", 15)] if len(row) > col_map.get("physical_format", 15) else None,
+            "edition": row[col_map.get("edition", 16)] if len(row) > col_map.get("edition", 16) else None,
+            "cover_url": row[col_map.get("cover_url", 17)] if len(row) > col_map.get("cover_url", 17) else None,
         }
 
         if dry_run:
@@ -190,6 +220,17 @@ def migrate_books(
                     if book_data["thumbnail_url"]
                     else None
                 ),
+                publisher=book_data["publisher"],
+                description=book_data["description"],
+                series=book_data["series"],
+                bisac_category=book_data["bisac_category"],
+                bisac_main_category=book_data["bisac_main_category"],
+                bisac_sub_category=book_data["bisac_sub_category"],
+                language=book_data["language"],
+                page_count=book_data["page_count"],
+                physical_format=book_data["physical_format"],
+                edition=book_data["edition"],
+                cover_url=book_data["cover_url"],
             )
 
         books_added += 1
