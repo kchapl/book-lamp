@@ -317,7 +317,18 @@ class PostgresStorage:
                         title = EXCLUDED.title,
                         author = EXCLUDED.author,
                         publication_year = EXCLUDED.publication_year,
-                        thumbnail_url = EXCLUDED.thumbnail_url
+                        thumbnail_url = EXCLUDED.thumbnail_url,
+                        publisher = EXCLUDED.publisher,
+                        description = EXCLUDED.description,
+                        series = EXCLUDED.series,
+                        bisac_category = EXCLUDED.bisac_category,
+                        bisac_main_category = EXCLUDED.bisac_main_category,
+                        bisac_sub_category = EXCLUDED.bisac_sub_category,
+                        language = EXCLUDED.language,
+                        page_count = EXCLUDED.page_count,
+                        physical_format = EXCLUDED.physical_format,
+                        edition = EXCLUDED.edition,
+                        cover_url = EXCLUDED.cover_url
                     RETURNING id
                 """
                 row_raw = conn.execute(
