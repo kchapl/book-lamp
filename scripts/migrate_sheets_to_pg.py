@@ -280,18 +280,35 @@ def migrate_reading_list(
     list_added = 0
 
     # Expected headers: id, user_id, book_id, created_at
+    # Verify headers
+    if rows and len(rows[0]) >= 2:
+        headers = [h.strip().lower() for h in rows[0]]
+        print(f"  ReadingList headers: {headers}")
+
     for row in rows[1:]:
         if len(row) < 3 or not row[2]:  # Skip rows without book_id
             continue
 
+        # Use safe_int to handle any unexpected values
+        def safe_int(val: str) -> int | None:
+            if not val:
+                return None
+            try:
+                return int(val)
+            except ValueError:
+                if "T" in val:  # Timestamp
+                    return None
+                return None
+
+        book_id = safe_int(row[2])
+
         if dry_run:
             print(f"DRY RUN: Would add book {row[2]} to reading list")
+        elif book_id is None:
+            print(f"SKIP: Invalid book_id in row: {row}")
+            continue
         else:
-            storage.add_to_reading_list(int(row[2]))
-
-        list_added += 1
-
-    return list_added
+            storage.add_to_reading_list(book_id)
 
 
 def migrate_settings(
