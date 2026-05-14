@@ -528,12 +528,24 @@ class PostgresStorage:
         end_date: Optional[str] = None,
         rating: int = 0,
     ) -> dict[str, Any]:
-        query = """
-            INSERT INTO reading_records (user_id, book_id, status, start_date, end_date, rating)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING *
+        # Check if record already exists for this book_status combination
+        existing_query = """
+            SELECT id FROM reading_records 
+            WHERE user_id = %s AND book_id = %s AND status = %s AND start_date = %s
         """
         with self.pool.connection() as conn:
+            existing = conn.execute(
+                existing_query, [self.user_id, book_id, status, start_date]
+            ).fetchone()
+            if existing:
+                logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
+                return self.get_reading_record(existing["id"])
+
+            query = """
+                INSERT INTO reading_records (user_id, book_id, status, start_date, end_date, rating)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING *
+            """
             row_raw = conn.execute(
                 query, [self.user_id, book_id, status, start_date, end_date, rating]
             ).fetchone()
