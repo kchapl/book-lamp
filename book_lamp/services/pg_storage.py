@@ -78,7 +78,8 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
                 # Check for retryable errors
                 is_retryable = (
                     "too many connections" in error_msg
-                    or "connection" in error_msg and "timeout" in error_msg
+                    or "connection" in error_msg
+                    and "timeout" in error_msg
                     or "pool" in error_msg
                 )
                 if not is_retryable or attempt == MAX_RETRIES - 1:
@@ -91,7 +92,11 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
                 time.sleep(wait_time)
             except Exception:
                 raise
-        raise last_exception if last_exception else OperationalError("Max retries exceeded")
+        raise (
+            last_exception
+            if last_exception
+            else OperationalError("Max retries exceeded")
+        )
 
     return wrapper
 
@@ -123,7 +128,6 @@ class PostgresStorage:
             return False
 
     @with_retry
-
     def get_all_books(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return all books known to the system for a given user.
 
@@ -331,32 +335,38 @@ class PostgresStorage:
                         cover_url = EXCLUDED.cover_url
                     RETURNING id
                 """
-                row_raw = conn.execute(
-                    query,
-                    [
-                        target_isbn,
-                        title,
-                        author,
-                        publication_year,
-                        thumbnail_url,
-                        publisher,
-                        description,
-                        series,
-                        bisac_category,
-                        bisac_main_category,
-                        bisac_sub_category,
-                        language,
-                        page_count,
-                        physical_format,
-                        edition,
-                        cover_url,
-                    ],
-                ).fetchone()
+                row_raw = cast(
+                    Dict[str, Any],
+                    conn.execute(
+                        query,
+                        [
+                            target_isbn,
+                            title,
+                            author,
+                            publication_year,
+                            thumbnail_url,
+                            publisher,
+                            description,
+                            series,
+                            bisac_category,
+                            bisac_main_category,
+                            bisac_sub_category,
+                            language,
+                            page_count,
+                            physical_format,
+                            edition,
+                            cover_url,
+                        ],
+                    ).fetchone(),
+                )
                 if not row_raw or not row_raw["id"]:
                     # If for some reason ON CONFLICT didn't work, fetch existing
-                    existing = conn.execute(
-                        "SELECT id FROM books WHERE isbn13 = %s", [target_isbn]
-                    ).fetchone()
+                    existing = cast(
+                        Dict[str, Any],
+                        conn.execute(
+                            "SELECT id FROM books WHERE isbn13 = %s", [target_isbn]
+                        ).fetchone(),
+                    )
                     if existing:
                         book_id = existing["id"]
                     else:
@@ -549,7 +559,9 @@ class PostgresStorage:
                 existing_query, [self.user_id, book_id, status, start_date]
             ).fetchone()
             if existing:
-                logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
+                logger.info(
+                    f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'"
+                )
                 # Return the existing record
                 records = self.get_reading_records(book_id=book_id)
                 for r in records:

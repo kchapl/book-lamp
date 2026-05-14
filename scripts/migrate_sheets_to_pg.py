@@ -6,7 +6,6 @@ import json
 import os
 import sys
 import uuid
-from datetime import datetime
 from typing import Any, Dict, List, Optional, cast
 
 from dotenv import load_dotenv
@@ -14,7 +13,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from book_lamp.services.pg_storage import PostgresStorage, get_pool
+from book_lamp.services.pg_storage import PostgresStorage
 
 # Load environment variables from .env file
 load_dotenv()
@@ -79,7 +78,7 @@ def validate_migration(
     storage: PostgresStorage, spreadsheet_id: str, sheets_service: Any
 ) -> Dict[str, Any]:
     """Validate migration viability without making changes."""
-    validation_results = {
+    validation_results: Dict[str, Any] = {
         "valid": True,
         "notes": [],
         "warnings": [],
@@ -101,9 +100,7 @@ def validate_migration(
         data = get_sheet_data(sheets_service, spreadsheet_id, range_name)
         count = max(0, len(data) - 1) if data else 0  # Subtract header row
         validation_results[f"{tab_name.lower()}_count"] = count
-        validation_results["notes"].append(
-            f"{tab_name}: {count} rows found"
-        )
+        validation_results["notes"].append(f"{tab_name}: {count} rows found")
 
         # Check for potential issues
         if tab_name == "Books" and data and len(data) > 1:
@@ -123,7 +120,9 @@ def validate_migration(
                     break
 
     validation_results["book_count"] = validation_results.get("books_count", 0)
-    validation_results["record_count"] = validation_results.get("readingrecords_count", 0)
+    validation_results["record_count"] = validation_results.get(
+        "readingrecords_count", 0
+    )
 
     return validation_results
 
@@ -176,31 +175,91 @@ def migrate_books(
         if not row[title_col]:
             continue
 
+        def safe_int(val: str) -> int | None:
+            if not val:
+                return None
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+
         book_data = {
-            "isbn13": row[col_map.get("isbn13", 1)] if len(row) > col_map.get("isbn13", 1) else None,
+            "isbn13": (
+                row[col_map.get("isbn13", 1)]
+                if len(row) > col_map.get("isbn13", 1)
+                else None
+            ),
             "title": row[title_col],
-            "author": row[col_map.get("author", 3)] if len(row) > col_map.get("author", 3) else None,
+            "author": (
+                row[col_map.get("author", 3)]
+                if len(row) > col_map.get("author", 3)
+                else None
+            ),
             "publication_year": (
-                int(row[col_map.get("publication_year", 4)])
-                if len(row) > col_map.get("publication_year", 4) and row[col_map.get("publication_year", 4)]
+                safe_int(row[col_map.get("publication_year", 4)])
+                if len(row) > col_map.get("publication_year", 4)
                 else None
             ),
-            "thumbnail_url": row[col_map.get("thumbnail_url", 5)] if len(row) > col_map.get("thumbnail_url", 5) else None,
-            "publisher": row[col_map.get("publisher", 6)] if len(row) > col_map.get("publisher", 6) else None,
-            "description": row[col_map.get("description", 8)] if len(row) > col_map.get("description", 8) else None,
-            "series": row[col_map.get("series", 9)] if len(row) > col_map.get("series", 9) else None,
-            "bisac_category": row[col_map.get("bisac_category", 10)] if len(row) > col_map.get("bisac_category", 10) else None,
-            "bisac_main_category": row[col_map.get("bisac_main_category", 11)] if len(row) > col_map.get("bisac_main_category", 11) else None,
-            "bisac_sub_category": row[col_map.get("bisac_sub_category", 12)] if len(row) > col_map.get("bisac_sub_category", 12) else None,
-            "language": row[col_map.get("language", 13)] if len(row) > col_map.get("language", 13) else None,
+            "thumbnail_url": (
+                row[col_map.get("thumbnail_url", 5)]
+                if len(row) > col_map.get("thumbnail_url", 5)
+                else None
+            ),
+            "publisher": (
+                row[col_map.get("publisher", 6)]
+                if len(row) > col_map.get("publisher", 6)
+                else None
+            ),
+            "description": (
+                row[col_map.get("description", 8)]
+                if len(row) > col_map.get("description", 8)
+                else None
+            ),
+            "series": (
+                row[col_map.get("series", 9)]
+                if len(row) > col_map.get("series", 9)
+                else None
+            ),
+            "bisac_category": (
+                row[col_map.get("bisac_category", 10)]
+                if len(row) > col_map.get("bisac_category", 10)
+                else None
+            ),
+            "bisac_main_category": (
+                row[col_map.get("bisac_main_category", 11)]
+                if len(row) > col_map.get("bisac_main_category", 11)
+                else None
+            ),
+            "bisac_sub_category": (
+                row[col_map.get("bisac_sub_category", 12)]
+                if len(row) > col_map.get("bisac_sub_category", 12)
+                else None
+            ),
+            "language": (
+                row[col_map.get("language", 13)]
+                if len(row) > col_map.get("language", 13)
+                else None
+            ),
             "page_count": (
-                int(row[col_map.get("page_count", 14)])
-                if len(row) > col_map.get("page_count", 14) and row[col_map.get("page_count", 14)]
+                safe_int(row[col_map.get("page_count", 14)])
+                if len(row) > col_map.get("page_count", 14)
                 else None
             ),
-            "physical_format": row[col_map.get("physical_format", 15)] if len(row) > col_map.get("physical_format", 15) else None,
-            "edition": row[col_map.get("edition", 16)] if len(row) > col_map.get("edition", 16) else None,
-            "cover_url": row[col_map.get("cover_url", 17)] if len(row) > col_map.get("cover_url", 17) else None,
+            "physical_format": (
+                row[col_map.get("physical_format", 15)]
+                if len(row) > col_map.get("physical_format", 15)
+                else None
+            ),
+            "edition": (
+                row[col_map.get("edition", 16)]
+                if len(row) > col_map.get("edition", 16)
+                else None
+            ),
+            "cover_url": (
+                row[col_map.get("cover_url", 17)]
+                if len(row) > col_map.get("cover_url", 17)
+                else None
+            ),
         }
 
         if dry_run:
@@ -220,20 +279,24 @@ def migrate_books(
                     if book_data["thumbnail_url"]
                     else None
                 ),
-                publisher=book_data["publisher"],
-                description=book_data["description"],
-                series=book_data["series"],
-                bisac_category=book_data["bisac_category"],
-                bisac_main_category=book_data["bisac_main_category"],
-                bisac_sub_category=book_data["bisac_sub_category"],
-                language=book_data["language"],
-                page_count=book_data["page_count"],
-                physical_format=book_data["physical_format"],
-                edition=book_data["edition"],
-                cover_url=book_data["cover_url"],
+                publisher=cast(Optional[str], book_data["publisher"]),
+                description=cast(Optional[str], book_data["description"]),
+                series=cast(Optional[str], book_data["series"]),
+                bisac_category=cast(Optional[str], book_data["bisac_category"]),
+                bisac_main_category=cast(
+                    Optional[str], book_data["bisac_main_category"]
+                ),
+                bisac_sub_category=cast(Optional[str], book_data["bisac_sub_category"]),
+                language=cast(Optional[str], book_data["language"]),
+                page_count=cast(Optional[int], book_data["page_count"]),
+                physical_format=cast(Optional[str], book_data["physical_format"]),
+                edition=cast(Optional[str], book_data["edition"]),
+                cover_url=cast(Optional[str], book_data["cover_url"]),
             )
             if book_data["description"]:
-                print(f"  Added description for: {book_data['title'][:30]}...")
+                print(
+                    f"  Added description for: {cast(str, book_data['title'])[:30]}..."
+                )
 
         books_added += 1
 
@@ -451,6 +514,7 @@ def main() -> None:
         sys.exit(1)
 
     # Handle rollback option
+    user_id: Optional[int] = None
     if args.rollback:
         if not args.user_email:
             print("Error: --user-email is required for rollback")
@@ -461,7 +525,6 @@ def main() -> None:
 
     try:
         # Initialize storage
-        user_id = None
         if not args.dry_run:
             user_id = PostgresStorage.upsert_user(args.user_email, args.user_email)
             print(f"User ID: {user_id}")
@@ -476,7 +539,9 @@ def main() -> None:
         # Validate first if requested
         if args.validate_only:
             print("Validating migration...")
-            validation = validate_migration(storage, args.spreadsheet_id, sheets_service)
+            validation = validate_migration(
+                storage, args.spreadsheet_id, sheets_service
+            )
             print("\n=== Validation Results ===")
             print(f"Valid: {validation['valid']}")
             print("\nNotes:")
@@ -486,7 +551,9 @@ def main() -> None:
                 print("\nWarnings:")
                 for warning in validation["warnings"]:
                     print(f"  - {warning}")
-            print(f"\nTotal records to migrate: {validation['book_count']} books, {validation['record_count']} records")
+            print(
+                f"\nTotal records to migrate: {validation['book_count']} books, {validation['record_count']} records"
+            )
             return
 
         print(
@@ -495,22 +562,22 @@ def main() -> None:
         print(f"User email: {args.user_email}")
 
         # Create batch for tracking
-        batch_id = create_migration_batch() if not args.dry_run else None
+        create_migration_batch() if not args.dry_run else None
 
         # Get data from each tab
         tabs = {
-            "Books": ("Books!A:G", migrate_books),
+            "Books": ("Books!A:S", migrate_books),
             "ReadingRecords": ("ReadingRecords!A:G", migrate_reading_records),
             "ReadingList": (
-                "ReadingList!A:D",
+                "ReadingList!A:C",
                 lambda s, r, d: migrate_reading_list(s, r, user_id or 0, d),
             ),
             "Settings": (
-                "Settings!A:E",
+                "Settings!A:B",
                 lambda s, r, d: migrate_settings(s, r, user_id or 0, d),
             ),
             "Recommendations": (
-                "Recommendations!A:E",
+                "Recommendations!A:F",
                 lambda s, r, d: migrate_recommendations(s, r, user_id or 0, d),
             ),
         }
