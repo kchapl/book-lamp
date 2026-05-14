@@ -305,7 +305,7 @@ class PostgresStorage:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
             with conn.transaction():
-                # 1. Insert book
+                # First try atomic upsert
                 query = """
                     INSERT INTO books (
                         isbn13, title, author, publication_year, thumbnail_url,
@@ -313,6 +313,11 @@ class PostgresStorage:
                         bisac_main_category, bisac_sub_category, language,
                         page_count, physical_format, edition, cover_url
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (isbn13) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        author = EXCLUDED.author,
+                        publication_year = EXCLUDED.publication_year,
+                        thumbnail_url = EXCLUDED.thumbnail_url
                     RETURNING id
                 """
                 row_raw = conn.execute(
@@ -336,12 +341,19 @@ class PostgresStorage:
                         cover_url,
                     ],
                 ).fetchone()
-                if not row_raw:
-                    raise Exception("Failed to insert book")
-                row = cast(Dict[str, Any], row_raw)
-                book_id = row["id"]
+                if not row_raw or not row_raw["id"]:
+                    # If for some reason ON CONFLICT didn't work, fetch existing
+                    existing = conn.execute(
+                        "SELECT id FROM books WHERE isbn13 = %s", [target_isbn]
+                    ).fetchone()
+                    if existing:
+                        book_id = existing["id"]
+                    else:
+                        raise Exception("Failed to insert or find book")
+                else:
+                    book_id = row_raw["id"]
 
-                # 2. Handle authors
+                # Handle authors
                 self._update_book_authors(conn, book_id, author)
 
         return self.get_book_by_id(book_id)  # type: ignore
@@ -483,47 +495,25 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        existing_raw = self.get_book_by_isbn(isbn13)
-        if existing_raw:
-            existing = cast(Dict[str, Any], existing_raw)
-            return self.update_book(
-                book_id=existing["id"],
-                isbn13=isbn13,
-                title=title,
-                author=author,
-                publication_year=publication_year,
-                thumbnail_url=thumbnail_url,
-                publisher=publisher,
-                description=description,
-                series=series,
-                bisac_category=bisac_category,
-                bisac_main_category=bisac_main_category,
-                bisac_sub_category=bisac_sub_category,
-                language=language,
-                page_count=page_count,
-                physical_format=physical_format,
-                edition=edition,
-                cover_url=cover_url,
-            )
-        else:
-            return self.add_book(
-                isbn13=isbn13,
-                title=title,
-                author=author,
-                publication_year=publication_year,
-                thumbnail_url=thumbnail_url,
-                publisher=publisher,
-                description=description,
-                series=series,
-                bisac_category=bisac_category,
-                bisac_main_category=bisac_main_category,
-                bisac_sub_category=bisac_sub_category,
-                language=language,
-                page_count=page_count,
-                physical_format=physical_format,
-                edition=edition,
-                cover_url=cover_url,
-            )
+        # add_book now handles duplicates atomically with ON CONFLICT DO UPDATE
+        return self.add_book(
+            isbn13=isbn13,
+            title=title,
+            author=author,
+            publication_year=publication_year,
+            thumbnail_url=thumbnail_url,
+            publisher=publisher,
+            description=description,
+            series=series,
+            bisac_category=bisac_category,
+            bisac_main_category=bisac_main_category,
+            bisac_sub_category=bisac_sub_category,
+            language=language,
+            page_count=page_count,
+            physical_format=physical_format,
+            edition=edition,
+            cover_url=cover_url,
+        )
 
     def delete_book(self, book_id: int) -> bool:
         with self.pool.connection() as conn:
@@ -702,6 +692,11 @@ class PostgresStorage:
                                 bisac_main_category, bisac_sub_category, language,
                                 page_count, physical_format, edition, cover_url
                             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (isbn13) DO UPDATE SET
+                                title = EXCLUDED.title,
+                                author = EXCLUDED.author,
+                                publication_year = EXCLUDED.publication_year,
+                                thumbnail_url = EXCLUDED.thumbnail_url
                             RETURNING id
                         """
                         row_raw = conn.execute(

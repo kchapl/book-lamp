@@ -176,7 +176,7 @@ def migrate_books(
         if dry_run:
             print(f"DRY RUN: Would add book: {book_data['title']}")
         else:
-            storage.add_book(
+            storage.upsert_book(
                 isbn13=str(book_data["isbn13"]) if book_data["isbn13"] else "",
                 title=str(book_data["title"]),
                 author=str(book_data["author"]) if book_data["author"] else "",
