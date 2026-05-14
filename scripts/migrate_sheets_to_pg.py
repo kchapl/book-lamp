@@ -211,17 +211,35 @@ def migrate_reading_records(
         if len(row) < 3 or not row[2]:  # Skip rows without status
             continue
 
+        # More robust parsing - handle timestamps that might appear in any column
+        def safe_int(val: str) -> int | None:
+            if not val:
+                return None
+            try:
+                # Try direct int conversion first
+                return int(val)
+            except ValueError:
+                # Might be a timestamp, try extracting date part
+                if "T" in val:
+                    # It's a timestamp like 2026-02-24T21:26:34.285672+00:00
+                    return None
+                return None
+
         record_data = {
-            "book_id": int(row[1]) if len(row) > 1 and row[1].isdigit() else None,
+            "book_id": safe_int(row[1]),
             "status": row[2],
             "start_date": parse_date(row[3]) if len(row) > 3 else None,
             "end_date": parse_date(row[4]) if len(row) > 4 else None,
-            "rating": int(row[5]) if len(row) > 5 and row[5].isdigit() else None,
+            "rating": safe_int(row[5]),
         }
 
         if dry_run:
             print(f"DRY RUN: Would add reading record: {record_data['status']}")
         else:
+            if record_data["book_id"] is None:
+                print(f"SKIP: Invalid book_id in row: {row}")
+                continue
+
             storage.add_reading_record(
                 book_id=cast(int, record_data["book_id"]) or 0,
                 status=str(record_data["status"]),
