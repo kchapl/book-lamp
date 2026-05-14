@@ -975,9 +975,14 @@ def collection_stats():
     # Yearly counts
     yearly_counts = Counter()
     for r in completed_records:
-        date_str = r.get("end_date", "")
-        if date_str and len(date_str) >= 4:
-            year = date_str[:4]
+        date_val = r.get("end_date")
+        if date_val:
+            if isinstance(date_val, datetime):
+                year = str(date_val.year)
+            elif isinstance(date_val, str) and len(date_val) >= 4:
+                year = date_val[:4]
+            else:
+                continue
             if year.isdigit():
                 yearly_counts[year] += 1
 
