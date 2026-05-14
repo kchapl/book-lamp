@@ -539,7 +539,12 @@ class PostgresStorage:
             ).fetchone()
             if existing:
                 logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
-                return self.get_reading_record(existing["id"])
+                # Return the existing record
+                records = self.get_reading_records(book_id=book_id)
+                for r in records:
+                    if r["status"] == status and r["start_date"] == start_date:
+                        return r
+                return records[0] if records else {}
 
             query = """
                 INSERT INTO reading_records (user_id, book_id, status, start_date, end_date, rating)
