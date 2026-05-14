@@ -280,35 +280,39 @@ def migrate_reading_list(
     list_added = 0
 
     # Expected headers: id, user_id, book_id, created_at
-    # Verify headers
+    # Verify headers and map columns by name
     if rows and len(rows[0]) >= 2:
         headers = [h.strip().lower() for h in rows[0]]
         print(f"  ReadingList headers: {headers}")
 
+        # Map column names to indices (e.g., {"book_id": 0, "position": 1, "created_at": 2})
+        col_map = {name: idx for idx, name in enumerate(headers)}
+        book_id_col = col_map.get("book_id", 0)  # Default to column 0
+    else:
+        book_id_col = 0
+
     for row in rows[1:]:
-        if len(row) < 3 or not row[2]:  # Skip rows without book_id
+        if len(row) <= book_id_col:
             continue
 
-        # Use safe_int to handle any unexpected values
-        def safe_int(val: str) -> int | None:
-            if not val:
-                return None
-            try:
-                return int(val)
-            except ValueError:
-                if "T" in val:  # Timestamp
-                    return None
-                return None
+        book_id_val = row[book_id_col]
+        if not book_id_val:
+            continue
 
-        book_id = safe_int(row[2])
+        # Use safe_int
+        try:
+            book_id = int(book_id_val)
+        except ValueError:
+            print(f"SKIP: Invalid book_id '{book_id_val}' in row: {row}")
+            continue
 
         if dry_run:
-            print(f"DRY RUN: Would add book {row[2]} to reading list")
-        elif book_id is None:
-            print(f"SKIP: Invalid book_id in row: {row}")
-            continue
+            print(f"DRY RUN: Would add book {book_id} to reading list")
         else:
             storage.add_to_reading_list(book_id)
+            list_added += 1
+
+    return list_added
 
 
 def migrate_settings(
