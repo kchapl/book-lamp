@@ -109,7 +109,11 @@ def test_upsert_book_idempotency(pg_storage):
         author="Aldous Huxley",
     )
 
-    all_books = pg_storage.get_all_books()
+    # Directly check the database books table for the upsert result
+    with pg_storage.pool.connection() as conn:
+        all_books = conn.execute(
+            "SELECT * FROM books WHERE isbn13 = '9780141036144'"
+        ).fetchall()
     assert len(all_books) == 1
     assert all_books[0]["title"] == "Brave New World (Special Edition)"
 

@@ -139,13 +139,17 @@ class PostgresStorage:
         query = """
             SELECT DISTINCT b.*, array_agg(a.name) as author_names
             FROM books b
-            JOIN reading_records rr ON b.id = rr.book_id AND rr.user_id = %s
+            LEFT JOIN reading_records rr ON b.id = rr.book_id AND rr.user_id = %s
+            LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
             LEFT JOIN book_authors ba ON b.id = ba.book_id
             LEFT JOIN authors a ON ba.author_id = a.id
+            WHERE rr.id IS NOT NULL OR rl.book_id IS NOT NULL
             GROUP BY b.id
         """
         with self.pool.connection() as conn:
-            rows = conn.execute(query, [effective_user_id]).fetchall()
+            rows = conn.execute(
+                query, [effective_user_id, effective_user_id]
+            ).fetchall()
             books = []
             for row_raw in rows:
                 book = cast(Dict[str, Any], row_raw)

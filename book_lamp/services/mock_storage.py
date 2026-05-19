@@ -311,7 +311,17 @@ class MockStorage:
         return False
 
     def get_reading_list(self) -> list[dict[str, Any]]:
-        return sorted(self.reading_list, key=lambda x: x["position"])
+        result = []
+        book_map = {b["id"]: b for b in self.books}
+        for item in sorted(self.reading_list, key=lambda x: x["position"]):
+            book = book_map.get(item["book_id"])
+            if book:
+                enriched = item.copy()
+                enriched["title"] = book.get("title", "")
+                enriched["author"] = book.get("author", "")
+                enriched["thumbnail_url"] = book.get("thumbnail_url")
+                result.append(enriched)
+        return result
 
     def add_to_reading_list(self, book_id: int) -> None:
         if any(item["book_id"] == book_id for item in self.reading_list):
