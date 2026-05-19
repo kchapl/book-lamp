@@ -101,6 +101,8 @@ _mock_storage_singleton = MockStorage()
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
     if is_test_mode():
+        # Authorise storage for Lighthouse CI and other automated testing
+        _mock_storage_singleton.set_authorised(True)
         return _mock_storage_singleton
 
     user_id = session.get("user_id")
