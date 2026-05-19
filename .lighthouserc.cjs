@@ -10,7 +10,7 @@ module.exports = {
                 "http://localhost:5000/stats"
             ],
             settings: {
-                chromeFlags: "--no-sandbox --headless --disable-gpu"
+                chromeFlags: "--no-sandbox --headless --disable-gpu --disable-dev-shm-usage"
             }
         },
         assert: {
