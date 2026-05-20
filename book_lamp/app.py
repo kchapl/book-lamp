@@ -98,10 +98,13 @@ def is_test_mode() -> bool:
 def generate_csrf_token() -> str:
     """Generate or retrieve a CSRF token for the current session."""
     if "csrf_token" not in session:
-        session["csrf_token"] = secrets.token_hex(32)
+        token = secrets.token_hex(32)
+        session["csrf_token"] = token
+    else:
+        token = session["csrf_token"]
     # Store in g for after_request hook
-    g.csrf_token = session["csrf_token"]
-    return session["csrf_token"]
+    g.csrf_token = token
+    return token
 
 
 def csrf_protect(f):
@@ -117,9 +120,8 @@ def csrf_protect(f):
                 return f(*args, **kwargs)
 
             # Verify the CSRF token
-            submitted_token = (
-                request.headers.get("X-CSRF-Token")
-                or request.form.get("csrf_token")
+            submitted_token = request.headers.get("X-CSRF-Token") or request.form.get(
+                "csrf_token"
             )
             session_token = session.get("csrf_token")
             if not session_token or submitted_token != session_token:
@@ -431,7 +433,7 @@ if not secret_key and not is_test_mode():
     raise ValueError(
         "SECRET_KEY environment variable is required. "
         "Please set it in your .env file. "
-        "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        'Generate a secure key with: python -c "import secrets; print(secrets.token_hex(32))"'
     )
 elif not secret_key:
     # Only use for test mode - still warn operators
