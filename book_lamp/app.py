@@ -216,7 +216,12 @@ if not os.environ.get("LLM_API_KEY"):
 @app.context_processor
 def inject_global_vars():
     """Inject variables into all templates."""
-    is_auth = get_storage().is_authorised()
+    # Only check storage auth if user_id exists in session
+    user_id = session.get("user_id")
+    if user_id:
+        is_auth = get_storage().is_authorised()
+    else:
+        is_auth = False
     user_name = session.get("user_name")
 
     return {
@@ -377,13 +382,16 @@ def api_recommendations():
 
 @app.route("/")
 def home():
-    is_authorised = get_storage().is_authorised()
+    """Home page - public and shows sign-in or dashboard based on authentication."""
+    # Only check session for auth state - don't call get_storage() for non-authenticated users
+    user_id = session.get("user_id")
+    is_authorised = user_id is not None
     return render_template("home.html", is_authorised=is_authorised)
 
 
 @app.route("/about")
-@authorisation_required
 def about():
+    """Public about page - no authentication required."""
     return render_template("about.html", version=APP_VERSION)
 
 
@@ -399,6 +407,16 @@ def logout():
     # Ensure the session cookie is marked for removal
     session.permanent = False
     flash("Successfully signed out.", "info")
+    return redirect(url_for("home"))
+
+
+@app.route("/connect")
+def connect():
+    """Redirect to home page which displays the Google sign-in UI."""
+    # The home page will show the Google sign-in flow when not authenticated.
+    # If already authenticated, redirect to books.
+    if session.get("user_id"):
+        return redirect(url_for("list_books"))
     return redirect(url_for("home"))
 
 
