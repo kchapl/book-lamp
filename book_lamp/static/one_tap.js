@@ -42,13 +42,46 @@ function initialiseGoogleSignIn() {
         return;
     }
 
+    // Determine the current origin for logging
+    const currentOrigin = window.location.origin;
+    console.log('Current origin:', currentOrigin);
+
     try {
         // Programmatic initialisation with client configuration
         google.accounts.id.initialize({
             client_id: window.GOOGLE_CLIENT_ID,
             callback: handleOneTapCredential,
             auto_prompt: false,
-            cancel_on_tap_outside: false
+            cancel_on_tap_outside: false,
+            // Listen for One Tap display events to diagnose issues
+            moment_listener: function(notification) {
+                const reason = notification.getMomentNotGoingVisibleReason();
+                const detail = notification.getDetailedNotGoingVisibleReason();
+                
+                if (reason === 'DISPLAYED') {
+                    console.log('One Tap displayed successfully');
+                } else if (reason === 'NOT_DISPLAYED') {
+                    console.warn('One Tap not displayed. Reason:', detail);
+                    
+                    // Specific diagnostics for common issues
+                    if (detail === 'OPTIMUS_TAP_ALREADY_SIGNED_IN') {
+                        console.log('(User is already signed in to Google)');
+                    } else if (detail === 'FEDCM_API-disabled') {
+                        console.log('(FedCM disabled - check browser privacy settings)');
+                    } else if (detail === 'INVALID_CLIENT_ID') {
+                        console.error('(INVALID_CLIENT_ID - check Google Cloud Console client ID)');
+                    } else if (detail.startsWith('POPUP_BLOCKED') || detail === 'WINDOW_BLOCKED') {
+                        console.log('(Popup blocked - check browser popup blocker)');
+                    } else if (detail.includes('ORIGIN')) {
+                        console.error('(ORIGIN_MISMATCH - add ' + currentOrigin + ' to Authorized JavaScript origins in Google Cloud Console)');
+                        console.error('Go to: Google Cloud Console → APIs & Services → Credentials → OAuth Client → Authorized JavaScript origins');
+                    } else {
+                        console.log('(Unknown reason - check browser console for more details)');
+                    }
+                } else {
+                    console.log('One Tap notification:', reason, detail);
+                }
+            }
         });
         console.log('Google Sign-In initialised successfully');
 
