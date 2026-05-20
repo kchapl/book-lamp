@@ -1,6 +1,6 @@
 ---
 name: book-lamp-development
-description: Guidelines and workflows for developing the Book Lamp application, focusing on the Google Sheets adapter pattern and project philosophy.
+description: Guidelines and workflows for developing the Book Lamp application, focusing on the PostgreSQL adapter pattern and project philosophy.
 ---
 
 # Book Lamp Development Skill
@@ -14,13 +14,13 @@ Following the **Python Architecture Tutor** principles, we prioritise clarity, r
 ### 1. Layered Architecture (Separation of Concerns)
 The project is structured into distinct layers to separate business logic from external side effects:
 - **Models/Entities**: Pure data structures (e.g., book dictionaries with defined keys).
-- **Adapters (Persistence)**: Isolated in `book_lamp/services/`. `GoogleSheetsStorage` is our primary adapter for Google Sheets.
+- **Adapters (Persistence)**: Isolated in `book_lamp/services/`. `PostgresStorage` is our primary adapter for PostgreSQL.
 - **Service Layer**: Pure logic that sits between entry points and adapters (e.g., `book_lookup.py`).
 - **Entry Points**: Flask routes in `app.py` and CLI commands.
 
 ### 2. Pure vs. Effectful Separation
 - **Pure Code**: Logic should be deterministic. It should not perform I/O or rely on system time directly.
-- **Effectful Code**: All I/O (Google Sheets API, network, filesystem, time) must be isolated at the edges in adapter classes or functions.
+- **Effectful Code**: All I/O (PostgreSQL, network, filesystem, time) must be isolated at the edges in adapter classes or functions.
 - **Dependency Injection**: Inject adapters into logic or entry points to keep them decoupled.
 
 ### 3. Mentorship & Readability
@@ -51,29 +51,32 @@ The project is structured into distinct layers to separate business logic from e
       """
   ```
 
-## Working with Google Sheets Storage
+## Working with PostgresStorage
 
-The `GoogleSheetsStorage` class in `book_lamp/services/sheets_storage.py` is the primary adapter for data.
+The `PostgresStorage` class in `book_lamp/services/postgres_storage.py` is the primary adapter for data.
 
-### Sheet Structure
-- **Books**: `id`, `isbn13`, `title`, `author`, `publication_year`, `thumbnail_url`, `created_at`
-- **ReadingRecords**: `id`, `book_id`, `status`, `start_date`, `end_date`, `rating`, `created_at`
+### Database Schema
+- **books**: `id`, `isbn13`, `title`, `author`, `publication_year`, `thumbnail_url`, `created_at`
+- **reading_records**: `id`, `book_id`, `status`, `start_date`, `end_date`, `rating`, `created_at`
+- **users**: `id`, `email`, `created_at`
+- **reading_list**: `id`, `user_id`, `book_id`, `created_at`
+- **settings**: `id`, `user_id`, `key`, `value`, `created_at`
+- **recommendations**: `id`, `user_id`, `book_id`, `reason`, `created_at`
 
-### Dynamic Management
-- On first run or if a token is present, the app creates a folder hierarchy `AppData/BookLamp` in the user's Google Drive.
-- It creates/uses a spreadsheet based on the environment:
-  - **Production**: `BookLampData`
-  - **Development**: `DevBookLampData`
+### Database Management
+- Schema is managed by Alembic migrations in the `alembic/` directory.
+- Use `alembic upgrade head` to apply migrations.
+- Use `alembic revision --autogenerate -m "description"` to create new migrations.
 
 ### Extending the Schema
-1.  Update the `initialize_sheets` method to include new headers.
-2.  Update the range in `get_all_books` or `get_reading_records`.
-3.  Update the mapping logic in the getter and adder methods.
-4.  Always use 1-based indexing for row deletions and updates as required by the Google Sheets API.
+1.  Create a new Alembic migration: `alembic revision --autogenerate -m "Add new table"`
+2.  Update the `PostgresStorage` class methods to handle new columns/tables.
+3.  Use parameterized queries for all database operations.
+4.  Test the migration with `alembic upgrade head` and `alembic downgrade -1`.
 
 ### Handling IDs
-- IDs are managed manually by finding the maximum value in the first column of a tab and incrementing it.
-- Always check for empty sheets or sheets with only headers.
+- IDs are auto-incrementing serial columns managed by PostgreSQL.
+- Foreign key constraints ensure referential integrity.
 
 ## Testing Strategy
 
@@ -81,36 +84,36 @@ Refer to the **Testing** skill for standards and patterns. All code must be veri
 
 ## Security and Configuration
 
-### OAuth and Authentication
-- The application uses **Google OAuth2** for authentication.
-- Users must authorize the application to access their Google Drive and Sheets.
-- The `token.json` file stores the OAuth2 tokens.
+### Authentication
+- The application optionally uses **Google One Tap** for authentication.
+- No OAuth flow is required; users can use the app without Google login.
+- If Google One Tap is used, only `GOOGLE_CLIENT_ID` is needed.
 
 ### Secrets and Sanitization
-- Never commit `credentials.json`, `token.json`, or `.env` files.
+- Never commit `.env` files or credentials.
 - **Required Environment Variables**:
   - `SECRET_KEY`: For Flask session management.
-  - `GOOGLE_CLIENT_ID`: Google Cloud Client ID.
-  - `GOOGLE_CLIENT_SECRET`: Google Cloud Client Secret.
+  - `DATABASE_URL`: PostgreSQL connection string.
+  - `GOOGLE_CLIENT_ID`: Optional Google One Tap Client ID.
 - **Input Sanitization**: Always strip and normalize user input (ISBNs, titles) before processing or storing.
 
 ## Debugging and Diagnostics
 
-### Common Google Sheets Errors
-- **403 Forbidden**: Check if the OAuth user has given the app permission to access Google Drive and Sheets.
-- **401 Unauthorized**: Ensure the user has authorized the app via the `/login` route.
-- **Initialization Error**: If the app cannot create the folder hierarchy, check Drive permissions.
-- **Invalid Credentials**: Delete `token.json` and re-run the login flow via the web interface.
+### Common PostgreSQL Errors
+- **Connection Error**: Check if `DATABASE_URL` is correct and database is accessible.
+- **Migration Error**: Run `alembic upgrade head` to ensure schema is current.
+- **Constraint Violation**: Check foreign key relationships and data integrity.
+- **Pool Timeout**: Increase connection pool size or check database load.
 
 ### Logs
-- Application logs are configured with standard formatting. Check terminal output for OAuth flow logs and API interactions.
+- Application logs are configured with standard formatting. Check terminal output for database queries and connection pool status.
 
 ## Environment Setup
 1.  **Dependencies**: Run `mise install`, then `poetry install` for backend and `npm install` for frontend.
-2.  **Configuration**: Copy `.env.example` to `.env` and fill in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
-3.  **Authentication**: Start the app and visit `/login` to authorize Google access.
+2.  **Configuration**: Copy `.env.example` to `.env` and fill in `DATABASE_URL` and optional `GOOGLE_CLIENT_ID`.
+3.  **Database Setup**: Run `podman-compose up -d` to start PostgreSQL, then `poetry run alembic upgrade head`.
 4.  **Frontend Build**: Run `npm run build` to compile TypeScript to JavaScript.
-5.  **Initialization**: The app automatically creates the necessary folders and spreadsheets on first use. You can also run `poetry run flask --app book_lamp.app init-sheets` to prepare it manually.
+5.  **Initialization**: The database schema is automatically created by Alembic migrations.
 6.  **Local Run**: `poetry run flask --app book_lamp.app run --debug`.
 
 ## Commits and Change Discipline
