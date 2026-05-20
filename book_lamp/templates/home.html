@@ -28,8 +28,8 @@
         // Make Google Client ID available to JavaScript
         window.GOOGLE_CLIENT_ID = "{{ config['GOOGLE_CLIENT_ID'] }}";
     </script>
-    <script src="{{ url_for('static', filename='one_tap.js') }}" type="module" defer></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" defer></script>
+    <script src="{{ url_for('static', filename='one_tap.js') }}" defer></script>
     <div id="google-signin-btn"></div>
     {% endif %}
 </div>
