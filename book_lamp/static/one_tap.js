@@ -24,67 +24,99 @@ async function handleOneTapCredential(response) {
     }
 }
 
-// Initialize Google One Tap with fallback
-function initializeGoogleOneTap() {
-    console.log('Initializing Google One Tap...');
+// Initialise Google Sign-In programmatically
+function initialiseGoogleSignIn() {
+    console.log('Initialising Google Sign-In...');
     console.log('GOOGLE_CLIENT_ID:', window.GOOGLE_CLIENT_ID);
-    
+
     if (!window.GOOGLE_CLIENT_ID) {
         console.error('GOOGLE_CLIENT_ID not found in window object');
-        showManualSignIn();
+        showFallbackSignIn();
         return;
     }
-    
-    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-        try {
-            google.accounts.id.initialize({
-                client_id: window.GOOGLE_CLIENT_ID,
-                callback: handleOneTapCredential,
-                auto_prompt: false,
-                cancel_on_tap_outside: false
-            });
-            console.log('Google One Tap initialized successfully');
-            
-            // Try to show One Tap, but handle FedCM errors
-            try {
-                google.accounts.id.prompt();
-            } catch (error) {
-                console.warn('FedCM error, falling back to manual sign-in:', error);
-                showManualSignIn();
-            }
-        } catch (error) {
-            console.error('Error initializing Google One Tap:', error);
-            showManualSignIn();
-        }
-    } else {
+
+    // Wait for Google API to be ready
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
         console.log('Google API not ready yet, retrying...');
-        setTimeout(initializeGoogleOneTap, 100);
+        setTimeout(initialiseGoogleSignIn, 100);
+        return;
+    }
+
+    try {
+        // Programmatic initialisation with client configuration
+        google.accounts.id.initialize({
+            client_id: window.GOOGLE_CLIENT_ID,
+            callback: handleOneTapCredential,
+            auto_prompt: false,
+            cancel_on_tap_outside: false
+        });
+        console.log('Google Sign-In initialised successfully');
+
+        // Render the standard sign-in button inside custom container
+        renderGoogleButton();
+
+        // Asynchronously overlay One Tap as a helper flow
+        overlayOneTap();
+    } catch (error) {
+        console.error('Error initialising Google Sign-In:', error);
+        showFallbackSignIn();
     }
 }
 
-// Show manual sign-in button as fallback
-function showManualSignIn() {
-    console.log('Showing manual sign-in option');
-    const signInDiv = document.querySelector('.g_id_signin');
-    if (signInDiv) {
-        // Initialize manual sign-in button
-        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-            google.accounts.id.renderButton(signInDiv, {
-                theme: 'outline',
-                size: 'large',
-                text: 'signin_with',
-                shape: 'rectangular'
-            });
+// Render the standard Google sign-in button in custom container
+function renderGoogleButton() {
+    const buttonContainer = document.getElementById('google-signin-btn');
+    if (!buttonContainer) {
+        console.error('Button container #google-signin-btn not found');
+        return;
+    }
+
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.renderButton(buttonContainer, {
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular'
+        });
+        console.log('Google sign-in button rendered');
+    }
+}
+
+// Overlay One Tap prompt as a helper flow
+function overlayOneTap() {
+    // Delay One Tap to ensure button is visible first
+    setTimeout(() => {
+        try {
+            google.accounts.id.prompt();
+            console.log('One Tap prompt shown as helper flow');
+        } catch (error) {
+            // One Tap may fail silently (e.g., FedCM blocked)
+            console.warn('One Tap prompt skipped:', error.message);
         }
+    }, 500);
+}
+
+// Fallback for when Google API fails
+function showFallbackSignIn() {
+    const buttonContainer = document.getElementById('google-signin-btn');
+    if (!buttonContainer) return;
+
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.renderButton(buttonContainer, {
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular'
+        });
     }
 }
 
-// Make function globally available
+// Make functions globally available
 window.handleOneTapCredential = handleOneTapCredential;
 
-// Initialize when ready
+// Initialise when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeGoogleOneTap);
+    document.addEventListener('DOMContentLoaded', initialiseGoogleSignIn);
 } else {
-    initializeGoogleOneTap();
+    initialiseGoogleSignIn();
 }

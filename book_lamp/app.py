@@ -1466,6 +1466,7 @@ def import_books():
         flash("No selected file", "error")
         return redirect(url_for("import_books_form"))
 
+    # pyrefly: ignore [missing-attribute]
     if not file or not file.filename.endswith(".csv"):
         flash("Please upload a valid CSV file.", "error")
         return redirect(url_for("import_books_form"))
