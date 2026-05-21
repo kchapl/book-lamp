@@ -76,12 +76,14 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
             except OperationalError as e:
                 last_exception = e
                 error_msg = str(e).lower()
-                # Check for retryable errors
+                # Check for retryable errors (SSL, connection closed, timeouts, pool issues)
                 is_retryable = (
                     "too many connections" in error_msg
                     or "connection" in error_msg
                     and "timeout" in error_msg
                     or "pool" in error_msg
+                    or "ssl" in error_msg
+                    or "consuming input failed" in error_msg
                 )
                 if not is_retryable or attempt == MAX_RETRIES - 1:
                     raise
