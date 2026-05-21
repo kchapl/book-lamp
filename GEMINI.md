@@ -12,7 +12,7 @@
 
 ### Core Technologies
 - **Backend:** Python 3.13, Flask, Poetry, psycopg3, Alembic.
-- **Frontend:** TypeScript, Vitest (Testing), Vanilla CSS, Jinja2 Templates.
+- **Frontend:** React 18, TypeScript, Vite (Build), React Router, @dnd-kit (Drag and Drop), html5-qrcode.
 - **Tooling:** `mise` (tool version management), `poetry`, `npm`, `ruff`, `mypy`, `black`, `isort`.
 
 ---
@@ -48,12 +48,23 @@
    ```
 4. **Build Frontend:**
    ```bash
+   # Build vanilla TypeScript (legacy)
+   npm run build:ts
+   
+   # Build React SPA
+   npm run build:react
+   
+   # Or build both
    npm run build
    ```
 
 ### Running the Application
 ```bash
+# Start the Flask development server
 poetry run flask --app book_lamp.app run
+
+# For development with hot reload
+npm run dev
 ```
 
 ### Testing
@@ -78,9 +89,10 @@ poetry run flask --app book_lamp.app run
   - Lint with `ruff` and type-check with `mypy` (strict mode).
   - Routes should be thin; delegate logic to services.
 - **Frontend:**
-  - **TypeScript Only:** All logic MUST be in `src/ts/`. Never edit compiled `.js` files in `static/`.
-  - **CSS:** Use dedicated files in `static/` (e.g., `base.css`, `books.css`). No inline styles or `<style>` blocks in HTML.
-  - **HTML:** Keep templates focused on structure and Jinja2 logic.
+  - **React 18:** All new UI MUST use React components in `src/react/`.
+  - **TypeScript Only:** All logic MUST be in TypeScript. Never edit compiled files directly.
+  - **CSS:** Use dedicated files in `static/css/` for global styles. React-specific styles in `src/react/styles/`.
+  - **HTML:** Keep templates focused on structure and Jinja2 logic. React renders UI via components.
 
 ### Testing Policy
 - **Mandatory Testing:** All new features must have unit tests.
@@ -97,11 +109,17 @@ poetry run flask --app book_lamp.app run
 
 ## Project Structure
 - `book_lamp/`: Main Python package.
-  - `app.py`: Flask application entry point and routes.
+  - `app.py`: Flask application entry point and routes (serves both Jinja2 templates and React SPA).
   - `services/`: Business logic and storage adapters (e.g., `postgres_storage.py`).
-  - `templates/`: Jinja2 HTML templates.
-  - `static/`: Compiled JS, CSS, and assets.
-- `src/ts/`: TypeScript source files.
+  - `templates/`: Jinja2 HTML templates (legacy) and `index.html` (React SPA entry point).
+  - `static/`: Compiled JS, CSS, and assets. React app is built to `static/react/`.
+- `src/ts/`: Legacy vanilla TypeScript source files.
+- `src/react/`: React 18 application (replaces vanilla TypeScript).
+  - `pages/`: Page components (Home, Books, History, etc.)
+  - `components/`: Shared UI components (Layout, etc.)
+  - `services/`: API service layer.
+  - `types/`: TypeScript type definitions.
+  - `styles/`: React-specific CSS styles.
 - `tests/`: Backend test suite.
 - `scripts/`: Utility scripts (e.g., Lighthouse reporting).
 - `pyproject.toml` / `package.json`: Dependency manifests.
