@@ -1062,7 +1062,6 @@ def api_author_page(author_slug: str):
     storage = get_storage()
 
     books = storage.get_all_books()
-    all_records = storage.get_reading_records()
     rl_items = storage.get_reading_list()
     reading_list_book_ids = {item["book_id"] for item in rl_items}
 
