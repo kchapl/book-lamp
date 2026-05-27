@@ -312,8 +312,9 @@ nav {
 }
 
 .logo-icon {
-    font-size: 1.75rem;
-    color: var(--md-sys-color-primary);
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 .nav-links a {
