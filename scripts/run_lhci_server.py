@@ -32,7 +32,7 @@ def main() -> None:
     
     # Start Flask server
     proc = subprocess.Popen(
-        ["poetry", "run", "flask", "--app", "book_lamp.app:app", "run", "--port", str(port), "--host", "127.0.0.1"],
+        ["uv", "run", "flask", "--app", "book_lamp.app:app", "run", "--port", str(port), "--host", "127.0.0.1"],
         env=env,
     )
     
