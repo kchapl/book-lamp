@@ -1,9 +1,6 @@
 # book-lamp
 
-A personal reading history tracker using Google Sheets for storage.
-
-**Security note:** the app only requests the `https://www.googleapis.com/auth/drive.file` scope
-to find and manage the specific spreadsheet across sessions. No broader access is required.
+A personal reading history tracker.
 
 ## Setup
 
