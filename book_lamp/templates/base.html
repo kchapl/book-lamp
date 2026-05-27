@@ -42,7 +42,10 @@
 
 <body>
     <nav>
-        <a href="/" class="logo">Book Lamp</a>
+        <a href="/" class="logo">
+            <img src="{{ url_for('static', filename='lamp-icon.svg') }}" alt="" class="logo-icon" width="28" height="28">
+            Book Lamp
+        </a>
         <div class="nav-links">
             <a href="/books">Books read</a>
             <a href="/history">Reading log</a>
@@ -145,7 +148,7 @@
     <script src="{{ url_for('static', filename='job-indicator.js') }}" type="module" defer></script>
 
     <footer>
-        &copy; {{ current_year }} Kelvin Chappell. Built with Python and Google Sheets.
+        &copy; {{ current_year }} Kelvin Chappell.
     </footer>
 </body>
 

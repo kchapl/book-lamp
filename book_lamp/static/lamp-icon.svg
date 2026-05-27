@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Armchair -->
+  <rect x="12" y="36" width="40" height="20" rx="4" fill="#4f46e5" opacity="0.3"/>
+  <rect x="8" y="32" width="48" height="12" rx="6" fill="#4f46e5"/>
+  <rect x="4" y="38" width="8" height="18" rx="4" fill="#4f46e5"/>
+  <rect x="52" y="38" width="8" height="18" rx="4" fill="#4f46e5"/>
+  
+  <!-- Lamp stand -->
+  <rect x="30" y="16" width="4" height="16" fill="#4f46e5"/>
+  
+  <!-- Lamp shade -->
+  <path d="M22 4 L42 4 L46 16 L18 16 Z" fill="#4f46e5"/>
+  
+  <!-- Light rays -->
+  <path d="M24 16 L18 28" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M32 18 L32 32" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M40 16 L46 28" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <path d="M26 18 L22 30" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  <path d="M38 18 L42 30" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+</svg>

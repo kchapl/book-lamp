@@ -1,8 +1,16 @@
 /* Global styles - base styles loaded via HTML links in index.html */
 /* Additional React-specific styles can be added here */
 
+/* Import MD3 tokens */
+@import './tokens.css';
+
 #root {
     min-height: 100vh;
+}
+
+/* MD3 baseline reset */
+* {
+    box-sizing: border-box;
 }
 
 /* React component styles */
@@ -14,7 +22,7 @@
 }
 
 .error-message {
-    color: var(--color-error, #dc3545);
+    color: var(--md-sys-color-error);
     padding: 1rem;
 }
 
@@ -29,5 +37,23 @@
 
 .empty-state p {
     margin-bottom: 1.5rem;
-    color: var(--color-text-secondary, #666);
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+/* MD3 Surface containers */
+.md3-surface {
+    background-color: var(--md-sys-color-surface);
+    color: var(--md-sys-color-on-surface);
+}
+
+.md3-surface-container {
+    background-color: var(--md-sys-color-surface-container);
+}
+
+.md3-surface-container-low {
+    background-color: var(--md-sys-color-surface-container-low);
+}
+
+.md3-surface-container-high {
+    background-color: var(--md-sys-color-surface-container-high);
 }
