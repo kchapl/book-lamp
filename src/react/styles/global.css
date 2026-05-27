@@ -1,0 +1,33 @@
+/* Global styles - base styles loaded via HTML links in index.html */
+/* Additional React-specific styles can be added here */
+
+#root {
+    min-height: 100vh;
+}
+
+/* React component styles */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+}
+
+.error-message {
+    color: var(--color-error, #dc3545);
+    padding: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.empty-state h2 {
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    margin-bottom: 1.5rem;
+    color: var(--color-text-secondary, #666);
+}
