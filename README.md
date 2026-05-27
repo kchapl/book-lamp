@@ -7,10 +7,10 @@ to find and manage the specific spreadsheet across sessions. No broader access i
 
 ## Setup
 
-This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python, Node, Poetry).
+This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python, Node, uv).
 
 1. Install tools: `mise install`
-2. Install backend dependencies: `poetry install`
+2. Install backend dependencies: `uv sync`
 3. Install frontend dependencies: `npm install`
 3. Compile TypeScript: `npm run build`
 4. Create `.env` file with required variables:
@@ -21,13 +21,13 @@ This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python,
 
    SECRET_KEY=your_secret_key
    ```
-5. Run the app: `poetry run flask --app book_lamp.app run`
+5. Run the app: `uv run flask --app book_lamp.app run`
 
 ## Testing
 
 Run backend unit tests:
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 Run frontend unit tests:

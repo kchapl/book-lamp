@@ -11,16 +11,16 @@
 - **Metadata Enrichment:** Automatically fetches book covers and metadata (e.g., BISAC categories) from Open Library and Google Books.
 
 ### Core Technologies
-- **Backend:** Python 3.13, Flask, Poetry, psycopg3, Alembic.
+- **Backend:** Python 3.13, Flask, uv, psycopg3, Alembic.
 - **Frontend:** React 18, TypeScript, Vite (Build), React Router, @dnd-kit (Drag and Drop), html5-qrcode.
-- **Tooling:** `mise` (tool version management), `poetry`, `npm`, `ruff`, `mypy`, `black`, `isort`.
+- **Tooling:** `mise` (tool version management), `uv`, `npm`, `ruff`, `mypy`, `black`, `isort`.
 
 ---
 
 ## Building and Running
 
 ### Prerequisites
-- **mise**: (Required) This project uses `mise` to manage Python, Node, and Poetry versions. Ensure it is installed and configured.
+- **mise**: (Required) This project uses `mise` to manage Python, Node, and uv versions. Ensure it is installed and configured.
 
 ### Initial Setup
 1. **Install Tools:**
@@ -29,7 +29,7 @@
    ```
 2. **Install Dependencies:**
    ```bash
-   poetry install
+   uv sync --all-extras
    npm install
    ```
 2. **Configure Environment:**
@@ -44,7 +44,7 @@
 3. **Start Database:**
    ```bash
    podman-compose up -d
-   poetry run alembic upgrade head
+   uv run alembic upgrade head
    ```
 4. **Build Frontend:**
    ```bash
@@ -61,14 +61,14 @@
 ### Running the Application
 ```bash
 # Start the Flask development server
-poetry run flask --app book_lamp.app run
+uv run flask --app book_lamp.app run
 
 # For development with hot reload
 npm run dev
 ```
 
 ### Testing
-- **Backend (Pytest):** `poetry run pytest`
+- **Backend (Pytest):** `uv run pytest`
 - **Frontend (Vitest):** `npm test`
 - **Lighthouse:** `npm run lighthouse:ci`
 
@@ -84,7 +84,7 @@ npm run dev
 
 ### Coding Standards
 - **Python:**
-  - Use `poetry run` for all commands.
+  - Use `uv run` for all commands.
   - Format with `black` and `isort` (default configs).
   - Lint with `ruff` and type-check with `mypy` (strict mode).
   - Routes should be thin; delegate logic to services.

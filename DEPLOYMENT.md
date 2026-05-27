@@ -40,12 +40,12 @@ If you want Google login functionality:
 
 **Build Command:**
 ```bash
-npm ci && npm run build && pip install poetry && poetry install --without dev && poetry run alembic upgrade head
+npm ci && npm run build && uv sync --no-dev && uv run alembic upgrade head
 ```
 
 **Start Command:**
 ```bash
-poetry run gunicorn book_lamp.app:app
+uv run gunicorn book_lamp.app:app
 ```
 
 ### First-Time Setup
