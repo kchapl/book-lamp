@@ -42,6 +42,12 @@ export class JobTracker {
 
     /**
      * Starts monitoring the job.
+     *
+     * Note: Uses localStorage to persist job ID across page navigation.
+     * Security consideration: Job IDs are non-sensitive UUIDs, but if XSS
+     * is possible, an attacker could access this. The trade-off is needed to
+     * resume monitoring after navigation. For higher security requirements,
+     * consider sessionStorage with shorter TTL.
      */
     start(): void {
         console.log(`[JobTracker] Starting tracker for job ${this.jobId}`);
