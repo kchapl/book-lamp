@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 import re
+import secrets
 from collections import Counter
 from functools import wraps
 from typing import Union, cast
@@ -92,6 +93,47 @@ def is_test_mode() -> bool:
     unreliable when the variable was changed after import.
     """
     return os.environ.get("TEST_MODE", "0") == "1"
+
+
+def generate_csrf_token() -> str:
+    """Generate or retrieve a CSRF token for the current session."""
+    if "csrf_token" not in session:
+        token = secrets.token_hex(32)
+        session["csrf_token"] = token
+    else:
+        token = session["csrf_token"]
+    # Store in g for after_request hook
+    g.csrf_token = token
+    return token
+
+
+def csrf_protect(f):
+    """Decorator to protect routes from CSRF attacks."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip CSRF check in test mode or if session doesn't exist yet
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            # Skip CSRF check for test mode (testing infrastructure handles it)
+            # Also skip if there's no user_id in session (not authenticated anyway)
+            if is_test_mode() or not session.get("user_id"):
+                return f(*args, **kwargs)
+
+            # Verify the CSRF token
+            submitted_token = request.headers.get("X-CSRF-Token") or request.form.get(
+                "csrf_token"
+            )
+            session_token = session.get("csrf_token")
+            if not session_token or submitted_token != session_token:
+                app.logger.warning(
+                    f"CSRF validation failed for {request.endpoint}: "
+                    f"submitted={submitted_token[:8] if submitted_token else 'None'}, "
+                    f"session={session_token[:8] if session_token else 'None'}"
+                )
+                return jsonify({"error": "CSRF token validation failed"}), 403
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 # Global singleton for test mode only
@@ -237,6 +279,7 @@ def get_job_status(job_id: str):
 
 @app.route("/api/settings", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def update_settings():
     """Update user settings."""
     data = request.json
@@ -278,8 +321,12 @@ def google_one_tap_login():
         from book_lamp.services.pg_storage import PostgresStorage
 
         user_id = PostgresStorage.upsert_user(email=email, name=name)
+
+        # Regenerate session to prevent session fixation attacks
+        session.clear()
         session["user_id"] = user_id
         session["user_email"] = email
+        session["csrf_token"] = secrets.token_hex(32)
 
         app.logger.info(f"Authentication successful for user: {email}")
 
@@ -357,7 +404,10 @@ def unauthorised():
 
 @app.route("/logout")
 def logout():
+    # Clear session completely to prevent session reuse
     session.clear()
+    # Ensure the session cookie is marked for removal
+    session.permanent = False
     flash("Successfully signed out.", "info")
     return redirect(url_for("home"))
 
@@ -386,7 +436,27 @@ def spa_fallback(fallback):
 
 
 # Secret key for session management
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key and not is_test_mode():
+    raise ValueError(
+        "SECRET_KEY environment variable is required. "
+        "Please set it in your .env file. "
+        'Generate a secure key with: python -c "import secrets; print(secrets.token_hex(32))"'
+    )
+elif not secret_key:
+    # Only use for test mode - still warn operators
+    secret_key = "test-only-insecure-key-do-not-use-in-production"
+    logging.getLogger(__name__).warning(
+        "SECRET_KEY not set - using insecure default for TEST MODE ONLY. "
+        "This is acceptable for automated testing but NOT for production."
+    )
+
+app.config["SECRET_KEY"] = secret_key
+
+# Session cookie security settings
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = not is_test_mode()  # Enable Secure in production
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Google OAuth configuration (One Tap only needs Client ID)
 app.config["GOOGLE_CLIENT_ID"] = os.environ.get("GOOGLE_CLIENT_ID")
@@ -402,6 +472,20 @@ if not is_test_mode():
 
     # Authentication is required - Google One Tap is the authentication method
     app.logger.info("Authentication required: Google One Tap authentication is enabled")
+
+
+@app.after_request
+def add_csrf_token_header(response):
+    """Add CSRF token to response headers for AJAX requests."""
+    if "csrf_token" in g:
+        response.headers["X-CSRF-Token"] = g.csrf_token
+    return response
+
+
+@app.context_processor
+def inject_csrf_token():
+    """Inject CSRF token into all templates."""
+    return {"csrf_token": generate_csrf_token()}
 
 
 @app.cli.command("backfill-bisac")
@@ -614,6 +698,7 @@ def api_get_reading_list():
 
 @app.route("/reading-list/reorder", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def reorder_reading_list():
     storage = get_storage()
     book_ids = request.json.get("book_ids", [])
@@ -623,6 +708,7 @@ def reorder_reading_list():
 
 @app.route("/reading-list/remove/<int:book_id>", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def remove_from_reading_list(book_id: int):
     storage = get_storage()
     storage.remove_from_reading_list(book_id)
@@ -632,6 +718,7 @@ def remove_from_reading_list(book_id: int):
 
 @app.route("/books/<int:book_id>/start-reading", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def start_reading(book_id: int):
     """Move book from reading list to reading log and set status to 'In Progress'."""
     app.logger.info(f"START_READING initiation: book_id={book_id}")
@@ -650,6 +737,7 @@ def start_reading(book_id: int):
 
 @app.route("/books/<int:book_id>/add-to-reading-list", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def add_existing_to_reading_list(book_id: int):
     storage = get_storage()
     try:
@@ -1585,6 +1673,7 @@ def book_detail(book_id: int):
 
 @app.route("/books/<int:book_id>/reading-records", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def create_reading_record(book_id: int):
     storage = get_storage()
     status = request.form.get("status")
@@ -1631,6 +1720,7 @@ def _get_safe_redirect_target(target: str | None) -> str | None:
 
 @app.route("/reading-records/<int:record_id>/edit", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def update_reading_record(record_id: int):
     storage = get_storage()
     status = request.form.get("status")
@@ -1663,6 +1753,7 @@ def update_reading_record(record_id: int):
 
 @app.route("/reading-records/<int:record_id>/delete", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def delete_reading_record(record_id: int):
     storage = get_storage()
     try:
@@ -1681,6 +1772,7 @@ def delete_reading_record(record_id: int):
 
 @app.route("/books", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def create_book():
     storage = get_storage()
     from book_lamp.utils.books import normalize_isbn
@@ -1863,6 +1955,7 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
 
 @app.route("/books/fetch-covers", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def fetch_missing_data():
     """Queue background job to fetch missing data (covers, metadata) for all books."""
     job_queue = get_job_queue()
@@ -1944,6 +2037,7 @@ def _background_import_books(
 
 @app.route("/books/import", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def import_books():
     """Queue background job to import books from Libib CSV."""
     job_queue = get_job_queue()
@@ -1990,6 +2084,7 @@ def import_books():
 
 @app.route("/books/<int:book_id>/edit", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def edit_book(book_id: int):
     storage = get_storage()
     # Extract data from form
@@ -2048,6 +2143,7 @@ def edit_book(book_id: int):
 
 @app.route("/books/<int:book_id>/delete", methods=["POST"])
 @authorisation_required
+@csrf_protect
 def delete_book(book_id: int):
     storage = get_storage()
     success = storage.delete_book(book_id)
