@@ -1,26 +1,37 @@
 {
-    "name": "book-lamp-frontend",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "tsc",
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage",
-        "lighthouse:ci": "lhci autorun",
-        "lighthouse:fast": "lhci autorun --collect.numberOfRuns=1",
-        "lighthouse:report": "poetry run python scripts/lhci_actionable_report.py",
-        "lighthouse:fast:report": "npm run lighthouse:fast; npm run lighthouse:report"
-    },
-    "devDependencies": {
-        "@lhci/cli": "^0.15.1",
-        "@vitest/coverage-v8": "^3.0.0",
-        "jsdom": "^26.0.0",
-        "typescript": "^5.0.0",
-        "vitest": "^3.0.0"
-    },
-    "dependencies": {
-        "html5-qrcode": "^2.3.8"
-    }
+  "name": "book-lamp-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lighthouse:ci": "lhci autorun",
+    "lighthouse:fast": "lhci autorun --collect.numberOfRuns=1",
+    "lighthouse:report": "poetry run python scripts/lhci_actionable_report.py",
+    "lighthouse:fast:report": "npm run lighthouse:fast; npm run lighthouse:report",
+    "build:react": "vite build",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "@lhci/cli": "0.15.1",
+    "@types/node": "^25.9.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "3.2.4",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3",
+    "vite": "^8.0.14",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "html5-qrcode": "2.3.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.3"
+  }
 }

@@ -9,7 +9,6 @@ from typing import Union, cast
 from urllib.parse import urlparse
 
 import click  # noqa: E402
-from authlib.integrations.flask_client import OAuth  # type: ignore  # noqa: E402
 from dotenv import load_dotenv
 from flask import (  # noqa: E402
     Flask,
@@ -23,13 +22,11 @@ from flask import (  # noqa: E402
     url_for,
 )
 
-from book_lamp.services import sheets_storage as from_sheets_storage
-from book_lamp.services.async_sqlite_storage import AsyncSQLiteStorage
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.llm_client import LLMClient
 from book_lamp.services.mock_storage import MockStorage
-from book_lamp.services.sheets_storage import GoogleSheetsStorage
+from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
     is_valid_isbn13,
@@ -38,10 +35,6 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.libib_import import parse_libib_csv
-from book_lamp.utils.protobuf_patch import apply_patch
-
-# Apply security patch for CVE-2026-0994
-apply_patch()
 
 
 def get_safe_redirect_target(fallback_endpoint: str) -> str:
@@ -103,40 +96,29 @@ def is_test_mode() -> bool:
 
 # Global singleton for test mode only
 _mock_storage_singleton = MockStorage()
-_async_storage_singleton: AsyncSQLiteStorage | None = None
 
 
 def get_storage():
     """Get the appropriate storage backend for the current request context."""
-    global _async_storage_singleton
     if is_test_mode():
+        # Authorise storage for Lighthouse CI and other automated testing
+        _mock_storage_singleton.set_authorised(True)
         return _mock_storage_singleton
-    if os.environ.get("ASYNC_SQLITE_STORAGE", "0") == "1":
-        if _async_storage_singleton is None:
-            is_prod = os.environ.get("FLASK_ENV") == "production"
-            sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-            _async_storage_singleton = AsyncSQLiteStorage(sheet_name=sheet_name)
-        _async_storage_singleton.configure_remote(
-            credentials_dict=session.get("credentials"),
-            spreadsheet_id=session.get("spreadsheet_id"),
-        )
-        return _async_storage_singleton
-    if "storage" not in g:
-        app.logger.info("Initializing storage for request...")
-        # Use different sheet names for production and development
-        # FLASK_DEBUG=True or lack of FLASK_ENV=production indicates development
-        is_prod = os.environ.get("FLASK_ENV") == "production"
-        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
 
-        # Initialize implementation with credentials from session
-        credentials = session.get("credentials")
-        spreadsheet_id = session.get("spreadsheet_id")
-        g.storage = GoogleSheetsStorage(
-            sheet_name=sheet_name,
-            credentials_dict=credentials,
-            spreadsheet_id=spreadsheet_id,
-        )
-    return g.storage
+    user_id = session.get("user_id")
+    if user_id:
+        from book_lamp.services.pg_storage import PostgresStorage
+
+        return PostgresStorage(user_id=user_id)
+
+    # Authentication is required - no bypass allowed (except in test mode)
+    # Return a storage that will always fail authorization checks
+    from book_lamp.services.mock_storage import MockStorage
+
+    unauthed = MockStorage()
+    unauthed.set_authorised(False)
+    app.logger.warning("Unauthenticated access attempted - no bypass allowed")
+    return unauthed
 
 
 def get_llm_client() -> LLMClient:
@@ -150,7 +132,19 @@ def authorisation_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         app.logger.info(f"AUTHORISATION_CHECK for route: {f.__name__}")
+
+        # Always require valid user_id in session (except in test mode)
+        user_id = session.get("user_id")
+        if not user_id and not is_test_mode():
+            app.logger.warning(
+                f"Authorization failed for {f.__name__}: no user_id in session"
+            )
+            return redirect(url_for("unauthorised"))
+
         if not get_storage().is_authorised():
+            app.logger.warning(
+                f"Authorization failed for {f.__name__}: storage not authorised"
+            )
             return redirect(url_for("unauthorised"))
         return f(*args, **kwargs)
 
@@ -159,13 +153,13 @@ def authorisation_required(f):
 
 def get_app_version():
     """Get the application version based on environment."""
-    if os.environ.get("FLASK_ENV") == "production":
-        # Check for common deployment commit hash environment variables
-        for env_var in ["RENDER_GIT_COMMIT", "GIT_COMMIT", "HEROKU_SLUG_COMMIT"]:
-            val = os.environ.get(env_var)
-            if val:
-                return val[:7]
-        return "prod"
+    # Check for common deployment commit hash environment variables
+    for env_var in ["RENDER_GIT_COMMIT", "GIT_COMMIT", "HEROKU_SLUG_COMMIT"]:
+        val = os.environ.get(env_var)
+        if val:
+            return val[:7]
+
+    # Default version
     return "dev"
 
 
@@ -181,29 +175,20 @@ if not os.environ.get("LLM_API_KEY"):
 
 @app.context_processor
 def inject_global_vars():
-    # Use a fast check for the template context to avoid redundant storage creation
-    is_auth = False
-    if "credentials" in session:
-        # In test mode, we might want to still call is_authorised
-        if is_test_mode():
-            is_auth = get_storage().is_authorised()
-        else:
-            is_auth = True
-
-    # Fetch user theme preference
-    theme = "dark"
-    if is_auth:
-        try:
-            settings = get_storage().get_settings()
-            theme = settings.get("theme", "dark")
-        except Exception:
-            app.logger.warning("Failed to fetch settings for template injection")
+    """Inject variables into all templates."""
+    # Only check storage auth if user_id exists in session
+    user_id = session.get("user_id")
+    if user_id:
+        is_auth = get_storage().is_authorised()
+    else:
+        is_auth = False
+    user_name = session.get("user_name")
 
     return {
         "is_authorised": is_auth,
+        "user_name": user_name,
         "current_year": datetime.datetime.now().year,
         "app_version": getattr(app, "app_version", APP_VERSION),
-        "user_theme": theme,
     }
 
 
@@ -267,15 +252,48 @@ def update_settings():
     return jsonify({"success": True})
 
 
+@app.route("/api/auth/google", methods=["POST"])
+def google_one_tap_login():
+    """Verify a Google One Tap credential JWT and create a session."""
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    # Note: We allow this in test mode so we can test the logic with mocks.
+    # The real Google verify will be mocked in tests.
+
+    data = request.get_json(silent=True) or {}
+    credential = data.get("credential")
+    if not credential:
+        return jsonify({"error": "Missing credential"}), 400
+
+    try:
+        id_info = id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            app.config["GOOGLE_CLIENT_ID"],
+        )
+        email = id_info["email"]
+        name = id_info.get("name", "")
+
+        from book_lamp.services.pg_storage import PostgresStorage
+
+        user_id = PostgresStorage.upsert_user(email=email, name=name)
+        session["user_id"] = user_id
+        session["user_email"] = email
+
+        app.logger.info(f"Authentication successful for user: {email}")
+
+        return jsonify({"ok": True})
+    except ValueError as e:
+        app.logger.exception(f"One Tap credential verification failed: {e}")
+        app.logger.warning(f"Authentication failure: {e}")
+        return jsonify({"error": "Invalid credential"}), 401
+
+
 @app.route("/api/sync/diagnostics", methods=["GET"])
 @authorisation_required
 def sync_diagnostics():
-    """Return async sync diagnostics when SQLite async storage is enabled."""
-    storage = get_storage()
-    if isinstance(storage, AsyncSQLiteStorage) or hasattr(
-        storage, "get_sync_diagnostics"
-    ):
-        return jsonify(storage.get_sync_diagnostics())
+    """Return sync diagnostics (legacy, now disabled)."""
     return jsonify({"enabled": False, "message": "Async SQLite storage is disabled"})
 
 
@@ -319,13 +337,16 @@ def api_recommendations():
 
 @app.route("/")
 def home():
-    is_authorised = get_storage().is_authorised()
+    """Home page - public and shows sign-in or dashboard based on authentication."""
+    # Only check session for auth state - don't call get_storage() for non-authenticated users
+    user_id = session.get("user_id")
+    is_authorised = user_id is not None
     return render_template("home.html", is_authorised=is_authorised)
 
 
 @app.route("/about")
-@authorisation_required
 def about():
+    """Public about page - no authentication required."""
     return render_template("about.html", version=APP_VERSION)
 
 
@@ -336,10 +357,18 @@ def unauthorised():
 
 @app.route("/logout")
 def logout():
-    if is_test_mode():
-        return redirect(url_for("test_disconnect"))
     session.clear()
-    flash("Google Sheets disconnected.", "info")
+    flash("Successfully signed out.", "info")
+    return redirect(url_for("home"))
+
+
+@app.route("/connect")
+def connect():
+    """Redirect to home page which displays the Google sign-in UI."""
+    # The home page will show the Google sign-in flow when not authenticated.
+    # If already authenticated, redirect to books.
+    if session.get("user_id"):
+        return redirect(url_for("list_books"))
     return redirect(url_for("home"))
 
 
@@ -348,15 +377,19 @@ def favicon():
     return app.send_static_file("favicon.png")
 
 
+@app.route("/<path:fallback>")
+def spa_fallback(fallback):
+    """Catch-all for SPA routing - serve index.html for non-API routes."""
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Not found"}), 404
+    return render_template("index.html")
+
+
 # Secret key for session management
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
-# Google OAuth configuration
+# Google OAuth configuration (One Tap only needs Client ID)
 app.config["GOOGLE_CLIENT_ID"] = os.environ.get("GOOGLE_CLIENT_ID")
-app.config["GOOGLE_CLIENT_SECRET"] = os.environ.get("GOOGLE_CLIENT_SECRET")
-app.config["GOOGLE_DISCOVERY_URL"] = (
-    "https://accounts.google.com/.well-known/openid-configuration"
-)
 
 # Validate OAuth configuration (skip in test mode)
 if not is_test_mode():
@@ -366,105 +399,9 @@ if not is_test_mode():
             "Please set it in your .env file. "
             "Get credentials from https://console.cloud.google.com/"
         )
-    if not app.config["GOOGLE_CLIENT_SECRET"]:
-        raise ValueError(
-            "GOOGLE_CLIENT_SECRET environment variable is required. "
-            "Please set it in your .env file. "
-            "Get credentials from https://console.cloud.google.com/"
-        )
 
-oauth = OAuth(app)
-if not is_test_mode():
-    oauth.register(
-        name="google",
-        client_id=app.config["GOOGLE_CLIENT_ID"],
-        client_secret=app.config["GOOGLE_CLIENT_SECRET"],
-        server_metadata_url=app.config["GOOGLE_DISCOVERY_URL"],
-        client_kwargs={
-            "scope": " ".join(from_sheets_storage.SCOPES)
-        },  # drive.file only
-    )
-
-
-@app.route("/connect")
-def connect():
-    if is_test_mode():
-        return redirect(url_for("test_connect"))
-
-    try:
-        if (
-            "CODESPACE_NAME" in os.environ
-            and "GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN" in os.environ
-        ):
-            codespace_name = os.environ["CODESPACE_NAME"]
-            domain = os.environ["GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"]
-            redirect_uri = f"https://{codespace_name}-5000.{domain}/authorize"
-        else:
-            redirect_uri = url_for("authorize", _external=True)
-
-        app.logger.info(f"Initiating OAuth flow with redirect_uri: {redirect_uri}")
-        # Request offline access to get a refresh token
-        return oauth.google.authorize_redirect(
-            redirect_uri, access_type="offline", prompt="consent"
-        )
-    except Exception:
-        app.logger.exception("OAuth authorisation initiation failed")
-        return (
-            "<h1>Authorisation Error</h1>"
-            "<p>Failed to initiate Google authorisation.</p>"
-            "<p>Please check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set correctly.</p>"
-            "<a href='/'>Go back</a>"
-        ), 500
-
-
-@app.route("/authorize")
-def authorize():
-    try:
-        token = oauth.google.authorize_access_token()
-        app.logger.info("OAuth token received successfully")
-
-        # Save the token for GoogleSheetsStorage
-        if not is_test_mode():
-            # Bridging Authlib token to Google-auth format.
-            # Client ID and secret are NOT saved - they're read from env vars for security.
-            creds_data = {
-                "token": token.get("access_token"),
-                "refresh_token": token.get("refresh_token"),
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "scopes": from_sheets_storage.SCOPES,  # drive.file only
-            }
-            if token.get("expires_at"):
-                creds_data["expiry"] = (
-                    datetime.datetime.fromtimestamp(
-                        token["expires_at"], tz=datetime.timezone.utc
-                    )
-                    .isoformat()
-                    .replace("+00:00", "Z")
-                )
-
-            # Save credentials to session for this user
-            session["credentials"] = creds_data
-
-        flash("Google Sheets access authorised!", "success")
-        return redirect(url_for("home"))
-    except Exception:
-        app.logger.exception("Failed to authorise access token")
-        return (
-            "<h1>Authorisation Error</h1><p>Failed to complete Google authorisation.</p><a href='/'>Go back</a>"
-        ), 401
-
-
-@app.cli.command("init-sheets")
-def init_sheets_command():
-    """Initialize Google Sheets with required tabs and headers."""
-    if is_test_mode():
-        click.echo("Not available in test mode.")
-        return
-
-    # Note: This will likely fail in CLI since there is no session
-    # A robust CLI would need a way to input a token manually
-    get_storage().initialize_sheets()
-    click.echo("Google Sheets initialized successfully.")
+    # Authentication is required - Google One Tap is the authentication method
+    app.logger.info("Authentication required: Google One Tap authentication is enabled")
 
 
 @app.cli.command("backfill-bisac")
@@ -505,9 +442,6 @@ def backfill_bisac_command():
 def reading_history():
     """Show detailed reading history as a chronological list of individual events."""
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     history = storage.get_reading_history()
     # Get status list for filter dropdown (from all records)
@@ -563,6 +497,64 @@ def reading_history():
     )
 
 
+@app.route("/api/history", methods=["GET"])
+@authorisation_required
+def api_reading_history():
+    """API endpoint for reading history data."""
+    storage = get_storage()
+
+    history = storage.get_reading_history()
+    all_statuses = sorted(
+        list(set(r.get("status") for r in history if r.get("status")))
+    )
+
+    status_filter = request.args.get("status")
+    if status_filter:
+        history = [r for r in history if r.get("status") == status_filter]
+
+    min_rating = request.args.get("min_rating")
+    if min_rating and min_rating.isdigit():
+        min_rating = int(min_rating)
+        history = [r for r in history if r.get("rating", 0) >= min_rating]
+
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        history = [
+            r
+            for r in history
+            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
+            or (
+                not r.get("end_date")
+                and r.get("start_date")
+                and r.get("start_date")[:4] == year_filter
+            )
+        ]
+
+    sort_by = request.args.get("sort", "date_desc")
+
+    if sort_by == "date_desc":
+        history.sort(
+            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
+        )
+    elif sort_by == "date_asc":
+        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
+    elif sort_by == "rating_desc":
+        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
+    elif sort_by == "title":
+        history.sort(key=lambda r: (r.get("book_title") or "").lower())
+
+    return jsonify({
+        "history": history,
+        "statuses": all_statuses,
+        "filters": {
+            "status": status_filter,
+            "rating": min_rating,
+            "year": year_filter,
+            "sort": sort_by,
+        }
+    })
+
+
 # -----------------------------
 # Books feature
 # -----------------------------
@@ -573,27 +565,51 @@ def reading_history():
 def new_book_form():
     isbn = request.args.get("isbn", "")
     show_manual = request.args.get("manual", "0") == "1"
-    return render_template("add_book.html", isbn=isbn, show_manual=show_manual)
+    add_to_reading_list = request.args.get("add_to_reading_list", "0") == "1"
+    return render_template(
+        "add_book.html",
+        isbn=isbn,
+        show_manual=show_manual,
+        add_to_reading_list=add_to_reading_list,
+    )
 
 
 @app.route("/reading-list", methods=["GET"])
 @authorisation_required
 def reading_list():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     rl_items = storage.get_reading_list()
+    # Extract books directly from reading_list query (already joined with books table)
     books = []
-
-    all_books = storage.get_all_books()
-    book_map = {b["id"]: b for b in all_books}
     for item in rl_items:
-        if item["book_id"] in book_map:
-            books.append(book_map[item["book_id"]])
+        book = {
+            "id": item["book_id"],
+            "title": item["title"],
+            "author": item["author"],
+            "thumbnail_url": item.get("thumbnail_url"),
+        }
+        books.append(book)
 
     return render_template("reading_list.html", books=books)
+
+
+@app.route("/api/reading-list", methods=["GET"])
+@authorisation_required
+def api_get_reading_list():
+    """API endpoint to get reading list."""
+    storage = get_storage()
+    rl_items = storage.get_reading_list()
+    books = []
+    for item in rl_items:
+        book = {
+            "id": item["book_id"],
+            "title": item["title"],
+            "author": item["author"],
+            "thumbnail_url": item.get("thumbnail_url"),
+        }
+        books.append(book)
+    return jsonify({"books": books})
 
 
 @app.route("/reading-list/reorder", methods=["POST"])
@@ -639,8 +655,7 @@ def add_existing_to_reading_list(book_id: int):
     try:
         storage.add_to_reading_list(book_id)
         app.logger.info(f"Successfully added book ID {book_id} to reading list")
-        if storage.spreadsheet_id:
-            session["spreadsheet_id"] = storage.spreadsheet_id
+
         flash("Added to reading list.", "success")
     except Exception as e:
         app.logger.error(
@@ -654,9 +669,6 @@ def add_existing_to_reading_list(book_id: int):
 @authorisation_required
 def list_books():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
@@ -772,6 +784,109 @@ def list_books():
     )
 
 
+@app.route("/api/books", methods=["GET"])
+@authorisation_required
+def api_list_books():
+    """API endpoint for books list."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    all_records = storage.get_reading_records()
+
+    sort_by = request.args.get("sort", "reading_date")
+    if sort_by not in SORT_OPTIONS:
+        sort_by = "reading_date"
+
+    books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") >= latest_records[bid].get("start_date", ""):
+                latest_records[bid] = r
+
+    for book in books:
+        record = latest_records.get(book.get("id"))
+        if record:
+            book["latest_status"] = record.get("status")
+
+    books = [
+        b
+        for b in books
+        if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
+    ]
+
+    # Apply filters
+    status_filter = request.args.get("status")
+    if status_filter:
+        books = [b for b in books if b.get("latest_status") == status_filter]
+
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[:4] == year_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    month_filter = request.args.get("month")
+    if month_filter and month_filter.isdigit():
+        month_idx = f"{int(month_filter):02d}"
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[5:7] == month_idx:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    rating_filter = request.args.get("rating")
+    if rating_filter and rating_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                if str(record.get("rating")) == rating_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    category_filter = request.args.get("category")
+    if category_filter:
+        filtered_books = []
+        for b in books:
+            bisac = b.get("bisac_category")
+            if bisac and category_filter.lower() in str(bisac).lower():
+                filtered_books.append(b)
+        books = filtered_books
+
+    all_categories = set()
+    for b in storage.get_all_books():
+        bisac = b.get("bisac_category")
+        if bisac:
+            top_level = str(bisac).split("/")[0].strip()
+            all_categories.add(top_level)
+    sorted_categories = sorted(list(all_categories))
+
+    return jsonify({
+        "books": books,
+        "sort": sort_by,
+        "sort_options": SORT_OPTIONS,
+        "filters": {
+            "status": status_filter,
+            "year": year_filter,
+            "month": month_filter,
+            "rating": rating_filter,
+            "category": category_filter,
+        },
+        "categories": sorted_categories,
+    })
+
+
 @app.route("/books/search", methods=["GET"])
 @authorisation_required
 def search_books():
@@ -843,9 +958,6 @@ def author_page(author_slug: str):
     """
 
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     all_user_books = storage.get_all_books()
     rl_items = storage.get_reading_list()
@@ -943,13 +1055,132 @@ def author_page(author_slug: str):
     )
 
 
+@app.route("/api/author/<path:author_slug>", methods=["GET"])
+@authorisation_required
+def api_author_page(author_slug: str):
+    """API endpoint for author page."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    rl_items = storage.get_reading_list()
+    reading_list_book_ids = {item["book_id"] for item in rl_items}
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-").replace(".", "") if name else ""
+
+    search_slug = author_slug.lower()
+
+    author_books = []
+    display_author_name = author_slug.replace("-", " ").title()
+
+    for book in books:
+        if book.get("authors"):
+            for a in book["authors"]:
+                if to_slug(a) == search_slug:
+                    author_books.append(book)
+                    display_author_name = a
+                    break
+        elif book.get("author"):
+            if to_slug(book["author"]) == search_slug:
+                author_books.append(book)
+                display_author_name = book["author"]
+
+    for book in author_books:
+        book["is_owned"] = True
+        book["in_reading_list"] = book["id"] in reading_list_book_ids
+
+    read_books = [b for b in author_books if not b["in_reading_list"]]
+    reading_list_books = [b for b in author_books if b["in_reading_list"]]
+
+    def sort_key(b):
+        py = b.get("publication_year")
+        try:
+            year = int(py) if py else 0
+        except (ValueError, TypeError):
+            year = 0
+        return (year, (b.get("title") or "").lower())
+
+    read_books.sort(key=sort_key)
+    reading_list_books.sort(key=sort_key)
+
+    unread_books: list[dict] = []
+    if not is_test_mode():
+        try:
+            external_books = lookup_books_by_author(display_author_name)
+            owned_isbns = {
+                b.get("isbn13", "").replace("-", "").replace(" ", "")
+                for b in author_books
+                if b.get("isbn13")
+            }
+            owned_norm_titles = {
+                b.get("title", "").strip().lower() for b in author_books
+            }
+
+            for ext_book in external_books:
+                isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
+                norm_title = ext_book.get("title", "").strip().lower()
+                if isbn and isbn in owned_isbns:
+                    continue
+                if norm_title in owned_norm_titles:
+                    continue
+                ext_book["is_owned"] = False
+                ext_book["in_reading_list"] = False
+                ext_book["id"] = None
+                unread_books.append(ext_book)
+                owned_norm_titles.add(norm_title)
+        except Exception:
+            app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
+
+    return jsonify({
+        "author_name": display_author_name,
+        "read_books": read_books,
+        "reading_list_books": reading_list_books,
+        "unread_books": unread_books,
+    })
+
+
+@app.route("/api/publisher/<path:publisher_slug>", methods=["GET"])
+@authorisation_required
+def api_publisher_page(publisher_slug: str):
+    """API endpoint for publisher page."""
+    storage = get_storage()
+    books = storage.get_all_books()
+
+    publisher_books = []
+    display_publisher_name = publisher_slug.replace("-", " ").title()
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-") if name else ""
+
+    search_slug = publisher_slug.lower()
+
+    for book in books:
+        if book.get("publisher"):
+            norm_pub = _normalize_publisher(book["publisher"])
+            if norm_pub and to_slug(norm_pub) == search_slug:
+                publisher_books.append(book)
+                display_publisher_name = norm_pub
+
+    def sort_key(b):
+        py = b.get("publication_year")
+        try:
+            year = int(py) if py else 0
+        except (ValueError, TypeError):
+            year = 0
+        return (year, (b.get("title") or "").lower())
+
+    publisher_books.sort(key=sort_key)
+
+    return jsonify({
+        "publisher_name": display_publisher_name,
+        "books": publisher_books,
+    })
+
+
 @app.route("/publisher/<path:publisher_slug>", methods=["GET"])
 @authorisation_required
 def publisher_page(publisher_slug: str):
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
 
@@ -990,9 +1221,6 @@ def publisher_page(publisher_slug: str):
 @authorisation_required
 def collection_stats():
     storage = get_storage()
-    storage.prefetch()
-    if storage.spreadsheet_id:
-        session["spreadsheet_id"] = storage.spreadsheet_id
 
     books = storage.get_all_books()
     all_records = storage.get_reading_records()
@@ -1081,9 +1309,14 @@ def collection_stats():
     # Yearly counts
     yearly_counts = Counter()
     for r in completed_records:
-        date_str = r.get("end_date", "")
-        if date_str and len(date_str) >= 4:
-            year = date_str[:4]
+        date_val = r.get("end_date")
+        if date_val:
+            if isinstance(date_val, datetime.date):
+                year = str(date_val.year)
+            elif isinstance(date_val, str) and len(date_val) >= 4:
+                year = date_val[:4]
+            else:
+                continue
             if year.isdigit():
                 yearly_counts[year] += 1
 
@@ -1160,6 +1393,170 @@ def collection_stats():
         max_month_count=max_month_count,
         avg_month_count=avg_month_count,
     )
+
+
+@app.route("/api/stats", methods=["GET"])
+@authorisation_required
+def api_collection_stats():
+    """API endpoint for collection statistics."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    all_records = storage.get_reading_records()
+
+    completed_records = [r for r in all_records if r.get("status") == "Completed"]
+    completed_book_ids = {r.get("book_id") for r in completed_records}
+    completed_books = [b for b in books if b.get("id") in completed_book_ids]
+
+    total_books = len(completed_books)
+    total_records = len(all_records)
+
+    valid_ratings = []
+    for r in all_records:
+        rating_val = r.get("rating")
+        try:
+            if rating_val and int(rating_val) > 0:
+                valid_ratings.append(int(rating_val))
+        except (ValueError, TypeError):
+            continue
+    avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
+
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") > latest_records[bid].get("start_date", ""):
+                latest_records[bid] = r
+
+    allowed_statuses = {"In Progress", "Completed", "Abandoned"}
+    statuses = []
+    for b in books:
+        bid = b.get("id")
+        if bid in latest_records:
+            status = latest_records[bid].get("status")
+            if status in allowed_statuses:
+                statuses.append(status)
+    status_counts = Counter(statuses)
+
+    rating_counts = Counter()
+    for r in all_records:
+        if r.get("status") == "Completed":
+            try:
+                r_val = int(r.get("rating", 0))
+                if 1 <= r_val <= 5:
+                    rating_counts[r_val] += 1
+            except (ValueError, TypeError):
+                continue
+
+    rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
+
+    all_authors = []
+    for b in completed_books:
+        if b.get("authors"):
+            all_authors.extend(b["authors"])
+        elif b.get("author"):
+            all_authors.append(b["author"])
+
+    total_authors = len(set(all_authors))
+    top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]
+
+    all_publishers = []
+    for b in completed_books:
+        if b.get("publisher"):
+            norm_pub = _normalize_publisher(b["publisher"])
+            if norm_pub:
+                all_publishers.append(norm_pub)
+    top_publishers = sorted(Counter(all_publishers).items(), key=lambda x: (-x[1], x[0]))[:5]
+
+    completed_records_for_dates = [
+        r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
+    ]
+
+    yearly_counts = Counter()
+    for r in completed_records_for_dates:
+        date_val = r.get("end_date")
+        if date_val:
+            if isinstance(date_val, datetime.date):
+                year = str(date_val.year)
+            elif isinstance(date_val, str) and len(date_val) >= 4:
+                year = date_val[:4]
+            else:
+                continue
+            if year.isdigit():
+                yearly_counts[year] += 1
+
+    sorted_years = sorted(yearly_counts.items())
+    max_year_count = max(yearly_counts.values()) if yearly_counts else 1
+
+    monthly_counts = Counter()
+    for r in completed_records_for_dates:
+        date_str = r.get("end_date", "")
+        if date_str and len(date_str) >= 7:
+            month_idx = date_str[5:7]
+            if month_idx.isdigit():
+                monthly_counts[month_idx] += 1
+
+    ordered_months = []
+    for i in range(1, 13):
+        idx_str = f"{i:02d}"
+        name = calendar.month_name[i][:3]
+        ordered_months.append({"index": i, "name": name, "count": monthly_counts[idx_str]})
+
+    max_month_count = max(monthly_counts.values()) if monthly_counts else 1
+
+    category_bins = Counter()
+    for b in completed_books:
+        bisac = b.get("bisac_category")
+        if bisac:
+            main_cat, _ = parse_bisac_category(bisac)
+            if main_cat:
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                category_bins[norm_cat] += 1
+
+    all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
+    category_distribution = all_categories_sorted[:10]
+    if len(all_categories_sorted) > 10:
+        other_total = sum(count for label, count in all_categories_sorted[10:])
+        category_distribution.append(("Other", other_total))
+
+    max_category_count = max(count for label, count in category_distribution) if category_distribution else 1
+
+    return jsonify({
+        "total_books": total_books,
+        "total_authors": total_authors,
+        "total_records": total_records,
+        "avg_rating": avg_rating,
+        "status_counts": dict(status_counts),
+        "rating_distribution": rating_distribution,
+        "top_authors": [{"name": name, "count": count} for name, count in top_authors],
+        "top_publishers": [{"name": name, "count": count} for name, count in top_publishers],
+        "category_distribution": [{"label": label, "count": count} for label, count in category_distribution],
+        "max_category_count": max_category_count,
+        "yearly_counts": sorted_years,
+        "max_year_count": max_year_count,
+        "monthly_counts": ordered_months,
+        "max_month_count": max_month_count,
+    })
+
+
+@app.route("/api/books/<int:book_id>", methods=["GET"])
+@authorisation_required
+def api_book_detail(book_id: int):
+    """API endpoint for book detail."""
+    storage = get_storage()
+    book = storage.get_book_by_id(book_id)
+    if not book:
+        return jsonify({"error": "Book not found"}), 404
+
+    all_records = storage.get_reading_records()
+    book["reading_records"] = [r for r in all_records if r["book_id"] == book_id]
+    book["reading_records"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
+
+    rl_items = storage.get_reading_list()
+    is_planned = any(item["book_id"] == book_id for item in rl_items)
+    book["is_planned"] = is_planned
+
+    return jsonify(book)
 
 
 @app.route("/books/<int:book_id>", methods=["GET"])
@@ -1380,7 +1777,9 @@ def create_book():
             f"No book metadata found for ISBN {isbn}. You can enter details manually below.",
             "info",
         )
-        return redirect(url_for("new_book_form", isbn=isbn, manual=1))
+        return redirect(
+            url_for("new_book_form", isbn=isbn, manual=1, add_to_reading_list=1)
+        )
 
     try:
         created_book = storage.add_book(
@@ -1412,8 +1811,7 @@ def create_book():
         app.logger.info(
             f"BOOK_MOVED_TO_READING_LIST: id={created_book['id']}, status='Plan to Read'"
         )
-        if storage.spreadsheet_id:
-            session["spreadsheet_id"] = storage.spreadsheet_id
+
         flash("Book added to your reading list.", "success")
     except Exception as e:
         app.logger.error(
@@ -1426,19 +1824,17 @@ def create_book():
     return redirect(url_for("reading_list"))
 
 
-def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: str):
+def _background_fetch_missing_data(job_id: str, user_id: int):
     """Background task: bulk fetch missing data (covers, metadata) for all books."""
     from book_lamp.services.book_lookup import enhance_books_batch
 
     try:
-        # Create storage with passed credentials (outside request context)
-        storage: Union[MockStorage, GoogleSheetsStorage]
+        # Create storage (outside request context)
+        storage: Union[MockStorage, PostgresStorage]
         if is_test_mode():
             storage = _mock_storage_singleton
         else:
-            storage = GoogleSheetsStorage(
-                sheet_name=sheet_name, credentials_dict=credentials_dict
-            )
+            storage = PostgresStorage(user_id=user_id)
 
         books = storage.get_all_books()
         app.logger.info(
@@ -1470,17 +1866,10 @@ def _background_fetch_missing_data(job_id: str, credentials_dict, sheet_name: st
 def fetch_missing_data():
     """Queue background job to fetch missing data (covers, metadata) for all books."""
     job_queue = get_job_queue()
-
-    # Capture request-context data before submitting to background thread
-    credentials_dict = session.get("credentials")
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
     job_id = job_queue.submit_job(
         "fetch_missing_data",
         _background_fetch_missing_data,
-        credentials_dict,
-        sheet_name,
+        session["user_id"],
     )
 
     flash(
@@ -1495,15 +1884,10 @@ def fetch_missing_data():
 def fetch_missing_categories():
     """Trigger backfill of BISAC categories from the stats page."""
     job_queue = get_job_queue()
-    credentials_dict = session.get("credentials")
-    is_prod = os.environ.get("FLASK_ENV") == "production"
-    sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
     job_id = job_queue.submit_job(
         "backfill_bisac",
         _background_fetch_missing_data,  # Reusing the background fetcher which now includes categories
-        credentials_dict,
-        sheet_name,
+        session["user_id"],
     )
 
     flash(
@@ -1520,20 +1904,18 @@ def import_books_form():
 
 
 def _background_import_books(
-    job_id: str, content: str, fetch_metadata: bool, credentials_dict, sheet_name: str
+    job_id: str, content: str, fetch_metadata: bool, user_id: int
 ):
     """Background task: import books from Libib CSV."""
     app.logger.info(f"Background job {job_id}: parsing CSV content...")
 
     try:
-        # Create storage with passed credentials (outside request context)
-        storage: Union[MockStorage, GoogleSheetsStorage]
+        # Create storage (outside request context)
+        storage: Union[MockStorage, PostgresStorage]
         if is_test_mode():
             storage = _mock_storage_singleton
         else:
-            storage = GoogleSheetsStorage(
-                sheet_name=sheet_name, credentials_dict=credentials_dict
-            )
+            storage = PostgresStorage(user_id=user_id)
 
         items = parse_libib_csv(content)
         app.logger.info(f"Background job {job_id}: parsed {len(items)} items from CSV")
@@ -1575,6 +1957,7 @@ def import_books():
         flash("No selected file", "error")
         return redirect(url_for("import_books_form"))
 
+    # pyrefly: ignore [missing-attribute]
     if not file or not file.filename.endswith(".csv"):
         flash("Please upload a valid CSV file.", "error")
         return redirect(url_for("import_books_form"))
@@ -1583,19 +1966,15 @@ def import_books():
         content = file.read().decode("utf-8")
         fetch_metadata = request.form.get("fetch_metadata") == "on"
 
-        # Capture request-context data before submitting to background thread
-        credentials_dict = session.get("credentials")
-        is_prod = os.environ.get("FLASK_ENV") == "production"
-        sheet_name = "BookLampData" if is_prod else "DevBookLampData"
-
         # Queue the import job
+        job_queue = get_job_queue()
+
         job_id = job_queue.submit_job(
             "import_books",
             _background_import_books,
             content,
             fetch_metadata,
-            credentials_dict,
-            sheet_name,
+            session["user_id"],
         )
 
         flash(

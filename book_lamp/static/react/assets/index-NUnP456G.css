@@ -1,0 +1,1 @@
+#root{min-height:100vh}.loading{justify-content:center;align-items:center;padding:2rem;display:flex}.error-message{color:var(--color-error,#dc3545);padding:1rem}.empty-state{text-align:center;padding:3rem 1rem}.empty-state h2{margin-bottom:.5rem}.empty-state p{color:var(--color-text-secondary,#666);margin-bottom:1.5rem}

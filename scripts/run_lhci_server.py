@@ -1,61 +1,58 @@
+#!/usr/bin/env python3
+"""Start Flask for Lighthouse CI testing in test mode."""
 import os
+import socket
+import subprocess
 import sys
-from pathlib import Path
-
-# Force TEST_MODE before importing app
-os.environ["TEST_MODE"] = "1"
-os.environ["SECRET_KEY"] = "lhci-secret-key"
-os.environ["GOOGLE_CLIENT_ID"] = "dummy-id"
-os.environ["GOOGLE_CLIENT_SECRET"] = "dummy-secret"
-
-# Add project root to sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
-
-from book_lamp.app import app, get_storage  # noqa: E402
+import time
 
 
-def seed_data():
-    with app.app_context():
-        storage = get_storage()
-        storage.set_authorised(True)
+def is_port_open(port: int, host: str = "127.0.0.1") -> bool:
+    """Check if a port is open."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
 
-        # Add some sample data for LHCI to render
-        if not storage.get_all_books():
-            b1 = storage.add_book(
-                isbn13="9780140449136",
-                title="The Odyssey",
-                author="Homer",
-                publication_year=1946,
-                publisher="Penguin Classics",
-                description="The epic journey of Odysseus.",
-            )
-            b2 = storage.add_book(
-                isbn13="9780141439518",
-                title="Pride and Prejudice",
-                author="Jane Austen",
-                publication_year=1813,
-                publisher="T. Egerton",
-                description="A classic novel of manners.",
-            )
 
-            storage.add_reading_record(
-                book_id=b1["id"],
-                status="Completed",
-                start_date="2024-01-01",
-                end_date="2024-01-10",
-                rating=5,
-            )
-            storage.add_reading_record(
-                book_id=b2["id"], status="In Progress", start_date="2024-02-01"
-            )
-
-            storage.add_to_reading_list(b2["id"])
+def main() -> None:
+    port = 5000
+    
+    # Set environment
+    env = os.environ.copy()
+    env["TEST_MODE"] = "1"
+    env["GOOGLE_CLIENT_ID"] = "dummy"
+    env["GOOGLE_CLIENT_SECRET"] = "dummy"
+    
+    print(f"Starting Flask on port {port}...", flush=True)
+    
+    # Start Flask server
+    proc = subprocess.Popen(
+        ["poetry", "run", "flask", "--app", "book_lamp.app:app", "run", "--port", str(port), "--host", "127.0.0.1"],
+        env=env,
+    )
+    
+    # Wait for port to be ready
+    for _ in range(60):
+        if is_port_open(port):
+            print(f"Server ready at http://127.0.0.1:{port}", flush=True)
+            break
+        time.sleep(1)
+    else:
+        print("Server failed to start", file=sys.stderr)
+        proc.kill()
+        sys.exit(1)
+    
+    # Wait for process to end
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        proc.kill()
 
 
 if __name__ == "__main__":
-    seed_data()
-    print("Seeded LHCI server data.")
-    print("Server is ready!")
-    # Run mirroring the ci.yml setup but with a fixed port
-    app.run(host="127.0.0.1", port=5000)
+    main()
