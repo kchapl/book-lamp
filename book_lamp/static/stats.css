@@ -1,3 +1,7 @@
+/* =============================================================================
+   MD3 STATS PAGE STYLES
+   ============================================================================= */
+
 .stats-header {
     margin-bottom: 3rem;
     gap: 1.5rem;
@@ -11,51 +15,49 @@
 }
 
 .stat-card {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    padding: 2rem;
+    background-color: var(--md-sys-color-surface-container-low);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    padding: 1.5rem;
     text-align: center;
-    transition: transform 0.3s ease;
+    transition: transform var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
+                box-shadow var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    border-color: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: var(--md-sys-elevation-2);
 }
 
 .stat-value {
-    font-family: 'Playfair Display', 'Playfair Fallback', serif;
-    font-size: 3.5rem;
-    font-weight: 700;
+    font-family: 'Roboto', sans-serif;
+    font-size: 3rem;
+    font-weight: 400;
     line-height: 1;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to bottom, var(--primary), var(--primary-light));
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--md-sys-color-primary);
 }
 
 .stat-label {
-    color: var(--text-muted);
+    color: var(--md-sys-color-on-surface-variant);
     text-transform: uppercase;
     letter-spacing: 0.1rem;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
 .charts-container {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 2rem;
+    gap: 1.5rem;
     margin-bottom: 3rem;
 }
 
 .chart-card {
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    border-radius: 24px;
-    padding: 2rem;
+    background-color: var(--md-sys-color-surface-container-low);
+    border: 1px solid var(--md-sys-color-outline-variant);
+    border-radius: var(--md-sys-shape-corner-medium);
+    padding: 1.5rem;
 }
 
 .chart-card.wide {
@@ -64,17 +66,17 @@
 
 .chart-card h3 {
     margin-top: 0;
-    margin-bottom: 2rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--text);
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface);
 }
 
-/* Reading Progress Bars */
+/* MD3 Progress Bars */
 .progress-container {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
 .progress-row {
@@ -92,42 +94,42 @@
 }
 
 .status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--md-sys-shape-corner-full);
 }
 
 .status-dot.completed {
-    background: #10b981;
+    background-color: var(--md-sys-color-primary);
 }
 
 .status-dot.in-progress {
-    background: #3b82f6;
+    background-color: var(--md-sys-color-secondary);
 }
 
 .status-dot.abandoned {
-    background: #ef4444;
+    background-color: var(--md-sys-color-error);
 }
 
 /* Rating Distribution Bars */
 .rating-bar {
-    background: #fbbf24 !important;
-    border-radius: 4px;
+    background-color: var(--md-sys-color-primary) !important;
+    border-radius: var(--md-sys-shape-corner-small);
     height: 100%;
 }
 
 .status-dot.not-begun {
-    background: #6b7280;
+    background-color: var(--md-sys-color-outline);
 }
 
 .status-name {
-    font-size: 0.9rem;
-    color: var(--text);
+    font-size: 0.875rem;
+    color: var(--md-sys-color-on-surface);
 }
 
 /* make status names look and behave like links */
 .progress-row .status-name a {
-    color: var(--primary-light);
+    color: var(--md-sys-color-primary);
     text-decoration: none;
     cursor: pointer;
 }
@@ -147,40 +149,39 @@
 
 .bar-wrapper {
     flex-grow: 1;
-    height: 12px;
-    background: var(--input-bg);
-    border-radius: 6px;
+    height: 8px;
+    background-color: var(--md-sys-color-surface-container-high);
+    border-radius: var(--md-sys-shape-corner-full);
     overflow: hidden;
 }
 
 .bar {
     height: 100%;
     width: var(--bar-width, 0%);
-    border-radius: 6px;
-    /* Use transform instead of width to avoid layout shift */
+    border-radius: var(--md-sys-shape-corner-full);
     transform: scaleX(0);
     transform-origin: left center;
-    animation: bar-grow-x 0.8s ease-out forwards;
+    animation: bar-grow-x 0.6s var(--md-sys-motion-easing-emphasized-decelerate) forwards;
 }
 
 .bar.completed {
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background-color: var(--md-sys-color-primary);
 }
 
 .bar.in-progress {
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    background-color: var(--md-sys-color-secondary);
 }
 
 .bar.abandoned {
-    background: linear-gradient(90deg, #ef4444, #f87171);
+    background-color: var(--md-sys-color-error);
 }
 
 .bar.not-begun {
-    background: linear-gradient(90deg, #6b7280, #9ca3af);
+    background-color: var(--md-sys-color-outline);
 }
 
 .count {
-    font-weight: 600;
+    font-weight: 500;
     width: 30px;
     text-align: right;
 }
@@ -195,30 +196,30 @@
 .top-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 .list-item {
     display: flex;
     align-items: center;
     padding: 1rem;
-    background: var(--input-bg);
-    border-radius: 12px;
-    border: 1px solid var(--glass-border);
+    background-color: var(--md-sys-color-surface-container);
+    border-radius: var(--md-sys-shape-corner-small);
+    border: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .rank {
-    width: 30px;
-    height: 30px;
-    background: var(--primary);
-    color: white;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    border-radius: var(--md-sys-shape-corner-small);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 700;
-    margin-right: 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-right: 1rem;
 }
 
 .item-name {
@@ -229,16 +230,16 @@
 .item-name a {
     color: inherit;
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
 
 .item-name a:hover {
-    color: var(--primary-light);
+    color: var(--md-sys-color-primary);
 }
 
 .item-value {
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: 0.875rem;
 }
 
 /* Timeline & Category Grids */
@@ -259,28 +260,28 @@
     right: 0;
     bottom: var(--marker-bottom, 0%);
     height: 2px;
-    border-top: 2px dashed var(--glass-border);
+    border-top: 2px dashed var(--md-sys-color-outline-variant);
     z-index: 5;
     pointer-events: all;
-    transition: border-color 0.3s;
+    transition: border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
 }
 
 .marker-line:hover {
-    border-top-color: var(--primary-light);
+    border-top-color: var(--md-sys-color-primary);
 }
 
 .marker-tooltip {
     position: absolute;
     right: 0;
     top: -25px;
-    background: var(--primary-light);
-    color: var(--bg);
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
     padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+    font-size: 0.6875rem;
+    font-weight: 500;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     pointer-events: none;
 }
 
@@ -319,23 +320,22 @@
 .timeline-bar,
 .category-bar {
     width: 80%;
-    /* Set final height directly; animate with scaleY to avoid layout shift */
     height: var(--bar-height, 0%);
-    background: linear-gradient(to top, var(--primary), var(--primary-light));
-    border-radius: 6px 6px 0 0;
+    background-color: var(--md-sys-color-primary);
+    border-radius: var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small) 0 0;
     position: relative;
     transform: scaleY(0);
     transform-origin: bottom;
-    animation: bar-grow-y 0.8s ease-out forwards;
+    animation: bar-grow-y 0.6s var(--md-sys-motion-easing-emphasized-decelerate) forwards;
 }
 
 .timeline-bar.month {
-    background: linear-gradient(to top, #3b82f6, #60a5fa);
+    background-color: var(--md-sys-color-secondary);
 }
 
 .timeline-bar:hover,
 .category-bar:hover {
-    filter: brightness(1.2);
+    filter: brightness(1.1);
 }
 
 .count-tooltip {
@@ -343,14 +343,14 @@
     top: -30px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--text);
-    color: var(--bg);
+    background-color: var(--md-sys-color-inverse-surface);
+    color: var(--md-sys-color-inverse-on-surface);
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: var(--md-sys-shape-corner-extra-small);
     font-size: 0.75rem;
-    font-weight: 700;
+    font-weight: 500;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     pointer-events: none;
     white-space: nowrap;
     z-index: 10;
@@ -370,9 +370,9 @@
 .timeline-label,
 .category-label {
     margin-top: 1rem;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-weight: 600;
+    font-size: 0.6875rem;
+    color: var(--md-sys-color-on-surface-variant);
+    font-weight: 500;
     text-align: center;
     width: 100%;
     word-break: break-word;
@@ -403,7 +403,7 @@
     }
 
     .category-grid {
-        gap: 0.5rem;
+        gap: 0.25rem;
     }
 
     .category-label {
