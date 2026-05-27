@@ -427,6 +427,14 @@ def favicon():
     return app.send_static_file("favicon.png")
 
 
+@app.route("/<path:fallback>")
+def spa_fallback(fallback):
+    """Catch-all for SPA routing - serve index.html for non-API routes."""
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Not found"}), 404
+    return render_template("index.html")
+
+
 # Secret key for session management
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key and not is_test_mode():
@@ -573,6 +581,64 @@ def reading_history():
     )
 
 
+@app.route("/api/history", methods=["GET"])
+@authorisation_required
+def api_reading_history():
+    """API endpoint for reading history data."""
+    storage = get_storage()
+
+    history = storage.get_reading_history()
+    all_statuses = sorted(
+        list(set(r.get("status") for r in history if r.get("status")))
+    )
+
+    status_filter = request.args.get("status")
+    if status_filter:
+        history = [r for r in history if r.get("status") == status_filter]
+
+    min_rating = request.args.get("min_rating")
+    if min_rating and min_rating.isdigit():
+        min_rating = int(min_rating)
+        history = [r for r in history if r.get("rating", 0) >= min_rating]
+
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        history = [
+            r
+            for r in history
+            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
+            or (
+                not r.get("end_date")
+                and r.get("start_date")
+                and r.get("start_date")[:4] == year_filter
+            )
+        ]
+
+    sort_by = request.args.get("sort", "date_desc")
+
+    if sort_by == "date_desc":
+        history.sort(
+            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
+        )
+    elif sort_by == "date_asc":
+        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
+    elif sort_by == "rating_desc":
+        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
+    elif sort_by == "title":
+        history.sort(key=lambda r: (r.get("book_title") or "").lower())
+
+    return jsonify({
+        "history": history,
+        "statuses": all_statuses,
+        "filters": {
+            "status": status_filter,
+            "rating": min_rating,
+            "year": year_filter,
+            "sort": sort_by,
+        }
+    })
+
+
 # -----------------------------
 # Books feature
 # -----------------------------
@@ -610,6 +676,24 @@ def reading_list():
         books.append(book)
 
     return render_template("reading_list.html", books=books)
+
+
+@app.route("/api/reading-list", methods=["GET"])
+@authorisation_required
+def api_get_reading_list():
+    """API endpoint to get reading list."""
+    storage = get_storage()
+    rl_items = storage.get_reading_list()
+    books = []
+    for item in rl_items:
+        book = {
+            "id": item["book_id"],
+            "title": item["title"],
+            "author": item["author"],
+            "thumbnail_url": item.get("thumbnail_url"),
+        }
+        books.append(book)
+    return jsonify({"books": books})
 
 
 @app.route("/reading-list/reorder", methods=["POST"])
@@ -788,6 +872,109 @@ def list_books():
     )
 
 
+@app.route("/api/books", methods=["GET"])
+@authorisation_required
+def api_list_books():
+    """API endpoint for books list."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    all_records = storage.get_reading_records()
+
+    sort_by = request.args.get("sort", "reading_date")
+    if sort_by not in SORT_OPTIONS:
+        sort_by = "reading_date"
+
+    books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") >= latest_records[bid].get("start_date", ""):
+                latest_records[bid] = r
+
+    for book in books:
+        record = latest_records.get(book.get("id"))
+        if record:
+            book["latest_status"] = record.get("status")
+
+    books = [
+        b
+        for b in books
+        if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
+    ]
+
+    # Apply filters
+    status_filter = request.args.get("status")
+    if status_filter:
+        books = [b for b in books if b.get("latest_status") == status_filter]
+
+    year_filter = request.args.get("year")
+    if year_filter and year_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[:4] == year_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    month_filter = request.args.get("month")
+    if month_filter and month_filter.isdigit():
+        month_idx = f"{int(month_filter):02d}"
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                end_date = record.get("end_date")
+                if end_date and end_date[5:7] == month_idx:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    rating_filter = request.args.get("rating")
+    if rating_filter and rating_filter.isdigit():
+        filtered_books = []
+        for b in books:
+            record = latest_records.get(b.get("id"))
+            if record and record.get("status") == "Completed":
+                if str(record.get("rating")) == rating_filter:
+                    filtered_books.append(b)
+        books = filtered_books
+
+    category_filter = request.args.get("category")
+    if category_filter:
+        filtered_books = []
+        for b in books:
+            bisac = b.get("bisac_category")
+            if bisac and category_filter.lower() in str(bisac).lower():
+                filtered_books.append(b)
+        books = filtered_books
+
+    all_categories = set()
+    for b in storage.get_all_books():
+        bisac = b.get("bisac_category")
+        if bisac:
+            top_level = str(bisac).split("/")[0].strip()
+            all_categories.add(top_level)
+    sorted_categories = sorted(list(all_categories))
+
+    return jsonify({
+        "books": books,
+        "sort": sort_by,
+        "sort_options": SORT_OPTIONS,
+        "filters": {
+            "status": status_filter,
+            "year": year_filter,
+            "month": month_filter,
+            "rating": rating_filter,
+            "category": category_filter,
+        },
+        "categories": sorted_categories,
+    })
+
+
 @app.route("/books/search", methods=["GET"])
 @authorisation_required
 def search_books():
@@ -954,6 +1141,128 @@ def author_page(author_slug: str):
         reading_list_books=reading_list_books,
         unread_books=unread_books,
     )
+
+
+@app.route("/api/author/<path:author_slug>", methods=["GET"])
+@authorisation_required
+def api_author_page(author_slug: str):
+    """API endpoint for author page."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    rl_items = storage.get_reading_list()
+    reading_list_book_ids = {item["book_id"] for item in rl_items}
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-").replace(".", "") if name else ""
+
+    search_slug = author_slug.lower()
+
+    author_books = []
+    display_author_name = author_slug.replace("-", " ").title()
+
+    for book in books:
+        if book.get("authors"):
+            for a in book["authors"]:
+                if to_slug(a) == search_slug:
+                    author_books.append(book)
+                    display_author_name = a
+                    break
+        elif book.get("author"):
+            if to_slug(book["author"]) == search_slug:
+                author_books.append(book)
+                display_author_name = book["author"]
+
+    for book in author_books:
+        book["is_owned"] = True
+        book["in_reading_list"] = book["id"] in reading_list_book_ids
+
+    read_books = [b for b in author_books if not b["in_reading_list"]]
+    reading_list_books = [b for b in author_books if b["in_reading_list"]]
+
+    def sort_key(b):
+        py = b.get("publication_year")
+        try:
+            year = int(py) if py else 0
+        except (ValueError, TypeError):
+            year = 0
+        return (year, (b.get("title") or "").lower())
+
+    read_books.sort(key=sort_key)
+    reading_list_books.sort(key=sort_key)
+
+    unread_books: list[dict] = []
+    if not is_test_mode():
+        try:
+            external_books = lookup_books_by_author(display_author_name)
+            owned_isbns = {
+                b.get("isbn13", "").replace("-", "").replace(" ", "")
+                for b in author_books
+                if b.get("isbn13")
+            }
+            owned_norm_titles = {
+                b.get("title", "").strip().lower() for b in author_books
+            }
+
+            for ext_book in external_books:
+                isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
+                norm_title = ext_book.get("title", "").strip().lower()
+                if isbn and isbn in owned_isbns:
+                    continue
+                if norm_title in owned_norm_titles:
+                    continue
+                ext_book["is_owned"] = False
+                ext_book["in_reading_list"] = False
+                ext_book["id"] = None
+                unread_books.append(ext_book)
+                owned_norm_titles.add(norm_title)
+        except Exception:
+            app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
+
+    return jsonify({
+        "author_name": display_author_name,
+        "read_books": read_books,
+        "reading_list_books": reading_list_books,
+        "unread_books": unread_books,
+    })
+
+
+@app.route("/api/publisher/<path:publisher_slug>", methods=["GET"])
+@authorisation_required
+def api_publisher_page(publisher_slug: str):
+    """API endpoint for publisher page."""
+    storage = get_storage()
+    books = storage.get_all_books()
+
+    publisher_books = []
+    display_publisher_name = publisher_slug.replace("-", " ").title()
+
+    def to_slug(name):
+        return name.lower().replace(" ", "-") if name else ""
+
+    search_slug = publisher_slug.lower()
+
+    for book in books:
+        if book.get("publisher"):
+            norm_pub = _normalize_publisher(book["publisher"])
+            if norm_pub and to_slug(norm_pub) == search_slug:
+                publisher_books.append(book)
+                display_publisher_name = norm_pub
+
+    def sort_key(b):
+        py = b.get("publication_year")
+        try:
+            year = int(py) if py else 0
+        except (ValueError, TypeError):
+            year = 0
+        return (year, (b.get("title") or "").lower())
+
+    publisher_books.sort(key=sort_key)
+
+    return jsonify({
+        "publisher_name": display_publisher_name,
+        "books": publisher_books,
+    })
 
 
 @app.route("/publisher/<path:publisher_slug>", methods=["GET"])
@@ -1172,6 +1481,170 @@ def collection_stats():
         max_month_count=max_month_count,
         avg_month_count=avg_month_count,
     )
+
+
+@app.route("/api/stats", methods=["GET"])
+@authorisation_required
+def api_collection_stats():
+    """API endpoint for collection statistics."""
+    storage = get_storage()
+
+    books = storage.get_all_books()
+    all_records = storage.get_reading_records()
+
+    completed_records = [r for r in all_records if r.get("status") == "Completed"]
+    completed_book_ids = {r.get("book_id") for r in completed_records}
+    completed_books = [b for b in books if b.get("id") in completed_book_ids]
+
+    total_books = len(completed_books)
+    total_records = len(all_records)
+
+    valid_ratings = []
+    for r in all_records:
+        rating_val = r.get("rating")
+        try:
+            if rating_val and int(rating_val) > 0:
+                valid_ratings.append(int(rating_val))
+        except (ValueError, TypeError):
+            continue
+    avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
+
+    latest_records = {}
+    for r in all_records:
+        bid = r.get("book_id")
+        if bid:
+            if bid not in latest_records or r.get("start_date", "") > latest_records[bid].get("start_date", ""):
+                latest_records[bid] = r
+
+    allowed_statuses = {"In Progress", "Completed", "Abandoned"}
+    statuses = []
+    for b in books:
+        bid = b.get("id")
+        if bid in latest_records:
+            status = latest_records[bid].get("status")
+            if status in allowed_statuses:
+                statuses.append(status)
+    status_counts = Counter(statuses)
+
+    rating_counts = Counter()
+    for r in all_records:
+        if r.get("status") == "Completed":
+            try:
+                r_val = int(r.get("rating", 0))
+                if 1 <= r_val <= 5:
+                    rating_counts[r_val] += 1
+            except (ValueError, TypeError):
+                continue
+
+    rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
+
+    all_authors = []
+    for b in completed_books:
+        if b.get("authors"):
+            all_authors.extend(b["authors"])
+        elif b.get("author"):
+            all_authors.append(b["author"])
+
+    total_authors = len(set(all_authors))
+    top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]
+
+    all_publishers = []
+    for b in completed_books:
+        if b.get("publisher"):
+            norm_pub = _normalize_publisher(b["publisher"])
+            if norm_pub:
+                all_publishers.append(norm_pub)
+    top_publishers = sorted(Counter(all_publishers).items(), key=lambda x: (-x[1], x[0]))[:5]
+
+    completed_records_for_dates = [
+        r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
+    ]
+
+    yearly_counts = Counter()
+    for r in completed_records_for_dates:
+        date_val = r.get("end_date")
+        if date_val:
+            if isinstance(date_val, datetime.date):
+                year = str(date_val.year)
+            elif isinstance(date_val, str) and len(date_val) >= 4:
+                year = date_val[:4]
+            else:
+                continue
+            if year.isdigit():
+                yearly_counts[year] += 1
+
+    sorted_years = sorted(yearly_counts.items())
+    max_year_count = max(yearly_counts.values()) if yearly_counts else 1
+
+    monthly_counts = Counter()
+    for r in completed_records_for_dates:
+        date_str = r.get("end_date", "")
+        if date_str and len(date_str) >= 7:
+            month_idx = date_str[5:7]
+            if month_idx.isdigit():
+                monthly_counts[month_idx] += 1
+
+    ordered_months = []
+    for i in range(1, 13):
+        idx_str = f"{i:02d}"
+        name = calendar.month_name[i][:3]
+        ordered_months.append({"index": i, "name": name, "count": monthly_counts[idx_str]})
+
+    max_month_count = max(monthly_counts.values()) if monthly_counts else 1
+
+    category_bins = Counter()
+    for b in completed_books:
+        bisac = b.get("bisac_category")
+        if bisac:
+            main_cat, _ = parse_bisac_category(bisac)
+            if main_cat:
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                category_bins[norm_cat] += 1
+
+    all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
+    category_distribution = all_categories_sorted[:10]
+    if len(all_categories_sorted) > 10:
+        other_total = sum(count for label, count in all_categories_sorted[10:])
+        category_distribution.append(("Other", other_total))
+
+    max_category_count = max(count for label, count in category_distribution) if category_distribution else 1
+
+    return jsonify({
+        "total_books": total_books,
+        "total_authors": total_authors,
+        "total_records": total_records,
+        "avg_rating": avg_rating,
+        "status_counts": dict(status_counts),
+        "rating_distribution": rating_distribution,
+        "top_authors": [{"name": name, "count": count} for name, count in top_authors],
+        "top_publishers": [{"name": name, "count": count} for name, count in top_publishers],
+        "category_distribution": [{"label": label, "count": count} for label, count in category_distribution],
+        "max_category_count": max_category_count,
+        "yearly_counts": sorted_years,
+        "max_year_count": max_year_count,
+        "monthly_counts": ordered_months,
+        "max_month_count": max_month_count,
+    })
+
+
+@app.route("/api/books/<int:book_id>", methods=["GET"])
+@authorisation_required
+def api_book_detail(book_id: int):
+    """API endpoint for book detail."""
+    storage = get_storage()
+    book = storage.get_book_by_id(book_id)
+    if not book:
+        return jsonify({"error": "Book not found"}), 404
+
+    all_records = storage.get_reading_records()
+    book["reading_records"] = [r for r in all_records if r["book_id"] == book_id]
+    book["reading_records"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
+
+    rl_items = storage.get_reading_list()
+    is_planned = any(item["book_id"] == book_id for item in rl_items)
+    book["is_planned"] = is_planned
+
+    return jsonify(book)
 
 
 @app.route("/books/<int:book_id>", methods=["GET"])
