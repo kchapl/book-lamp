@@ -39,7 +39,7 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --all-extras --no-interaction
+        run: uv sync --all-extras
 
       - name: Run tests with pytest
         env:
@@ -88,7 +88,7 @@ jobs:
             venv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --all-extras --no-interaction
+        run: uv sync --all-extras
 
       - name: Lint with ruff
         run: uv run ruff check .
@@ -122,7 +122,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/uv.lock') }}
 
       - name: Install Python dependencies
-        run: uv sync --all-extras --no-interaction
+        run: uv sync --all-extras
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
