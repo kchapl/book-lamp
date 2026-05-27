@@ -306,6 +306,14 @@ nav {
     font-weight: 500;
     color: var(--md-sys-color-on-surface);
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.logo-icon {
+    font-size: 1.75rem;
+    color: var(--md-sys-color-primary);
 }
 
 .nav-links a {
