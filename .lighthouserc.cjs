@@ -2,7 +2,7 @@ module.exports = {
     ci: {
         collect: {
             numberOfRuns: 3,
-            startServerCommand: "poetry run python scripts/run_lhci_server.py",
+            startServerCommand: "uv run python scripts/run_lhci_server.py",
             url: [
                 "http://localhost:5000/"
             ],
