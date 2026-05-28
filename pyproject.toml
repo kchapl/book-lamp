@@ -6,7 +6,7 @@ readme = "README.md"
 packages = [{include = "book_lamp"}]
 
 [tool.poetry.dependencies]
-python = "3.13"
+python = "3.13.13"
 psycopg = {extras = ["binary"], version = "3.3.4"}
 psycopg-pool = "3.3.1"
 alembic = "1.13.0"
