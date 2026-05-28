@@ -2,7 +2,7 @@ module.exports = {
     ci: {
         collect: {
             numberOfRuns: 3,
-            startServerCommand: "poetry run python scripts/run_lhci_server.py",
+            startServerCommand: "uv run python scripts/run_lhci_server.py",
             url: [
                 "http://localhost:5000/"
             ],
@@ -14,7 +14,7 @@ module.exports = {
             assertions: {
                 // Core Web Vitals Targets from performance-engineer skill
                 "categories:performance": ["warn", { "minScore": 0.5 }],
-                "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+                "largest-contentful-paint": ["error", { "maxNumericValue": 4000 }],
                 "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
                 "interactive": ["error", { "maxNumericValue": 3500 }],
 

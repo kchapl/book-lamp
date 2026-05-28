@@ -25,13 +25,13 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **Fail fast with context**: Validate inputs early and raise actionable errors.
 - **Security**: Validate and sanitize all external inputs (requests, env vars, web forms).
 - Never log secrets. Use structured, levelled logging.
-- Keep dependencies minimal; respect pinned versions managed by Poetry.
+- Keep dependencies minimal; respect pinned versions managed by uv.
 
 ### Coding standards (Python)
 - **Language and tooling**:
   - Python 3.13.x
-  - Use `poetry` for dependency management.
-  - Call `poetry run` for all commands.
+  - Use `uv` for dependency management.
+  - Call `uv run` for all commands.
   - Format with `black` and sort imports with `isort` (keep default project configs if present).
   - Lint with `ruff` and type-check with `mypy` (be strict on public APIs; avoid `Any`).
 - **Style**:
@@ -67,7 +67,7 @@ This file provides shared context and guardrails for Cursor and other AI agents 
 - **No Regex Search**: Do not allow unsanitized user input in regular expressions. To prevent ReDoS (Regular Expression Denial of Service), user search inputs must be escaped or regex capabilities disabled entirely for end-users.
 - **Database Security**: Use parameterized queries and proper connection pooling. Validate all inputs before database operations.
 - Never log secrets. Use structured, levelled logging.
-- Keep dependencies minimal; respect pinned versions managed by Poetry.
+- Keep dependencies minimal; respect pinned versions managed by uv.
 - Never commit tokens or credentials to version control.
 
 ### Change discipline
@@ -86,9 +86,9 @@ This file provides shared context and guardrails for Cursor and other AI agents 
  - Body lines should be maximum of 72 chars.
 
 ### Tooling
-- **Tool Manager**: `mise` (manages Python, Node, and Poetry versions)
+- **Tool Manager**: `mise` (manages Python, Node, and uv versions)
 - **Python**: 3.13.x
-- **Dependency Managers**: Poetry (`poetry run`) and NPM (`npm install`)
+- **Dependency Managers**: uv (`uv run`) and NPM (`npm install`)
 - **Build**: TypeScript (`npm run build`) via `tsc`.
 - **Formatters**: `black`, `isort`
 - **Linters**: `ruff`, `mypy` (strict mode), `tsc` (strict mode)
