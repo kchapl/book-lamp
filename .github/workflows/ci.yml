@@ -18,11 +18,11 @@ jobs:
       checks: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
         id: setup-python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -35,7 +35,7 @@ jobs:
           installer-parallel: true
 
       - name: Load cached venv
-        uses: actions/cache@v5
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
@@ -75,11 +75,11 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
         id: setup-python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -92,7 +92,7 @@ jobs:
           installer-parallel: true
 
       - name: Load cached venv
-        uses: actions/cache@v5
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
@@ -118,11 +118,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
         id: setup-python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -135,7 +135,7 @@ jobs:
           installer-parallel: true
 
       - name: Load cached venv
-        uses: actions/cache@v5
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2
         with:
           path: .venv
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
@@ -144,7 +144,7 @@ jobs:
         run: poetry install --no-interaction
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@8f152de45cc393bb48ce5d89d36b731f54556e65
         with:
           node-version: '20'
 
