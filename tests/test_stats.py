@@ -73,3 +73,13 @@ def test_stats_category_limit(client, authenticated_client):
     # It should NOT show "FICTION" (all uppercase) as a label
     # We use .title() normalization, so FICTION -> Fiction
     assert "FICTION" not in html or "FICTION / General" not in html
+
+
+def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+
+    assert 'aria-label="More statistics actions"' in html
+    assert 'role="menu"' in html
+    assert 'class="action-menu-item" role="menuitem"' in html
+    assert html.index("Fetch missing categories") > html.index('role="menu"')
