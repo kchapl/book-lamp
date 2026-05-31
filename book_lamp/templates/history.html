@@ -12,7 +12,7 @@
 <div class="history-header">
     <h1>Reading History {% if current_year %}: {{ current_year }}{% endif %}</h1>
     {% if current_year %}
-    <a href="{{ url_for('reading_history', status=current_status, min_rating=current_rating, sort=current_sort) }}" class="btn-clear-filter">Show All Years ✕</a>
+    <a href="{{ url_for('reading_history', status=current_status, min_rating=current_rating, sort=current_sort) }}" class="btn btn-outline btn-small">Show All Years ✕</a>
     {% endif %}
 </div>
 
@@ -173,8 +173,8 @@
                                 </div>
                             </div>
                             <div class="edit-form-actions">
-                                <button type="submit" class="btn-save">Save</button>
-                                <button type="button" class="btn-cancel"
+                                <button type="submit" class="btn btn-save">Save</button>
+                                <button type="button" class="btn btn-cancel"
                                     onclick="setRecordEditMode('{{ record.id }}', false)">Cancel</button>
                             </div>
                         </div>
