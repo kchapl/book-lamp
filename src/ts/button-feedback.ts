@@ -26,7 +26,7 @@ export function initButtonFeedback(): void {
     };
 
     const handleBodyClick = (e: MouseEvent): void => {
-        const el = (e.target as HTMLElement).closest('a.btn, button.btn, .btn') as HTMLElement;
+        const el = (e.target as HTMLElement).closest('a.btn, button.btn, button.btn-icon, .btn') as HTMLElement;
         if (!el || el.classList.contains('no-feedback')) return;
 
         // If it's a link with target or external, skip
@@ -46,8 +46,9 @@ export function initButtonFeedback(): void {
             return;
         }
 
-        // If button inside a form, let form submit handler manage it
-        if (el.tagName === 'BUTTON' && (el as HTMLButtonElement).type === 'submit') return;
+        // Submit controls are handled by the submit listener. Plain buttons often
+        // toggle UI state; opt in only for buttons that trigger navigation/POSTs.
+        if (el.tagName === 'BUTTON' && el.dataset.feedback !== 'true') return;
 
         setLoading(el);
     };
