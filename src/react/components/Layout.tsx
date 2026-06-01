@@ -61,7 +61,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         )}
                         <div className="theme-selector">
                             <button
-                                className="theme-btn"
+                                className="btn-icon"
                                 onClick={() => setShowThemeMenu(!showThemeMenu)}
                                 aria-label="Change theme"
                             >
@@ -70,7 +70,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             {showThemeMenu && (
                                 <div className="theme-menu">
                                     <button
-                                        className={theme === 'light' ? 'active' : ''}
+                                        className={`btn btn-text ${theme === 'light' ? 'active' : ''}`}
                                         onClick={() => {
                                             setTheme('light');
                                             setShowThemeMenu(false);
@@ -79,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         Light
                                     </button>
                                     <button
-                                        className={theme === 'dark' ? 'active' : ''}
+                                        className={`btn btn-text ${theme === 'dark' ? 'active' : ''}`}
                                         onClick={() => {
                                             setTheme('dark');
                                             setShowThemeMenu(false);
@@ -88,7 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         Dark
                                     </button>
                                     <button
-                                        className={theme === 'system' ? 'active' : ''}
+                                        className={`btn btn-text ${theme === 'system' ? 'active' : ''}`}
                                         onClick={() => {
                                             setTheme('system');
                                             setShowThemeMenu(false);
@@ -99,7 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 </div>
                             )}
                         </div>
-                        <Link to="/books/new" className="add-book-btn">
+                        <Link to="/books/new" className="btn btn-primary">
                             + Add Book
                         </Link>
                     </div>

@@ -306,12 +306,6 @@
     justify-content: flex-end;
 }
 
-.btn-save,
-.btn-cancel {
-    padding: 0.3rem 0.8rem;
-    font-size: 0.85rem;
-}
-
 /* MD3 Sort dropdown styling */
 #sort-select {
     background-color: var(--md-sys-color-surface-container);
@@ -343,28 +337,8 @@
     border-color: var(--md-sys-color-primary);
 }
 
-.btn-small {
-    padding: 4px 12px;
-    font-size: 0.75rem;
-}
-
-/* Primary-outline button used for secondary actions */
-.btn-outline-primary {
-    background: transparent;
-    border: 1px solid var(--primary-light);
-    color: var(--primary-light);
-    padding: 0.6rem 1rem;
-    border-radius: 8px;
-    font-weight: 600;
-}
-
-.btn-outline-primary:hover {
-    background: rgba(129, 140, 248, 0.08);
-}
-
 /* Search button modifier */
 .btn-search {
-    padding: 0.6rem 1rem;
     flex-shrink: 0;
     min-width: fit-content;
     white-space: nowrap;
@@ -407,7 +381,7 @@
 
 .clear-search-btn {
     position: absolute;
-    right: 0.75rem;
+    right: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
     color: var(--md-sys-color-on-surface-variant);
@@ -417,8 +391,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 40px;
+    height: 40px;
     border-radius: var(--md-sys-shape-corner-full);
     transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
                 color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
@@ -504,8 +478,6 @@
 
     .btn-save,
     .btn-cancel {
-        padding: 0.4rem 0.6rem;
-        font-size: 0.75rem;
         flex: 1;
     }
 
@@ -586,30 +558,6 @@
     border-radius: var(--md-sys-shape-corner-extra-small);
     padding: 2px 6px;
     margin-bottom: 0.25rem;
-}
-
-/* "Add to reading list" button on unread cards */
-.btn-add-rl {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    background: transparent;
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-primary);
-    border-radius: var(--md-sys-shape-corner-small);
-    cursor: pointer;
-    text-decoration: none;
-    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
-                color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
-    white-space: nowrap;
-}
-
-.btn-add-rl:hover {
-    background-color: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
 }
 
 /* Reading-list status badge on read book cards */

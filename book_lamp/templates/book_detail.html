@@ -125,8 +125,8 @@
                 <!-- Edit mode controls -->
                 <div class="edit-only book-detail-edit-actions">
                     <div class="flex gap-05 justify-end">
-                        <button type="submit" class="btn-save">Save Changes</button>
-                        <button type="button" class="btn-cancel" onclick="setEditMode(false)">Cancel</button>
+                        <button type="submit" class="btn btn-save">Save Changes</button>
+                        <button type="button" class="btn btn-cancel" onclick="setEditMode(false)">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -142,7 +142,7 @@
                 {% if not is_planned %}
                 <form method="post" action="{{ url_for('add_existing_to_reading_list', book_id=book.id) }}"
                     class="flex">
-                    <button type="submit" class="btn btn-outline" style="background: var(--glass);">Add to Reading
+                    <button type="submit" class="btn btn-outline">Add to Reading
                         List</button>
                 </form>
                 {% else %}
@@ -184,8 +184,7 @@
                 </div>
                 <div class="flex gap-05">
                     <button type="submit" class="btn btn-small">Save</button>
-                    <button type="button" class="btn btn-small"
-                        style="background: transparent; border: 1px solid var(--glass-border);"
+                    <button type="button" class="btn btn-cancel btn-small"
                         onclick="toggleForm('{{ book.id }}')">Cancel</button>
                 </div>
             </form>
@@ -283,8 +282,8 @@
                             </div>
                         </div>
                         <div class="edit-form-actions">
-                            <button type="submit" class="btn-save">Save</button>
-                            <button type="button" class="btn-cancel"
+                            <button type="submit" class="btn btn-save">Save</button>
+                            <button type="button" class="btn btn-cancel"
                                 onclick="setRecordEditMode('{{ record.id }}', false)">Cancel</button>
                         </div>
                     </div>

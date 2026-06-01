@@ -9,16 +9,22 @@
 {% block content %}
 <div class="books-header">
     <h1>Books</h1>
-    <div class="flex gap-1">
-        <form method="post" action="{{ url_for('fetch_missing_data') }}">
-            <button type="submit" class="btn btn-outline-primary">Fetch missing data</button>
-        </form>
-        <form method="get" action="{{ url_for('import_books_form') }}">
-            <button type="submit" class="btn btn-outline-primary">Import from Libib</button>
-        </form>
-        <form method="get" action="{{ url_for('new_book_form') }}">
-            <button type="submit" class="btn">Add new book</button>
-        </form>
+    <div class="flex gap-05">
+        <a href="{{ url_for('new_book_form') }}" class="btn">Add new book</a>
+        <div class="action-menu">
+            <button type="button" class="btn-icon action-menu-toggle" aria-haspopup="menu" aria-expanded="false"
+                aria-label="More book actions" title="More book actions">⋮</button>
+            <div class="action-menu-panel" role="menu">
+                <a href="{{ url_for('import_books_form') }}" class="action-menu-item" role="menuitem">
+                    Import from Libib
+                </a>
+                <form method="post" action="{{ url_for('fetch_missing_data') }}" role="none">
+                    <button type="submit" class="action-menu-item" role="menuitem">
+                        Fetch missing data
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 

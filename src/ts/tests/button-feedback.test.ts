@@ -13,6 +13,8 @@ describe('button-feedback', () => {
       <form id="test-form">
         <button type="submit" id="submit-btn" class="btn">Submit</button>
       </form>
+      <button type="button" id="toggle-btn" class="btn">Toggle</button>
+      <button type="button" id="post-btn" class="btn" data-feedback="true">Post</button>
       <a href="/books" id="link-btn" class="btn">Books</a>
       <a href="https://external.com" id="ext-link" class="btn">External</a>
     `;
@@ -51,6 +53,24 @@ describe('button-feedback', () => {
         link.click();
 
         expect(link.classList.contains('loading')).toBe(false);
+    });
+
+    it('does NOT set loading on plain buttons', () => {
+        const button = document.getElementById('toggle-btn') as HTMLButtonElement;
+
+        button.click();
+
+        expect(button.classList.contains('loading')).toBe(false);
+        expect(button.disabled).toBe(false);
+    });
+
+    it('sets loading on plain buttons that opt in to feedback', () => {
+        const button = document.getElementById('post-btn') as HTMLButtonElement;
+
+        button.click();
+
+        expect(button.classList.contains('loading')).toBe(true);
+        expect(button.disabled).toBe(true);
     });
 
     it('resets loading state on popstate', () => {

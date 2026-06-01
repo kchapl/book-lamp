@@ -392,12 +392,18 @@ nav {
    ============================================================================= */
 
 .btn {
-    /* MD3 Filled Button */
-    background-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    border: none;
-    padding: 0.625rem 1.5rem;
-    border-radius: var(--md-sys-shape-corner-large);
+    /* MD3 filled button; variant classes override the custom properties. */
+    --btn-container-color: var(--md-sys-color-primary);
+    --btn-label-color: var(--md-sys-color-on-primary);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-on-primary);
+
+    min-height: 40px;
+    background-color: var(--btn-container-color);
+    color: var(--btn-label-color);
+    border: 1px solid var(--btn-outline-color);
+    padding: 0 1.5rem;
+    border-radius: var(--md-sys-shape-corner-full);
     cursor: pointer;
     font-family: 'Roboto', sans-serif;
     font-size: 0.875rem;
@@ -422,13 +428,12 @@ nav {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: var(--md-sys-color-on-primary);
+    background-color: var(--btn-state-layer-color);
     opacity: 0;
     transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
 }
 
 .btn:hover {
-    background-color: var(--md-sys-color-primary);
     box-shadow: var(--md-sys-elevation-2);
 }
 
@@ -436,8 +441,8 @@ nav {
     opacity: var(--md-sys-state-hover-state-layer-opacity);
 }
 
-.btn:focus {
-    outline: 2px solid var(--md-sys-color-on-primary-container);
+.btn:focus-visible {
+    outline: 2px solid var(--md-sys-color-primary);
     outline-offset: 2px;
 }
 
@@ -449,107 +454,65 @@ nav {
     opacity: var(--md-sys-state-pressed-state-layer-opacity);
 }
 
-.btn-outline {
+.btn-primary {
+    --btn-container-color: var(--md-sys-color-primary);
+    --btn-label-color: var(--md-sys-color-on-primary);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-on-primary);
+}
+
+.btn-secondary {
+    --btn-container-color: var(--md-sys-color-secondary-container);
+    --btn-label-color: var(--md-sys-color-on-secondary-container);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-on-secondary-container);
+}
+
+.btn-danger {
+    --btn-container-color: var(--md-sys-color-error);
+    --btn-label-color: var(--md-sys-color-on-error);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-on-error);
+}
+
+.btn-outline,
+.btn-outline-primary,
+.btn-cancel {
     /* MD3 Outlined Button */
-    background: transparent;
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-primary);
-    padding: 0.625rem 1.5rem;
-    border-radius: var(--md-sys-shape-corner-large);
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-    font-size: 0.875rem;
-    font-weight: 500;
-    letter-spacing: 0.1px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard),
-                border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
-    position: relative;
-    overflow: hidden;
+    --btn-container-color: transparent;
+    --btn-label-color: var(--md-sys-color-primary);
+    --btn-outline-color: var(--md-sys-color-outline);
+    --btn-state-layer-color: var(--md-sys-color-primary);
+    box-shadow: none;
 }
 
-.btn-outline::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--md-sys-color-primary);
-    opacity: 0;
-    transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+.btn-outline:hover,
+.btn-outline-primary:hover,
+.btn-cancel:hover {
+    --btn-outline-color: var(--md-sys-color-primary);
+    box-shadow: none;
 }
 
-.btn-outline:hover {
-    border-color: var(--md-sys-color-primary);
-}
-
-.btn-outline:hover::before {
-    opacity: var(--md-sys-state-hover-state-layer-opacity);
-}
-
-.btn-outline:focus {
-    outline: 2px solid var(--md-sys-color-primary);
-    outline-offset: 2px;
-}
-
-.btn-outline:active::before {
-    opacity: var(--md-sys-state-pressed-state-layer-opacity);
-}
-
-.btn-text {
+.btn-text,
+.btn-back {
     /* MD3 Text Button */
-    background: transparent;
-    border: none;
-    color: var(--md-sys-color-primary);
-    padding: 0.625rem 1rem;
-    border-radius: var(--md-sys-shape-corner-large);
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-    font-size: 0.875rem;
-    font-weight: 500;
-    letter-spacing: 0.1px;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
-    position: relative;
-    overflow: hidden;
+    --btn-container-color: transparent;
+    --btn-label-color: var(--md-sys-color-primary);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-primary);
+    padding: 0 0.75rem;
+    box-shadow: none;
 }
 
-.btn-text::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--md-sys-color-primary);
-    opacity: 0;
-    transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
+.btn-text:hover,
+.btn-back:hover {
+    box-shadow: none;
 }
 
-.btn-text:hover::before {
-    opacity: var(--md-sys-state-hover-state-layer-opacity);
-}
-
-.btn-text:focus {
-    outline: 2px solid var(--md-sys-color-primary);
-    outline-offset: 2px;
-}
-
-.btn-text:active::before {
-    opacity: var(--md-sys-state-pressed-state-layer-opacity);
-}
-
-.btn-sm {
-    padding: 0.375rem 1rem !important;
+.btn-sm,
+.btn-small {
+    min-height: 32px;
+    padding: 0 1rem !important;
     font-size: 0.8125rem !important;
 }
 
@@ -558,7 +521,9 @@ nav {
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 0.75rem;
+    width: 40px;
+    height: 40px;
+    padding: 0;
     border-radius: var(--md-sys-shape-corner-full);
     transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     display: flex;
@@ -590,13 +555,65 @@ nav {
     opacity: var(--md-sys-state-hover-state-layer-opacity);
 }
 
-.btn-icon:focus {
+.btn-icon:focus-visible {
     outline: 2px solid var(--md-sys-color-primary);
     outline-offset: 2px;
 }
 
 .btn-icon:active::before {
     opacity: var(--md-sys-state-pressed-state-layer-opacity);
+}
+
+.action-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.action-menu-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 220px;
+    padding: 0.5rem 0;
+    border-radius: var(--md-sys-shape-corner-small);
+    background-color: var(--md-sys-color-surface-container);
+    color: var(--md-sys-color-on-surface);
+    box-shadow: var(--md-sys-elevation-2);
+    z-index: 900;
+}
+
+.action-menu.open .action-menu-panel {
+    display: block;
+}
+
+.action-menu-panel form {
+    margin: 0;
+}
+
+.action-menu-item {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    text-decoration: none;
+    font: inherit;
+    font-size: 0.875rem;
+    letter-spacing: 0.1px;
+}
+
+.action-menu-item:hover,
+.action-menu-item:focus-visible {
+    background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+    outline: none;
 }
 
 .alert {
@@ -739,33 +756,10 @@ footer {
 }
 
 .btn-save {
-    background-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    border: none;
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--md-sys-shape-corner-large);
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 500;
-    font-size: 0.875rem;
-    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
-}
-
-.btn-cancel {
-    background: transparent;
-    color: var(--md-sys-color-primary);
-    border: 1px solid var(--md-sys-color-outline);
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--md-sys-shape-corner-large);
-    cursor: pointer;
-    font-family: 'Roboto', sans-serif;
-    font-weight: 500;
-    font-size: 0.875rem;
-    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
-}
-
-.btn-cancel:hover {
-    background-color: var(--md-sys-color-surface-container);
+    --btn-container-color: var(--md-sys-color-primary);
+    --btn-label-color: var(--md-sys-color-on-primary);
+    --btn-outline-color: transparent;
+    --btn-state-layer-color: var(--md-sys-color-on-primary);
 }
 
 /* MD3 Form inputs and selects */
@@ -813,28 +807,30 @@ select.edit-input option {
 /* Loading and disabled states for CTA buttons/links */
 button:disabled,
 .btn:disabled,
-.btn-save:disabled {
+.btn[aria-disabled="true"] {
     opacity: 0.6;
     cursor: default;
     transform: none;
     pointer-events: none;
 }
 
-.loading {
+.btn.loading,
+.btn-icon.loading {
     opacity: 0.9 !important;
     pointer-events: none !important;
     transform: none !important;
 }
 
-.loading::after {
+.btn.loading::after,
+.btn-icon.loading::after {
     content: '';
     display: inline-block;
     width: 16px;
     height: 16px;
     margin-left: 0.5rem;
     vertical-align: middle;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    border-top-color: white;
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+    border-top-color: currentColor;
     border-radius: 50%;
     animation: btn-spin 0.8s linear infinite;
 }
@@ -1074,12 +1070,6 @@ button:disabled,
 
 .border-top {
     border-top: 1px solid var(--glass-border);
-}
-
-/* Standardized Buttons */
-.btn-small {
-    padding: 0.4rem 1rem;
-    font-size: 0.8rem;
 }
 
 /* =============================================================================
