@@ -1,6 +1,10 @@
 name: Clear Stale Dependencies
 on: workflow_dispatch # Allows manual triggering
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   clear:
     runs-on: ubuntu-latest
