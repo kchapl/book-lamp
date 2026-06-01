@@ -83,3 +83,88 @@ def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
     assert 'role="menu"' in html
     assert 'class="action-menu-item" role="menuitem"' in html
     assert html.index("Fetch missing categories") > html.index('role="menu"')
+
+
+def test_stats_chart_uses_unknown_instead_of_dewey(authenticated_client):
+    authenticated_client.post(
+        "/books",
+        data={
+            "title": "Dewey Book",
+            "author": "Author",
+            "isbn": "9780000000001",
+            "bisac_category": "823.914",
+        },
+    )
+    authenticated_client.post(
+        "/books/1/reading-records",
+        data={
+            "status": "Completed",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-02",
+            "rating": "5",
+        },
+    )
+
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+
+    assert '<div class="category-label">Unknown</div>' in html
+    assert '<div class="category-label">823.914</div>' not in html
+
+
+def test_stats_chart_uses_unknown_instead_of_language_code(authenticated_client):
+    """Language code bisac_category values (e.g. 'en') should show as Unknown."""
+    authenticated_client.post(
+        "/books",
+        data={
+            "title": "Language Code Book",
+            "author": "Author",
+            "isbn": "9780000000002",
+            "bisac_category": "en",
+        },
+    )
+    authenticated_client.post(
+        "/books/1/reading-records",
+        data={
+            "status": "Completed",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-02",
+            "rating": "5",
+        },
+    )
+
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+
+    assert '<div class="category-label">Unknown</div>' in html
+    # The raw language code must NOT appear as a category
+    assert '<div class="category-label">en</div>' not in html
+    assert '<div class="category-label">EN</div>' not in html
+
+
+def test_stats_chart_uses_unknown_instead_of_page_count(authenticated_client):
+    """Numeric page-count bisac_category values (e.g. '416') should show as Unknown."""
+    authenticated_client.post(
+        "/books",
+        data={
+            "title": "Page Count Book",
+            "author": "Author",
+            "isbn": "9780000000003",
+            "bisac_category": "416",
+        },
+    )
+    authenticated_client.post(
+        "/books/1/reading-records",
+        data={
+            "status": "Completed",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-02",
+            "rating": "5",
+        },
+    )
+
+    resp = authenticated_client.get("/stats")
+    html = resp.data.decode("utf-8")
+
+    assert '<div class="category-label">Unknown</div>' in html
+    assert '<div class="category-label">416</div>' not in html

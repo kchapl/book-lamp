@@ -6,7 +6,7 @@ import re
 import secrets
 from collections import Counter
 from functools import wraps
-from typing import Union, cast
+from typing import Any, Union, cast
 from urllib.parse import urlparse
 
 import click  # noqa: E402
@@ -30,8 +30,11 @@ from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.utils import (
     SORT_OPTIONS,
+    UNKNOWN_CATEGORY,
+    category_label,
     is_valid_isbn13,
-    parse_bisac_category,
+    normalise_bisac_category,
+    normalise_major_bisac,
     parse_publication_year,
     sort_books,
 )
@@ -93,6 +96,14 @@ def is_test_mode() -> bool:
     unreliable when the variable was changed after import.
     """
     return os.environ.get("TEST_MODE", "0") == "1"
+
+
+def _category_label_for_book(book: dict[str, Any]) -> str:
+    """Return the chart/filter label for a book category."""
+    major = normalise_major_bisac(book.get("bisac_main_category"))
+    if major is None:
+        major = normalise_major_bisac(book.get("bisac_category"))
+    return category_label(major)
 
 
 def generate_csrf_token() -> str:
@@ -627,16 +638,18 @@ def api_reading_history():
     elif sort_by == "title":
         history.sort(key=lambda r: (r.get("book_title") or "").lower())
 
-    return jsonify({
-        "history": history,
-        "statuses": all_statuses,
-        "filters": {
-            "status": status_filter,
-            "rating": min_rating,
-            "year": year_filter,
-            "sort": sort_by,
+    return jsonify(
+        {
+            "history": history,
+            "statuses": all_statuses,
+            "filters": {
+                "status": status_filter,
+                "rating": min_rating,
+                "year": year_filter,
+                "sort": sort_by,
+            },
         }
-    })
+    )
 
 
 # -----------------------------
@@ -842,19 +855,15 @@ def list_books():
     if category_filter:
         filtered_books = []
         for b in books:
-            bisac = b.get("bisac_category")
-            if bisac and category_filter.lower() in str(bisac).lower():
+            category_label = _category_label_for_book(b)
+            if category_label.lower() == category_filter.lower():
                 filtered_books.append(b)
         books = filtered_books
 
     # Extract all top-level categories for the filter dropdown
     all_categories = set()
     for b in storage.get_all_books():
-        bisac = b.get("bisac_category")
-        if bisac:
-            # Extract top-level (e.g., "Fiction" from "Fiction / Mystery")
-            top_level = str(bisac).split("/")[0].strip()
-            all_categories.add(top_level)
+        all_categories.add(_category_label_for_book(b))
     sorted_categories = sorted(list(all_categories))
 
     return render_template(
@@ -891,7 +900,9 @@ def api_list_books():
     for r in all_records:
         bid = r.get("book_id")
         if bid:
-            if bid not in latest_records or r.get("start_date", "") >= latest_records[bid].get("start_date", ""):
+            if bid not in latest_records or r.get("start_date", "") >= latest_records[
+                bid
+            ].get("start_date", ""):
                 latest_records[bid] = r
 
     for book in books:
@@ -960,19 +971,21 @@ def api_list_books():
             all_categories.add(top_level)
     sorted_categories = sorted(list(all_categories))
 
-    return jsonify({
-        "books": books,
-        "sort": sort_by,
-        "sort_options": SORT_OPTIONS,
-        "filters": {
-            "status": status_filter,
-            "year": year_filter,
-            "month": month_filter,
-            "rating": rating_filter,
-            "category": category_filter,
-        },
-        "categories": sorted_categories,
-    })
+    return jsonify(
+        {
+            "books": books,
+            "sort": sort_by,
+            "sort_options": SORT_OPTIONS,
+            "filters": {
+                "status": status_filter,
+                "year": year_filter,
+                "month": month_filter,
+                "rating": rating_filter,
+                "category": category_filter,
+            },
+            "categories": sorted_categories,
+        }
+    )
 
 
 @app.route("/books/search", methods=["GET"])
@@ -1217,14 +1230,18 @@ def api_author_page(author_slug: str):
                 unread_books.append(ext_book)
                 owned_norm_titles.add(norm_title)
         except Exception:
-            app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
+            app.logger.warning(
+                f"Failed to fetch external books for author: {display_author_name}"
+            )
 
-    return jsonify({
-        "author_name": display_author_name,
-        "read_books": read_books,
-        "reading_list_books": reading_list_books,
-        "unread_books": unread_books,
-    })
+    return jsonify(
+        {
+            "author_name": display_author_name,
+            "read_books": read_books,
+            "reading_list_books": reading_list_books,
+            "unread_books": unread_books,
+        }
+    )
 
 
 @app.route("/api/publisher/<path:publisher_slug>", methods=["GET"])
@@ -1259,10 +1276,12 @@ def api_publisher_page(publisher_slug: str):
 
     publisher_books.sort(key=sort_key)
 
-    return jsonify({
-        "publisher_name": display_publisher_name,
-        "books": publisher_books,
-    })
+    return jsonify(
+        {
+            "publisher_name": display_publisher_name,
+            "books": publisher_books,
+        }
+    )
 
 
 @app.route("/publisher/<path:publisher_slug>", methods=["GET"])
@@ -1437,13 +1456,7 @@ def collection_stats():
     # Category Distribution
     category_bins = Counter()
     for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                # Normalize (e.g., 'Fiction' vs 'FICTION')
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
+        category_bins[_category_label_for_book(b)] += 1
 
     # Sort categories by count (descending)
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
@@ -1513,7 +1526,9 @@ def api_collection_stats():
     for r in all_records:
         bid = r.get("book_id")
         if bid:
-            if bid not in latest_records or r.get("start_date", "") > latest_records[bid].get("start_date", ""):
+            if bid not in latest_records or r.get("start_date", "") > latest_records[
+                bid
+            ].get("start_date", ""):
                 latest_records[bid] = r
 
     allowed_statuses = {"In Progress", "Completed", "Abandoned"}
@@ -1554,7 +1569,9 @@ def api_collection_stats():
             norm_pub = _normalize_publisher(b["publisher"])
             if norm_pub:
                 all_publishers.append(norm_pub)
-    top_publishers = sorted(Counter(all_publishers).items(), key=lambda x: (-x[1], x[0]))[:5]
+    top_publishers = sorted(
+        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
+    )[:5]
 
     completed_records_for_dates = [
         r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
@@ -1588,18 +1605,15 @@ def api_collection_stats():
     for i in range(1, 13):
         idx_str = f"{i:02d}"
         name = calendar.month_name[i][:3]
-        ordered_months.append({"index": i, "name": name, "count": monthly_counts[idx_str]})
+        ordered_months.append(
+            {"index": i, "name": name, "count": monthly_counts[idx_str]}
+        )
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
     category_bins = Counter()
     for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
+        category_bins[_category_label_for_book(b)] += 1
 
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
     category_distribution = all_categories_sorted[:10]
@@ -1607,24 +1621,37 @@ def api_collection_stats():
         other_total = sum(count for label, count in all_categories_sorted[10:])
         category_distribution.append(("Other", other_total))
 
-    max_category_count = max(count for label, count in category_distribution) if category_distribution else 1
+    max_category_count = (
+        max(count for label, count in category_distribution)
+        if category_distribution
+        else 1
+    )
 
-    return jsonify({
-        "total_books": total_books,
-        "total_authors": total_authors,
-        "total_records": total_records,
-        "avg_rating": avg_rating,
-        "status_counts": dict(status_counts),
-        "rating_distribution": rating_distribution,
-        "top_authors": [{"name": name, "count": count} for name, count in top_authors],
-        "top_publishers": [{"name": name, "count": count} for name, count in top_publishers],
-        "category_distribution": [{"label": label, "count": count} for label, count in category_distribution],
-        "max_category_count": max_category_count,
-        "yearly_counts": sorted_years,
-        "max_year_count": max_year_count,
-        "monthly_counts": ordered_months,
-        "max_month_count": max_month_count,
-    })
+    return jsonify(
+        {
+            "total_books": total_books,
+            "total_authors": total_authors,
+            "total_records": total_records,
+            "avg_rating": avg_rating,
+            "status_counts": dict(status_counts),
+            "rating_distribution": rating_distribution,
+            "top_authors": [
+                {"name": name, "count": count} for name, count in top_authors
+            ],
+            "top_publishers": [
+                {"name": name, "count": count} for name, count in top_publishers
+            ],
+            "category_distribution": [
+                {"label": label, "count": count}
+                for label, count in category_distribution
+            ],
+            "max_category_count": max_category_count,
+            "yearly_counts": sorted_years,
+            "max_year_count": max_year_count,
+            "monthly_counts": ordered_months,
+            "max_month_count": max_month_count,
+        }
+    )
 
 
 @app.route("/api/books/<int:book_id>", methods=["GET"])
@@ -1953,6 +1980,102 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         raise
 
 
+def _background_backfill_categories(job_id: str, user_id: int):
+    """Background task: set every book category to a major BISAC or Unknown."""
+    from book_lamp.services.book_lookup import enhance_books_batch
+    from book_lamp.utils.books import is_dewey_category, is_language_code
+
+    try:
+        storage: Union[MockStorage, PostgresStorage]
+        if is_test_mode():
+            storage = _mock_storage_singleton
+        else:
+            storage = PostgresStorage(user_id=user_id)
+
+        books = storage.get_all_books()
+        app.logger.info(
+            f"Background job {job_id}: backfilling categories for {len(books)} books..."
+        )
+
+        # Phase 1: Pre-cleanup
+        for book in books:
+            major = normalise_major_bisac(book.get("bisac_main_category"))
+            if major is None:
+                major = normalise_major_bisac(book.get("bisac_category"))
+
+            if major is None:
+                # Invalid or missing, clear all category fields so enhance_books_batch will look them up
+                book["bisac_category"] = None
+                book["bisac_main_category"] = None
+                book["bisac_sub_category"] = None
+            else:
+                # We have a valid major category, but clean up the subcategory if it's invalid
+                sub = book.get("bisac_sub_category")
+                if sub:
+                    sub_str = str(sub).strip()
+                    if (
+                        is_language_code(sub_str)
+                        or is_dewey_category(sub_str)
+                        or sub_str.isdigit()
+                    ):
+                        book["bisac_sub_category"] = None
+                        book["bisac_category"] = major
+
+        # Phase 2: Enhanced Lookups
+        enhanced_count = enhance_books_batch(books, force_refresh=True)
+
+        # Phase 3: Standardisation
+        known_count = 0
+        unknown_count = 0
+        changed_count = 0
+        for book in books:
+            original_category = book.get("bisac_category")
+            original_main = book.get("bisac_main_category")
+            original_sub = book.get("bisac_sub_category")
+
+            cat_str = book.get("bisac_category")
+            if not cat_str or cat_str == UNKNOWN_CATEGORY:
+                cat_str = book.get("bisac_main_category")
+
+            full_cat, major_cat, sub_cat = normalise_bisac_category(cat_str)
+
+            if major_cat is None:
+                final_category = UNKNOWN_CATEGORY
+                final_main = UNKNOWN_CATEGORY
+                final_sub = None
+                unknown_count += 1
+            else:
+                final_category = full_cat
+                final_main = major_cat
+                final_sub = sub_cat
+                known_count += 1
+
+            book["bisac_category"] = final_category
+            book["bisac_main_category"] = final_main
+            book["bisac_sub_category"] = final_sub
+
+            if (
+                original_category != book["bisac_category"]
+                or original_main != book["bisac_main_category"]
+                or original_sub != book["bisac_sub_category"]
+            ):
+                changed_count += 1
+
+        items_to_update = [{"book": b, "record": None} for b in books]
+        storage.bulk_import(items_to_update)
+
+        result_msg = (
+            "Backfilled categories for "
+            f"{changed_count} book(s): {known_count} known, {unknown_count} unknown. "
+            f"Enhanced metadata for {enhanced_count} book(s)."
+        )
+        app.logger.info(f"Background job {job_id}: completed - {result_msg}")
+        return result_msg
+    except Exception:
+        app.logger.exception(f"Background job {job_id} failed")
+        raise
+
+
 @app.route("/books/fetch-covers", methods=["POST"])
 @authorisation_required
 @csrf_protect
@@ -1979,7 +2102,7 @@ def fetch_missing_categories():
     job_queue = get_job_queue()
     job_id = job_queue.submit_job(
         "backfill_bisac",
-        _background_fetch_missing_data,  # Reusing the background fetcher which now includes categories
+        _background_backfill_categories,
         session["user_id"],
     )
 

@@ -7,6 +7,8 @@ import requests
 
 from book_lamp.utils.books import (
     isbn13_to_isbn10,
+    normalise_bisac_category,
+    normalise_major_bisac,
     normalize_isbn,
 )
 
@@ -101,8 +103,6 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         first_pub = publisher_list[0] or {}
         publisher_name = first_pub.get("name")
 
-    from book_lamp.utils.books import parse_bisac_category
-
     description = data.get("notes")
     subjects = data.get("subjects") or []
     # Extract the name from the first subject if it's a dict, otherwise use it as-is
@@ -120,7 +120,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
             bisac = first_subject.strip() if first_subject else None
         # If it's some other type, bisac stays None
 
-    main_cat, sub_cat = parse_bisac_category(bisac)
+    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -472,10 +472,8 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         image_links.get("thumbnail") or image_links.get("smallThumbnail")
     )
 
-    from book_lamp.utils.books import parse_bisac_category
-
     bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
-    main_cat, sub_cat = parse_bisac_category(bisac)
+    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
 
     return {
         "title": html.unescape(info.get("title", "")),
@@ -667,6 +665,19 @@ def _merge_metadata(
     return target
 
 
+def has_valid_category(data: Optional[Dict[str, Any]]) -> bool:
+    """Check if the given dictionary has a valid normalized major category."""
+    if not data:
+        return False
+    main_cat = data.get("bisac_main_category")
+    if main_cat and main_cat != "Unknown" and normalise_major_bisac(main_cat):
+        return True
+    cat = data.get("bisac_category")
+    if cat and cat != "Unknown" and normalise_major_bisac(cat):
+        return True
+    return False
+
+
 def lookup_book_by_isbn13(
     isbn13: str,
     title: Optional[str] = None,
@@ -684,55 +695,76 @@ def lookup_book_by_isbn13(
 
     # 1. ISBN-based API Lookups
     logger.debug("  Trying ISBN-based lookups...")
-    best = _merge_metadata(best, _lookup_open_library(clean_isbn))
-    best = _merge_metadata(best, _lookup_google_books(clean_isbn))
+    gb_res = _lookup_google_books(clean_isbn)
+    ol_res = _lookup_open_library(clean_isbn)
 
-    if best.get("thumbnail_url"):
-        return best
+    if gb_res:
+        best = _merge_metadata(best, gb_res)
 
-    # 2. Direct Cover Lookups
-    logger.debug("  Trying direct cover lookups...")
-    ol_direct = _lookup_open_library_cover_direct(clean_isbn)
-    if ol_direct:
-        best["thumbnail_url"] = ol_direct
-        best["cover_url"] = ol_direct.replace("-M.jpg", "-L.jpg")
-        return best
+    if ol_res:
+        # Fall back to Open Library category ONLY if we don't have a valid category from Google Books
+        if has_valid_category(best):
+            ol_res_no_cat = dict(ol_res)
+            ol_res_no_cat["bisac_category"] = None
+            ol_res_no_cat["bisac_main_category"] = None
+            ol_res_no_cat["bisac_sub_category"] = None
+            best = _merge_metadata(best, ol_res_no_cat)
+        else:
+            best = _merge_metadata(best, ol_res)
 
-    prh_cover = _lookup_penguin_cover(clean_isbn)
-    if prh_cover:
-        best["thumbnail_url"] = prh_cover
-        best["cover_url"] = prh_cover
-        return best
+    # 2. Direct Cover Lookups (if still missing cover/thumbnail)
+    if not best.get("thumbnail_url"):
+        logger.debug("  Trying direct cover lookups...")
+        ol_direct = _lookup_open_library_cover_direct(clean_isbn)
+        if ol_direct:
+            best["thumbnail_url"] = ol_direct
+            best["cover_url"] = ol_direct.replace("-M.jpg", "-L.jpg")
+        else:
+            prh_cover = _lookup_penguin_cover(clean_isbn)
+            if prh_cover:
+                best["thumbnail_url"] = prh_cover
+                best["cover_url"] = prh_cover
+            else:
+                amazon_cover = _lookup_amazon_cover(clean_isbn)
+                if amazon_cover:
+                    best["thumbnail_url"] = amazon_cover
+                    best["cover_url"] = amazon_cover
 
-    amazon_cover = _lookup_amazon_cover(clean_isbn)
-    if amazon_cover:
-        best["thumbnail_url"] = amazon_cover
-        best["cover_url"] = amazon_cover
-        return best
-
-    # 3. Search Fallbacks (Crucial for missing covers on specific editions)
+    # 3. Search Fallbacks (Crucial for missing covers or categories)
+    # Trigger search fallback if we are missing the thumbnail/cover OR if we are missing a valid category!
     search_title = best.get("title")
     search_author = best.get("author")
 
     if search_title and search_title != "Unknown":
-        logger.debug(f"  Initiating search fallback for '{search_title}'")
-        # Open Library search often finds related editions with covers
-        ol_search = _lookup_open_library_search(search_title, search_author)
-        best = _merge_metadata(best, ol_search)
-        if best.get("thumbnail_url"):
-            return best
+        if not best.get("thumbnail_url") or not has_valid_category(best):
+            logger.debug(f"  Initiating search fallback for '{search_title}'")
+            gb_search = _lookup_google_books_search(search_title, search_author)
+            if gb_search:
+                if has_valid_category(best):
+                    gb_search_no_cat = dict(gb_search)
+                    gb_search_no_cat["bisac_category"] = None
+                    gb_search_no_cat["bisac_main_category"] = None
+                    gb_search_no_cat["bisac_sub_category"] = None
+                    best = _merge_metadata(best, gb_search_no_cat)
+                else:
+                    best = _merge_metadata(best, gb_search)
 
-        # Google Books search
-        gb_search = _lookup_google_books_search(search_title, search_author)
-        best = _merge_metadata(best, gb_search)
-        if best.get("thumbnail_url"):
-            return best
+            if not best.get("thumbnail_url") or not has_valid_category(best):
+                ol_search = _lookup_open_library_search(search_title, search_author)
+                if ol_search:
+                    if has_valid_category(best):
+                        ol_search_no_cat = dict(ol_search)
+                        ol_search_no_cat["bisac_category"] = None
+                        ol_search_no_cat["bisac_main_category"] = None
+                        ol_search_no_cat["bisac_sub_category"] = None
+                        best = _merge_metadata(best, ol_search_no_cat)
+                    else:
+                        best = _merge_metadata(best, ol_search)
 
-        # iTunes search
-        it_search = _lookup_itunes_search(search_title, search_author)
-        best = _merge_metadata(best, it_search)
-        if best.get("thumbnail_url"):
-            return best
+            if not best.get("thumbnail_url"):
+                it_search = _lookup_itunes_search(search_title, search_author)
+                if it_search:
+                    best = _merge_metadata(best, it_search)
 
     if len(best) > 1:  # More than just the ISBN
         return best
