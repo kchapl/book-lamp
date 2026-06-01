@@ -4,6 +4,8 @@ updates:
     directory: /
     schedule:
       interval: daily
+    cooldown:
+      default-days: 10
     groups:
       action-updates:
         patterns:
@@ -13,6 +15,8 @@ updates:
     directory: /
     schedule:
       interval: daily
+    cooldown:
+      default-days: 10
     groups:
       npm-minor-and-patch-updates:
         update-types:
@@ -23,6 +27,8 @@ updates:
     directory: /
     schedule:
       interval: daily
+    cooldown:
+      default-days: 10
     groups:
       uv-minor-and-patch-updates:
         update-types:
