@@ -1,0 +1,314 @@
+/* =============================================================================
+   HOME PAGE — Museum/Editorial Hero Section
+   Clean, spacious, elegant
+   ============================================================================= */
+
+.home-page {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* =============================================================================
+   HERO SECTION — Museum-inspired welcome
+   ============================================================================= */
+
+.hero {
+    text-align: center;
+    padding: 4rem 1rem 5rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.hero h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 400;
+    color: var(--md-sys-color-on-surface);
+    margin: 0 0 1.5rem 0;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.hero p {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 1.1875rem;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.7;
+    margin: 0 0 2.5rem 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+/* =============================================================================
+   FEATURES SECTION — Three-column grid
+   ============================================================================= */
+
+.features {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 3rem 0;
+    border-top: 1px solid var(--md-sys-color-outline-variant);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.feature-card {
+    padding: 2rem 1.5rem;
+    background: var(--md-sys-color-surface-container-low);
+    border-radius: var(--md-sys-shape-md);
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--md-sys-elevation-2);
+}
+
+.feature-card h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.375rem;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface);
+    margin: 0 0 0.75rem 0;
+}
+
+.feature-card p {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 1rem;
+    color: var(--md-sys-color-on-surface-variant);
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* =============================================================================
+   RECOMMENDATIONS SECTION — Book carousel/grid
+   ============================================================================= */
+
+.recommendations {
+    padding: 4rem 0 2rem;
+}
+
+.recommendations h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1.75rem;
+    font-weight: 400;
+    color: var(--md-sys-color-on-surface);
+    margin: 0 0 2rem 0;
+    text-align: center;
+}
+
+.book-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+/* =============================================================================
+   BOOK CARDS — Elegant, touch-friendly
+   ============================================================================= */
+
+.book-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--md-sys-color-surface-container-low);
+    border-radius: var(--md-sys-shape-md);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.book-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--md-sys-elevation-3);
+}
+
+.book-card img {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    background: var(--md-sys-color-surface-container-high);
+}
+
+.book-placeholder {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    background: var(--md-sys-color-surface-container-high);
+    color: var(--md-sys-color-on-surface-variant);
+}
+
+.book-info {
+    padding: 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.book-info h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--md-sys-color-on-surface);
+    margin: 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.book-author {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 0.875rem;
+    color: var(--md-sys-color-on-surface-variant);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =============================================================================
+   SKELETON LOADING
+   ============================================================================= */
+
+.skeleton-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.skeleton-card {
+    background: var(--md-sys-color-surface-container-low);
+    border-radius: var(--md-sys-shape-md);
+    overflow: hidden;
+}
+
+.skeleton-image {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(
+        90deg,
+        var(--md-sys-color-surface-container-high) 25%,
+        var(--md-sys-color-surface-container-highest) 50%,
+        var(--md-sys-color-surface-container-high) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+.skeleton-title {
+    height: 20px;
+    margin: 1rem;
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: var(--md-sys-shape-xs);
+    animation: shimmer 1.5s infinite;
+}
+
+.skeleton-author {
+    height: 16px;
+    margin: 0.5rem 1rem 1rem;
+    width: 60%;
+    background: var(--md-sys-color-surface-container-high);
+    border-radius: var(--md-sys-shape-xs);
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* =============================================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================================= */
+
+/* Tablet */
+@media (min-width: 640px) {
+    .features {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .book-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .hero {
+        padding: 5rem 2rem 6rem;
+    }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+    .hero {
+        padding: 6rem 2rem 7rem;
+    }
+
+    .hero h1 {
+        font-size: 3.75rem;
+    }
+
+    .features {
+        padding: 4rem 0;
+        gap: 2rem;
+    }
+
+    .book-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+    }
+}
+
+/* Large Desktop */
+@media (min-width: 1280px) {
+    .book-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+/* Mobile specific adjustments */
+@media (max-width: 480px) {
+    .hero {
+        padding: 3rem 1rem 4rem;
+    }
+
+    .hero h1 {
+        font-size: 2rem;
+    }
+
+    .hero p {
+        font-size: 1.0625rem;
+    }
+
+    .book-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    .book-info {
+        padding: 0.75rem;
+    }
+
+    .book-info h3 {
+        font-size: 0.9375rem;
+    }
+}

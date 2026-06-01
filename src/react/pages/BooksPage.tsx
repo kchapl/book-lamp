@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getBooks, searchBooks } from '../services/api';
 import type { Book, BooksFilters } from '../types';
+import '../styles/books.css';
 
 const BooksPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -72,6 +73,7 @@ const BooksPage: React.FC = () => {
     };
 
     const hasActiveFilters = Object.values(filters).some(v => v);
+    const isSearching = searchParams.get('q');
 
     return (
         <div className="books-page">
@@ -81,17 +83,19 @@ const BooksPage: React.FC = () => {
                 <form className="search-form" onSubmit={handleSearch}>
                     <input
                         type="text"
-                        placeholder="Search books..."
+                        placeholder="Search by title, author..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        aria-label="Search books"
                     />
-                    <button type="submit" className="btn">Search</button>
+                    <button type="submit" className="btn btn-primary">Search</button>
                 </form>
 
                 <div className="filter-controls">
                     <select
                         value={filters.status}
                         onChange={(e) => handleFilterChange('status', e.target.value)}
+                        aria-label="Filter by status"
                     >
                         <option value="">All Statuses</option>
                         <option value="In Progress">In Progress</option>
@@ -102,6 +106,7 @@ const BooksPage: React.FC = () => {
                     <select
                         value={filters.category}
                         onChange={(e) => handleFilterChange('category', e.target.value)}
+                        aria-label="Filter by category"
                     >
                         <option value="">All Categories</option>
                         {categories.map((cat) => (
@@ -112,6 +117,7 @@ const BooksPage: React.FC = () => {
                     <select
                         value={sortBy}
                         onChange={(e) => handleFilterChange('sort', e.target.value)}
+                        aria-label="Sort books"
                     >
                         <option value="reading_date">Reading Date</option>
                         <option value="title">Title</option>
@@ -127,6 +133,12 @@ const BooksPage: React.FC = () => {
                 </div>
             </div>
 
+            {isSearching && (
+                <div className="search-results-badge">
+                    Searching for "{searchParams.get('q')}"
+                </div>
+            )}
+
             {loading ? (
                 <div className="skeleton-grid">
                     {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -139,7 +151,7 @@ const BooksPage: React.FC = () => {
             ) : books.length === 0 ? (
                 <div className="empty-state">
                     <h2>No books found</h2>
-                    <p>Add your first book to get started.</p>
+                    <p>Add your first book to start building your collection.</p>
                     <Link to="/books/new" className="btn btn-primary">Add Book</Link>
                 </div>
             ) : (
@@ -153,7 +165,7 @@ const BooksPage: React.FC = () => {
                             {book.thumbnail_url ? (
                                 <img src={book.thumbnail_url} alt={book.title} loading="lazy" />
                             ) : (
-                                <div className="book-placeholder">📖</div>
+                                <div className="book-placeholder">📚</div>
                             )}
                             <div className="book-info">
                                 <h3>{book.title}</h3>

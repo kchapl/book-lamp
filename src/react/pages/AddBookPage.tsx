@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupISBN, createBook, addToReadingList } from '../services/api';
 import type { Book } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
+import '../styles/form.css';
 
 const AddBookPage: React.FC = () => {
     const navigate = useNavigate();
@@ -139,12 +140,13 @@ const AddBookPage: React.FC = () => {
 
             <div className="isbn-section">
                 <label>
-                    ISBN:
+                    ISBN
                     <input
                         type="text"
                         placeholder="Enter ISBN (10 or 13 digits)"
                         value={isbn}
                         onChange={(e) => setIsbn(e.target.value)}
+                        aria-label="ISBN"
                     />
                 </label>
                 <div className="isbn-actions">
@@ -157,9 +159,9 @@ const AddBookPage: React.FC = () => {
                     </button>
                     <button
                         onClick={scanning ? stopScanner : startScanner}
-                        className="btn"
+                        className="btn btn-outline"
                     >
-                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
+                        {scanning ? 'Stop Scanner' : 'Scan Barcode'}
                     </button>
                     <button
                         onClick={() => setShowManualEntry(true)}

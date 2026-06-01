@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getHistory } from '../services/api';
 import type { ReadingRecord, HistoryFilters } from '../types';
+import '../styles/global.css';
 
 const HistoryPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -9,8 +10,6 @@ const HistoryPage: React.FC = () => {
     const [statuses, setStatuses] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [editingRecord, setEditingRecord] = useState<ReadingRecord | null>(null);
-    const [editForm, setEditForm] = useState({});
 
     const filters: Partial<HistoryFilters> = {
         status: searchParams.get('status') || undefined,
@@ -65,14 +64,15 @@ const HistoryPage: React.FC = () => {
     }, {} as Record<string, ReadingRecord[]>);
 
     return (
-        <div className="history-page">
-            <h1>Reading History</h1>
+        <div className="history-page" style={{ maxWidth: '900px', margin: '0 auto', padding: '0 1rem' }}>
+            <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', fontWeight: 400, marginBottom: '2rem' }}>Reading History</h1>
 
-            <div className="history-controls">
-                <div className="filter-controls">
+            <div className="history-controls" style={{ marginBottom: '2rem' }}>
+                <div className="filter-controls" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
                     <select
                         value={filters.status || ''}
                         onChange={(e) => handleFilterChange('status', e.target.value)}
+                        style={{ minHeight: '48px', minWidth: '140px' }}
                     >
                         <option value="">All Statuses</option>
                         {statuses.map((status) => (
@@ -83,6 +83,7 @@ const HistoryPage: React.FC = () => {
                     <select
                         value={filters.rating?.toString() || ''}
                         onChange={(e) => handleFilterChange('min_rating', e.target.value)}
+                        style={{ minHeight: '48px', minWidth: '120px' }}
                     >
                         <option value="">All Ratings</option>
                         <option value="5">5 Stars</option>
@@ -95,6 +96,7 @@ const HistoryPage: React.FC = () => {
                     <select
                         value={filters.sort || 'date_desc'}
                         onChange={(e) => handleFilterChange('sort', e.target.value)}
+                        style={{ minHeight: '48px', minWidth: '140px' }}
                     >
                         <option value="date_desc">Newest First</option>
                         <option value="date_asc">Oldest First</option>
@@ -121,26 +123,26 @@ const HistoryPage: React.FC = () => {
             ) : (
                 <div className="history-list">
                     {Object.entries(groupedHistory).map(([bookTitle, records]) => (
-                        <div key={bookTitle} className="history-group">
-                            <h3 className="group-title">
-                                <Link to={`/books/${records[0].book_id}`}>{bookTitle}</Link>
+                        <div key={bookTitle} className="history-group" style={{ marginBottom: '2rem', padding: '1.5rem', background: 'var(--md-sys-color-surface-container-low)', borderRadius: 'var(--md-sys-shape-md)', border: '1px solid var(--md-sys-color-outline-variant)' }}>
+                            <h3 className="group-title" style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: '1.25rem', marginBottom: '1rem' }}>
+                                <Link to={`/books/${records[0].book_id}`} style={{ color: 'var(--md-sys-color-on-surface)', textDecoration: 'none' }}>{bookTitle}</Link>
                             </h3>
-                            <div className="records-list">
+                            <div className="records-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                                 {records.map((record) => (
-                                    <div key={record.id} className="history-record">
-                                        <div className="record-main">
+                                    <div key={record.id} className="history-record" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', padding: '0.75rem', background: 'var(--md-sys-color-surface-container-lowest)', borderRadius: 'var(--md-sys-shape-sm)' }}>
+                                        <div className="record-main" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
                                             <span className={`status-badge status-${record.status.toLowerCase().replace(' ', '-')}`}>
                                                 {record.status}
                                             </span>
                                             {record.rating && (
-                                                <span className="rating">{'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}</span>
+                                                <span className="rating" style={{ color: 'var(--md-sys-color-primary)', letterSpacing: '0.1em' }}>{'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}</span>
                                             )}
-                                            <span className="dates">
-                                                {record.start_date} - {record.end_date || 'Present'}
+                                            <span className="dates" style={{ fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: '0.875rem', color: 'var(--md-sys-color-on-surface-variant)' }}>
+                                                {record.start_date} — {record.end_date || 'Present'}
                                             </span>
                                         </div>
                                         {record.notes && (
-                                            <p className="notes">{record.notes}</p>
+                                            <p className="notes" style={{ width: '100%', margin: '0.5rem 0 0 0', fontSize: '0.9375rem', color: 'var(--md-sys-color-on-surface-variant)' }}>{record.notes}</p>
                                         )}
                                     </div>
                                 ))}

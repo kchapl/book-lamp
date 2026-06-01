@@ -1,0 +1,141 @@
+/* =============================================================================
+   ADD BOOK PAGE — Museum/Editorial Style Forms
+   Clean, spacious, touch-friendly
+   ============================================================================= */
+
+.add-book-page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.add-book-page h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: clamp(1.75rem, 4vw, 2.25rem);
+    font-weight: 400;
+    color: var(--md-sys-color-on-surface);
+    margin: 0 0 2.5rem 0;
+    text-align: center;
+}
+
+/* =============================================================================
+   ISBN SECTION
+   ============================================================================= */
+
+.isbn-section {
+    margin-bottom: 2.5rem;
+}
+
+.isbn-section label {
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.isbn-section input {
+    width: 100%;
+    margin-bottom: 1rem;
+}
+
+.isbn-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* =============================================================================
+   FORM STYLES
+   ============================================================================= */
+
+.add-book-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 2rem;
+    background: var(--md-sys-color-surface-container-low);
+    border-radius: var(--md-sys-shape-md);
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.add-book-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.add-book-form input {
+    width: 100%;
+}
+
+/* Checkbox label */
+.add-book-form .checkbox-label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 1rem;
+    color: var(--md-sys-color-on-surface);
+    cursor: pointer;
+}
+
+.add-book-form .checkbox-label input {
+    width: 24px;
+    height: 24px;
+    min-height: 24px;
+    margin: 0;
+}
+
+.add-book-form .btn[type="submit"] {
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+/* =============================================================================
+   SCANNER CONTAINER
+   ============================================================================= */
+
+.scanner-container {
+    margin-top: 1.5rem;
+    border-radius: var(--md-sys-shape-md);
+    overflow: hidden;
+    border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.scanner-container #scanner-reader {
+    min-height: 250px;
+}
+
+/* =============================================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================================= */
+
+@media (min-width: 640px) {
+    .add-book-page {
+        padding: 0 2rem;
+    }
+
+    .isbn-actions {
+        flex-wrap: nowrap;
+    }
+
+    .isbn-actions .btn-icon,
+    .isbn-actions .btn-text {
+        flex-shrink: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .isbn-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .isbn-actions .btn {
+        width: 100%;
+    }
+
+    .add-book-form {
+        padding: 1.5rem;
+    }
+}

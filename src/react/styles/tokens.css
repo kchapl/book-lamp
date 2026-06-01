@@ -1,125 +1,107 @@
 /**
- * Material Design 3 Token System
- * Seed colour: #4f46e5 (indigo)
- * Based on: https://m3.material.io/styles/color/the-color-system/color-roles
+ * Museum/Editorial Design Token System
+ * Warm, sophisticated palette inspired by cultural institutions
+ * and literary magazines
  */
 
 /* =============================================================================
-   COLOUR TOKENS — LIGHT THEME
+   COLOUR TOKENS — WARM MUSEUM PALETTE (LIGHT THEME)
    ============================================================================= */
 
 :root {
-    /* Primary */
-    --md-sys-color-primary: #4f46e5;
-    --md-sys-color-on-primary: #ffffff;
-    --md-sys-color-primary-container: #e0e7ff;
-    --md-sys-color-on-primary-container: #1e1b4b;
+    /* Primary - Warm Terracotta */
+    --md-sys-color-primary: #A65D49;
+    --md-sys-color-on-primary: #FDFBF7;
+    --md-sys-color-primary-container: #F5E6E0;
+    --md-sys-color-on-primary-container: #3D1E16;
 
     /* Primary dark */
-    --md-sys-color-primary-dark: #6366f1;
-    --md-sys-color-on-primary-dark: #ffffff;
-    --md-sys-color-primary-container-dark: #312e81;
-    --md-sys-color-on-primary-container-dark: #e0e7ff;
+    --md-sys-color-primary-dark: #C47A68;
+    --md-sys-color-on-primary-dark: #FDFBF7;
+    --md-sys-color-primary-container-dark: #5C3329;
+    --md-sys-color-on-primary-container-dark: #F5DED6;
 
-    /* Secondary */
-    --md-sys-color-secondary: #625b71;
-    --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #e8def8;
-    --md-sys-color-on-secondary-container: #1d192b;
+    /* Secondary - Sage Green */
+    --md-sys-color-secondary: #5E7362;
+    --md-sys-color-on-secondary: #FDFBF7;
+    --md-sys-color-secondary-container: #E0E8E1;
+    --md-sys-color-on-secondary-container: #1A241B;
 
-    /* Secondary dark */
-    --md-sys-color-secondary-dark: #7c7a8c;
-    --md-sys-color-on-secondary-dark: #ffffff;
-    --md-sys-color-secondary-container-dark: #4a4458;
-    --md-sys-color-on-secondary-container-dark: #e8def8;
-
-    /* Tertiary */
-    --md-sys-color-tertiary: #7d5260;
-    --md-sys-color-on-tertiary: #ffffff;
-    --md-sys-color-tertiary-container: #ffd8e4;
-    --md-sys-color-on-tertiary-container: #31111d;
-
-    /* Tertiary dark */
-    --md-sys-color-tertiary-dark: #9b7786;
-    --md-sys-color-on-tertiary-dark: #ffffff;
-    --md-sys-color-tertiary-container-dark: #633b48;
-    --md-sys-color-on-tertiary-container-dark: #ffd8e4;
+    /* Tertiary - Deep Burgundy */
+    --md-sys-color-tertiary: #6B3A3A;
+    --md-sys-color-on-tertiary: #FDFBF7;
+    --md-sys-color-tertiary-container: #F0E0E0;
+    --md-sys-color-on-tertiary-container: #2A1515;
 
     /* Error */
-    --md-sys-color-error: #b3261e;
-    --md-sys-color-on-error: #ffffff;
-    --md-sys-color-error-container: #f9dedc;
-    --md-sys-color-on-error-container: #410e0b;
+    --md-sys-color-error: #BA1A1A;
+    --md-sys-color-on-error: #FDFBF7;
+    --md-sys-color-error-container: #FFDAD6;
+    --md-sys-color-on-error-container: #410002;
 
-    /* Error dark */
-    --md-sys-color-error-dark: #f2b8b5;
-    --md-sys-color-on-error-dark: #601410;
-    --md-sys-color-error-container-dark: #8c1d18;
-    --md-sys-color-on-error-container-dark: #f9dedc;
-
-    /* Surface */
-    --md-sys-color-surface: #fefbff;
-    --md-sys-color-on-surface: #1c1b1f;
-    --md-sys-color-surface-variant: #e7e0ec;
-    --md-sys-color-on-surface-variant: #49454f;
-    --md-sys-color-surface-container: #f3edf7;
-    --md-sys-color-surface-container-low: #f7f2fa;
-    --md-sys-color-surface-container-high: #ece6f0;
-    --md-sys-color-surface-container-highest: #e6e0e9;
-    --md-sys-color-outline: #79747e;
-    --md-sys-color-outline-variant: #cac4d0;
-
-    /* Surface dark */
-    --md-sys-color-surface-dark: #141218;
-    --md-sys-color-on-surface-dark: #e6e1e5;
-    --md-sys-color-surface-variant-dark: #49454f;
-    --md-sys-color-on-surface-variant-dark: #cac4d0;
-    --md-sys-color-surface-container-dark: #211f26;
-    --md-sys-color-surface-container-low-dark: #1d1b20;
-    --md-sys-color-surface-container-high-dark: #2b2930;
-    --md-sys-color-surface-container-highest-dark: #36343b;
-    --md-sys-color-outline-dark: #938f99;
-    --md-sys-color-outline-variant-dark: #49454f;
+    /* Surface - Warm Museum Whites */
+    --md-sys-color-surface: #FDFBF7;
+    --md-sys-color-on-surface: #1A1815;
+    --md-sys-color-surface-variant: #E8E3DB;
+    --md-sys-color-on-surface-variant: #4B4640;
+    --md-sys-color-surface-container: #F7F3EC;
+    --md-sys-color-surface-container-low: #FAF8F5;
+    --md-sys-color-surface-container-high: #F0EBE4;
+    --md-sys-color-surface-container-highest: #E8E3DB;
+    --md-sys-color-surface-container-lowest: #FFFFFF;
+    --md-sys-color-outline: #7D7670;
+    --md-sys-color-outline-variant: #CFC9C0;
 
     /* Background */
-    --md-sys-color-background: #fefbff;
-    --md-sys-color-on-background: #1c1b1f;
-
-    /* Background dark */
-    --md-sys-color-background-dark: #141218;
-    --md-sys-color-on-background-dark: #e6e1e5;
+    --md-sys-color-background: #FDFBF7;
+    --md-sys-color-on-background: #1A1815;
 
     /* Inverse */
-    --md-sys-color-inverse-surface: #313033;
-    --md-sys-color-inverse-on-surface: #f4eff4;
-    --md-sys-color-inverse-primary: #a8b3ff;
-
-    /* Inverse dark */
-    --md-sys-color-inverse-surface-dark: #e6e1e5;
-    --md-sys-color-inverse-on-surface-dark: #313033;
-    --md-sys-color-inverse-primary-dark: #4442a4;
+    --md-sys-color-inverse-surface: #312F2C;
+    --md-sys-color-inverse-on-surface: #F1EFE9;
+    --md-sys-color-inverse-primary: #F5DED6;
 
     /* Shadow & Scrim */
-    --md-sys-color-shadow: #000000;
-    --md-sys-color-scrim: #000000;
+    --md-sys-color-shadow: #1A1815;
+    --md-sys-color-scrim: #1A1815;
 
     /* Surface tint */
-    --md-sys-color-surface-tint: #4f46e5;
-    --md-sys-color-surface-tint-dark: #8b8ae8;
+    --md-sys-color-surface-tint: #A65D49;
 
-    /* Surface elevation */
-    --md-sys-color-surface-elevation-1: rgba(79, 70, 229, 0.05);
-    --md-sys-color-surface-elevation-2: rgba(79, 70, 229, 0.08);
-    --md-sys-color-surface-elevation-3: rgba(79, 70, 229, 0.11);
-    --md-sys-color-surface-elevation-4: rgba(79, 70, 229, 0.12);
-    --md-sys-color-surface-elevation-5: rgba(79, 70, 229, 0.14);
+    /* Surface elevation (warm tinted) */
+    --md-sys-color-surface-elevation-1: rgba(166, 93, 73, 0.04);
+    --md-sys-color-surface-elevation-2: rgba(166, 93, 73, 0.06);
+    --md-sys-color-surface-elevation-3: rgba(166, 93, 73, 0.08);
+    --md-sys-color-surface-elevation-4: rgba(166, 93, 73, 0.10);
+    --md-sys-color-surface-elevation-5: rgba(166, 93, 73, 0.12);
 
-    /* Surface elevation dark */
-    --md-sys-color-surface-elevation-1-dark: rgba(139, 138, 232, 0.08);
-    --md-sys-color-surface-elevation-2-dark: rgba(139, 138, 232, 0.12);
-    --md-sys-color-surface-elevation-3-dark: rgba(139, 138, 232, 0.16);
-    --md-sys-color-surface-elevation-4-dark: rgba(139, 138, 232, 0.18);
-    --md-sys-color-surface-elevation-5-dark: rgba(139, 138, 232, 0.20);
+    /* Elevation shadows - warm, subtle */
+    --md-sys-elevation-1: 0 1px 2px rgba(26, 24, 21, 0.06), 0 1px 3px 1px rgba(26, 24, 21, 0.04);
+    --md-sys-elevation-2: 0 1px 2px rgba(26, 24, 21, 0.08), 0 2px 6px 2px rgba(26, 24, 21, 0.06);
+    --md-sys-elevation-3: 0 4px 8px 3px rgba(26, 24, 21, 0.06), 0 1px 4px rgba(26, 24, 21, 0.08);
+    --md-sys-elevation-4: 0 8px 16px 4px rgba(26, 24, 21, 0.08), 0 2px 8px rgba(26, 24, 21, 0.06);
+
+    /* =============================================================================
+       TYPOGRAPHY TOKENS — EDITORIAL/MUSEUM STYLE
+       ============================================================================= */
+
+    --md-sys-typescale-display-large-font: 'Playfair Display', Georgia, serif;
+    --md-sys-typescale-display-large-size: 57px;
+    --md-sys-typescale-display-large-line-height: 64px;
+    --md-sys-typescale-display-large-weight: 400;
+    --md-sys-typescale-display-large-tracking: -0.25px;
+
+    --md-sys-typescale-display-medium-font: 'Playfair Display', Georgia, serif;
+    --md-sys-typescale-display-medium-size: 45px;
+    --md-sys-typescale-display-medium-line-height: 52px;
+    --md-sys-typescale-display-medium-weight: 400;
+    --md-sys-typescale-display-medium-tracking: 0;
+
+    --md-sys-typescale-display-small-font: 'Playfair Display', Georgia, serif;
+    --md-sys-typescale-display-small-size: 36px;
+    --md-sys-typescale-display-small-line-height: 44px;
+    --md-sys-typescale-display-small-weight: 400;
+    --md-sys-typescale-display-small-tracking: 0;
 
     /* =============================================================================
        SHAPE TOKENS
@@ -175,94 +157,81 @@
     --md-sys-state-dragged-state-layer-opacity: 0.16;
 
     /* =============================================================================
-       TYPOGRAPHY TOKENS
+       TYPOGRAPHY TOKENS — EDITORIAL/MUSEUM STYLE
        ============================================================================= */
 
-    --md-sys-typescale-display-large-font: 'Roboto', sans-serif;
-    --md-sys-typescale-display-large-size: 57px;
-    --md-sys-typescale-display-large-line-height: 64px;
-    --md-sys-typescale-display-large-weight: 400;
-    --md-sys-typescale-display-large-tracking: -0.25px;
-
-    --md-sys-typescale-display-medium-font: 'Roboto', sans-serif;
-    --md-sys-typescale-display-medium-size: 45px;
-    --md-sys-typescale-display-medium-line-height: 52px;
-    --md-sys-typescale-display-medium-weight: 400;
-    --md-sys-typescale-display-medium-tracking: 0;
-
-    --md-sys-typescale-display-small-font: 'Roboto', sans-serif;
-    --md-sys-typescale-display-small-size: 36px;
-    --md-sys-typescale-display-small-line-height: 44px;
-    --md-sys-typescale-display-small-weight: 400;
-    --md-sys-typescale-display-small-tracking: 0;
-
-    --md-sys-typescale-headline-large-font: 'Roboto', sans-serif;
+    /* Headlines - elegant serif for editorial feel */
+    --md-sys-typescale-headline-large-font: 'Playfair Display', Georgia, serif;
     --md-sys-typescale-headline-large-size: 32px;
     --md-sys-typescale-headline-large-line-height: 40px;
     --md-sys-typescale-headline-large-weight: 400;
     --md-sys-typescale-headline-large-tracking: 0;
 
-    --md-sys-typescale-headline-medium-font: 'Roboto', sans-serif;
+    --md-sys-typescale-headline-medium-font: 'Playfair Display', Georgia, serif;
     --md-sys-typescale-headline-medium-size: 28px;
     --md-sys-typescale-headline-medium-line-height: 36px;
     --md-sys-typescale-headline-medium-weight: 400;
     --md-sys-typescale-headline-medium-tracking: 0;
 
-    --md-sys-typescale-headline-small-font: 'Roboto', sans-serif;
+    --md-sys-typescale-headline-small-font: 'Playfair Display', Georgia, serif;
     --md-sys-typescale-headline-small-size: 24px;
     --md-sys-typescale-headline-small-line-height: 32px;
     --md-sys-typescale-headline-small-weight: 400;
     --md-sys-typescale-headline-small-tracking: 0;
 
-    --md-sys-typescale-title-large-font: 'Roboto', sans-serif;
+    /* Title - refined serifs for headings */
+    --md-sys-typescale-title-large-font: 'Playfair Display', Georgia, serif;
     --md-sys-typescale-title-large-size: 22px;
     --md-sys-typescale-title-large-line-height: 28px;
     --md-sys-typescale-title-large-weight: 400;
     --md-sys-typescale-title-large-tracking: 0;
 
-    --md-sys-typescale-title-medium-font: 'Roboto', sans-serif;
+    /* UI labels - clean modern sans */
+    --md-sys-typescale-title-medium-font: 'DM Sans', system-ui, sans-serif;
     --md-sys-typescale-title-medium-size: 16px;
     --md-sys-typescale-title-medium-line-height: 24px;
     --md-sys-typescale-title-medium-weight: 500;
     --md-sys-typescale-title-medium-tracking: 0.15px;
 
-    --md-sys-typescale-title-small-font: 'Roboto', sans-serif;
+    --md-sys-typescale-title-small-font: 'DM Sans', system-ui, sans-serif;
     --md-sys-typescale-title-small-size: 14px;
     --md-sys-typescale-title-small-line-height: 20px;
     --md-sys-typescale-title-small-weight: 500;
     --md-sys-typescale-title-small-tracking: 0.1px;
 
-    --md-sys-typescale-body-large-font: 'Roboto', sans-serif;
+    /* Body - elegant, readable serif */
+    --md-sys-typescale-body-large-font: 'Source Serif 4', Georgia, serif;
     --md-sys-typescale-body-large-size: 16px;
-    --md-sys-typescale-body-large-line-height: 24px;
+    --md-sys-typescale-body-large-line-height: 28px;
     --md-sys-typescale-body-large-weight: 400;
-    --md-sys-typescale-body-large-tracking: 0.5px;
+    --md-sys-typescale-body-large-tracking: 0.15px;
 
-    --md-sys-typescale-body-medium-font: 'Roboto', sans-serif;
+    --md-sys-typescale-body-medium-font: 'Source Serif 4', Georgia, serif;
     --md-sys-typescale-body-medium-size: 14px;
-    --md-sys-typescale-body-medium-line-height: 20px;
+    --md-sys-typescale-body-medium-line-height: 22px;
     --md-sys-typescale-body-medium-weight: 400;
     --md-sys-typescale-body-medium-tracking: 0.25px;
 
-    --md-sys-typescale-body-small-font: 'Roboto', sans-serif;
+    --md-sys-typescale-body-small-font: 'Source Serif 4', Georgia, serif;
     --md-sys-typescale-body-small-size: 12px;
-    --md-sys-typescale-body-small-line-height: 16px;
-    --md-sys-cache-body-small-weight: 400;
+    --md-sys-typescale-body-small-line-height: 18px;
+    --md-sys-typescale-body-small-weight: 400;
     --md-sys-typescale-body-small-tracking: 0.4px;
 
-    --md-sys-typescale-label-large-font: 'Roboto', sans-serif;
+    /* UI Labels - clean sans */
+    --md-sys-typescale-label-large-font: 'DM Sans', system-ui, sans-serif;
     --md-sys-typescale-label-large-size: 14px;
     --md-sys-typescale-label-large-line-height: 20px;
     --md-sys-typescale-label-large-weight: 500;
     --md-sys-typescale-label-large-tracking: 0.1px;
 
-    --md-sys-typescale-label-medium-font: 'Roboto', sans-serif;
+    --md-sys-typescale-label-medium-font: 'DM Sans', system-ui, sans-serif;
     --md-sys-typescale-label-medium-size: 12px;
     --md-sys-typescale-label-medium-line-height: 16px;
     --md-sys-typescale-label-medium-weight: 500;
     --md-sys-typescale-label-medium-tracking: 0.5px;
 
-    --md-sys-typescale-label-small-font: 'Roboto', sans-serif;
+    --md-sys-typescale-label-small-font: 'DM Sans', system-ui, sans-serif;
     --md-sys-typescale-label-small-size: 11px;
     --md-sys-typescale-label-small-line-height: 16px;
     --md-sys-typescale-label-small-weight: 500;
@@ -343,75 +312,75 @@
 }
 
 [data-theme="light"] {
-    /* Reset to light values (already defaults in :root, but explicit for clarity) */
-    --md-sys-color-surface: #fefbff;
-    --md-sys-color-on-surface: #1c1b1f;
-    --md-sys-color-surface-variant: #e7e0ec;
-    --md-sys-color-on-surface-variant: #49454f;
-    --md-sys-color-surface-container: #f3edf7;
-    --md-sys-color-surface-container-low: #f7f2fa;
-    --md-sys-color-surface-container-high: #ece6f0;
-    --md-sys-color-surface-container-highest: #e6e0e9;
-    --md-sys-color-outline: #79747e;
-    --md-sys-color-outline-variant: #cac4d0;
-    --md-sys-color-primary: #4f46e5;
-    --md-sys-color-on-primary: #ffffff;
-    --md-sys-color-primary-container: #e0e7ff;
-    --md-sys-color-on-primary-container: #1e1b4b;
-    --md-sys-color-secondary: #625b71;
-    --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #e8def8;
-    --md-sys-color-on-secondary-container: #1d192b;
-    --md-sys-color-tertiary: #7d5260;
-    --md-sys-color-on-tertiary: #ffffff;
-    --md-sys-color-tertiary-container: #ffd8e4;
-    --md-sys-color-on-tertiary-container: #31111d;
-    --md-sys-color-error: #b3261e;
-    --md-sys-color-on-error: #ffffff;
-    --md-sys-color-error-container: #f9dedc;
-    --md-sys-color-on-error-container: #410e0b;
-    --md-sys-color-background: #fefbff;
-    --md-sys-color-on-background: #1c1b1f;
-    --md-sys-color-inverse-surface: #313033;
-    --md-sys-color-inverse-on-surface: #f4eff4;
-    --md-sys-color-inverse-primary: #a8b3ff;
-    --md-sys-color-surface-tint: #4f46e5;
+    /* Light theme - warm museum palette */
+    --md-sys-color-surface: #FDFBF7;
+    --md-sys-color-on-surface: #1A1815;
+    --md-sys-color-surface-variant: #E8E3DB;
+    --md-sys-color-on-surface-variant: #4B4640;
+    --md-sys-color-surface-container: #F7F3EC;
+    --md-sys-color-surface-container-low: #FAF8F5;
+    --md-sys-color-surface-container-high: #F0EBE4;
+    --md-sys-color-surface-container-highest: #E8E3DB;
+    --md-sys-color-outline: #7D7670;
+    --md-sys-color-outline-variant: #CFC9C0;
+    --md-sys-color-primary: #A65D49;
+    --md-sys-color-on-primary: #FDFBF7;
+    --md-sys-color-primary-container: #F5E6E0;
+    --md-sys-color-on-primary-container: #3D1E16;
+    --md-sys-color-secondary: #5E7362;
+    --md-sys-color-on-secondary: #FDFBF7;
+    --md-sys-color-secondary-container: #E0E8E1;
+    --md-sys-color-on-secondary-container: #1A241B;
+    --md-sys-color-tertiary: #6B3A3A;
+    --md-sys-color-on-tertiary: #FDFBF7;
+    --md-sys-color-tertiary-container: #F0E0E0;
+    --md-sys-color-on-tertiary-container: #2A1515;
+    --md-sys-color-error: #BA1A1A;
+    --md-sys-color-on-error: #FDFBF7;
+    --md-sys-color-error-container: #FFDAD6;
+    --md-sys-color-on-error-container: #410002;
+    --md-sys-color-background: #FDFBF7;
+    --md-sys-color-on-background: #1A1815;
+    --md-sys-color-inverse-surface: #312F2C;
+    --md-sys-color-inverse-on-surface: #F1EFE9;
+    --md-sys-color-inverse-primary: #F5DED6;
+    --md-sys-color-surface-tint: #A65D49;
 }
 
 [data-theme="dark"] {
-    /* Dark theme values */
-    --md-sys-color-surface: #141218;
-    --md-sys-color-on-surface: #e6e1e5;
-    --md-sys-color-surface-variant: #49454f;
-    --md-sys-color-on-surface-variant: #cac4d0;
-    --md-sys-color-surface-container: #211f26;
-    --md-sys-color-surface-container-low: #1d1b20;
-    --md-sys-color-surface-container-high: #2b2930;
-    --md-sys-color-surface-container-highest: #36343b;
-    --md-sys-color-outline: #938f99;
-    --md-sys-color-outline-variant: #49454f;
-    --md-sys-color-primary: #6366f1;
-    --md-sys-color-on-primary: #ffffff;
-    --md-sys-color-primary-container: #312e81;
-    --md-sys-color-on-primary-container: #e0e7ff;
-    --md-sys-color-secondary: #7c7a8c;
-    --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #4a4458;
-    --md-sys-color-on-secondary-container: #e8def8;
-    --md-sys-color-tertiary: #9b7786;
-    --md-sys-color-on-tertiary: #ffffff;
-    --md-sys-color-tertiary-container: #633b48;
-    --md-sys-color-on-tertiary-container: #ffd8e4;
-    --md-sys-color-error: #f2b8b5;
-    --md-sys-color-on-error: #601410;
-    --md-sys-color-error-container: #8c1d18;
-    --md-sys-color-on-error-container: #f9dedc;
-    --md-sys-color-background: #141218;
-    --md-sys-color-on-background: #e6e1e5;
-    --md-sys-color-inverse-surface: #e6e1e5;
-    --md-sys-color-inverse-on-surface: #313033;
-    --md-sys-color-inverse-primary: #4442a4;
-    --md-sys-color-surface-tint: #8b8ae8;
+    /* Dark theme - warm museum palette */
+    --md-sys-color-surface: #1A1815;
+    --md-sys-color-on-surface: #F1EFE9;
+    --md-sys-color-surface-variant: #4B4640;
+    --md-sys-color-on-surface-variant: #CFC9C0;
+    --md-sys-color-surface-container: #242220;
+    --md-sys-color-surface-container-low: #1E1C1A;
+    --md-sys-color-surface-container-high: #2E2B28;
+    --md-sys-color-surface-container-highest: #383533;
+    --md-sys-color-outline: #9C958D;
+    --md-sys-color-outline-variant: #4B4640;
+    --md-sys-color-primary: #C47A68;
+    --md-sys-color-on-primary: #1A1815;
+    --md-sys-color-primary-container: #5C3329;
+    --md-sys-color-on-primary-container: #F5DED6;
+    --md-sys-color-secondary: #8FA88A;
+    --md-sys-color-on-secondary: #1A1815;
+    --md-sys-color-secondary-container: #3E4E3C;
+    --md-sys-color-on-secondary-container: #C0D1BE;
+    --md-sys-color-tertiary: #D4A5A5;
+    --md-sys-color-on-tertiary: #1A1815;
+    --md-sys-color-tertiary-container: #4D2323;
+    --md-sys-color-on-tertiary-container: #F0DEDE;
+    --md-sys-color-error: #FFB4AB;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000A;
+    --md-sys-color-on-error-container: #FFDAD6;
+    --md-sys-color-background: #1A1815;
+    --md-sys-color-on-background: #F1EFE9;
+    --md-sys-color-inverse-surface: #F1EFE9;
+    --md-sys-color-inverse-on-surface: #312F2C;
+    --md-sys-color-inverse-primary: #A65D49;
+    --md-sys-color-surface-tint: #C47A68;
 }
 
 /* =============================================================================
