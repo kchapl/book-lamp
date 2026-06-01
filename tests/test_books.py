@@ -105,6 +105,17 @@ def test_books_page_buttons_have_no_inline_styles(authenticated_client):
     assert "style=" not in fetch_tag
 
 
+def test_books_bulk_actions_are_in_overflow_menu(authenticated_client):
+    resp = authenticated_client.get("/books")
+    html = resp.data.decode("utf-8")
+
+    assert 'aria-label="More book actions"' in html
+    assert 'role="menu"' in html
+    assert 'class="action-menu-item" role="menuitem"' in html
+    assert html.index("Import from Libib") > html.index('role="menu"')
+    assert html.index("Fetch missing data") > html.index('role="menu"')
+
+
 def test_books_year_filter(authenticated_client):
     """Test filtering books bookshelf by year completed."""
     storage = get_storage()

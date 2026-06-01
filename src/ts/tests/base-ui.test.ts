@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { showConfirm, submitPostRequest, toggleConnection } from '../base-ui.js';
+import { initBaseUI, showConfirm, submitPostRequest, toggleConnection } from '../base-ui.js';
 
 describe('base-ui', () => {
     beforeEach(() => {
@@ -54,5 +54,29 @@ describe('base-ui', () => {
 
         const title = document.getElementById('modal-title');
         expect(title?.textContent).toBe('Disconnect Google Sheets');
+    });
+
+    it('opens and closes action menus', () => {
+        document.body.innerHTML += `
+          <div class="action-menu">
+            <button type="button" class="action-menu-toggle" aria-expanded="false">More</button>
+            <div class="action-menu-panel" role="menu">
+              <button type="button" class="action-menu-item" role="menuitem">Action</button>
+            </div>
+          </div>
+        `;
+
+        initBaseUI();
+
+        const menu = document.querySelector<HTMLElement>('.action-menu');
+        const toggle = document.querySelector<HTMLButtonElement>('.action-menu-toggle');
+
+        toggle?.click();
+        expect(menu?.classList.contains('open')).toBe(true);
+        expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(menu?.classList.contains('open')).toBe(false);
+        expect(toggle?.getAttribute('aria-expanded')).toBe('false');
     });
 });

@@ -156,13 +156,60 @@ export function initBaseUI(): void {
         });
     });
 
-    // 5. Global exposing of functions that might be called from templates
+    // 5. Action menus
+    initActionMenus();
+
+    // 6. Global exposing of functions that might be called from templates
     // Note: We'll also update the templates to use modern event listeners where possible
     initSyncHealthBadge();
     (window as any).showConfirm = showConfirm;
     (window as any).closeModal = closeModal;
     (window as any).submitPostRequest = submitPostRequest;
     (window as any).toggleConnection = toggleConnection;
+}
+
+function initActionMenus(): void {
+    const menus = [...document.querySelectorAll<HTMLElement>('.action-menu')];
+    if (menus.length === 0) return;
+
+    const closeMenu = (menu: HTMLElement): void => {
+        menu.classList.remove('open');
+        const toggle = menu.querySelector<HTMLButtonElement>('.action-menu-toggle');
+        toggle?.setAttribute('aria-expanded', 'false');
+    };
+
+    const closeAllMenus = (): void => {
+        menus.forEach(closeMenu);
+    };
+
+    menus.forEach((menu) => {
+        const toggle = menu.querySelector<HTMLButtonElement>('.action-menu-toggle');
+        if (!toggle) return;
+
+        toggle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = menu.classList.contains('open');
+            closeAllMenus();
+            if (!isOpen) {
+                menu.classList.add('open');
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        menus.forEach((menu) => {
+            if (!menu.contains(event.target as Node)) {
+                closeMenu(menu);
+            }
+        });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeAllMenus();
+        }
+    });
 }
 
 function initSyncHealthBadge(): void {
