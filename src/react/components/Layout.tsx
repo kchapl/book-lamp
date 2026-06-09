@@ -10,6 +10,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { theme, setTheme, syncStatus } = useContext(AppContext);
     const [showThemeMenu, setShowThemeMenu] = useState(false);
     const [jobIndicator, setJobIndicator] = useState<string | null>(null);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
 
     useEffect(() => {
@@ -36,12 +37,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Link to="/" className="logo">
                         Book Lamp
                     </Link>
-                    <ul className="nav-links">
+                    {/* Mobile menu toggle button */}
+                    <button
+                        className="mobile-menu-toggle btn-icon"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                        aria-expanded={mobileMenuOpen}
+                    >
+                        {mobileMenuOpen ? '✕' : '☰'}
+                    </button>
+                    <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
                         {navItems.map((item) => (
                             <li key={item.path}>
                                 <Link
                                     to={item.path}
                                     className={location.pathname === item.path ? 'active' : ''}
+                                    onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {item.label}
                                 </Link>
