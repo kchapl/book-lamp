@@ -32,7 +32,7 @@
     --btn-outline-color: transparent;
     --btn-state-layer-color: var(--md-sys-color-on-primary);
 
-    min-height: 40px;
+    min-height: 48px;
     padding: 0 1.5rem;
     border: 1px solid var(--btn-outline-color);
     border-radius: var(--md-sys-shape-corner-full);
@@ -52,6 +52,20 @@
     position: relative;
     overflow: hidden;
     transition: box-shadow var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+/* Mobile touch target improvements */
+@media (max-width: 640px) {
+    .btn {
+        min-height: 48px;
+        padding: 0 1.25rem;
+        font-size: 1rem;
+        min-width: 44px;
+    }
+
+    .btn + .btn {
+        margin-left: 0.75rem;
+    }
 }
 
 .btn::before {
@@ -128,14 +142,14 @@
 
 .btn-sm,
 .btn-small {
-    min-height: 32px;
+    min-height: 40px;
     padding: 0 1rem;
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
 }
 
 .btn-icon {
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     border: none;
     border-radius: var(--md-sys-shape-corner-full);
@@ -147,6 +161,20 @@
     justify-content: center;
     position: relative;
     overflow: hidden;
+}
+
+/* Mobile adjustments for small buttons and icon buttons */
+@media (max-width: 640px) {
+    .btn-sm,
+    .btn-small {
+        min-height: 40px;
+        font-size: 0.9375rem;
+    }
+
+    .btn-icon {
+        width: 48px;
+        height: 48px;
+    }
 }
 
 .btn-icon::before {
@@ -223,4 +251,86 @@
 
 .md3-surface-container-high {
     background-color: var(--md-sys-color-surface-container-high);
+}
+
+/* =============================================================================
+   MOBILE NAVIGATION IMPROVEMENTS (React)
+   ============================================================================= */
+
+/* Mobile menu toggle button */
+.mobile-menu-toggle {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .mobile-menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        background: transparent;
+        border: none;
+        border-radius: var(--md-sys-shape-corner-full);
+        cursor: pointer;
+        font-size: 1.5rem;
+        color: var(--md-sys-color-on-surface-variant);
+        transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    }
+
+    .mobile-menu-toggle:hover {
+        background-color: var(--md-sys-color-surface-container);
+    }
+
+    .mobile-menu-toggle:focus-visible {
+        outline: 2px solid var(--md-sys-color-primary);
+        outline-offset: 2px;
+    }
+
+    /* Navigation links - mobile menu */
+    .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--md-sys-color-surface-container-lowest);
+        border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        padding: 1rem;
+        box-shadow: var(--md-sys-elevation-2);
+        z-index: 100;
+    }
+
+    .nav-links.nav-open {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .nav-links li {
+        width: 100%;
+    }
+
+    .nav-links a {
+        display: block;
+        width: 100%;
+        padding: 1rem;
+        margin: 0;
+        min-height: 48px;
+        border-radius: var(--md-sys-shape-corner-small);
+        font-size: 1rem;
+        text-align: center;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+        background-color: var(--md-sys-color-primary-container);
+        color: var(--md-sys-color-on-primary-container);
+    }
+
+    /* Main nav - mobile layout */
+    .main-nav {
+        position: relative;
+    }
 }
