@@ -81,7 +81,7 @@ def test_stats_top_authors_only_completed(authenticated_client):
     storage.add_to_reading_list(b1["id"])
     storage.add_to_reading_list(b2["id"])
 
-    resp = authenticated_client.get("/stats")
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     html = resp.data.decode("utf-8")
     # Author1 should be listed with 1 books, not 2
     assert "Author1" in html
@@ -100,7 +100,7 @@ def test_stats_status_links(authenticated_client):
     storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-05")
     storage.add_reading_record(b2["id"], "In Progress", "2023-02-01")
 
-    resp = authenticated_client.get("/stats")
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     html = resp.data.decode("utf-8")
     # Each status row now has two links (label + bar)
     assert html.count('href="/books?status=Completed"') >= 2
@@ -171,7 +171,7 @@ def test_stats_top_authors_sorting(authenticated_client):
     for book in storage.get_all_books():
         storage.add_reading_record(book["id"], "Completed", "2023-01-01", "2023-01-10")
 
-    resp = authenticated_client.get("/stats")
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     html = resp.data.decode("utf-8")
 
     # Expected order: Tolkien (3), Bryson (2), Rowling (2)

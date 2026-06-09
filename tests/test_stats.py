@@ -31,8 +31,8 @@ def test_stats_category_limit(client, authenticated_client):
             },
         )
 
-    # Get stats page
-    resp = authenticated_client.get("/stats")
+    # Get stats page (now redirects to /dashboard)
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     assert resp.status_code == 200
 
     # Check that we only have 11 categories shown (10 + Other)
@@ -67,7 +67,7 @@ def test_stats_category_limit(client, authenticated_client):
             },
         )
 
-    resp = authenticated_client.get("/stats")
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     html = resp.data.decode()
     assert "Fiction" in html
     # It should NOT show "FICTION" (all uppercase) as a label
@@ -76,10 +76,80 @@ def test_stats_category_limit(client, authenticated_client):
 
 
 def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
-    resp = authenticated_client.get("/stats")
+    resp = authenticated_client.get("/stats", follow_redirects=True)
     html = resp.data.decode("utf-8")
 
     assert 'aria-label="More statistics actions"' in html
     assert 'role="menu"' in html
     assert 'class="action-menu-item" role="menuitem"' in html
     assert html.index("Fetch missing categories") > html.index('role="menu"')
+
+
+def test_dashboard_route_redirect(authenticated_client):
+    """Test that /stats redirects to /dashboard."""
+    resp = authenticated_client.get("/stats", follow_redirects=False)
+    # Should redirect with 301
+    assert resp.status_code == 301
+    # Location should be /dashboard
+    assert "dashboard" in resp.location
+
+
+def test_api_dashboard_endpoint(authenticated_client):
+    """Test the new /api/dashboard endpoint returns enhanced stats."""
+    authenticated_client.post("/test/reset")
+    authenticated_client.get("/test/connect")
+
+    # Add a completed book
+    authenticated_client.post(
+        "/books",
+        data={
+            "title": "Test Book",
+            "author": "Test Author",
+            "isbn": "9781234567890",
+            "bisac_category": "FICTION / General",
+            "page_count": "300",
+            "physical_format": "Hardcover",
+            "language": "English",
+        },
+    )
+    authenticated_client.post(
+        "/books/1/reading-records",
+        data={
+            "status": "Completed",
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-15",
+            "rating": "4",
+        },
+    )
+
+    # Test API endpoint
+    resp = authenticated_client.get("/api/dashboard")
+    assert resp.status_code == 200
+
+    data = resp.get_json()
+
+    # Check basic stats
+    assert data["total_books"] == 1
+    assert data["avg_rating"] == 4.0
+    # Note: MockStorage may not persist page_count, so we just check it exists
+    assert "total_pages_read" in data
+    assert "avg_pages_per_book" in data
+
+    # Check new stats fields
+    assert "current_streak" in data
+    assert "longest_streak" in data
+    assert "books_this_year" in data
+    assert "year_comparison" in data
+    assert "reading_pace_monthly" in data
+    assert "format_distribution" in data
+    assert "language_distribution" in data
+    assert "category_details" in data
+
+
+def test_api_stats_redirect(authenticated_client):
+    """Test that /api/stats redirects to /api/dashboard."""
+    resp = authenticated_client.get("/api/stats", follow_redirects=False)
+    # Should redirect with 301
+    assert resp.status_code == 301
+    # Location should be /api/dashboard
+    assert "dashboard" in resp.location

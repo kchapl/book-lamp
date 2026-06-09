@@ -170,9 +170,9 @@ export async function getHistory(filters?: Partial<HistoryFilters>): Promise<{
     return fetchJSON(`${API_BASE}/history${query ? `?${query}` : ''}`);
 }
 
-// Stats API
+// Dashboard/Stats API
 export async function getStats(): Promise<Stats> {
-    return fetchJSON<Stats>(`${API_BASE}/stats`);
+    return fetchJSON<Stats>(`${API_BASE}/dashboard`);
 }
 
 // Author/Publisher pages

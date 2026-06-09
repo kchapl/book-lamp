@@ -6,7 +6,7 @@ import re
 import secrets
 from collections import Counter
 from functools import wraps
-from typing import Union, cast
+from typing import Dict, List, Union, cast
 from urllib.parse import urlparse
 
 import click  # noqa: E402
@@ -1786,7 +1786,14 @@ def publisher_page(publisher_slug: str):
     )
 
 
-@app.route("/stats", methods=["GET"])
+@app.route("/stats")
+@authorisation_required
+def stats_redirect():
+    """Redirect old /stats route to /dashboard."""
+    return redirect(url_for("collection_stats"), code=301)
+
+
+@app.route("/dashboard", methods=["GET"])
 @authorisation_required
 def collection_stats():
     storage = get_storage()
@@ -1966,6 +1973,13 @@ def collection_stats():
 
 @app.route("/api/stats", methods=["GET"])
 @authorisation_required
+def api_stats_redirect():
+    """Redirect old /api/stats to /api/dashboard."""
+    return redirect(url_for("api_collection_stats"), code=301)
+
+
+@app.route("/api/dashboard", methods=["GET"])
+@authorisation_required
 def api_collection_stats():
     """API endpoint for collection statistics."""
     storage = get_storage()
@@ -2100,6 +2114,199 @@ def api_collection_stats():
         else 1
     )
 
+    # NEW: Page count statistics
+    total_pages_read = 0
+    for b in completed_books:
+        page_count = b.get("page_count")
+        if page_count:
+            try:
+                total_pages_read += int(page_count)
+            except (ValueError, TypeError):
+                pass
+
+    avg_pages_per_book = (
+        total_pages_read / total_books if total_books > 0 else 0
+    )
+
+    # NEW: Reading duration estimates (based on start/end dates)
+    total_reading_days = 0
+    for r in completed_records_for_dates:
+        start = r.get("start_date")
+        end = r.get("end_date")
+        if start and end:
+            try:
+                if isinstance(start, datetime.date):
+                    start_dt = start
+                elif isinstance(start, str):
+                    start_dt = datetime.date.fromisoformat(start[:10])
+                else:
+                    continue
+                if isinstance(end, datetime.date):
+                    end_dt = end
+                elif isinstance(end, str):
+                    end_dt = datetime.date.fromisoformat(end[:10])
+                else:
+                    continue
+                days = (end_dt - start_dt).days
+                if days >= 0:
+                    total_reading_days += days
+            except (ValueError, TypeError):
+                pass
+
+    avg_reading_time_days = (
+        total_reading_days / len(completed_records_for_dates)
+        if completed_records_for_dates
+        else 0
+    )
+
+    # NEW: Reading streaks
+    current_year = datetime.datetime.now().year
+    current_streak = 0
+    longest_streak = 0
+
+    # Group completions by month
+    completions_by_month: Dict[str, int] = {}
+    for r in completed_records_for_dates:
+        date_str = r.get("end_date", "")
+        if date_str and len(date_str) >= 7:
+            year_month = date_str[:7]  # YYYY-MM
+            completions_by_month[year_month] = completions_by_month.get(year_month, 0) + 1
+
+    if completions_by_month:
+        # Calculate current streak (consecutive months from current month going back)
+        check_date = datetime.date(current_year, datetime.datetime.now().month, 1)
+        while True:
+            key = check_date.strftime("%Y-%m")
+            if key in completions_by_month:
+                current_streak += 1
+                # Move to previous month
+                if check_date.month == 1:
+                    check_date = datetime.date(check_date.year - 1, 12, 1)
+                else:
+                    check_date = datetime.date(check_date.year, check_date.month - 1, 1)
+            else:
+                break
+
+        # Calculate longest streak
+        sorted_months = sorted(completions_by_month.keys())
+        if sorted_months:
+            streak = 1
+            for i in range(1, len(sorted_months)):
+                prev = datetime.date.fromisoformat(sorted_months[i - 1] + "-01")
+                curr = datetime.date.fromisoformat(sorted_months[i] + "-01")
+                # Check if consecutive months
+                expected = prev.replace(month=prev.month + 1) if prev.month < 12 else datetime.date(prev.year + 1, 1, 1)
+                if curr == expected:
+                    streak += 1
+                else:
+                    longest_streak = max(longest_streak, streak)
+                    streak = 1
+            longest_streak = max(longest_streak, streak)
+
+    # NEW: Year-over-year comparison
+    current_year_str = str(current_year)
+    previous_year_str = str(current_year - 1)
+    books_this_year = yearly_counts.get(current_year_str, 0)
+    books_last_year = yearly_counts.get(previous_year_str, 0)
+
+    if books_last_year > 0:
+        percentage_change = round(((books_this_year - books_last_year) / books_last_year) * 100, 1)
+    else:
+        percentage_change = 100.0 if books_this_year > 0 else 0.0
+
+    year_comparison = {
+        "current_year": books_this_year,
+        "previous_year": books_last_year,
+        "percentage_change": percentage_change,
+    }
+
+    # NEW: Reading pace (books per month)
+    months_with_data = len(completions_by_month) if completions_by_month else 1
+    reading_pace_monthly = round(total_books / months_with_data, 2) if months_with_data > 0 else 0
+    reading_pace_annualised = round(reading_pace_monthly * 12, 1)
+
+    # NEW: Format distribution
+    format_bins = Counter()
+    for b in completed_books:
+        fmt = b.get("physical_format")
+        if fmt:
+            format_bins[fmt] += 1
+    format_distribution = [
+        {"label": label, "count": count}
+        for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
+    ]
+
+    # NEW: Language distribution
+    language_bins = Counter()
+    for b in completed_books:
+        lang = b.get("language")
+        if lang:
+            language_bins[lang] += 1
+    language_distribution = [
+        {"label": label, "count": count}
+        for label, count in sorted(language_bins.items(), key=lambda x: -x[1])
+    ]
+
+    # NEW: Top series
+    series_bins: Dict[str, List[str]] = {}
+    for b in completed_books:
+        series = b.get("series")
+        if series:
+            if series not in series_bins:
+                series_bins[series] = []
+            title = b.get("title", "Unknown")
+            if title not in series_bins[series]:
+                series_bins[series].append(title)
+
+    top_series = [
+        {"name": name, "count": len(books), "books": books[:5]}
+        for name, books in sorted(series_bins.items(), key=lambda x: -len(x[1]))[:5]
+    ]
+
+    # NEW: Category details with subcategories
+    category_details_list = []
+    for b in completed_books:
+        bisac = b.get("bisac_category")
+        if bisac:
+            main_cat, sub_cat = parse_bisac_category(bisac)
+            if main_cat:
+                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
+                # Find or create category entry
+                existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
+                if not existing:
+                    existing = {"label": norm_cat, "count": 0, "subcategories": Counter()}
+                    category_details_list.append(existing)
+                existing["count"] += 1
+                if sub_cat:
+                    existing["subcategories"][sub_cat] += 1
+
+    category_details_list.sort(key=lambda x: -x["count"])
+    category_details = [
+        {
+            "label": c["label"],
+            "count": c["count"],
+            "subcategories": [
+                {"name": name, "count": count}
+                for name, count in c["subcategories"].most_common(5)
+            ],
+        }
+        for c in category_details_list[:10]
+    ]
+
+    # NEW: Yearly goal (from settings)
+    yearly_goal = None
+    try:
+        settings = storage.get_settings()
+        goal_str = settings.get("yearly_goal")
+        if goal_str:
+            yearly_goal = int(goal_str)
+    except Exception:
+        pass
+
+    goal_progress_percent = 0.0
+    if yearly_goal and yearly_goal > 0:
+        goal_progress_percent = min(round((books_this_year / yearly_goal) * 100, 1), 100.0)
+
     return jsonify(
         {
             "total_books": total_books,
@@ -2123,6 +2330,23 @@ def api_collection_stats():
             "max_year_count": max_year_count,
             "monthly_counts": ordered_months,
             "max_month_count": max_month_count,
+            # New fields
+            "total_pages_read": total_pages_read,
+            "avg_pages_per_book": round(avg_pages_per_book, 1),
+            "avg_reading_time_days": round(avg_reading_time_days, 1),
+            "total_reading_days": total_reading_days,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "yearly_goal": yearly_goal,
+            "books_this_year": books_this_year,
+            "goal_progress_percent": goal_progress_percent,
+            "format_distribution": format_distribution,
+            "language_distribution": language_distribution,
+            "top_series": top_series,
+            "category_details": category_details,
+            "year_comparison": year_comparison,
+            "reading_pace_monthly": reading_pace_monthly,
+            "reading_pace_annualised": reading_pace_annualised,
         }
     )
 
