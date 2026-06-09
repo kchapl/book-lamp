@@ -542,7 +542,7 @@ def api_create_book():
         app.logger.error(
             f"api_create_book: storage.add_book failed: {exc}", exc_info=True
         )
-        return jsonify({"error": f"Failed to create book: {exc}"}), 500
+        return jsonify({"error": "Failed to create book"}), 500
 
     try:
         storage.add_to_reading_list(created["id"])
