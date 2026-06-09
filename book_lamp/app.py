@@ -798,9 +798,10 @@ def api_delete_reading_record(record_id: int):
         return jsonify({"success": True})
     except Exception as exc:
         app.logger.error(
-            f"api_delete_reading_record: failed for record_id={record_id}: {exc}"
+            f"api_delete_reading_record: failed for record_id={record_id}: {exc}",
+            exc_info=True,
         )
-        return jsonify({"error": f"Failed to delete reading record: {exc}"}), 500
+        return jsonify({"error": "Failed to delete reading record"}), 500
 
 
 @app.route("/api/reading-list/reorder", methods=["POST"])
