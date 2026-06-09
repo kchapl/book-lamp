@@ -730,11 +730,11 @@ def api_create_reading_record(book_id: int):
         )
         app.logger.info(f"RECORD_CREATED (API): book_id={book_id}, status='{status}'")
         return jsonify(record), 201
-    except Exception as exc:
-        app.logger.error(
-            f"api_create_reading_record: failed for book_id={book_id}: {exc}"
+    except Exception:
+        app.logger.exception(
+            f"api_create_reading_record: failed for book_id={book_id}"
         )
-        return jsonify({"error": f"Failed to create reading record: {exc}"}), 500
+        return jsonify({"error": "Failed to create reading record"}), 500
 
 
 @app.route("/api/reading-records/<int:record_id>/edit", methods=["POST"])
@@ -773,11 +773,11 @@ def api_update_reading_record(record_id: int):
             f"RECORD_UPDATED (API): record_id={record_id}, status='{status}'"
         )
         return jsonify({"success": True})
-    except Exception as exc:
-        app.logger.error(
-            f"api_update_reading_record: failed for record_id={record_id}: {exc}"
+    except Exception:
+        app.logger.exception(
+            f"api_update_reading_record: failed for record_id={record_id}"
         )
-        return jsonify({"error": f"Failed to update reading record: {exc}"}), 500
+        return jsonify({"error": "Failed to update reading record"}), 500
 
 
 @app.route("/api/reading-records/<int:record_id>/delete", methods=["POST"])
