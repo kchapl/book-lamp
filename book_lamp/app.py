@@ -497,11 +497,11 @@ def api_create_book():
         else:
             try:
                 book_data = lookup_book_by_isbn13(isbn)
-            except Exception as exc:
-                app.logger.error(
-                    f"api_create_book: ISBN lookup failed for {isbn}: {exc}"
+            except Exception:
+                app.logger.exception(
+                    f"api_create_book: ISBN lookup failed for {isbn}"
                 )
-                return jsonify({"error": f"ISBN lookup failed: {exc}"}), 502
+                return jsonify({"error": "ISBN lookup failed"}), 502
 
         if not book_data:
             return jsonify({"error": f"No book data found for ISBN {isbn}"}), 404
