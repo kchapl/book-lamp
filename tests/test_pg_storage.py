@@ -1,3 +1,9 @@
+"""PostgreSQL storage integration tests.
+
+These tests require a running Postgres instance.
+In CI, pytest-docker will provide it via docker-compose.
+Locally, it uses the DATABASE_URL from .env or the default below.
+"""
 import os
 
 import psycopg
@@ -7,9 +13,24 @@ from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
 
-# This test requires a running Postgres instance.
-# In CI, pytest-docker will provide it.
-# Locally, it uses the DATABASE_URL from .env or the default below.
+
+def _docker_available():
+    """Check if docker-compose is available for pytest-docker."""
+    import subprocess
+
+    for cmd in ["docker-compose", "podman-compose"]:
+        try:
+            subprocess.run([cmd, "--version"], capture_output=True, check=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _docker_available(),
+    reason="docker-compose/podman-compose not available",
+)
 
 
 @pytest.fixture(scope="session")
