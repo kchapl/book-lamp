@@ -76,21 +76,21 @@ export async function getBookDetail(bookId: number): Promise<Book> {
 }
 
 export async function createBook(book: Partial<Book>): Promise<Book> {
-    return fetchJSON<Book>('/books', {
+    return fetchJSON<Book>(`${API_BASE}/books`, {
         method: 'POST',
         body: JSON.stringify(book),
     });
 }
 
 export async function updateBook(bookId: number, book: Partial<Book>): Promise<void> {
-    await fetchJSON(`/books/${bookId}/edit`, {
+    await fetchJSON(`${API_BASE}/books/${bookId}/edit`, {
         method: 'POST',
         body: JSON.stringify(book),
     });
 }
 
 export async function deleteBook(bookId: number): Promise<void> {
-    await fetchJSON(`/books/${bookId}/delete`, {
+    await fetchJSON(`${API_BASE}/books/${bookId}/delete`, {
         method: 'POST',
     });
 }
@@ -100,26 +100,26 @@ export async function searchBooks(query: string): Promise<{
     search_query: string;
 }> {
     const params = new URLSearchParams({ q: query });
-    return fetchJSON(`/books/search?${params}`);
+    return fetchJSON(`${API_BASE}/books/search?${params}`);
 }
 
 // Reading Records API
 export async function createReadingRecord(bookId: number, record: Partial<ReadingRecord>): Promise<ReadingRecord> {
-    return fetchJSON<ReadingRecord>(`/books/${bookId}/reading-records`, {
+    return fetchJSON<ReadingRecord>(`${API_BASE}/books/${bookId}/reading-records`, {
         method: 'POST',
         body: JSON.stringify(record),
     });
 }
 
 export async function updateReadingRecord(recordId: number, record: Partial<ReadingRecord>): Promise<void> {
-    await fetchJSON(`/reading-records/${recordId}/edit`, {
+    await fetchJSON(`${API_BASE}/reading-records/${recordId}/edit`, {
         method: 'POST',
         body: JSON.stringify(record),
     });
 }
 
 export async function deleteReadingRecord(recordId: number): Promise<void> {
-    await fetchJSON(`/reading-records/${recordId}/delete`, {
+    await fetchJSON(`${API_BASE}/reading-records/${recordId}/delete`, {
         method: 'POST',
     });
 }
@@ -137,19 +137,19 @@ export async function reorderReadingList(bookIds: number[]): Promise<void> {
 }
 
 export async function removeFromReadingList(bookId: number): Promise<void> {
-    await fetchJSON(`/reading-list/remove/${bookId}`, {
+    await fetchJSON(`${API_BASE}/reading-list/remove/${bookId}`, {
         method: 'POST',
     });
 }
 
 export async function startReading(bookId: number): Promise<void> {
-    await fetchJSON(`/books/${bookId}/start-reading`, {
+    await fetchJSON(`${API_BASE}/books/${bookId}/start-reading`, {
         method: 'POST',
     });
 }
 
 export async function addToReadingList(bookId: number): Promise<void> {
-    await fetchJSON(`/books/${bookId}/add-to-reading-list`, {
+    await fetchJSON(`${API_BASE}/books/${bookId}/add-to-reading-list`, {
         method: 'POST',
     });
 }
@@ -187,12 +187,12 @@ export async function getPublisherPage(publisherSlug: string): Promise<Publisher
 // ISBN lookup
 export async function lookupISBN(isbn: string): Promise<Book | null> {
     const params = new URLSearchParams({ isbn });
-    return fetchJSON(`/books/lookup?${params}`);
+    return fetchJSON(`${API_BASE}/books/lookup?${params}`);
 }
 
 // Fetch covers
 export async function fetchCovers(bookIds: number[]): Promise<void> {
-    await fetchJSON('/books/fetch-covers', {
+    await fetchJSON(`${API_BASE}/books/fetch-covers`, {
         method: 'POST',
         body: JSON.stringify({ book_ids: bookIds }),
     });

@@ -427,6 +427,475 @@ def favicon():
     return app.send_static_file("favicon.png")
 
 
+# -----------------------------
+# JSON API routes for mutating actions (used by the React SPA)
+# Each route delegates to the same storage calls as the legacy form-based
+# routes but returns JSON instead of redirecting to an HTML template.
+# -----------------------------
+
+
+@app.route("/api/books", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_create_book():
+    """Create a new book from a JSON payload and add it to the reading list.
+
+    The client must supply at least an ``isbn`` field. If ``title`` and
+    ``author`` are also present the book is stored directly (manual entry).
+    Otherwise the ISBN is resolved via the Open Library / Google Books APIs.
+
+    Returns:
+        JSON representation of the newly created book, with HTTP 201.
+    """
+    from book_lamp.utils.books import normalize_isbn
+
+    storage = get_storage()
+    data = request.get_json(silent=True) or {}
+
+    isbn = normalize_isbn(str(data.get("isbn", "") or ""))
+    title = str(data.get("title", "") or "").strip()
+    author = str(data.get("author", "") or "").strip()
+
+    # Deduplicate: if book already exists, add it to the reading list.
+    if isbn:
+        existing = storage.get_book_by_isbn(isbn)
+        if existing:
+            try:
+                storage.add_to_reading_list(existing["id"])
+            except Exception as exc:
+                app.logger.warning(
+                    f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
+                )
+            return jsonify(existing), 200
+
+    if title and author:
+        # Manual entry: store immediately without external lookup.
+        book_data = {
+            "title": title,
+            "author": author,
+            "publisher": data.get("publisher"),
+            "publish_date": data.get("publication_year"),
+            "thumbnail_url": data.get("thumbnail_url"),
+            "cover_url": data.get("cover_url"),
+            "description": data.get("description"),
+            "bisac_category": data.get("bisac_category"),
+        }
+    else:
+        # Lookup via Open Library / Google Books.
+        if not isbn:
+            return jsonify({"error": "isbn is required"}), 400
+
+        from book_lamp.services.book_lookup import lookup_book_by_isbn13
+
+        if is_test_mode() and isbn == TEST_ISBN:
+            book_data = {
+                "title": "Test Book",
+                "author": "Test Author",
+                "publish_date": "2019-05-02",
+                "thumbnail_url": "http://example.com/thumb.jpg",
+            }
+        else:
+            try:
+                book_data = lookup_book_by_isbn13(isbn)
+            except Exception:
+                app.logger.exception(
+                    f"api_create_book: ISBN lookup failed for {isbn}"
+                )
+                return jsonify({"error": "ISBN lookup failed"}), 502
+
+        if not book_data:
+            return jsonify({"error": f"No book data found for ISBN {isbn}"}), 404
+
+    title = str(book_data.get("title") or "")
+    author = str(book_data.get("author") or "")
+
+    if not title or not author:
+        return (
+            jsonify({"error": "Could not determine title or author for this ISBN"}),
+            422,
+        )
+
+    publish_date = book_data.get("publish_date")
+    year = parse_publication_year(str(publish_date) if publish_date else None)
+    thumbnail_url = book_data.get("thumbnail_url")
+
+    try:
+        created = storage.add_book(
+            isbn13=isbn,
+            title=title[:300],
+            author=author[:200],
+            publication_year=year,
+            thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
+            publisher=book_data.get("publisher"),
+            description=book_data.get("description"),
+            bisac_category=book_data.get("bisac_category"),
+            language=book_data.get("language"),
+            page_count=book_data.get("page_count"),
+            physical_format=book_data.get("physical_format"),
+            edition=book_data.get("edition"),
+            cover_url=book_data.get("cover_url"),
+        )
+        app.logger.info(
+            f"BOOK_CREATED (API): id={created['id']}, isbn={isbn}, title='{title}'"
+        )
+    except Exception as exc:
+        app.logger.error(
+            f"api_create_book: storage.add_book failed: {exc}", exc_info=True
+        )
+        return jsonify({"error": "Failed to create book"}), 500
+
+    try:
+        storage.add_to_reading_list(created["id"])
+    except Exception as exc:
+        app.logger.warning(
+            f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}"
+        )
+
+    return jsonify(created), 201
+
+
+@app.route("/api/books/<int:book_id>/edit", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_update_book(book_id: int):
+    """Update an existing book's details from a JSON payload.
+
+    Returns:
+        JSON ``{"success": True}`` on success, or an error object.
+    """
+    storage = get_storage()
+    data = request.get_json(silent=True) or {}
+
+    title = str(data.get("title", "") or "").strip()
+    author = str(data.get("author", "") or "").strip()
+
+    if not title or not author:
+        return jsonify({"error": "title and author are required"}), 400
+
+    isbn13 = str(data.get("isbn13", "") or "").strip().replace("-", "")
+    if (
+        isbn13
+        and not is_valid_isbn13(isbn13)
+        and not (is_test_mode() and isbn13 == TEST_ISBN)
+    ):
+        return jsonify({"error": "Invalid ISBN-13"}), 400
+
+    publication_year = None
+    year_str = str(data.get("publication_year", "") or "").strip()
+    if year_str:
+        try:
+            publication_year = int(year_str)
+        except ValueError:
+            pass
+
+    try:
+        storage.update_book(
+            book_id=book_id,
+            isbn13=isbn13,
+            title=title[:300],
+            author=author[:200],
+            publication_year=publication_year,
+            thumbnail_url=(str(data.get("thumbnail_url", "") or "").strip() or None),
+            publisher=(str(data.get("publisher", "") or "").strip() or None),
+            description=(str(data.get("description", "") or "").strip() or None),
+            series=(str(data.get("series", "") or "").strip() or None),
+            bisac_category=(str(data.get("bisac_category", "") or "").strip() or None),
+            cover_url=(str(data.get("cover_url", "") or "").strip() or None),
+        )
+        app.logger.info(f"BOOK_UPDATED (API): book_id={book_id}")
+        return jsonify({"success": True})
+    except Exception as exc:
+        app.logger.error(f"api_update_book: failed for book_id={book_id}: {exc}")
+        return jsonify({"error": "Failed to update book"}), 500
+
+
+@app.route("/api/books/<int:book_id>/delete", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_delete_book(book_id: int):
+    """Delete a book by ID.
+
+    Returns:
+        JSON ``{"success": True}`` on success, HTTP 404 if not found.
+    """
+    storage = get_storage()
+    success = storage.delete_book(book_id)
+    if not success:
+        return jsonify({"error": "Book not found"}), 404
+    app.logger.info(f"BOOK_DELETED (API): book_id={book_id}")
+    return jsonify({"success": True})
+
+
+@app.route("/api/books/search", methods=["GET"])
+@authorisation_required
+def api_search_books():
+    """Search books and return JSON results.
+
+    Returns:
+        JSON with ``books`` list and ``search_query`` string.
+    """
+    storage = get_storage()
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"books": [], "search_query": ""})
+
+    try:
+        books = storage.search(query)
+        all_records = storage.get_reading_records()
+        latest_records: dict = {}
+        for r in all_records:
+            bid = r.get("book_id")
+            if bid:
+                if bid not in latest_records or r.get(
+                    "start_date", ""
+                ) >= latest_records[bid].get("start_date", ""):
+                    latest_records[bid] = r
+        for book in books:
+            record = latest_records.get(book.get("id"))
+            if record:
+                book["latest_status"] = record.get("status")
+        books = [
+            b
+            for b in books
+            if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
+        ]
+        return jsonify({"books": books, "search_query": query})
+    except Exception as exc:
+        app.logger.error(f"api_search_books: search failed: {exc}")
+        return jsonify({"error": "Search failed"}), 500
+
+
+@app.route("/api/books/lookup", methods=["GET"])
+@authorisation_required
+def api_lookup_isbn():
+    """Look up a book by ISBN without storing it.
+
+    Returns:
+        JSON book data, or ``null`` if not found.
+    """
+    isbn = request.args.get("isbn", "").strip()
+    if not isbn:
+        return jsonify({"error": "isbn query parameter is required"}), 400
+
+    if is_test_mode() and isbn == TEST_ISBN:
+        return jsonify(
+            {
+                "title": "Test Book",
+                "author": "Test Author",
+                "isbn13": TEST_ISBN,
+            }
+        )
+
+    from book_lamp.services.book_lookup import lookup_book_by_isbn13
+
+    try:
+        data = lookup_book_by_isbn13(isbn)
+        return jsonify(data)
+    except Exception as exc:
+        app.logger.error(f"api_lookup_isbn: lookup failed for {isbn}: {exc}")
+        return jsonify({"error": "Lookup failed"}), 502
+
+
+@app.route("/api/books/<int:book_id>/reading-records", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_create_reading_record(book_id: int):
+    """Create a reading record for a book from a JSON payload.
+
+    Returns:
+        JSON representation of the new reading record, with HTTP 201.
+    """
+    storage = get_storage()
+    data = request.get_json(silent=True) or {}
+
+    status = str(data.get("status", "") or "").strip()
+    start_date = str(data.get("start_date", "") or "").strip()
+    end_date = str(data.get("end_date", "") or "").strip() or None
+    rating_raw = data.get("rating", 0)
+    try:
+        rating = int(rating_raw)
+    except (TypeError, ValueError):
+        rating = 0
+
+    if not status or not start_date:
+        return jsonify({"error": "status and start_date are required"}), 400
+
+    try:
+        record = storage.add_reading_record(
+            book_id=book_id,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            rating=rating,
+        )
+        app.logger.info(f"RECORD_CREATED (API): book_id={book_id}, status='{status}'")
+        return jsonify(record), 201
+    except Exception:
+        app.logger.exception(
+            f"api_create_reading_record: failed for book_id={book_id}"
+        )
+        return jsonify({"error": "Failed to create reading record"}), 500
+
+
+@app.route("/api/reading-records/<int:record_id>/edit", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_update_reading_record(record_id: int):
+    """Update a reading record from a JSON payload.
+
+    Returns:
+        JSON ``{"success": True}`` on success.
+    """
+    storage = get_storage()
+    data = request.get_json(silent=True) or {}
+
+    status = str(data.get("status", "") or "").strip()
+    start_date = str(data.get("start_date", "") or "").strip()
+    end_date = str(data.get("end_date", "") or "").strip() or None
+    rating_raw = data.get("rating", 0)
+    try:
+        rating = int(rating_raw)
+    except (TypeError, ValueError):
+        rating = 0
+
+    if not status or not start_date:
+        return jsonify({"error": "status and start_date are required"}), 400
+
+    try:
+        storage.update_reading_record(
+            record_id=record_id,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            rating=rating,
+        )
+        app.logger.info(
+            f"RECORD_UPDATED (API): record_id={record_id}, status='{status}'"
+        )
+        return jsonify({"success": True})
+    except Exception:
+        app.logger.exception(
+            f"api_update_reading_record: failed for record_id={record_id}"
+        )
+        return jsonify({"error": "Failed to update reading record"}), 500
+
+
+@app.route("/api/reading-records/<int:record_id>/delete", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_delete_reading_record(record_id: int):
+    """Delete a reading record by ID.
+
+    Returns:
+        JSON ``{"success": True}`` on success, HTTP 404 if not found.
+    """
+    storage = get_storage()
+    try:
+        success = storage.delete_reading_record(record_id)
+        if not success:
+            return jsonify({"error": "Reading record not found"}), 404
+        app.logger.info(f"RECORD_DELETED (API): record_id={record_id}")
+        return jsonify({"success": True})
+    except Exception as exc:
+        app.logger.error(
+            f"api_delete_reading_record: failed for record_id={record_id}: {exc}",
+            exc_info=True,
+        )
+        return jsonify({"error": "Failed to delete reading record"}), 500
+
+
+@app.route("/api/reading-list/reorder", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_reorder_reading_list():
+    """Reorder the reading list from a JSON payload.
+
+    Returns:
+        JSON ``{"success": True}``.
+    """
+    storage = get_storage()
+    data = request.get_json(silent=True) or {}
+    book_ids = data.get("book_ids", [])
+    storage.update_reading_list_order(book_ids)
+    return jsonify({"success": True})
+
+
+@app.route("/api/reading-list/remove/<int:book_id>", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_remove_from_reading_list(book_id: int):
+    """Remove a book from the reading list and return JSON.
+
+    Returns:
+        JSON ``{"success": True}``.
+    """
+    storage = get_storage()
+    storage.remove_from_reading_list(book_id)
+    return jsonify({"success": True})
+
+
+@app.route("/api/books/<int:book_id>/start-reading", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_start_reading(book_id: int):
+    """Move a book from the reading list to the reading log.
+
+    Returns:
+        JSON ``{"success": True}`` on success.
+    """
+    storage = get_storage()
+    try:
+        storage.start_reading(book_id)
+        app.logger.info(
+            f"START_READING (API): book_id={book_id}, new_status='In Progress'"
+        )
+        return jsonify({"success": True})
+    except Exception:
+        app.logger.exception(
+            f"api_start_reading: failed for book_id={book_id}"
+        )
+        return jsonify({"error": "Failed to start reading."}), 500
+
+
+@app.route("/api/books/<int:book_id>/add-to-reading-list", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_add_to_reading_list(book_id: int):
+    """Add an existing book to the reading list and return JSON.
+
+    Returns:
+        JSON ``{"success": True}`` on success.
+    """
+    storage = get_storage()
+    try:
+        storage.add_to_reading_list(book_id)
+        app.logger.info(f"READING_LIST_ADD (API): book_id={book_id}")
+        return jsonify({"success": True})
+    except Exception:
+        app.logger.exception(
+            f"api_add_to_reading_list: failed for book_id={book_id}"
+        )
+        return jsonify({"error": "Failed to add to reading list."}), 500
+
+
+@app.route("/api/books/fetch-covers", methods=["POST"])
+@authorisation_required
+@csrf_protect
+def api_fetch_missing_data():
+    """Queue a background job to fetch missing covers and metadata.
+
+    Returns:
+        JSON with ``job_id`` of the queued background job.
+    """
+    job_queue = get_job_queue()
+    job_id = job_queue.submit_job(
+        "fetch_missing_data",
+        _background_fetch_missing_data,
+        session["user_id"],
+    )
+    return jsonify({"job_id": job_id})
+
+
 @app.route("/<path:fallback>")
 def spa_fallback(fallback):
     """Catch-all for SPA routing - serve index.html for non-API routes."""
@@ -627,16 +1096,18 @@ def api_reading_history():
     elif sort_by == "title":
         history.sort(key=lambda r: (r.get("book_title") or "").lower())
 
-    return jsonify({
-        "history": history,
-        "statuses": all_statuses,
-        "filters": {
-            "status": status_filter,
-            "rating": min_rating,
-            "year": year_filter,
-            "sort": sort_by,
+    return jsonify(
+        {
+            "history": history,
+            "statuses": all_statuses,
+            "filters": {
+                "status": status_filter,
+                "rating": min_rating,
+                "year": year_filter,
+                "sort": sort_by,
+            },
         }
-    })
+    )
 
 
 # -----------------------------
@@ -891,7 +1362,9 @@ def api_list_books():
     for r in all_records:
         bid = r.get("book_id")
         if bid:
-            if bid not in latest_records or r.get("start_date", "") >= latest_records[bid].get("start_date", ""):
+            if bid not in latest_records or r.get("start_date", "") >= latest_records[
+                bid
+            ].get("start_date", ""):
                 latest_records[bid] = r
 
     for book in books:
@@ -960,19 +1433,21 @@ def api_list_books():
             all_categories.add(top_level)
     sorted_categories = sorted(list(all_categories))
 
-    return jsonify({
-        "books": books,
-        "sort": sort_by,
-        "sort_options": SORT_OPTIONS,
-        "filters": {
-            "status": status_filter,
-            "year": year_filter,
-            "month": month_filter,
-            "rating": rating_filter,
-            "category": category_filter,
-        },
-        "categories": sorted_categories,
-    })
+    return jsonify(
+        {
+            "books": books,
+            "sort": sort_by,
+            "sort_options": SORT_OPTIONS,
+            "filters": {
+                "status": status_filter,
+                "year": year_filter,
+                "month": month_filter,
+                "rating": rating_filter,
+                "category": category_filter,
+            },
+            "categories": sorted_categories,
+        }
+    )
 
 
 @app.route("/books/search", methods=["GET"])
@@ -1217,14 +1692,18 @@ def api_author_page(author_slug: str):
                 unread_books.append(ext_book)
                 owned_norm_titles.add(norm_title)
         except Exception:
-            app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
+            app.logger.warning(
+                f"Failed to fetch external books for author: {display_author_name}"
+            )
 
-    return jsonify({
-        "author_name": display_author_name,
-        "read_books": read_books,
-        "reading_list_books": reading_list_books,
-        "unread_books": unread_books,
-    })
+    return jsonify(
+        {
+            "author_name": display_author_name,
+            "read_books": read_books,
+            "reading_list_books": reading_list_books,
+            "unread_books": unread_books,
+        }
+    )
 
 
 @app.route("/api/publisher/<path:publisher_slug>", methods=["GET"])
@@ -1259,10 +1738,12 @@ def api_publisher_page(publisher_slug: str):
 
     publisher_books.sort(key=sort_key)
 
-    return jsonify({
-        "publisher_name": display_publisher_name,
-        "books": publisher_books,
-    })
+    return jsonify(
+        {
+            "publisher_name": display_publisher_name,
+            "books": publisher_books,
+        }
+    )
 
 
 @app.route("/publisher/<path:publisher_slug>", methods=["GET"])
@@ -1513,7 +1994,9 @@ def api_collection_stats():
     for r in all_records:
         bid = r.get("book_id")
         if bid:
-            if bid not in latest_records or r.get("start_date", "") > latest_records[bid].get("start_date", ""):
+            if bid not in latest_records or r.get("start_date", "") > latest_records[
+                bid
+            ].get("start_date", ""):
                 latest_records[bid] = r
 
     allowed_statuses = {"In Progress", "Completed", "Abandoned"}
@@ -1554,7 +2037,9 @@ def api_collection_stats():
             norm_pub = _normalize_publisher(b["publisher"])
             if norm_pub:
                 all_publishers.append(norm_pub)
-    top_publishers = sorted(Counter(all_publishers).items(), key=lambda x: (-x[1], x[0]))[:5]
+    top_publishers = sorted(
+        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
+    )[:5]
 
     completed_records_for_dates = [
         r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
@@ -1588,7 +2073,9 @@ def api_collection_stats():
     for i in range(1, 13):
         idx_str = f"{i:02d}"
         name = calendar.month_name[i][:3]
-        ordered_months.append({"index": i, "name": name, "count": monthly_counts[idx_str]})
+        ordered_months.append(
+            {"index": i, "name": name, "count": monthly_counts[idx_str]}
+        )
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
@@ -1607,24 +2094,37 @@ def api_collection_stats():
         other_total = sum(count for label, count in all_categories_sorted[10:])
         category_distribution.append(("Other", other_total))
 
-    max_category_count = max(count for label, count in category_distribution) if category_distribution else 1
+    max_category_count = (
+        max(count for label, count in category_distribution)
+        if category_distribution
+        else 1
+    )
 
-    return jsonify({
-        "total_books": total_books,
-        "total_authors": total_authors,
-        "total_records": total_records,
-        "avg_rating": avg_rating,
-        "status_counts": dict(status_counts),
-        "rating_distribution": rating_distribution,
-        "top_authors": [{"name": name, "count": count} for name, count in top_authors],
-        "top_publishers": [{"name": name, "count": count} for name, count in top_publishers],
-        "category_distribution": [{"label": label, "count": count} for label, count in category_distribution],
-        "max_category_count": max_category_count,
-        "yearly_counts": sorted_years,
-        "max_year_count": max_year_count,
-        "monthly_counts": ordered_months,
-        "max_month_count": max_month_count,
-    })
+    return jsonify(
+        {
+            "total_books": total_books,
+            "total_authors": total_authors,
+            "total_records": total_records,
+            "avg_rating": avg_rating,
+            "status_counts": dict(status_counts),
+            "rating_distribution": rating_distribution,
+            "top_authors": [
+                {"name": name, "count": count} for name, count in top_authors
+            ],
+            "top_publishers": [
+                {"name": name, "count": count} for name, count in top_publishers
+            ],
+            "category_distribution": [
+                {"label": label, "count": count}
+                for label, count in category_distribution
+            ],
+            "max_category_count": max_category_count,
+            "yearly_counts": sorted_years,
+            "max_year_count": max_year_count,
+            "monthly_counts": ordered_months,
+            "max_month_count": max_month_count,
+        }
+    )
 
 
 @app.route("/api/books/<int:book_id>", methods=["GET"])
