@@ -662,7 +662,7 @@ def api_search_books():
         return jsonify({"books": books, "search_query": query})
     except Exception as exc:
         app.logger.error(f"api_search_books: search failed: {exc}")
-        return jsonify({"error": f"Search failed: {exc}"}), 500
+        return jsonify({"error": "Search failed"}), 500
 
 
 @app.route("/api/books/lookup", methods=["GET"])
@@ -693,7 +693,7 @@ def api_lookup_isbn():
         return jsonify(data)
     except Exception as exc:
         app.logger.error(f"api_lookup_isbn: lookup failed for {isbn}: {exc}")
-        return jsonify({"error": f"Lookup failed: {exc}"}), 502
+        return jsonify({"error": "Lookup failed"}), 502
 
 
 @app.route("/api/books/<int:book_id>/reading-records", methods=["POST"])
