@@ -606,7 +606,7 @@ def api_update_book(book_id: int):
         return jsonify({"success": True})
     except Exception as exc:
         app.logger.error(f"api_update_book: failed for book_id={book_id}: {exc}")
-        return jsonify({"error": f"Failed to update book: {exc}"}), 500
+        return jsonify({"error": "Failed to update book"}), 500
 
 
 @app.route("/api/books/<int:book_id>/delete", methods=["POST"])
