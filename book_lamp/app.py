@@ -850,9 +850,11 @@ def api_start_reading(book_id: int):
             f"START_READING (API): book_id={book_id}, new_status='In Progress'"
         )
         return jsonify({"success": True})
-    except Exception as exc:
-        app.logger.error(f"api_start_reading: failed for book_id={book_id}: {exc}")
-        return jsonify({"error": f"Failed to start reading: {exc}"}), 500
+    except Exception:
+        app.logger.exception(
+            f"api_start_reading: failed for book_id={book_id}"
+        )
+        return jsonify({"error": "Failed to start reading."}), 500
 
 
 @app.route("/api/books/<int:book_id>/add-to-reading-list", methods=["POST"])
@@ -869,11 +871,11 @@ def api_add_to_reading_list(book_id: int):
         storage.add_to_reading_list(book_id)
         app.logger.info(f"READING_LIST_ADD (API): book_id={book_id}")
         return jsonify({"success": True})
-    except Exception as exc:
-        app.logger.error(
-            f"api_add_to_reading_list: failed for book_id={book_id}: {exc}"
+    except Exception:
+        app.logger.exception(
+            f"api_add_to_reading_list: failed for book_id={book_id}"
         )
-        return jsonify({"error": f"Failed to add to reading list: {exc}"}), 500
+        return jsonify({"error": "Failed to add to reading list."}), 500
 
 
 @app.route("/api/books/fetch-covers", methods=["POST"])
