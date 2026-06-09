@@ -17,14 +17,14 @@
   },
   "devDependencies": {
     "@lhci/cli": "0.15.1",
-    "@types/node": "25.9.1",
-    "@types/react": "19.2.15",
+    "@types/node": "^25.9.2",
+    "@types/react": "^19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitest/coverage-v8": "4.1.8",
     "jsdom": "29.1.1",
-    "typescript": "5.9.3",
-    "vite": "8.0.14",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
     "vitest": "4.1.8"
   },
   "dependencies": {
@@ -34,6 +34,6 @@
     "html5-qrcode": "2.3.8",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "react-router-dom": "7.16.0"
+    "react-router-dom": "^7.17.0"
   }
 }
