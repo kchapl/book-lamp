@@ -219,6 +219,7 @@ book_lamp/static/**/*.js
 !book_lamp/static/one_tap.js # Google One Tap authentication handler
 !book_lamp/static/favicon.js # In case there was one, but keep images
 !book_lamp/static/react/ # React SPA build output
+!book_lamp/static/css/ # CSS files for SPA
 coverage/
 node_modules/
 dist/
