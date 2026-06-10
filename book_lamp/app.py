@@ -1786,25 +1786,11 @@ def publisher_page(publisher_slug: str):
     )
 
 
-@app.route("/stats")
-@authorisation_required
-def stats_redirect():
-    """Redirect old /stats route to /dashboard."""
-    return redirect(url_for("collection_stats"), code=301)
-
-
 @app.route("/dashboard", methods=["GET"])
 @authorisation_required
-def collection_stats():
-    """Redirect to React SPA for dashboard stats."""
-    return redirect("/stats")
-
-
-@app.route("/api/stats", methods=["GET"])
-@authorisation_required
-def api_stats_redirect():
-    """Redirect old /api/stats to /api/dashboard."""
-    return redirect(url_for("api_collection_stats"), code=301)
+def dashboard():
+    """Dashboard route - handled by React SPA."""
+    return render_template("index.html")
 
 
 @app.route("/api/dashboard", methods=["GET"])
