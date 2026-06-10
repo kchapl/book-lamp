@@ -652,6 +652,14 @@
     overflow: hidden;
 }
 
+.category-item .category-count {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--md-sys-color-on-surface);
+}
+
 .gap-025 {
     gap: 0.25rem;
 }
