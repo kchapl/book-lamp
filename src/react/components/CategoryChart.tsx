@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface Subcategory {
     name: string;
@@ -37,12 +38,15 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
 }) => {
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     if (!categories || categories.length === 0) {
         return <p className="no-data">No category data available.</p>;
     }
 
-    const handleCategoryClick = (category: CategoryDetail) => {
+    const handleCategoryClick = (category: CategoryDetail, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (expandedCategory === category.label) {
             setExpandedCategory(null);
         } else {
@@ -51,6 +55,18 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
         if (onCategoryClick) {
             onCategoryClick(category.label);
         }
+    };
+
+    const handleSubcategoryClick = (categoryLabel: string, subcategoryName: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigate(`/books?category=${encodeURIComponent(categoryLabel)}&subcategory=${encodeURIComponent(subcategoryName)}`);
+    };
+
+    const handleCategoryLinkClick = (categoryLabel: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigate(`/books?category=${encodeURIComponent(categoryLabel)}`);
     };
 
     const getColor = (index: number): string => {
@@ -74,15 +90,23 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                         </button>
                         <span className="breadcrumb-title">{category.label}</span>
                         <span className="breadcrumb-count">{category.count} books</span>
+                        <button
+                            className="btn btn-text"
+                            onClick={(e) => handleCategoryLinkClick(category.label, e)}
+                        >
+                            View all →
+                        </button>
                     </div>
                     <div className="subcategory-grid">
                         {category.subcategories.map((sub, idx) => {
                             const percentage = (sub.count / maxSubCount) * 100;
                             const sharePercent = ((sub.count / totalBooks) * 100).toFixed(1);
                             return (
-                                <div
+                                <a
+                                    href={`/books?category=${encodeURIComponent(category.label)}&subcategory=${encodeURIComponent(sub.name)}`}
                                     key={sub.name}
                                     className={`subcategory-item ${hoveredItem === sub.name ? 'hovered' : ''}`}
+                                    onClick={(e) => handleSubcategoryClick(category.label, sub.name, e)}
                                     onMouseEnter={() => setHoveredItem(sub.name)}
                                     onMouseLeave={() => setHoveredItem(null)}
                                 >
@@ -99,7 +123,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                                     </div>
                                     <span className="subcategory-label">{sub.name}</span>
                                     <span className="subcategory-count">{sub.count}</span>
-                                </div>
+                                </a>
                             );
                         })}
                     </div>
@@ -121,37 +145,43 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                         <div
                             key={category.label}
                             className={`category-item-interactive ${hoveredItem === category.label ? 'hovered' : ''} ${hasSubcategories ? 'expandable' : ''}`}
-                            onClick={() => handleCategoryClick(category)}
+                            onClick={(e) => handleCategoryClick(category, e)}
                             onMouseEnter={() => setHoveredItem(category.label)}
                             onMouseLeave={() => setHoveredItem(null)}
                         >
-                            <div
-                                className="category-block"
-                                style={{
-                                    height: `${percentage}%`,
-                                    backgroundColor: getColor(idx),
-                                }}
+                            <a
+                                href={`/books?category=${encodeURIComponent(category.label)}`}
+                                className="category-link"
+                                onClick={(e) => handleCategoryLinkClick(category.label, e)}
                             >
-                                <div className="category-content">
-                                    <span className="category-name">{category.label}</span>
-                                    <span className="category-count">{category.count}</span>
-                                    <span className="category-percent">{sharePercent}%</span>
-                                    {hasSubcategories && (
-                                        <span className="category-expand-hint">Click to expand</span>
-                                    )}
+                                <div
+                                    className="category-block"
+                                    style={{
+                                        height: `${percentage}%`,
+                                        backgroundColor: getColor(idx),
+                                    }}
+                                >
+                                    <div className="category-content">
+                                        <span className="category-name">{category.label}</span>
+                                        <span className="category-count">{category.count}</span>
+                                        <span className="category-percent">{sharePercent}%</span>
+                                        {hasSubcategories && (
+                                            <span className="category-expand-hint">Click to expand</span>
+                                        )}
+                                    </div>
+                                    <div className="category-tooltip">
+                                        <strong>{category.label}</strong>
+                                        <br />
+                                        {category.count} books ({sharePercent}%)
+                                        {hasSubcategories && (
+                                            <>
+                                                <br />
+                                                <small>{category.subcategories.length} subcategories</small>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="category-tooltip">
-                                    <strong>{category.label}</strong>
-                                    <br />
-                                    {category.count} books ({sharePercent}%)
-                                    {hasSubcategories && (
-                                        <>
-                                            <br />
-                                            <small>{category.subcategories.length} subcategories</small>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                            </a>
                         </div>
                     );
                 })}

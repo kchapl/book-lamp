@@ -317,7 +317,7 @@ const StatsPage: React.FC = () => {
                                     ? (count / stats.max_category_count) * 100
                                     : 0;
                                 return (
-                                    <div key={label} className="category-item">
+                                    <Link key={label} to={`/books?category=${encodeURIComponent(label)}`} className="category-item">
                                         <span className="category-label">{label}</span>
                                         <div className="category-bar">
                                             <div 
@@ -326,7 +326,7 @@ const StatsPage: React.FC = () => {
                                             ></div>
                                         </div>
                                         <span className="category-count">{count}</span>
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>
