@@ -5,7 +5,7 @@ description = "Reading history."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "psycopg[binary]>=3.3",
+    "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.3",
     "alembic>=1.18",
     "click>=8.4",
