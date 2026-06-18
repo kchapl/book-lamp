@@ -277,6 +277,16 @@ def get_job_status(job_id: str):
     return jsonify(job.to_dict())
 
 
+@app.route("/api/csrf-token", methods=["GET"])
+def get_csrf_token():
+    """Return the current CSRF token for the SPA.
+
+    The token is also set in the X-CSRF-Token response header for convenience.
+    """
+    token = generate_csrf_token()
+    return jsonify({"csrf_token": token})
+
+
 @app.route("/api/settings", methods=["POST"])
 @authorisation_required
 @csrf_protect
@@ -901,6 +911,8 @@ def spa_fallback(fallback):
     """Catch-all for SPA routing - serve index.html for non-API routes."""
     if request.path.startswith("/api/"):
         return jsonify({"error": "Not found"}), 404
+    # Ensure CSRF token is generated so it's available in response headers
+    generate_csrf_token()
     return render_template("index.html")
 
 

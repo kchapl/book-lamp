@@ -2,13 +2,40 @@ import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, Hist
 
 const API_BASE = '/api';
 
+// Cache for the CSRF token
+let csrfToken: string | null = null;
+
+/**
+ * Fetch the CSRF token from the server.
+ * The token is also available in the X-CSRF-Token response header.
+ */
+async function fetchCSRFToken(): Promise<string> {
+    if (csrfToken) return csrfToken;
+    const response = await fetch(`${API_BASE}/csrf-token`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch CSRF token');
+    }
+    const data = await response.json();
+    csrfToken = data.csrf_token;
+    return csrfToken;
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+    // For POST/PUT/PATCH/DELETE requests, include CSRF token
+    const method = options?.method?.toUpperCase() || 'GET';
+    let headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...options?.headers as Record<string, string>,
+    };
+    
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const token = await fetchCSRFToken();
+        headers['X-CSRF-Token'] = token;
+    }
+
     const response = await fetch(url, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options?.headers,
-        },
+        headers,
     });
 
     if (!response.ok) {

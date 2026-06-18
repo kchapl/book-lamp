@@ -19,6 +19,38 @@ def _json(resp):
 
 
 # ---------------------------------------------------------------------------
+# CSRF Token
+# ---------------------------------------------------------------------------
+
+
+def test_api_csrf_token(client):
+    """GET /api/csrf-token returns a CSRF token."""
+    resp = client.get("/api/csrf-token")
+    assert resp.status_code == 200
+    body = _json(resp)
+    assert "csrf_token" in body
+    assert len(body["csrf_token"]) == 64  # 32 bytes hex = 64 chars
+
+
+def test_api_csrf_token_in_header(client):
+    """GET /api/csrf-token also sets the token in response headers."""
+    resp = client.get("/api/csrf-token")
+    assert resp.status_code == 200
+    assert "X-CSRF-Token" in resp.headers
+    body = _json(resp)
+    assert resp.headers["X-CSRF-Token"] == body["csrf_token"]
+
+
+def test_api_csrf_token_consistent(client):
+    """Multiple calls return the same token (stored in session)."""
+    resp1 = client.get("/api/csrf-token")
+    resp2 = client.get("/api/csrf-token")
+    body1 = _json(resp1)
+    body2 = _json(resp2)
+    assert body1["csrf_token"] == body2["csrf_token"]
+
+
+# ---------------------------------------------------------------------------
 # Books – create
 # ---------------------------------------------------------------------------
 
