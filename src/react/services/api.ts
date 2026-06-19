@@ -17,7 +17,7 @@ async function fetchCSRFToken(): Promise<string> {
     }
     const data = await response.json();
     csrfToken = data.csrf_token;
-    return csrfToken;
+    return data.csrf_token;
 }
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
