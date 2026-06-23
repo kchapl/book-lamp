@@ -13,20 +13,20 @@ dependencies = [
     "python-dotenv>=1.2",
     "requests>=2.34",
     "gunicorn>=26.0",
-    "google-auth>=2.53",
-    "openai>=2.38",
+    "google-auth>=2.54.0",
+    "openai>=2.41.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0",
+    "pytest>=9.1.0",
     "pytest-cov>=7.1",
     "black>=26.5",
     "isort>=8.0",
     "mypy>=2.1",
     "bandit>=1.9",
     "pbr>=7.0",
-    "ruff>=0.15",
+    "ruff>=0.15.17",
     "pre-commit>=4.6",
     "types-requests>=2.33",
     "pytest-docker>=3.2",
@@ -39,14 +39,14 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0",
+    "pytest>=9.1.0",
     "pytest-cov>=7.1",
     "black>=26.5",
     "isort>=8.0",
     "mypy>=2.1",
     "bandit>=1.9",
     "pbr>=7.0",
-    "ruff>=0.15",
+    "ruff>=0.15.17",
     "pre-commit>=4.6",
     "types-requests>=2.33",
     "pytest-docker>=3.2",
