@@ -1,0 +1,50 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request_target:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+    if: github.event.sender.login == 'dependabot[bot]'
+    steps:
+      - name: Enable auto-merge
+        run: |
+          gh pr merge --admin --squash --auto-merge ${{ github.event.pull_request.number }}
+
+  check-mergeable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Get open Dependabot PRs
+        id: prs
+        run: |
+          pr_numbers=$(gh pr list \
+            --repo ${{ github.repository }} \
+            --author app/dependabot \
+            --state open \
+            --base main \
+            --json number,mergeable,autoMergeRequest \
+            --jq '.[] | select(.mergeable == true and .autoMergeRequest == null) | .number')
+
+          echo "Mergeable PRs without auto-merge: $pr_numbers"
+          echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge for mergeable PRs
+        if: steps.prs.outputs.pr_numbers != ''
+        env:
+          PR_NUMBERS: ${{ steps.prs.outputs.pr_numbers }}
+        run: |
+          for pr in $PR_NUMBERS; do
+            echo "Enabling auto-merge for PR #$pr"
+            gh pr merge --admin --squash --auto-merge $pr
+          done
