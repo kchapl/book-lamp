@@ -4,8 +4,7 @@ on:
   pull_request_target:
     branches: [main]
   schedule:
-    # Run every hour to catch any PRs that might have been missed
-    - cron: '0 * * * *'
+    - cron: '0 3 * * *'
 
 permissions:
   contents: write
