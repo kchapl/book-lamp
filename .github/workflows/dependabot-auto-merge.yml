@@ -12,14 +12,6 @@ permissions:
   pull-requests: write
 
 jobs:
-  enable-auto-merge:
-    runs-on: ubuntu-latest
-    if: github.event.sender.login == 'dependabot[bot]'
-    steps:
-      - name: Enable auto-merge
-        run: |
-          gh pr merge --admin --squash --auto-merge ${{ github.event.pull_request.number }}
-
   check-mergeable:
     runs-on: ubuntu-latest
     steps:
@@ -46,6 +38,7 @@ jobs:
         if: steps.prs.outputs.pr_numbers != ''
         env:
           PR_NUMBERS: ${{ steps.prs.outputs.pr_numbers }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           for pr in $PR_NUMBERS; do
             echo "Enabling auto-merge for PR #$pr"
