@@ -29,7 +29,10 @@ def test_api_csrf_token(client):
     assert resp.status_code == 200
     body = _json(resp)
     assert "csrf_token" in body
-    assert len(body["csrf_token"]) == 64  # 32 bytes hex = 64 chars
+    token = body["csrf_token"]
+    assert isinstance(token, str), "csrf_token must be a string"
+    assert len(token) == 64, "csrf_token must be 64 characters (32 bytes hex)"
+    assert all(c in "0123456789abcdefABCDEF" for c in token), "csrf_token must contain only hexadecimal characters"
 
 
 def test_api_csrf_token_in_header(client):
