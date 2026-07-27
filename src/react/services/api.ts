@@ -34,8 +34,10 @@ async function fetchCSRFToken(): Promise<string> {
  */
 export async function logout(): Promise<void> {
     invalidateCSRFToken();
-    await fetch('/logout', { method: 'POST' });
-    window.location.href = '/';
+    const response = await fetch('/logout', { method: 'GET' });
+    if (response.ok) {
+        window.location.href = '/';
+    }
 }
 
 /**
@@ -50,14 +52,12 @@ export async function refreshCSRFToken(): Promise<string> {
 async function fetchJSON<T>(url: string, options?: RequestInit, retryOnCSRF?: boolean): Promise<T> {
     // For POST/PUT/PATCH/DELETE requests, include CSRF token
     const method = options?.method?.toUpperCase() || 'GET';
-    let headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...options?.headers as Record<string, string>,
-    };
+    const headers = new Headers(options?.headers);
+    headers.set('Content-Type', 'application/json');
 
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         const token = await fetchCSRFToken();
-        headers['X-CSRF-Token'] = token;
+        headers.set('X-CSRF-Token', token);
     }
 
     const response = await fetch(url, {
