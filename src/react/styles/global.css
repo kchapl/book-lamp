@@ -262,6 +262,38 @@
     display: none;
 }
 
+/* Mobile menu backdrop */
+.mobile-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    animation: fadeIn var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 @media (max-width: 640px) {
     .mobile-menu-toggle {
         display: inline-flex;
@@ -300,6 +332,7 @@
         padding: 1rem;
         box-shadow: var(--md-sys-elevation-2);
         z-index: 100;
+        animation: slideDown var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-emphasized-decelerate);
     }
 
     .nav-links.nav-open {
@@ -321,6 +354,8 @@
         border-radius: var(--md-sys-shape-corner-small);
         font-size: 1rem;
         text-align: center;
+        transition: background-color var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard),
+                    color var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
     }
 
     .nav-links a:hover,
@@ -332,5 +367,11 @@
     /* Main nav - mobile layout */
     .main-nav {
         position: relative;
+        z-index: 100;
+    }
+
+    /* Main content bottom padding for mobile nav */
+    .main-content {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     }
 }

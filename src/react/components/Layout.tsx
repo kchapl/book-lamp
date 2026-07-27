@@ -33,7 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return (
         <div className="app-container">
             <header className="site-header">
-                <nav className="main-nav">
+                <nav className="main-nav" style={{ position: 'relative', zIndex: 100 }}>
                     <Link to="/" className="logo">
                         Book Lamp
                     </Link>
@@ -46,6 +46,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     >
                         {mobileMenuOpen ? '✕' : '☰'}
                     </button>
+                    {/* Mobile menu backdrop */}
+                    {mobileMenuOpen && (
+                        <div
+                            className="mobile-menu-backdrop"
+                            onClick={() => setMobileMenuOpen(false)}
+                            aria-hidden="true"
+                        />
+                    )}
                     <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
                         {navItems.map((item) => (
                             <li key={item.path}>
