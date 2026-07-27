@@ -50,6 +50,33 @@ def test_api_csrf_token_consistent(client):
     assert body1["csrf_token"] == body2["csrf_token"]
 
 
+def test_spa_fallback_sets_csrf_header(client, app):
+    """Non-API SPA routes include X-CSRF-Token header via after_request hook."""
+    resp = client.get("/books")  # SPA fallback route
+    assert resp.status_code == 200
+    assert "X-CSRF-Token" in resp.headers
+    assert len(resp.headers["X-CSRF-Token"]) == 64
+
+
+def test_csrf_tokens_independent_per_session(client, app):
+    """Separate clients (sessions) have distinct CSRF tokens."""
+    # First client session
+    resp1a = client.get("/api/csrf-token")
+    resp1b = client.get("/api/csrf-token")
+    body1 = _json(resp1a)
+
+    # Second client session (new test client)
+    with app.test_client() as client2:
+        resp2 = client2.get("/api/csrf-token")
+        body2 = _json(resp2)
+
+    # Same session should have consistent token
+    assert body1["csrf_token"] == _json(resp1b)["csrf_token"]
+
+    # Different sessions should have different tokens
+    assert body1["csrf_token"] != body2["csrf_token"]
+
+
 # ---------------------------------------------------------------------------
 # Books – create
 # ---------------------------------------------------------------------------
