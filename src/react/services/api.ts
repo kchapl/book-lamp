@@ -6,8 +6,16 @@ const API_BASE = '/api';
 let csrfToken: string | null = null;
 
 /**
+ * Invalidate the cached CSRF token.
+ * Call this on logout, session expiry, or session regeneration.
+ */
+export function invalidateCSRFToken(): void {
+    csrfToken = null;
+}
+
+/**
  * Fetch the CSRF token from the server.
- * The token is also available in the X-CSRF-Token response header.
+ * If the token was invalidated, refetches from the server for the current session.
  */
 async function fetchCSRFToken(): Promise<string> {
     if (csrfToken) return csrfToken;
@@ -20,14 +28,33 @@ async function fetchCSRFToken(): Promise<string> {
     return data.csrf_token;
 }
 
-async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+/**
+ * Clear session and invalidate CSRF token.
+ * Call this on logout.
+ */
+export async function logout(): Promise<void> {
+    invalidateCSRFToken();
+    await fetch('/logout', { method: 'POST' });
+    window.location.href = '/';
+}
+
+/**
+ * Refresh CSRF token for the new session after login.
+ * Call this after successful authentication.
+ */
+export async function refreshCSRFToken(): Promise<string> {
+    invalidateCSRFToken();
+    return fetchCSRFToken();
+}
+
+async function fetchJSON<T>(url: string, options?: RequestInit, retryOnCSRF?: boolean): Promise<T> {
     // For POST/PUT/PATCH/DELETE requests, include CSRF token
     const method = options?.method?.toUpperCase() || 'GET';
     let headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...options?.headers as Record<string, string>,
     };
-    
+
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         const token = await fetchCSRFToken();
         headers['X-CSRF-Token'] = token;
@@ -40,8 +67,17 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
     if (!response.ok) {
         if (response.status === 401) {
+            invalidateCSRFToken();
             window.location.href = '/unauthorised';
             throw new Error('Unauthorized');
+        }
+        // Retry once on CSRF 403 if not already retried
+        if (response.status === 403 && retryOnCSRF !== false) {
+            const csrfError = await response.json().catch(() => ({}));
+            if (csrfError.error === 'CSRF token validation failed') {
+                invalidateCSRFToken();
+                return fetchJSON<T>(url, options, false);
+            }
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
