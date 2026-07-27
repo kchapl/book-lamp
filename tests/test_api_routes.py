@@ -55,14 +55,15 @@ def test_api_csrf_token_consistent(client):
 
 def test_spa_fallback_sets_csrf_header(client, app):
     """Non-API SPA routes include X-CSRF-Token header via after_request hook."""
+    # Get the session token
+    csrf_resp = client.get("/api/csrf-token")
+    session_token = _json(csrf_resp)["csrf_token"]
+
+    # SPA fallback should return the same session token
     resp = client.get("/books")  # SPA fallback route
     assert resp.status_code == 200
     assert "X-CSRF-Token" in resp.headers
-
-    # Verify the header token matches the one from /api/csrf-token
-    csrf_resp = client.get("/api/csrf-token")
-    csrf_body = _json(csrf_resp)
-    assert resp.headers["X-CSRF-Token"] == csrf_body["csrf_token"]
+    assert resp.headers["X-CSRF-Token"] == session_token
 
 
 def test_csrf_tokens_independent_per_session(client, app):
