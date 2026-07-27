@@ -58,7 +58,11 @@ def test_spa_fallback_sets_csrf_header(client, app):
     resp = client.get("/books")  # SPA fallback route
     assert resp.status_code == 200
     assert "X-CSRF-Token" in resp.headers
-    assert len(resp.headers["X-CSRF-Token"]) == 64
+
+    # Verify the header token matches the one from /api/csrf-token
+    csrf_resp = client.get("/api/csrf-token")
+    csrf_body = _json(csrf_resp)
+    assert resp.headers["X-CSRF-Token"] == csrf_body["csrf_token"]
 
 
 def test_csrf_tokens_independent_per_session(client, app):
