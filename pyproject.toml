@@ -7,14 +7,14 @@ requires-python = ">=3.13"
 dependencies = [
     "psycopg[binary]>=3.3.4",
     "psycopg-pool>=3.3",
-    "alembic>=1.18",
-    "click>=8.4",
+    "alembic>=1.18.5",
+    "click>=8.4.2",
     "Flask>=3.1",
     "python-dotenv>=1.2",
     "requests>=2.34",
     "gunicorn>=26.0",
-    "google-auth>=2.55.0",
-    "openai>=2.43.0",
+    "google-auth>=2.56.2",
+    "openai>=2.48.0",
 ]
 
 [project.optional-dependencies]
@@ -23,14 +23,14 @@ dev = [
     "pytest-cov>=7.1",
     "black>=26.5",
     "isort>=8.0",
-    "mypy>=2.1",
+    "mypy>=2.3.0",
     "bandit>=1.9",
     "pbr>=7.0",
-    "ruff>=0.15.18",
-    "pre-commit>=4.6",
+    "ruff>=0.16.0",
+    "pre-commit>=4.6.1",
     "types-requests>=2.33",
     "pytest-docker>=3.2",
-    "google-api-python-client>=2.197",
+    "google-api-python-client>=2.198.0",
 ]
 
 [build-system]
@@ -43,14 +43,14 @@ dev = [
     "pytest-cov>=7.1",
     "black>=26.5",
     "isort>=8.0",
-    "mypy>=2.1",
+    "mypy>=2.3.0",
     "bandit>=1.9",
     "pbr>=7.0",
-    "ruff>=0.15.18",
-    "pre-commit>=4.6",
+    "ruff>=0.16.0",
+    "pre-commit>=4.6.1",
     "types-requests>=2.33",
     "pytest-docker>=3.2",
-    "google-api-python-client>=2.197",
+    "google-api-python-client>=2.198.0",
 ]
 
 [tool.pytest.ini_options]
