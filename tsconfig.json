@@ -19,12 +19,17 @@
         "paths": {
             "@/*": ["src/react/*"]
         },
-        "ignoreDeprecations": "6.0"
+        "ignoreDeprecations": "5.0"
     },
     "include": [
         "src/ts/**/*.ts",
         "src/ts/**/*.tsx",
         "src/react/**/*.ts",
         "src/react/**/*.tsx"
+    ],
+    "exclude": [
+        "src/**/__tests__/*",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx"
     ]
 }

@@ -107,6 +107,15 @@ def generate_csrf_token() -> str:
     return token
 
 
+@app.route("/api/csrf-token", methods=["GET"])
+def get_csrf_token_api():
+    """Return CSRF token for client API requests."""
+    token = generate_csrf_token()
+    response = jsonify({"csrf_token": token})
+    response.set_cookie("csrf_token", token, samesite="Lax")
+    return response
+
+
 def csrf_protect(f):
     """Decorator to protect routes from CSRF attacks."""
 
@@ -181,6 +190,8 @@ def authorisation_required(f):
             app.logger.warning(
                 f"Authorization failed for {f.__name__}: no user_id in session"
             )
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("unauthorised"))
 
         if not get_storage().is_authorised():
@@ -435,8 +446,8 @@ def favicon():
 
 
 @app.route("/api/books", methods=["POST"])
-@authorisation_required
 @csrf_protect
+@authorisation_required
 def api_create_book():
     """Create a new book from a JSON payload and add it to the reading list.
 
@@ -498,9 +509,7 @@ def api_create_book():
             try:
                 book_data = lookup_book_by_isbn13(isbn)
             except Exception:
-                app.logger.exception(
-                    f"api_create_book: ISBN lookup failed for {isbn}"
-                )
+                app.logger.exception(f"api_create_book: ISBN lookup failed for {isbn}")
                 return jsonify({"error": "ISBN lookup failed"}), 502
 
         if not book_data:
@@ -731,9 +740,7 @@ def api_create_reading_record(book_id: int):
         app.logger.info(f"RECORD_CREATED (API): book_id={book_id}, status='{status}'")
         return jsonify(record), 201
     except Exception:
-        app.logger.exception(
-            f"api_create_reading_record: failed for book_id={book_id}"
-        )
+        app.logger.exception(f"api_create_reading_record: failed for book_id={book_id}")
         return jsonify({"error": "Failed to create reading record"}), 500
 
 
@@ -851,9 +858,7 @@ def api_start_reading(book_id: int):
         )
         return jsonify({"success": True})
     except Exception:
-        app.logger.exception(
-            f"api_start_reading: failed for book_id={book_id}"
-        )
+        app.logger.exception(f"api_start_reading: failed for book_id={book_id}")
         return jsonify({"error": "Failed to start reading."}), 500
 
 
@@ -872,9 +877,7 @@ def api_add_to_reading_list(book_id: int):
         app.logger.info(f"READING_LIST_ADD (API): book_id={book_id}")
         return jsonify({"success": True})
     except Exception:
-        app.logger.exception(
-            f"api_add_to_reading_list: failed for book_id={book_id}"
-        )
+        app.logger.exception(f"api_add_to_reading_list: failed for book_id={book_id}")
         return jsonify({"error": "Failed to add to reading list."}), 500
 
 
@@ -945,9 +948,10 @@ if not is_test_mode():
 
 @app.after_request
 def add_csrf_token_header(response):
-    """Add CSRF token to response headers for AJAX requests."""
+    """Add CSRF token to response headers and cookies for AJAX requests."""
     if "csrf_token" in g:
         response.headers["X-CSRF-Token"] = g.csrf_token
+        response.set_cookie("csrf_token", g.csrf_token, samesite="Lax")
     return response
 
 
@@ -1786,6 +1790,18 @@ def publisher_page(publisher_slug: str):
     )
 
 
+@app.route("/stats", methods=["GET"])
+def redirect_stats():
+    """Redirect legacy /stats route to /dashboard."""
+    return redirect(url_for("dashboard"), code=301)
+
+
+@app.route("/api/stats", methods=["GET"])
+def redirect_api_stats():
+    """Redirect legacy /api/stats route to /api/dashboard."""
+    return redirect(url_for("api_collection_stats"), code=301)
+
+
 @app.route("/dashboard", methods=["GET"])
 @authorisation_required
 def dashboard():
@@ -1939,9 +1955,7 @@ def api_collection_stats():
             except (ValueError, TypeError):
                 pass
 
-    avg_pages_per_book = (
-        total_pages_read / total_books if total_books > 0 else 0
-    )
+    avg_pages_per_book = total_pages_read / total_books if total_books > 0 else 0
 
     # NEW: Reading duration estimates (based on start/end dates)
     total_reading_days = 0
@@ -1985,7 +1999,9 @@ def api_collection_stats():
         date_str = r.get("end_date", "")
         if date_str and len(date_str) >= 7:
             year_month = date_str[:7]  # YYYY-MM
-            completions_by_month[year_month] = completions_by_month.get(year_month, 0) + 1
+            completions_by_month[year_month] = (
+                completions_by_month.get(year_month, 0) + 1
+            )
 
     if completions_by_month:
         # Calculate current streak (consecutive months from current month going back)
@@ -2010,7 +2026,11 @@ def api_collection_stats():
                 prev = datetime.date.fromisoformat(sorted_months[i - 1] + "-01")
                 curr = datetime.date.fromisoformat(sorted_months[i] + "-01")
                 # Check if consecutive months
-                expected = prev.replace(month=prev.month + 1) if prev.month < 12 else datetime.date(prev.year + 1, 1, 1)
+                expected = (
+                    prev.replace(month=prev.month + 1)
+                    if prev.month < 12
+                    else datetime.date(prev.year + 1, 1, 1)
+                )
                 if curr == expected:
                     streak += 1
                 else:
@@ -2025,7 +2045,9 @@ def api_collection_stats():
     books_last_year = yearly_counts.get(previous_year_str, 0)
 
     if books_last_year > 0:
-        percentage_change = round(((books_this_year - books_last_year) / books_last_year) * 100, 1)
+        percentage_change = round(
+            ((books_this_year - books_last_year) / books_last_year) * 100, 1
+        )
     else:
         percentage_change = 100.0 if books_this_year > 0 else 0.0
 
@@ -2037,7 +2059,9 @@ def api_collection_stats():
 
     # NEW: Reading pace (books per month)
     months_with_data = len(completions_by_month) if completions_by_month else 1
-    reading_pace_monthly = round(total_books / months_with_data, 2) if months_with_data > 0 else 0
+    reading_pace_monthly = (
+        round(total_books / months_with_data, 2) if months_with_data > 0 else 0
+    )
     reading_pace_annualised = round(reading_pace_monthly * 12, 1)
 
     # NEW: Format distribution
@@ -2087,9 +2111,15 @@ def api_collection_stats():
             if main_cat:
                 norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
                 # Find or create category entry
-                existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
+                existing = next(
+                    (c for c in category_details_list if c["label"] == norm_cat), None
+                )
                 if not existing:
-                    existing = {"label": norm_cat, "count": 0, "subcategories": Counter()}
+                    existing = {
+                        "label": norm_cat,
+                        "count": 0,
+                        "subcategories": Counter(),
+                    }
                     category_details_list.append(existing)
                 existing["count"] += 1
                 if sub_cat:
@@ -2120,7 +2150,9 @@ def api_collection_stats():
 
     goal_progress_percent = 0.0
     if yearly_goal and yearly_goal > 0:
-        goal_progress_percent = min(round((books_this_year / yearly_goal) * 100, 1), 100.0)
+        goal_progress_percent = min(
+            round((books_this_year / yearly_goal) * 100, 1), 100.0
+        )
 
     return jsonify(
         {
@@ -2526,7 +2558,7 @@ def fetch_missing_categories():
         "Book categorisation started in the background. Your charts will update as data is found.",
         "info",
     )
-    return redirect(url_for("collection_stats", job_id=job_id))
+    return redirect(url_for("dashboard", job_id=job_id))
 
 
 @app.route("/books/import", methods=["GET"])

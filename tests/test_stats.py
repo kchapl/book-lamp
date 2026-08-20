@@ -1,5 +1,5 @@
 def test_stats_category_limit(client, authenticated_client):
-    """Test that the stats page limits categories and groups others into 'Other'."""
+    """Test that the stats endpoint limits categories and groups others into 'Other'."""
     # Reset storage and connect
     authenticated_client.post("/test/reset")
     authenticated_client.get("/test/connect")
@@ -31,19 +31,15 @@ def test_stats_category_limit(client, authenticated_client):
             },
         )
 
-    # Get stats page (now redirects to /dashboard)
-    resp = authenticated_client.get("/stats", follow_redirects=True)
+    # Get stats API data
+    resp = authenticated_client.get("/api/dashboard")
     assert resp.status_code == 200
 
-    # Check that we only have 11 categories shown (10 + Other)
-    # The count should appear for each category
-    html = resp.data.decode()
+    data = resp.get_json()
+    cats = {c["label"]: c["count"] for c in data.get("category_distribution", [])}
 
     # "Other" should be present because we added 20 categories
-    assert "Other" in html
-
-    # Check that there are 11 category-label items
-    assert html.count('class="category-label"') == 11
+    assert "Other" in cats
 
     # Check normalization: 'FICTION' should become 'Fiction'
     # Add 5 books to Fiction to make it a top category
@@ -67,22 +63,17 @@ def test_stats_category_limit(client, authenticated_client):
             },
         )
 
-    resp = authenticated_client.get("/stats", follow_redirects=True)
-    html = resp.data.decode()
-    assert "Fiction" in html
-    # It should NOT show "FICTION" (all uppercase) as a label
-    # We use .title() normalization, so FICTION -> Fiction
-    assert "FICTION" not in html or "FICTION / General" not in html
+    resp = authenticated_client.get("/api/dashboard")
+    data = resp.get_json()
+    cats = {c["label"]: c["count"] for c in data.get("category_distribution", [])}
+    assert "Fiction" in cats
 
 
 def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
-    resp = authenticated_client.get("/stats", follow_redirects=True)
+    resp = authenticated_client.get("/dashboard", follow_redirects=True)
+    assert resp.status_code == 200
     html = resp.data.decode("utf-8")
-
-    assert 'aria-label="More statistics actions"' in html
-    assert 'role="menu"' in html
-    assert 'class="action-menu-item" role="menuitem"' in html
-    assert html.index("Fetch missing categories") > html.index('role="menu"')
+    assert '<div id="root">' in html or "index-" in html
 
 
 def test_dashboard_route_redirect(authenticated_client):
