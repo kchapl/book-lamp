@@ -6,10 +6,10 @@ updates:
       interval: daily
     cooldown:
       default-days: 10
-    groups:
-      action-updates:
-        patterns:
-          - "*"
+      groups:
+        all-dependencies:
+          patterns:
+            - "*"
           
   - package-ecosystem: npm
     directory: /
@@ -17,11 +17,10 @@ updates:
       interval: daily
     cooldown:
       default-days: 10
-    groups:
-      npm-minor-and-patch-updates:
-        update-types:
-          - minor
-          - patch
+      groups:
+        all-dependencies:
+          patterns:
+            - "*"
           
   - package-ecosystem: uv
     directory: /
@@ -29,8 +28,7 @@ updates:
       interval: daily
     cooldown:
       default-days: 10
-    groups:
-      uv-minor-and-patch-updates:
-        update-types:
-          - minor
-          - patch
+      groups:
+        all-dependencies:
+          patterns:
+            - "*"
