@@ -19,6 +19,7 @@
                     Import from Libib
                 </a>
                 <form method="post" action="{{ url_for('fetch_missing_data') }}" role="none">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="action-menu-item" role="menuitem">
                         Fetch missing data
                     </button>

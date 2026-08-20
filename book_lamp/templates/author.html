@@ -180,6 +180,7 @@
             {% if book.isbn13 %}
             <div class="mt-auto pt-075">
                 <form action="{{ url_for('create_book') }}" method="post" class="flex">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="isbn" value="{{ book.isbn13 }}">
                     <input type="hidden" name="add_to_reading_list" value="1">
                     <button type="submit" class="btn btn-outline btn-small" title="Add to Reading List">

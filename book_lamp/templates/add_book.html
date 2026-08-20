@@ -11,6 +11,7 @@
         </p>
 
         <form method="post" action="{{ url_for('create_book') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             {% if add_to_reading_list %}
             <input type="hidden" name="add_to_reading_list" value="1">
             {% endif %}

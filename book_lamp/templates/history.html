@@ -86,6 +86,7 @@
                 <div class="reading-event" id="record-{{ record.id }}" data-edit-mode="false">
                     {% if is_real_record %}
                     <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         {% endif %}
                         <!-- View Mode -->
                         <div class="view-only">

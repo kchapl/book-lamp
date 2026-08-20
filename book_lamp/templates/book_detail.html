@@ -9,6 +9,7 @@
 {% block content %}
 <div class="book-detail-container" id="book-container">
     <form id="edit-form" method="post" action="{{ url_for('edit_book', book_id=book.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <div class="book-detail-header" id="book-header" data-edit-mode="false">
             <div class="book-detail-cover-wrapper">
@@ -142,6 +143,7 @@
                 {% if not is_planned %}
                 <form method="post" action="{{ url_for('add_existing_to_reading_list', book_id=book.id) }}"
                     class="flex">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-outline">Add to Reading
                         List</button>
                 </form>
@@ -154,6 +156,7 @@
 
         <div id="form-{{ book.id }}" class="add-record-form hidden">
             <form method="post" action="{{ url_for('create_reading_record', book_id=book.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="form-group">
                     <label for="new_status">Status</label>
                     <select id="new_status" name="status" onchange="updateDateLabels('{{ book.id }}', this.value)"
@@ -197,6 +200,7 @@
             <div class="record-item" id="record-{{ record.id }}" data-edit-mode="false">
                 {% if is_real_record %}
                 <form method="post" action="{{ url_for('update_reading_record', record_id=record.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     {% endif %}
                     <!-- View Mode -->
                     <div class="view-only">

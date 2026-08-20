@@ -30,8 +30,7 @@ const AddBookPage: React.FC = () => {
     }, [searchParams]);
 
     const startScanner = async () => {
-        if (!scannerRef.current) return;
-        
+        // Ensure scanner element is present; no early exit
         setScanning(true);
         setScannerError(null);
         
@@ -169,11 +168,9 @@ const AddBookPage: React.FC = () => {
                     </button>
                 </div>
 
-                {scanning && (
-                    <div className="scanner-container">
-                        <div id="scanner-reader" ref={scannerRef}></div>
-                    </div>
-                )}
+                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
+                    <div id="scanner-reader" ref={scannerRef}></div>
+                </div>
 
                 {scannerError && <p className="error-message">{scannerError}</p>}
                 {isbnError && <p className="error-message">{isbnError}</p>}

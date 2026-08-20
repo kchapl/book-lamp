@@ -12,6 +12,7 @@
         </p>
 
         <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="form-group mb-1">
                 <label for="csv_file" class="form-label">Choose CSV
                     File</label>

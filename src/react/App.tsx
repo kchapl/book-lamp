@@ -96,7 +96,8 @@ function App() {
                         <Route path="/books/:bookId" element={<BookDetailPage />} />
                         <Route path="/history" element={<HistoryPage />} />
                         <Route path="/reading-list" element={<ReadingListPage />} />
-                        <Route path="/stats" element={<StatsPage />} />
+                        <Route path="/dashboard" element={<StatsPage />} />
+                        <Route path="/stats" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/author/:authorSlug" element={<AuthorPage />} />
                         <Route path="/publisher/:publisherSlug" element={<PublisherPage />} />
                         <Route path="/about" element={<AboutPage />} />

@@ -53,6 +53,31 @@ export interface Stats {
     max_year_count: number;
     monthly_counts: { index: number; name: string; count: number }[];
     max_month_count: number;
+    // New fields
+    total_pages_read?: number;
+    avg_pages_per_book?: number;
+    avg_reading_time_days?: number;
+    total_reading_days?: number;
+    current_streak?: number;
+    longest_streak?: number;
+    yearly_goal?: number | null;
+    books_this_year?: number;
+    goal_progress_percent?: number;
+    format_distribution?: { label: string; count: number }[];
+    language_distribution?: { label: string; count: number }[];
+    top_series?: { name: string; count: number; books: string[] }[];
+    category_details?: {
+        label: string;
+        count: number;
+        subcategories: { name: string; count: number }[];
+    }[];
+    year_comparison?: {
+        current_year: number;
+        previous_year: number;
+        percentage_change: number;
+    };
+    reading_pace_monthly?: number;
+    reading_pace_annualised?: number;
 }
 
 export interface HistoryFilters {

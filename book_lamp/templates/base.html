@@ -7,6 +7,7 @@
     <meta name="description"
         content="Book Lamp - A simple and beautiful book tracking application synced with Google Sheets.">
     <title>{% block title %}Book Lamp{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Playfair+Display:wght@700&display=optional" as="style" onload="this.onload=null;this.rel='stylesheet'">
@@ -50,7 +51,7 @@
             <a href="/books">Books read</a>
             <a href="/history">Reading log</a>
             <a href="/reading-list">Reading list</a>
-            <a href="/stats">Statistics</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/about">About</a>
             {% if not is_authorised %}
             <a href="/connect" class="btn btn-small">Authorise</a>
