@@ -2296,7 +2296,7 @@ def update_reading_record(record_id: int):
     storage = get_storage()
     status = request.form.get("status")
     start_date = request.form.get("start_date")
-    end_date = request.form.get("end_date")
+    end_date = request.form.get("end_date") or None
     rating = int(request.form.get("rating", 0))
 
     if not status or not start_date:
