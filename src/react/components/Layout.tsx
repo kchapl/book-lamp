@@ -10,6 +10,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { theme, setTheme, syncStatus } = useContext(AppContext);
     const [showThemeMenu, setShowThemeMenu] = useState(false);
     const [jobIndicator, setJobIndicator] = useState<string | null>(null);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
 
     useEffect(() => {
@@ -32,16 +33,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return (
         <div className="app-container">
             <header className="site-header">
-                <nav className="main-nav">
+                <nav className="main-nav" style={{ position: 'relative', zIndex: 100 }}>
                     <Link to="/" className="logo">
                         Book Lamp
                     </Link>
-                    <ul className="nav-links">
+                    {/* Mobile menu toggle button */}
+                    <button
+                        className="mobile-menu-toggle btn-icon"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                        aria-expanded={mobileMenuOpen}
+                    >
+                        {mobileMenuOpen ? '✕' : '☰'}
+                    </button>
+                    {/* Mobile menu backdrop */}
+                    {mobileMenuOpen && (
+                        <div
+                            className="mobile-menu-backdrop"
+                            onClick={() => setMobileMenuOpen(false)}
+                            aria-hidden="true"
+                        />
+                    )}
+                    <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
                         {navItems.map((item) => (
                             <li key={item.path}>
                                 <Link
                                     to={item.path}
                                     className={location.pathname === item.path ? 'active' : ''}
+                                    onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {item.label}
                                 </Link>

@@ -214,3 +214,67 @@
         margin-bottom: 0;
     }
 }
+
+/* =============================================================================
+   MOBILE ACCESSIBILITY IMPROVEMENTS FOR HISTORY
+   ============================================================================= */
+
+/* Additional mobile improvements for history page */
+@media (max-width: 640px) {
+    /* History controls - better touch targets */
+    .history-controls select {
+        min-height: 48px;
+        padding: 0.75rem 2.5rem 0.75rem 1rem;
+        font-size: 1rem;
+    }
+
+    .history-controls label {
+        font-size: 1rem;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    /* History book cards - ensure adequate spacing */
+    .history-book-card {
+        margin-bottom: 1rem;
+    }
+
+    /* Reading events - better touch targets */
+    .reading-event {
+        padding: 1rem;
+        min-height: 48px;
+    }
+
+    .event-meta {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    /* Ensure status badges are tappable */
+    .status-badge {
+        padding: 0.5rem 1rem;
+        min-height: 36px;
+        font-size: 0.8125rem;
+        cursor: pointer;
+    }
+}
+
+/* Extra small screens (480px and below) */
+@media (max-width: 480px) {
+    .history-controls {
+        padding: 0.75rem;
+    }
+
+    .history-book-card {
+        padding: 1rem;
+    }
+
+    .history-book-title {
+        font-size: 1.125rem;
+    }
+
+    .history-book-author {
+        font-size: 1rem;
+    }
+}

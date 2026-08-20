@@ -325,6 +325,10 @@ nav {
     font-size: 0.875rem;
     transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     position: relative;
+    padding: 0.75rem 0.5rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
 }
 
 .nav-links a:hover {
@@ -766,7 +770,7 @@ footer {
 .edit-input,
 select.edit-input {
     width: 100%;
-    padding: 0.625rem 0.75rem;
+    padding: 0.75rem 1rem;
     background-color: var(--md-sys-color-surface-container);
     border: 1px solid var(--md-sys-color-outline);
     border-radius: var(--md-sys-shape-corner-small);
@@ -775,7 +779,34 @@ select.edit-input {
     font-family: 'Roboto', sans-serif;
     box-sizing: border-box;
     min-width: 0;
+    min-height: 48px;
     transition: border-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+/* Mobile form input improvements */
+@media (max-width: 640px) {
+    .edit-input,
+    select.edit-input {
+        padding: 1rem 1.25rem;
+        font-size: 16px;
+        min-height: 52px;
+    }
+
+    .edit-textarea {
+        min-height: 120px;
+        font-size: 16px;
+    }
+
+    .form-label {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .form-input-large {
+        padding: 1.25rem;
+        font-size: 1.125rem;
+        min-height: 56px;
+    }
 }
 
 .edit-input:focus,
@@ -1387,4 +1418,88 @@ button:disabled,
 
 .success-flash {
     animation: successFlash 1s ease;
+}
+
+/* =============================================================================
+   MOBILE ACCESSIBILITY IMPROVEMENTS
+   ============================================================================= */
+
+/* Mobile-specific touch target improvements */
+@media (max-width: 640px) {
+    /* Ensure all buttons meet WCAG 2.2 AAA (44px minimum) */
+    .btn {
+        min-height: 48px;
+        padding: 0 1.25rem;
+        font-size: 1rem;
+    }
+
+    .btn-sm {
+        min-height: 44px;
+        font-size: 0.9375rem;
+    }
+
+    .btn-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    /* Add spacing between adjacent buttons to prevent accidental clicks */
+    .btn + .btn,
+    .btn-sm + .btn-sm,
+    .btn + .btn-sm {
+        margin-left: 0.5rem;
+    }
+
+    /* Ensure form selects have adequate touch target */
+    select {
+        min-height: 48px;
+        padding: 0.75rem 2.5rem 0.75rem 1rem;
+        font-size: 16px;
+    }
+
+    /* Improve checkbox and radio touch targets */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        min-height: 24px;
+    }
+
+    /* Improve alert touch targets */
+    .alert {
+        padding: 1rem;
+        min-height: 48px;
+    }
+
+    /* Better touch targets for action menus */
+    .action-menu-item {
+        padding: 0.875rem 1rem;
+        min-height: 48px;
+    }
+
+    /* Improve modal and dropdown buttons */
+    .modal-btn,
+    .dropdown-item {
+        min-height: 44px;
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* Extra small screens (320px and below) */
+@media (max-width: 480px) {
+    .btn {
+        padding: 0 1rem;
+        min-width: 44px;
+    }
+
+    .btn-text {
+        padding: 0.5rem;
+    }
+
+    .nav-links a {
+        padding: 0.5rem;
+        margin-left: 0.75rem;
+        font-size: 0.8125rem;
+    }
 }
