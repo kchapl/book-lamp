@@ -4,31 +4,25 @@ updates:
     directory: /
     schedule:
       interval: daily
-    cooldown:
-      default-days: 10
-      groups:
-        all-dependencies:
-          patterns:
-            - "*"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
           
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: daily
-    cooldown:
-      default-days: 10
-      groups:
-        all-dependencies:
-          patterns:
-            - "*"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
           
   - package-ecosystem: uv
     directory: /
     schedule:
       interval: daily
-    cooldown:
-      default-days: 10
-      groups:
-        all-dependencies:
-          patterns:
-            - "*"
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
