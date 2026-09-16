@@ -13,33 +13,55 @@ import AuthorPage from './pages/AuthorPage';
 import PublisherPage from './pages/PublisherPage';
 import AboutPage from './pages/AboutPage';
 import UnauthorisedPage from './pages/UnauthorisedPage';
-import { getSyncDiagnostics } from './services/api';
+import { getSyncDiagnostics, getAuthStatus, logout } from './services/api';
 
 export interface AppContextType {
     theme: 'light' | 'dark' | 'system';
     setTheme: (theme: 'light' | 'dark' | 'system') => void;
     isAuthorized: boolean;
+    setIsAuthorized: (auth: boolean) => void;
+    googleClientId: string | null;
     syncStatus: 'ok' | 'error' | 'checking';
+    logoutUser: () => Promise<void>;
 }
 
 export const AppContext = React.createContext<AppContextType>({
     theme: 'system',
     setTheme: () => {},
     isAuthorized: false,
+    setIsAuthorized: () => {},
+    googleClientId: null,
     syncStatus: 'checking',
+    logoutUser: async () => {},
 });
 
 function App() {
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [googleClientId, setGoogleClientId] = useState<string | null>(null);
     const [syncStatus, setSyncStatus] = useState<'ok' | 'error' | 'checking'>('checking');
 
     useEffect(() => {
-        // Check authorization status
+        // Check theme
         const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | 'system' | null;
         if (storedTheme && ['light', 'dark', 'system'].includes(storedTheme)) {
             setTheme(storedTheme);
         }
+
+        // Check auth status & Google Client ID
+        const checkAuth = async () => {
+            try {
+                const auth = await getAuthStatus();
+                setIsAuthorized(auth.is_authenticated);
+                if (auth.google_client_id) {
+                    setGoogleClientId(auth.google_client_id);
+                }
+            } catch (err) {
+                console.warn('Could not check auth status:', err);
+            }
+        };
+
+        checkAuth();
 
         // Check sync status
         const checkSync = async () => {
@@ -77,13 +99,27 @@ function App() {
         localStorage.setItem('theme', newTheme);
     };
 
+    const logoutUser = async () => {
+        try {
+            await logout();
+        } catch (err) {
+            console.warn('Logout request failed:', err);
+        } finally {
+            setIsAuthorized(false);
+            window.location.href = '/';
+        }
+    };
+
     return (
         <AppContext.Provider
             value={{
                 theme,
                 setTheme: handleThemeChange,
                 isAuthorized,
+                setIsAuthorized,
+                googleClientId,
                 syncStatus,
+                logoutUser,
             }}
         >
             <BrowserRouter>

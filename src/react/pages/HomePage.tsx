@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { AppContext } from '../App';
+import GoogleAuth from '../components/GoogleAuth';
 import { getRecommendations } from '../services/api';
 import type { Book } from '../types';
 
 const HomePage: React.FC = () => {
+    const { isAuthorized } = useContext(AppContext);
     const [recommendations, setRecommendations] = useState<Book[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        loadRecommendations();
-    }, []);
+        if (isAuthorized) {
+            loadRecommendations();
+        }
+    }, [isAuthorized]);
 
     const loadRecommendations = async () => {
         setLoading(true);
@@ -31,10 +36,19 @@ const HomePage: React.FC = () => {
             <section className="hero">
                 <h1>Welcome to Book Lamp</h1>
                 <p>Track your reading journey, discover new books, and manage your personal library.</p>
-                <div className="hero-actions">
-                    <Link to="/books" className="btn btn-primary">My Books</Link>
-                    <Link to="/stats" className="btn btn-secondary">View Statistics</Link>
-                </div>
+                {isAuthorized ? (
+                    <div className="hero-actions">
+                        <Link to="/books" className="btn btn-primary">My Books</Link>
+                        <Link to="/dashboard" className="btn btn-secondary">View Statistics</Link>
+                    </div>
+                ) : (
+                    <div className="auth-card" style={{ maxWidth: '400px', margin: '1.5rem auto 0', padding: '1.5rem', background: 'var(--card-bg, #fff)', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: 'var(--text-muted, #666)' }}>
+                            Sign in with Google to start tracking your reading history:
+                        </p>
+                        <GoogleAuth />
+                    </div>
+                )}
             </section>
 
             <section className="features">

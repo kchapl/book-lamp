@@ -158,13 +158,10 @@ class PostgresStorage:
 
                 # authors field in MockStorage is a comma-separated string
 
-                book["authors"] = (
-                    book["author_names"] if book["author_names"] != [None] else []
-                )
-
-                # Compatibility: MockStorage has 'author' as a single string
-                # We'll use the first author or empty string
-                book["author"] = book["author_names"][0] if book["author_names"] else ""
+                authors_list = [a for a in (book.get("author_names") or []) if a is not None]
+                book["authors"] = authors_list
+                # Use first normalized author if available, otherwise fall back to row's author column or empty string
+                book["author"] = authors_list[0] if authors_list else (row_raw.get("author") or "")
                 books.append(book)
             return books
 

@@ -1,76 +1,82 @@
-import os
+"""Tests for manual book entry via the JSON API."""
 
-import pytest
+from unittest.mock import patch
 
-from book_lamp.app import app
-
-
-@pytest.fixture
-def client():
-    app.config["TESTING"] = True
-    os.environ["TEST_MODE"] = "1"
-    with app.test_client() as client:
-        with app.app_context():
-            # Reset storage
-            client.post("/test/reset")
-            # Connect
-            client.get("/test/connect")
-        yield client
+from book_lamp.app import get_storage
 
 
-def test_manual_entry_success(client):
-    # Submit manual entry form
-    response = client.post(
-        "/books",
-        data={
+def test_manual_entry_success(authenticated_client):
+    """POST /api/books with title and author creates the book."""
+    response = authenticated_client.post(
+        "/api/books",
+        json={
             "isbn": "9781234567890",
             "title": "Manual Book",
             "author": "Manual Author",
             "publisher": "Manual Publisher",
             "publication_year": "2024",
         },
-        follow_redirects=True,
     )
 
-    assert response.status_code == 200
-    assert b"Book added to your reading list." in response.data
-    assert b"Manual Book" in response.data
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["title"] == "Manual Book"
+    assert body["author"] == "Manual Author"
+
+    storage = get_storage()
+    book = storage.get_book_by_isbn("9781234567890")
+    assert book is not None
+    assert book["title"] == "Manual Book"
 
 
-def test_isbn_lookup_fail_redirects_to_manual(client):
-    from unittest.mock import patch
-
-    # Use patch to ensure lookup fails
-    with patch("book_lamp.services.book_lookup.lookup_book_by_isbn13") as mock_lookup:
+def test_isbn_lookup_fail_reports_no_book_data(authenticated_client):
+    """POST /api/books with an unresolvable ISBN returns 404 with a clear error."""
+    with patch(
+        "book_lamp.services.book_lookup.lookup_book_by_isbn13"
+    ) as mock_lookup:
         mock_lookup.return_value = None
 
-        response = client.post(
-            "/books", data={"isbn": "0000000000000"}, follow_redirects=True
+        response = authenticated_client.post(
+            "/api/books", json={"isbn": "0000000000000"}
         )
 
-        assert response.status_code == 200
-        # Should see the message about entering manually
-        assert b"No book data found for ISBN 0000000000000" in response.data
-        # Should be on the new book page with ISBN prepopulated
-        assert b'value="0000000000000"' in response.data
-        assert b'id="manual-entry-section"' in response.data
+        assert response.status_code == 404
+        assert response.get_json()["error"] == (
+            "No book data found for ISBN 0000000000000"
+        )
 
 
-def test_manual_entry_duplicate_isbn(client):
-    # Add first book
-    client.post(
-        "/books",
-        data={"isbn": "9781234567890", "title": "First Entry", "author": "Author One"},
+def test_manual_entry_duplicate_isbn(authenticated_client):
+    """Adding an ISBN that already exists returns the existing book unchanged."""
+    storage = get_storage()
+    storage.add_book(
+        isbn13="9781234567890", title="First Entry", author="Author One"
     )
 
-    # Try to add same ISBN manually
-    response = client.post(
-        "/books",
-        data={"isbn": "9781234567890", "title": "Second Entry", "author": "Author Two"},
-        follow_redirects=True,
+    response = authenticated_client.post(
+        "/api/books",
+        json={"isbn": "9781234567890", "title": "Second Entry", "author": "Author Two"},
     )
 
     assert response.status_code == 200
-    assert b"Book moved to your reading list." in response.data
-    # Should be the first entry title, not the second
-    assert b"First Entry" in response.data
+    body = response.get_json()
+    # Should return the first entry, not create a second one
+    assert body["title"] == "First Entry"
+    assert body["author"] == "Author One"
+
+
+def test_manual_entry_existing_isbn_added_to_reading_list(authenticated_client):
+    """Re-adding an existing ISBN also queues the book on the reading list."""
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9781234567890", title="First Entry", author="Author One"
+    )
+
+    response = authenticated_client.post(
+        "/api/books",
+        json={"isbn": "9781234567890", "title": "Second Entry", "author": "Author Two"},
+    )
+
+    assert response.status_code == 200
+    reading_list = storage.get_reading_list()
+    assert any(item["book_id"] == book["id"] for item in reading_list)

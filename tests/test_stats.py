@@ -1,34 +1,24 @@
+"""Tests for stats/dashboard endpoints."""
+
+from book_lamp.app import get_storage
+
+
 def test_stats_category_limit(client, authenticated_client):
     """Test that the stats endpoint limits categories and groups others into 'Other'."""
-    # Reset storage and connect
-    authenticated_client.post("/test/reset")
-    authenticated_client.get("/test/connect")
+    storage = get_storage()
 
     # Add many books with different categories
     categories = [f"Category {i}" for i in range(20)]
     for i, cat in enumerate(categories):
-        # Create a book
-        authenticated_client.post(
-            "/books",
-            data={
-                "title": f"Book {i}",
-                "author": "Author",
-                "isbn": f"9780000000{i:03d}",
-                "publication_year": "2020",
-                "bisac_category": cat,
-            },
+        book = storage.add_book(
+            isbn13=f"9780000000{i:03d}",
+            title=f"Book {i}",
+            author="Author",
+            publication_year=2020,
+            bisac_category=cat,
         )
-
-        # Mark as completed
-        # book_id starts from 1
-        authenticated_client.post(
-            f"/books/{i+1}/reading-records",
-            data={
-                "status": "Completed",
-                "start_date": "2024-01-01",
-                "end_date": "2024-01-02",
-                "rating": "5",
-            },
+        storage.add_reading_record(
+            book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5
         )
 
     # Get stats API data
@@ -44,23 +34,14 @@ def test_stats_category_limit(client, authenticated_client):
     # Check normalization: 'FICTION' should become 'Fiction'
     # Add 5 books to Fiction to make it a top category
     for i in range(5):
-        authenticated_client.post(
-            "/books",
-            data={
-                "title": f"Fiction Book {i}",
-                "author": "Author",
-                "isbn": f"978111111111{i}",
-                "bisac_category": "FICTION / General",
-            },
+        book = storage.add_book(
+            isbn13=f"978111111111{i}",
+            title=f"Fiction Book {i}",
+            author="Author",
+            bisac_category="FICTION / General",
         )
-        authenticated_client.post(
-            f"/books/{21+i}/reading-records",
-            data={
-                "status": "Completed",
-                "start_date": "2024-01-01",
-                "end_date": "2024-01-02",
-                "rating": "5",
-            },
+        storage.add_reading_record(
+            book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5
         )
 
     resp = authenticated_client.get("/api/dashboard")
@@ -77,40 +58,29 @@ def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
 
 
 def test_dashboard_route_redirect(authenticated_client):
-    """Test that /stats redirects to /dashboard."""
+    """Test that /stats serves the SPA which client-side redirects to /dashboard."""
     resp = authenticated_client.get("/stats", follow_redirects=False)
-    # Should redirect with 301
-    assert resp.status_code == 301
-    # Location should be /dashboard
-    assert "dashboard" in resp.location
+    # The React SPA serves /stats and redirects to /dashboard in the client
+    assert resp.status_code == 200
+    assert b'id="root"' in resp.data
 
 
 def test_api_dashboard_endpoint(authenticated_client):
     """Test the new /api/dashboard endpoint returns enhanced stats."""
-    authenticated_client.post("/test/reset")
-    authenticated_client.get("/test/connect")
+    storage = get_storage()
 
     # Add a completed book
-    authenticated_client.post(
-        "/books",
-        data={
-            "title": "Test Book",
-            "author": "Test Author",
-            "isbn": "9781234567890",
-            "bisac_category": "FICTION / General",
-            "page_count": "300",
-            "physical_format": "Hardcover",
-            "language": "English",
-        },
+    book = storage.add_book(
+        isbn13="9781234567890",
+        title="Test Book",
+        author="Test Author",
+        bisac_category="FICTION / General",
+        page_count=300,
+        physical_format="Hardcover",
+        language="English",
     )
-    authenticated_client.post(
-        "/books/1/reading-records",
-        data={
-            "status": "Completed",
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-15",
-            "rating": "4",
-        },
+    storage.add_reading_record(
+        book["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
     )
 
     # Test API endpoint
