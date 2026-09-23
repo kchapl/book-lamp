@@ -102,6 +102,6 @@ def import_books():
         if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
             return jsonify({"job_id": job_id}), 202
         return redirect(url_for("spa.spa_page", fallback="books", job_id=job_id))
-    except Exception as e:
-        current_app.logger.error(f"Failed to queue import job: {str(e)}")
-        return jsonify({"error": f"Error starting import: {str(e)}"}), 500
+    except Exception:
+        current_app.logger.exception("Failed to queue import job")
+        return jsonify({"error": "Error starting import."}), 500
