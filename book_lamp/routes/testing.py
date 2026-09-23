@@ -24,7 +24,7 @@ def test_reset():
         return {"status": "ok"}
     except Exception as e:
         current_app.logger.exception("Failed to reset test storage: %s", e)
-        return {"status": "error", "message": str(e)}, 500
+        return {"status": "error", "message": "An internal error has occurred."}, 500
 
 
 @testing_bp.route("/test/connect")
