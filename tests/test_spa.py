@@ -1,6 +1,5 @@
 """Tests for SPA shell serving and client-side routing fallback."""
 
-import os
 from pathlib import Path
 
 import pytest
