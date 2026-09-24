@@ -1,11 +1,12 @@
 """Book Lamp application factory."""
 
+import gzip
 import logging
 import os
 from typing import Optional
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 
 from book_lamp.middleware.csrf import add_csrf_token_header
 from book_lamp.routes import register_blueprints
@@ -14,6 +15,44 @@ from book_lamp.services.storage_factory import is_test_mode
 load_dotenv()
 
 APP_VERSION = os.environ.get("APP_VERSION", "0.1.0")
+
+COMPRESSIBLE_MIMETYPES = {
+    "application/javascript",
+    "application/json",
+    "image/svg+xml",
+    "text/css",
+    "text/html",
+}
+
+
+def configure_compression(app: Flask) -> None:
+    """Gzip-compress compressible responses when the client supports it.
+
+    The Flask dev/test server does not compress on its own, which left the
+    SPA bundle (~240KB) and stylesheets uncompressed for Lighthouse CI.
+    """
+
+    @app.after_request
+    def compress_response(response):
+        if response.status_code != 200 or response.direct_passthrough:
+            return response
+        if response.mimetype not in COMPRESSIBLE_MIMETYPES:
+            return response
+        if response.headers.get("Content-Encoding"):
+            return response
+        if "gzip" not in request.headers.get("Accept-Encoding", "").lower():
+            return response
+        response.direct_passthrough = False
+        data = response.get_data()
+        if len(data) < 1024:
+            return response
+        compressed = gzip.compress(data, compresslevel=6)
+        if len(compressed) >= len(data):
+            return response
+        response.set_data(compressed)
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers.add("Vary", "Accept-Encoding")
+        return response
 
 
 def configure_logging() -> None:
@@ -58,6 +97,7 @@ def create_app(test_config: Optional[dict] = None) -> Flask:
 
     # Middleware
     app.after_request(add_csrf_token_header)
+    configure_compression(app)
 
     # Register all modular Blueprints
     register_blueprints(app)
