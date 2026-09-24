@@ -22,6 +22,7 @@ COMPRESSIBLE_MIMETYPES = {
     "image/svg+xml",
     "text/css",
     "text/html",
+    "text/javascript",
 }
 
 
@@ -34,7 +35,7 @@ def configure_compression(app: Flask) -> None:
 
     @app.after_request
     def compress_response(response):
-        if response.status_code != 200 or response.direct_passthrough:
+        if response.status_code != 200:
             return response
         if response.mimetype not in COMPRESSIBLE_MIMETYPES:
             return response
@@ -42,6 +43,8 @@ def configure_compression(app: Flask) -> None:
             return response
         if "gzip" not in request.headers.get("Accept-Encoding", "").lower():
             return response
+        # File-streamed responses (send_from_directory) are direct
+        # passthrough; materialise them so they can be compressed.
         response.direct_passthrough = False
         data = response.get_data()
         if len(data) < 1024:
