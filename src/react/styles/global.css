@@ -375,3 +375,10 @@
         padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     }
 }
+
+/* Prevent layout shift when the auth status resolves on first render:
+   the hero swaps between CTA buttons and the sign-in card (HomePage).
+   Reserving the hero's final height keeps CLS within budget. */
+.home-page .hero {
+    min-height: 24.5rem;
+}
