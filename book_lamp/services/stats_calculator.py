@@ -32,7 +32,7 @@ def calculate_collection_stats(
             continue
     avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
 
-    latest_records = {}
+    latest_records: Dict[Any, Dict[str, Any]] = {}
     for r in all_records:
         bid = r.get("book_id")
         if bid:
@@ -51,7 +51,7 @@ def calculate_collection_stats(
                 statuses.append(status)
     status_counts = Counter(statuses)
 
-    rating_counts = Counter()
+    rating_counts: Counter[int] = Counter()
     for r in all_records:
         if r.get("status") == "Completed":
             try:
@@ -87,7 +87,7 @@ def calculate_collection_stats(
         r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
     ]
 
-    yearly_counts = Counter()
+    yearly_counts: Counter[str] = Counter()
     for r in completed_records_for_dates:
         date_val = r.get("end_date")
         if date_val:
@@ -103,7 +103,7 @@ def calculate_collection_stats(
     sorted_years = sorted(yearly_counts.items())
     max_year_count = max(yearly_counts.values()) if yearly_counts else 1
 
-    monthly_counts = Counter()
+    monthly_counts: Counter[str] = Counter()
     for r in completed_records_for_dates:
         date_str = r.get("end_date", "")
         if date_str and len(date_str) >= 7:
@@ -121,7 +121,7 @@ def calculate_collection_stats(
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
-    category_bins = Counter()
+    category_bins: Counter[str] = Counter()
     for b in completed_books:
         bisac = b.get("bisac_category")
         if bisac:
@@ -251,7 +251,7 @@ def calculate_collection_stats(
     )
     reading_pace_annualised = round(reading_pace_monthly * 12, 1)
 
-    format_bins = Counter()
+    format_bins: Counter[str] = Counter()
     for b in completed_books:
         fmt = b.get("physical_format")
         if fmt:
@@ -261,7 +261,7 @@ def calculate_collection_stats(
         for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
     ]
 
-    language_bins = Counter()
+    language_bins: Counter[str] = Counter()
     for b in completed_books:
         lang = b.get("language")
         if lang:
@@ -286,7 +286,7 @@ def calculate_collection_stats(
         for name, series_books in sorted(series_bins.items(), key=lambda x: -len(x[1]))[:5]
     ]
 
-    category_details_list = []
+    category_details_list: List[Dict[str, Any]] = []
     for b in completed_books:
         bisac = b.get("bisac_category")
         if bisac:

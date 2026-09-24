@@ -1,19 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
-import BooksPage from './pages/BooksPage';
-import BookDetailPage from './pages/BookDetailPage';
-import AddBookPage from './pages/AddBookPage';
-import ImportBooksPage from './pages/ImportBooksPage';
-import HistoryPage from './pages/HistoryPage';
-import ReadingListPage from './pages/ReadingListPage';
-import StatsPage from './pages/StatsPage';
-import AuthorPage from './pages/AuthorPage';
-import PublisherPage from './pages/PublisherPage';
-import AboutPage from './pages/AboutPage';
-import UnauthorisedPage from './pages/UnauthorisedPage';
 import { getSyncDiagnostics, getAuthStatus, logout } from './services/api';
+
+// Code-split all non-home routes so the initial bundle stays small.
+// HomePage stays eager: it is the LCP element on "/".
+const BooksPage = lazy(() => import('./pages/BooksPage'));
+const BookDetailPage = lazy(() => import('./pages/BookDetailPage'));
+const AddBookPage = lazy(() => import('./pages/AddBookPage'));
+const ImportBooksPage = lazy(() => import('./pages/ImportBooksPage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const ReadingListPage = lazy(() => import('./pages/ReadingListPage'));
+const StatsPage = lazy(() => import('./pages/StatsPage'));
+const AuthorPage = lazy(() => import('./pages/AuthorPage'));
+const PublisherPage = lazy(() => import('./pages/PublisherPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const UnauthorisedPage = lazy(() => import('./pages/UnauthorisedPage'));
+
+const PageFallback = () => (
+    <div className="page-loading" role="status" aria-live="polite">Loading…</div>
+);
 
 export interface AppContextType {
     theme: 'light' | 'dark' | 'system';
@@ -126,18 +133,18 @@ function App() {
                 <Layout>
                     <Routes>
                         <Route path="/" element={<HomePage />} />
-                        <Route path="/books" element={<BooksPage />} />
-                        <Route path="/books/new" element={<AddBookPage />} />
-                        <Route path="/books/import" element={<ImportBooksPage />} />
-                        <Route path="/books/:bookId" element={<BookDetailPage />} />
-                        <Route path="/history" element={<HistoryPage />} />
-                        <Route path="/reading-list" element={<ReadingListPage />} />
-                        <Route path="/dashboard" element={<StatsPage />} />
+                        <Route path="/books" element={<Suspense fallback={<PageFallback />}><BooksPage /></Suspense>} />
+                        <Route path="/books/new" element={<Suspense fallback={<PageFallback />}><AddBookPage /></Suspense>} />
+                        <Route path="/books/import" element={<Suspense fallback={<PageFallback />}><ImportBooksPage /></Suspense>} />
+                        <Route path="/books/:bookId" element={<Suspense fallback={<PageFallback />}><BookDetailPage /></Suspense>} />
+                        <Route path="/history" element={<Suspense fallback={<PageFallback />}><HistoryPage /></Suspense>} />
+                        <Route path="/reading-list" element={<Suspense fallback={<PageFallback />}><ReadingListPage /></Suspense>} />
+                        <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><StatsPage /></Suspense>} />
                         <Route path="/stats" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="/author/:authorSlug" element={<AuthorPage />} />
-                        <Route path="/publisher/:publisherSlug" element={<PublisherPage />} />
-                        <Route path="/about" element={<AboutPage />} />
-                        <Route path="/unauthorised" element={<UnauthorisedPage />} />
+                        <Route path="/author/:authorSlug" element={<Suspense fallback={<PageFallback />}><AuthorPage /></Suspense>} />
+                        <Route path="/publisher/:publisherSlug" element={<Suspense fallback={<PageFallback />}><PublisherPage /></Suspense>} />
+                        <Route path="/about" element={<Suspense fallback={<PageFallback />}><AboutPage /></Suspense>} />
+                        <Route path="/unauthorised" element={<Suspense fallback={<PageFallback />}><UnauthorisedPage /></Suspense>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </Layout>

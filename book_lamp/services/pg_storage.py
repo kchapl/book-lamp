@@ -161,7 +161,7 @@ class PostgresStorage:
                 authors_list = [a for a in (book.get("author_names") or []) if a is not None]
                 book["authors"] = authors_list
                 # Use first normalized author if available, otherwise fall back to row's author column or empty string
-                book["author"] = authors_list[0] if authors_list else (row_raw.get("author") or "")
+                book["author"] = authors_list[0] if authors_list else (book.get("author") or "")
                 books.append(book)
             return books
 
