@@ -123,3 +123,13 @@ export interface User {
 }
 
 export type Theme = 'light' | 'dark' | 'system';
+
+export interface AuthStatus {
+    is_authenticated: boolean;
+    user?: {
+        id: number;
+        email: string;
+        name?: string;
+    };
+    google_client_id?: string;
+}
