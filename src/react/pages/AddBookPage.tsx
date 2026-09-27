@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupISBN, createBook, addToReadingList } from '../services/api';
 import type { Book } from '../types';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode } from 'html5-qrcode';
 
 const AddBookPage: React.FC = () => {
     const navigate = useNavigate();
@@ -30,12 +30,13 @@ const AddBookPage: React.FC = () => {
     }, [searchParams]);
 
     const startScanner = async () => {
-        if (!scannerRef.current) return;
-        
+        // Ensure scanner element is present; no early exit
         setScanning(true);
         setScannerError(null);
         
         try {
+            // Load the barcode scanner lib lazily (~300KB) only when actually scanning
+            const { Html5Qrcode } = await import('html5-qrcode');
             const html5QrCode = new Html5Qrcode('scanner-reader');
             html5QrCodeRef.current = html5QrCode;
             
@@ -169,11 +170,9 @@ const AddBookPage: React.FC = () => {
                     </button>
                 </div>
 
-                {scanning && (
-                    <div className="scanner-container">
-                        <div id="scanner-reader" ref={scannerRef}></div>
-                    </div>
-                )}
+                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
+                    <div id="scanner-reader" ref={scannerRef}></div>
+                </div>
 
                 {scannerError && <p className="error-message">{scannerError}</p>}
                 {isbnError && <p className="error-message">{isbnError}</p>}

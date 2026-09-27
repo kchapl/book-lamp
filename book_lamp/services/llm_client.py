@@ -11,7 +11,7 @@ class LLMClient:
     def __init__(self):
         self.api_key = os.environ.get("LLM_API_KEY")
         self.base_url = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
-        self.model = os.environ.get("LLM_MODEL", "gpt-3.5-turbo")
+        self.model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
 
         if self.api_key:
             # We use the OpenAI SDK which is compatible with many providers
@@ -35,8 +35,8 @@ class LLMClient:
             "You are a helpful and knowledgeable librarian recommending books to a reader. "
             "Use British English spelling (e.g., 'favourite', 'organised', 'colour') in the justification. "
             "IMPORTANT SAFETY GUIDELINES: Do not recommend any books that promote hate speech, illegal acts, self-harm, sexual violence, or extreme gore. "
-            "If the user's reading history consists entirely of such topics, politely refuse to provide recommendations by returning an empty JSON array []. "
-            "Output must be a JSON array of objects, containing exclusively the top 3 recommendations. "
+            "If the user's reading history consists entirely of such topics, politely refuse to provide recommendations by returning an empty recommendations list: []. "
+            "Output must be a JSON object with a 'recommendations' array containing exclusively the top 3 recommendations. "
             "Each object must have the following keys: 'title', 'author', 'isbn13', 'justification'. "
             "The 'justification' should be a 3-sentence explanation of why the user would like it based on their reading history."
         )
@@ -67,18 +67,18 @@ class LLMClient:
                 temperature=0.7,
             )
 
-            content = chat_completion.choices[0].message.content
-            # The model is asked to return a JSON object
+            content = chat_completion.choices[0].message.content or "{}"
             data = json.loads(content)
 
-            # Extract the actual array from the data
-            if isinstance(data, list):
-                return data
-            elif isinstance(data, dict):
-                # Look for the first list in the dict
+            if isinstance(data, dict):
+                recs = data.get("recommendations")
+                if isinstance(recs, list):
+                    return recs
                 for val in data.values():
                     if isinstance(val, list):
                         return val
+            elif isinstance(data, list):
+                return data
 
             return []
         except Exception as e:

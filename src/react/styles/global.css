@@ -4,6 +4,19 @@
 /* Import MD3 tokens */
 @import './tokens.css';
 
+/* Fallback font metric overrides to minimise CLS during font swap.
+   Roboto loads with display=optional, so it renders from cache only,
+   but cached fonts can still arrive after first paint - these keep
+   metrics identical in the interim. */
+@font-face {
+    font-family: 'Roboto Fallback';
+    src: local('Arial');
+    size-adjust: 100%;
+    ascent-override: 92.78%;
+    descent-override: 24.44%;
+    line-gap-override: 0%;
+}
+
 #root {
     min-height: 100vh;
 }
@@ -43,7 +56,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Roboto', 'Roboto Fallback', sans-serif;
     font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0.1px;
@@ -374,4 +387,18 @@
     .main-content {
         padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     }
+
+    /* Reserve the nav-actions height of the signed-in state (two stacked
+       48px buttons) so the auth status resolving after first paint cannot
+       grow the header and shift the page down. */
+    .nav-actions {
+        min-height: 7.1875rem;
+    }
+}
+
+/* Prevent layout shift when the auth status resolves on first render:
+   the hero swaps between CTA buttons and the sign-in card (HomePage).
+   Reserving the hero's final height keeps CLS within budget. */
+.home-page .hero {
+    min-height: 24.5rem;
 }

@@ -68,11 +68,20 @@ export function saveOrder(list: HTMLElement, reorderUrl: string): void {
     const items = [...list.querySelectorAll<HTMLElement>('.draggable-item')];
     const bookIds = items.map(item => parseInt(item.dataset.bookId || '0'));
 
+    const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+    const cookieMatch = document.cookie.match(/(?:^|;)\s*csrf_token=([^;]+)/);
+    const csrfToken = metaTag?.content || (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null);
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+
     fetch(reorderUrl, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ book_ids: bookIds })
     });
 }

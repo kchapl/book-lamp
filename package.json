@@ -4,19 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "tsc && cp -r book_lamp/static/ts/* book_lamp/static/ && vite build",
+    "build:ts": "tsc && cp -r book_lamp/static/ts/* book_lamp/static/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lighthouse:ci": "lhci autorun",
-    "lighthouse:fast": "lhci autorun --collect.numberOfRuns=1",
-    "lighthouse:report": "uv run python scripts/lhci_actionable_report.py",
-    "lighthouse:fast:report": "npm run lighthouse:fast; npm run lighthouse:report",
     "build:react": "vite build",
     "dev": "vite"
   },
   "devDependencies": {
-    "@lhci/cli": "0.15.1",
     "@types/node": "^25.9.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "19.2.3",
@@ -25,7 +21,10 @@
     "jsdom": "29.1.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "4.1.9"
+    "vitest": "4.1.9",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/user-event": "^14.5.0"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
