@@ -15,11 +15,9 @@
         "outDir": "book_lamp/static",
         "rootDir": "src",
         "jsx": "react-jsx",
-        "baseUrl": ".",
         "paths": {
-            "@/*": ["src/react/*"]
-        },
-        "ignoreDeprecations": "6.0"
+            "@/*": ["./src/react/*"]
+        }
     },
     "include": [
         "src/ts/**/*.ts",
