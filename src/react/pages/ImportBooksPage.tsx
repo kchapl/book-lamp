@@ -39,8 +39,18 @@ const ImportBooksPage: React.FC = () => {
         }
 
         try {
+            const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+            const cookieMatch = document.cookie.match(/(?:^|;)\s*csrf_token=([^;]+)/);
+            const csrfToken = metaTag?.content || (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null);
+
+            const headers: Record<string, string> = {};
+            if (csrfToken) {
+                headers['X-CSRF-Token'] = csrfToken;
+            }
+
             const response = await fetch('/books/import', {
                 method: 'POST',
+                headers,
                 body: formData,
             });
 
