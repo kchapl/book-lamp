@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupISBN, createBook, addToReadingList } from '../services/api';
 import type { Book } from '../types';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode } from 'html5-qrcode';
 
 const AddBookPage: React.FC = () => {
     const navigate = useNavigate();
@@ -35,6 +35,8 @@ const AddBookPage: React.FC = () => {
         setScannerError(null);
         
         try {
+            // Load the barcode scanner lib lazily (~300KB) only when actually scanning
+            const { Html5Qrcode } = await import('html5-qrcode');
             const html5QrCode = new Html5Qrcode('scanner-reader');
             html5QrCodeRef.current = html5QrCode;
             

@@ -1,11 +1,12 @@
-"""Tests for the author page feature.
+"""Tests for the author page API.
 
 Covers:
 - Owned books display (existing behaviour, no regression)
 - Unread books are NOT requested from Open Library in TEST_MODE
 - Deduplication logic (same book in collection should not appear as unread)
-- Page renders successfully with no books at all
+- Empty state returns empty collections
 """
+
 import os
 
 import pytest
@@ -17,7 +18,7 @@ import pytest
 
 
 def test_author_page_shows_owned_books(authenticated_client):
-    """Author page renders owned books for a matching author."""
+    """Author API returns owned books for a matching author."""
     from book_lamp.app import get_storage
 
     storage = get_storage()
@@ -28,16 +29,16 @@ def test_author_page_shows_owned_books(authenticated_client):
         publication_year=1813,
     )
 
-    resp = authenticated_client.get("/author/jane-austen")
+    resp = authenticated_client.get("/api/author/jane-austen")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
-    assert "Pride and Prejudice" in html
-    assert "Jane Austen" in html
-    assert "Read" in html
+    data = resp.get_json()
+    assert data["author_name"] == "Jane Austen"
+    assert [b["title"] for b in data["read_books"]] == ["Pride and Prejudice"]
+    assert data["read_books"][0]["author"] == "Jane Austen"
 
 
 def test_author_page_no_unread_section_in_test_mode(authenticated_client):
-    """In TEST_MODE no external API call is made, so the unread section is absent."""
+    """In TEST_MODE no external API call is made, so the unread list is empty."""
     from book_lamp.app import get_storage
 
     storage = get_storage()
@@ -47,26 +48,29 @@ def test_author_page_no_unread_section_in_test_mode(authenticated_client):
         author="Jane Austen",
     )
 
-    resp = authenticated_client.get("/author/jane-austen")
+    resp = authenticated_client.get("/api/author/jane-austen")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
-    # The "Also by" section is only rendered when unread_books is non-empty
-    assert "Also by" not in html
+    data = resp.get_json()
+    # The unread lookup is skipped entirely in TEST_MODE
+    assert data["unread_books"] == []
 
-    # Ensure the read/reading-list summary is correct
-    assert "Read" in html
-    assert "In Reading List" not in html
+    # Ensure the read/reading-list split is correct
+    assert len(data["read_books"]) == 1
+    assert data["reading_list_books"] == []
 
 
 def test_author_page_empty_state(authenticated_client):
-    """Author page shows a helpful empty state when no books are found."""
-    resp = authenticated_client.get("/author/unknown-author")
+    """Author API returns empty collections when no books are found."""
+    resp = authenticated_client.get("/api/author/unknown-author")
     assert resp.status_code == 200
-    assert b"No books found" in resp.data
+    data = resp.get_json()
+    assert data["read_books"] == []
+    assert data["reading_list_books"] == []
+    assert data["unread_books"] == []
 
 
 def test_author_page_reading_list_flag(authenticated_client):
-    """Books added to the reading list appear in their own section."""
+    """Books added to the reading list appear in their own collection."""
     from book_lamp.app import get_storage
 
     storage = get_storage()
@@ -77,13 +81,13 @@ def test_author_page_reading_list_flag(authenticated_client):
     )
     storage.add_to_reading_list(book["id"])
 
-    resp = authenticated_client.get("/author/jane-austen")
+    resp = authenticated_client.get("/api/author/jane-austen")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
-    # should be present as a section heading
-    assert "In Reading List" in html
-    # the book itself should still show up
-    assert "Pride and Prejudice" in html
+    data = resp.get_json()
+    # the book should appear in the reading-list section with the flag set
+    assert [b["title"] for b in data["reading_list_books"]] == ["Pride and Prejudice"]
+    assert data["reading_list_books"][0]["in_reading_list"] is True
+    assert data["read_books"] == []
 
 
 def test_author_page_sorts_by_pub_year_asc(authenticated_client):
@@ -104,11 +108,11 @@ def test_author_page_sorts_by_pub_year_asc(authenticated_client):
         publication_year=1815,
     )
 
-    resp = authenticated_client.get("/author/jane-austen")
+    resp = authenticated_client.get("/api/author/jane-austen")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
+    titles = [b["title"] for b in resp.get_json()["read_books"]]
     # Sense and Sensibility (1811) should appear before Emma (1815)
-    assert html.index("Sense and Sensibility") < html.index("Emma")
+    assert titles.index("Sense and Sensibility") < titles.index("Emma")
 
 
 def test_author_page_sorts_by_title_when_year_same(authenticated_client):
@@ -130,11 +134,11 @@ def test_author_page_sorts_by_title_when_year_same(authenticated_client):
         publication_year=1814,
     )
 
-    resp = authenticated_client.get("/author/jane-austen")
+    resp = authenticated_client.get("/api/author/jane-austen")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
+    titles = [b["title"] for b in resp.get_json()["read_books"]]
     # Mansfield Park should appear before Northanger Abbey (alphabetical)
-    assert html.index("Mansfield Park") < html.index("Northanger Abbey")
+    assert titles.index("Mansfield Park") < titles.index("Northanger Abbey")
 
 
 def test_author_page_no_duplicate_books(authenticated_client):
@@ -148,12 +152,10 @@ def test_author_page_no_duplicate_books(authenticated_client):
         author="Jane Austen",
     )
     # Simulate a second call; the mock storage prevents true duplicates via upsert
-    # but we still verify the page count-stat shows 1 book.
-    resp = authenticated_client.get("/author/jane-austen")
-    html = resp.data.decode("utf-8")
-    assert html.count("Pride and Prejudice") >= 1
-    # "1 read book" (not 2)
-    assert "1 read book" in html
+    resp = authenticated_client.get("/api/author/jane-austen")
+    read_books = resp.get_json()["read_books"]
+    assert len(read_books) == 1
+    assert read_books[0]["title"] == "Pride and Prejudice"
 
 
 @pytest.mark.skipif(
@@ -167,5 +169,5 @@ def test_author_page_unauthorised_redirect(client):
     storage = get_storage()
     storage.set_authorised(False)
 
-    resp = client.get("/author/jane-austen")
+    resp = client.get("/api/author/jane-austen")
     assert resp.status_code == 302

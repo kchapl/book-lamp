@@ -7,7 +7,7 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-    const { theme, setTheme, syncStatus } = useContext(AppContext);
+    const { theme, setTheme, syncStatus, isAuthorized, logoutUser } = useContext(AppContext);
     const [showThemeMenu, setShowThemeMenu] = useState(false);
     const [jobIndicator, setJobIndicator] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -118,9 +118,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                 </div>
                             )}
                         </div>
-                        <Link to="/books/new" className="btn btn-primary">
-                            + Add Book
-                        </Link>
+                        {isAuthorized ? (
+                            <>
+                                <Link to="/books/new" className="btn btn-primary">
+                                    + Add Book
+                                </Link>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={logoutUser}
+                                    style={{ marginLeft: '0.5rem' }}
+                                    aria-label="Sign out"
+                                >
+                                    Sign out
+                                </button>
+                            </>
+                        ) : (
+                            <Link to="/unauthorised" className="btn btn-primary">
+                                Sign in
+                            </Link>
+                        )}
                     </div>
                 </nav>
             </header>
