@@ -98,6 +98,7 @@ npm run dev
 - **Mandatory Testing:** All new features must have unit tests.
 - **Mocking:** Only mock process boundaries (PostgreSQL, network).
 - **Regression Tests:** Add a test for every bug fix.
+- **Test‑Driven Fixes:** Write a failing unit test that reproduces the bug before fixing it.
 - **TEST_MODE:** Uses `MockStorage` (in-memory) instead of real Google Sheets.
 
 ### Security & Reliability

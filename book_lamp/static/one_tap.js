@@ -6,11 +6,18 @@
 async function handleOneTapCredential(response) {
     const credential = response.credential;
     try {
+        const metaTag = document.querySelector('meta[name="csrf-token"]');
+        const cookieMatch = document.cookie.match(/(?:^|;)\s*csrf_token=([^;]+)/);
+        const csrfToken = metaTag?.content || (cookieMatch ? decodeURIComponent(cookieMatch[1]) : null);
+        const headers = {
+            "Content-Type": "application/json",
+        };
+        if (csrfToken) {
+            headers["X-CSRF-Token"] = csrfToken;
+        }
         const res = await fetch("/api/auth/google", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers,
             body: JSON.stringify({ credential }),
         });
         if (res.ok) {

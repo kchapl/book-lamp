@@ -1,22 +1,83 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord } from '../types';
+import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord, AuthStatus } from '../types';
 
 const API_BASE = '/api';
 
+function getCsrfToken(): string | null {
+    const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+    if (metaTag?.content) {
+        return metaTag.content;
+    }
+    const match = document.cookie.match(/(?:^|;)\s*csrf_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+    let token = getCsrfToken();
+    if (!token) {
+        try {
+            const res = await fetch(`${API_BASE}/csrf-token`, { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                token = data.csrf_token;
+                if (token) {
+                    let metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+                    if (!metaTag) {
+                        metaTag = document.createElement('meta');
+                        metaTag.name = 'csrf-token';
+                        document.head.appendChild(metaTag);
+                    }
+                    metaTag.content = token;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to fetch CSRF token:', e);
+        }
+    }
+    return token;
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+    const method = (options?.method || 'GET').toUpperCase();
+    let csrfToken = getCsrfToken();
+    if (method !== 'GET' && !csrfToken) {
+        csrfToken = await ensureCsrfToken();
+    }
+
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options?.headers as Record<string, string> || {}),
+    };
+
+    if (method !== 'GET' && csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+
     const response = await fetch(url, {
+        credentials: 'same-origin',
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options?.headers,
-        },
+        headers,
     });
+
+    // Capture X-CSRF-Token header from response if present to update cached session token
+    const newCsrfToken = response.headers.get('X-CSRF-Token');
+    if (newCsrfToken) {
+        let metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+        if (!metaTag) {
+            metaTag = document.createElement('meta');
+            metaTag.name = 'csrf-token';
+            document.head.appendChild(metaTag);
+        }
+        metaTag.content = newCsrfToken;
+    }
 
     if (!response.ok) {
         if (response.status === 401) {
             window.location.href = '/unauthorised';
             throw new Error('Unauthorized');
         }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || response.statusText;
+        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
     }
 
     return response.json();
@@ -36,10 +97,20 @@ export async function updateSettings(settings: Record<string, string>): Promise<
 }
 
 // Auth API
-export async function authenticateWithGoogle(credential: string): Promise<{ success: boolean; redirect?: string }> {
+export async function authenticateWithGoogle(credential: string): Promise<{ ok?: boolean; success?: boolean; error?: string }> {
     return fetchJSON(`${API_BASE}/auth/google`, {
         method: 'POST',
         body: JSON.stringify({ credential }),
+    });
+}
+
+export async function getAuthStatus(): Promise<AuthStatus> {
+    return fetchJSON<AuthStatus>(`${API_BASE}/auth/status`);
+}
+
+export async function logout(): Promise<{ ok: boolean }> {
+    return fetchJSON<{ ok: boolean }>(`${API_BASE}/auth/logout`, {
+        method: 'POST',
     });
 }
 
@@ -170,9 +241,9 @@ export async function getHistory(filters?: Partial<HistoryFilters>): Promise<{
     return fetchJSON(`${API_BASE}/history${query ? `?${query}` : ''}`);
 }
 
-// Stats API
+// Dashboard/Stats API
 export async function getStats(): Promise<Stats> {
-    return fetchJSON<Stats>(`${API_BASE}/stats`);
+    return fetchJSON<Stats>(`${API_BASE}/dashboard`);
 }
 
 // Author/Publisher pages

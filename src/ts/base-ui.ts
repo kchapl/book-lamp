@@ -39,6 +39,15 @@ export function closeModal(): void {
     }
 }
 
+function getCsrfToken(): string | null {
+    const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
+    if (metaTag?.content) {
+        return metaTag.content;
+    }
+    const match = document.cookie.match(/(?:^|;)\s*csrf_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
 /**
  * Submits a POST request to a given URL via a dynamically created form.
  */
@@ -50,6 +59,11 @@ export function submitPostRequest(urlStr: string, data: Record<string, string> =
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = url.toString();
+
+            const csrfToken = getCsrfToken();
+            if (csrfToken && !data['csrf_token']) {
+                data = { ...data, csrf_token: csrfToken };
+            }
 
             // Add hidden inputs for each data field
             Object.entries(data).forEach(([key, value]) => {
@@ -146,11 +160,17 @@ export function initBaseUI(): void {
             }
 
             // Persist theme choice to Google Sheets
+            const csrfToken = getCsrfToken();
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            if (csrfToken) {
+                headers['X-CSRF-Token'] = csrfToken;
+            }
+
             fetch('/api/settings', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({ theme: theme }),
             }).catch(err => console.error('Failed to save theme setting:', err));
         });
