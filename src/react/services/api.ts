@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord } from '../types';
+import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord, AuthStatus } from '../types';
 
 const API_BASE = '/api';
 
@@ -97,10 +97,20 @@ export async function updateSettings(settings: Record<string, string>): Promise<
 }
 
 // Auth API
-export async function authenticateWithGoogle(credential: string): Promise<{ success: boolean; redirect?: string }> {
+export async function authenticateWithGoogle(credential: string): Promise<{ ok?: boolean; success?: boolean; error?: string }> {
     return fetchJSON(`${API_BASE}/auth/google`, {
         method: 'POST',
         body: JSON.stringify({ credential }),
+    });
+}
+
+export async function getAuthStatus(): Promise<AuthStatus> {
+    return fetchJSON<AuthStatus>(`${API_BASE}/auth/status`);
+}
+
+export async function logout(): Promise<{ ok: boolean }> {
+    return fetchJSON<{ ok: boolean }>(`${API_BASE}/auth/logout`, {
+        method: 'POST',
     });
 }
 

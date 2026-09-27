@@ -1,5 +1,6 @@
 """Tests for the search service and route."""
 
+from book_lamp.app import get_storage
 from book_lamp.services.search import calculate_relevance_score, search_books
 
 
@@ -108,16 +109,21 @@ def test_search_with_series():
 
 
 def test_search_route_with_query(authenticated_client):
-    """Test search route with a valid query."""
+    """Test search API with a valid query."""
     # Add a test book
-    authenticated_client.post("/books", data={"isbn": "9780000000000"})
-    response = authenticated_client.get("/books/search?q=test", follow_redirects=True)
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000000", title="A Test Book", author="A1")
+    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-15")
+
+    response = authenticated_client.get("/api/books/search?q=test")
     assert response.status_code == 200
-    assert b"Search results" in response.data
+    body = response.get_json()
+    assert body["search_query"] == "test"
+    assert any(b["title"] == "A Test Book" for b in body["books"])
 
 
 def test_search_route_with_empty_query(authenticated_client):
-    """Test that empty query redirects back to books list."""
-    response = authenticated_client.get("/books/search?q=", follow_redirects=False)
-    assert response.status_code == 302
-    assert "/books" in response.location
+    """Test that empty query returns an empty result set rather than an error."""
+    response = authenticated_client.get("/api/books/search?q=")
+    assert response.status_code == 200
+    assert response.get_json() == {"books": [], "search_query": ""}

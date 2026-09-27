@@ -9,15 +9,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lighthouse:ci": "lhci autorun",
-    "lighthouse:fast": "lhci autorun --collect.numberOfRuns=1",
-    "lighthouse:report": "uv run python scripts/lhci_actionable_report.py",
-    "lighthouse:fast:report": "npm run lighthouse:fast; npm run lighthouse:report",
     "build:react": "vite build",
     "dev": "vite"
   },
   "devDependencies": {
-    "@lhci/cli": "0.15.1",
     "@types/node": "^25.9.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "19.2.3",

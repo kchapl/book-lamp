@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import GoogleAuth from '../components/GoogleAuth';
 
 const UnauthorisedPage: React.FC = () => {
     return (
@@ -7,11 +7,9 @@ const UnauthorisedPage: React.FC = () => {
             <div className="unauthorised-content">
                 <h1>Authentication Required</h1>
                 <p>
-                    You need to sign in to access your reading history.
+                    Please sign in with Google to access your reading history and bookshelf.
                 </p>
-                <Link to="/connect" className="btn btn-primary">
-                    Sign in with Google
-                </Link>
+                <GoogleAuth />
             </div>
         </div>
     );
