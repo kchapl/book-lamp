@@ -1,4 +1,3 @@
-import re
 from unittest.mock import patch
 
 from book_lamp.app import get_storage, is_valid_isbn13, parse_publication_year
@@ -43,10 +42,10 @@ def test_add_book_success(mock_session_factory, authenticated_client):
     mock_session.head.return_value = MockResp()
 
     resp = authenticated_client.post(
-        "/books", data={"isbn": "9780306406157"}, follow_redirects=True
+        "/api/books", json={"isbn": "9780306406157"}
     )
-    assert resp.status_code == 200
-    assert b"Book added to your reading list." in resp.data
+    assert resp.status_code == 201
+    assert resp.get_json()["title"] == "Example Book"
 
     book = storage.get_book_by_isbn("9780306406157")
     assert book["title"] == "Example Book"
@@ -59,7 +58,7 @@ def test_delete_book_success(authenticated_client):
     )
     book_id = book["id"]
 
-    resp = authenticated_client.post(f"/books/{book_id}/delete", follow_redirects=True)
+    resp = authenticated_client.post(f"/api/books/{book_id}/delete")
     assert resp.status_code == 200
     assert storage.get_book_by_id(book_id) is None
 
@@ -77,7 +76,7 @@ def test_edit_book_success(authenticated_client):
         "publication_year": "2022",
     }
     resp = authenticated_client.post(
-        f"/books/{book['id']}/edit", data=updated_data, follow_redirects=True
+        f"/api/books/{book['id']}/edit", json=updated_data
     )
     assert resp.status_code == 200
 
@@ -85,39 +84,12 @@ def test_edit_book_success(authenticated_client):
     assert updated_book["title"] == "Updated Title"
 
 
-# --- UI and Button Tests ---
-
-
-def _opening_tag_for_text(
-    html: str, tag_text: str, tag_name: str = "button"
-) -> str | None:
-    pattern = rf"(<{tag_name}[^>]*>)(?:\s*{re.escape(tag_text)})"
-    m = re.search(pattern, html, flags=re.IGNORECASE | re.DOTALL)
-    return m.group(1) if m else None
-
-
-def test_books_page_buttons_have_no_inline_styles(authenticated_client):
-    resp = authenticated_client.get("/books")
-    html = resp.data.decode("utf-8")
-
-    fetch_tag = _opening_tag_for_text(html, "Fetch missing data")
-    assert fetch_tag is not None
-    assert "style=" not in fetch_tag
-
-
-def test_books_bulk_actions_are_in_overflow_menu(authenticated_client):
-    resp = authenticated_client.get("/books")
-    html = resp.data.decode("utf-8")
-
-    assert 'aria-label="More book actions"' in html
-    assert 'role="menu"' in html
-    assert 'class="action-menu-item" role="menuitem"' in html
-    assert html.index("Import from Libib") > html.index('role="menu"')
-    assert html.index("Fetch missing data") > html.index('role="menu"')
+def _titles(payload):
+    return {b["title"] for b in payload["books"]}
 
 
 def test_books_year_filter(authenticated_client):
-    """Test filtering books bookshelf by year completed."""
+    """Test filtering the books API by year completed."""
     storage = get_storage()
     b1 = storage.add_book(isbn13="101", title="2024 Book", author="A1")
     b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
@@ -131,31 +103,26 @@ def test_books_year_filter(authenticated_client):
         b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
     )
 
-    # Filter bookshelf by year 2024
-    resp = authenticated_client.get("/books?year=2024")
-    html = resp.data.decode("utf-8")
-    assert "2024 Book" in html
-    assert "2023 Book" not in html
-    assert "2024" in html
-    assert "Books completed in" in html
+    # Filter by year 2024
+    resp = authenticated_client.get("/api/books?year=2024")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert _titles(payload) == {"2024 Book"}
+    assert payload["filters"]["year"] == "2024"
 
-    # Add an 'In Progress' book started in 2024 to ensure it's excluded
+    # An 'In Progress' book started in 2024 must be excluded
     b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
     storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
-    resp = authenticated_client.get("/books?year=2024")
-    assert "2024 In Progress" not in resp.data.decode("utf-8")
+    resp = authenticated_client.get("/api/books?year=2024")
+    assert "2024 In Progress" not in _titles(resp.get_json())
 
-    # Filter bookshelf by year 2023
-    resp = authenticated_client.get("/books?year=2023")
-    html = resp.data.decode("utf-8")
-    assert "2024 Book" not in html
-    assert "2023 Book" in html
-    assert "2023" in html
-    assert "Books completed in" in html
+    # Filter by year 2023
+    resp = authenticated_client.get("/api/books?year=2023")
+    assert _titles(resp.get_json()) == {"2023 Book"}
 
 
 def test_books_month_filter(authenticated_client):
-    """Test filtering books bookshelf by month completed."""
+    """Test filtering the books API by month completed."""
     storage = get_storage()
     b1 = storage.add_book(isbn13="201", title="January Book", author="A1")
     b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
@@ -169,29 +136,24 @@ def test_books_month_filter(authenticated_client):
         b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4
     )
 
-    # Filter bookshelf by month 1 (January)
-    resp = authenticated_client.get("/books?month=1")
-    html = resp.data.decode("utf-8")
-    assert "January Book" in html
-    assert "February Book" not in html
-    assert "January" in html
+    # Filter by month 1 (January)
+    resp = authenticated_client.get("/api/books?month=1")
+    assert resp.status_code == 200
+    assert _titles(resp.get_json()) == {"January Book"}
 
-    # Add an 'In Progress' book started in January to ensure it's excluded
+    # An 'In Progress' book started in January must be excluded
     b3 = storage.add_book(isbn13="203", title="January In Progress", author="A3")
     storage.add_reading_record(b3["id"], "In Progress", "2024-01-05")
-    resp = authenticated_client.get("/books?month=1")
-    assert "January In Progress" not in resp.data.decode("utf-8")
+    resp = authenticated_client.get("/api/books?month=1")
+    assert "January In Progress" not in _titles(resp.get_json())
 
-    # Filter bookshelf by month 2 (February)
-    resp = authenticated_client.get("/books?month=2")
-    html = resp.data.decode("utf-8")
-    assert "January Book" not in html
-    assert "February Book" in html
-    assert "February" in html
+    # Filter by month 2 (February)
+    resp = authenticated_client.get("/api/books?month=2")
+    assert _titles(resp.get_json()) == {"February Book"}
 
 
 def test_books_category_filter(authenticated_client):
-    """Test filtering books bookshelf by BISAC category."""
+    """Test filtering the books API by BISAC category."""
     storage = get_storage()
     # Science category
     b1 = storage.add_book(
@@ -206,33 +168,20 @@ def test_books_category_filter(authenticated_client):
     storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15")
     storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15")
 
-    # Filter bookshelf by Science
-    resp = authenticated_client.get("/books?category=Science")
-    html = resp.data.decode("utf-8")
-    assert "Science Book" in html
-    assert "Literature Book" not in html
-    assert "Category:" in html
-    assert "Science" in html
+    # Filter by Science
+    resp = authenticated_client.get("/api/books?category=Science")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert _titles(payload) == {"Science Book"}
+    assert "Science" in payload["categories"]
 
-    # Add an 'In Progress' science book to ensure it's excluded (status filter is implicit in year/month but explicit in dewey)
-    # Wait, in the updated app.py, the category filter applies to ALL books, not just completed.
-    # So I should adjust the test expectation if needed.
-
-    # Actually, in app.py:
-    # if category_filter:
-    #     for b in books: ...
-    # And 'books' comes from storage.get_all_books() optionally filtered by year/month/rating/status.
-
-    # Filter bookshelf by Fiction
-    resp = authenticated_client.get("/books?category=Fiction")
-    html = resp.data.decode("utf-8")
-    assert "Science Book" not in html
-    assert "Literature Book" in html
-    assert "Fiction" in html
+    # Filter by Fiction
+    resp = authenticated_client.get("/api/books?category=Fiction")
+    assert _titles(resp.get_json()) == {"Literature Book"}
 
 
 def test_books_rating_filter(authenticated_client):
-    """Test filtering books bookshelf by rating."""
+    """Test filtering the books API by rating."""
     storage = get_storage()
     b1 = storage.add_book(isbn13="401", title="5 Star Book", author="A1")
     b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
@@ -246,23 +195,18 @@ def test_books_rating_filter(authenticated_client):
         b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
     )
 
-    # Filter bookshelf by rating 5
-    resp = authenticated_client.get("/books?rating=5")
-    html = resp.data.decode("utf-8")
-    assert "5 Star Book" in html
-    assert "4 Star Book" not in html
-    assert "5 ★" in html
+    # Filter by rating 5
+    resp = authenticated_client.get("/api/books?rating=5")
+    assert resp.status_code == 200
+    assert _titles(resp.get_json()) == {"5 Star Book"}
 
-    # Filter bookshelf by rating 4
-    resp = authenticated_client.get("/books?rating=4")
-    html = resp.data.decode("utf-8")
-    assert "5 Star Book" not in html
-    assert "4 Star Book" in html
-    assert "4 ★" in html
+    # Filter by rating 4
+    resp = authenticated_client.get("/api/books?rating=4")
+    assert _titles(resp.get_json()) == {"4 Star Book"}
 
 
 def test_books_status_filter(authenticated_client):
-    """Test filtering books bookshelf by status."""
+    """Test filtering the books API by status."""
     storage = get_storage()
     b1 = storage.add_book(isbn13="501", title="In Progress Book", author="A1")
     b2 = storage.add_book(isbn13="502", title="Completed Book", author="A2")
@@ -274,18 +218,26 @@ def test_books_status_filter(authenticated_client):
         b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
     )
 
-    # Filter bookshelf by status "In Progress"
-    resp = authenticated_client.get("/books?status=In+Progress")
-    html = resp.data.decode("utf-8")
-    assert "In Progress Book" in html
-    assert "Completed Book" not in html
-    assert "Status:" in html
-    assert "In Progress" in html
+    # Filter by status "In Progress"
+    resp = authenticated_client.get("/api/books?status=In+Progress")
+    assert resp.status_code == 200
+    assert _titles(resp.get_json()) == {"In Progress Book"}
 
-    # Filter bookshelf by status "Completed"
-    resp = authenticated_client.get("/books?status=Completed")
-    html = resp.data.decode("utf-8")
-    assert "In Progress Book" not in html
-    assert "Completed Book" in html
-    assert "Status:" in html
-    assert "Completed" in html
+    # Filter by status "Completed"
+    resp = authenticated_client.get("/api/books?status=Completed")
+    assert _titles(resp.get_json()) == {"Completed Book"}
+
+
+def test_books_filters_echoed_in_response(authenticated_client):
+    """The API echoes the active filters so the SPA can render them."""
+    resp = authenticated_client.get(
+        "/api/books?status=Completed&year=2024&month=1&rating=5&category=Fiction"
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["filters"] == {
+        "status": "Completed",
+        "year": "2024",
+        "month": "1",
+        "rating": "5",
+        "category": "Fiction",
+    }
