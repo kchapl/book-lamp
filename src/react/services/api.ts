@@ -72,7 +72,12 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
     if (!response.ok) {
         if (response.status === 401) {
-            window.location.href = '/unauthorised';
+            // /unauthorised is served by the SPA catch-all, so navigating to
+            // it boots this module again. Redirect only when we are somewhere
+            // else, otherwise the page reloads itself in an endless loop.
+            if (window.location.pathname !== '/unauthorised') {
+                window.location.href = '/unauthorised';
+            }
             throw new Error('Unauthorized');
         }
         const errorData = await response.json().catch(() => null);

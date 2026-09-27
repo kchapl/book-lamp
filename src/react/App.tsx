@@ -69,8 +69,17 @@ function App() {
         };
 
         checkAuth();
+    }, []);
 
-        // Check sync status
+    useEffect(() => {
+        // Only poll sync diagnostics for authenticated users. Fetching it
+        // anonymously used to return 401, which redirected the browser to
+        // /unauthorised and back into this same code, looping forever.
+        if (!isAuthorized) {
+            setSyncStatus('checking');
+            return;
+        }
+
         const checkSync = async () => {
             try {
                 const diagnostics = await getSyncDiagnostics();
@@ -83,7 +92,7 @@ function App() {
         checkSync();
         const interval = setInterval(checkSync, 60000);
         return () => clearInterval(interval);
-    }, []);
+    }, [isAuthorized]);
 
     useEffect(() => {
         const root = document.documentElement;
