@@ -3,10 +3,11 @@
 import gzip
 import logging
 import os
+from datetime import timedelta
 from typing import Optional
 
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask, request, session
 
 from book_lamp.middleware.csrf import add_csrf_token_header
 from book_lamp.routes import register_blueprints
@@ -24,6 +25,33 @@ COMPRESSIBLE_MIMETYPES = {
     "text/html",
     "text/javascript",
 }
+
+# Sessions are signed cookies with no expiry by default, so closing the browser
+# signs the reader out. One month is long enough to be convenient for a personal
+# tracker, short enough that a forgotten session eventually lapses.
+PERMANENT_SESSION_LIFETIME = timedelta(days=31)
+
+
+def configure_sessions(app: Flask) -> None:
+    """Give sessions an expiry, so they outlive the browser session.
+
+    Flask stores ``permanent`` inside the session data and drops it when it
+    reloads a session from the cookie, so a handler that calls
+    ``session.clear()`` — as sign-in does — would have the flag swept away, and
+    Flask writes the cookie without an expiry whenever it refreshes it.
+    Asserting the flag on the way out, after the handler has run and before the
+    cookie is written, survives both.
+
+    A session with nothing in it is left alone, and a static request never
+    starts one, so fetching a cacheable asset cannot mint a session cookie for a
+    client that does not have one yet.
+    """
+
+    @app.after_request
+    def keep_session_permanent(response):
+        if session and not request.path.startswith("/static/"):
+            session.permanent = True
+        return response
 
 
 def configure_compression(app: Flask) -> None:
@@ -89,6 +117,7 @@ def create_app(test_config: Optional[dict] = None) -> Flask:
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SECURE"] = not is_test_mode()
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["PERMANENT_SESSION_LIFETIME"] = PERMANENT_SESSION_LIFETIME
     app.config["GOOGLE_CLIENT_ID"] = os.environ.get("GOOGLE_CLIENT_ID")
     app.config["APP_VERSION"] = APP_VERSION
 
@@ -98,6 +127,7 @@ def create_app(test_config: Optional[dict] = None) -> Flask:
     # Middleware
     app.after_request(add_csrf_token_header)
     configure_compression(app)
+    configure_sessions(app)
 
     # Register all modular Blueprints
     register_blueprints(app)
