@@ -13,6 +13,7 @@ from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.services.storage_factory import TEST_ISBN, _mock_storage_singleton, get_storage, is_test_mode
 from book_lamp.utils import SORT_OPTIONS, is_valid_isbn13, parse_publication_year, sort_books
 from book_lamp.utils.books import normalize_isbn
+from book_lamp.utils.reading_status import latest_record_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
 books_bp = Blueprint("books", __name__)
@@ -30,9 +31,7 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
             storage = PostgresStorage(user_id=user_id)
 
         books = storage.get_all_books()
-        logger.info(
-            f"Background job {job_id}: checking {len(books)} books for missing data..."
-        )
+        logger.info(f"Background job {job_id}: checking {len(books)} books for missing data...")
 
         updated_count = enhance_books_batch(books, force_refresh=True)
 
@@ -66,25 +65,8 @@ def api_list_books():
 
     books = sort_books(books, sort_by=sort_by, reading_records=all_records)
 
-    latest_records: dict = {}
-    for r in all_records:
-        bid = r.get("book_id")
-        if bid:
-            if bid not in latest_records or r.get("start_date", "") >= latest_records[
-                bid
-            ].get("start_date", ""):
-                latest_records[bid] = r
-
-    for book in books:
-        record = latest_records.get(book.get("id"))
-        if record:
-            book["latest_status"] = record.get("status")
-
-    books = [
-        b
-        for b in books
-        if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
-    ]
+    latest_records = latest_record_by_book(all_records)
+    books = with_reading_status(books, all_records)
 
     status_filter = request.args.get("status")
     if status_filter:
@@ -144,9 +126,7 @@ def api_list_books():
         {
             "books": books,
             "sort": sort_by,
-            "sort_options": {
-                key: label for key, (label, _) in SORT_OPTIONS.items()
-            },
+            "sort_options": {key: label for key, (label, _) in SORT_OPTIONS.items()},
             "filters": {
                 "status": status_filter,
                 "year": year_filter,
@@ -245,21 +225,15 @@ def api_create_book():
             edition=book_data.get("edition"),
             cover_url=book_data.get("cover_url"),
         )
-        current_app.logger.info(
-            f"BOOK_CREATED (API): id={created['id']}, isbn={isbn}, title='{title}'"
-        )
+        current_app.logger.info(f"BOOK_CREATED (API): id={created['id']}, isbn={isbn}, title='{title}'")
     except Exception as exc:
-        current_app.logger.error(
-            f"api_create_book: storage.add_book failed: {exc}", exc_info=True
-        )
+        current_app.logger.error(f"api_create_book: storage.add_book failed: {exc}", exc_info=True)
         return jsonify({"error": "Failed to create book"}), 500
 
     try:
         storage.add_to_reading_list(created["id"])
     except Exception as exc:
-        current_app.logger.warning(
-            f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}"
-        )
+        current_app.logger.warning(f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}")
 
     return jsonify(created), 201
 
@@ -299,11 +273,7 @@ def api_update_book(book_id: int):
         return jsonify({"error": "title and author are required"}), 400
 
     isbn13 = str(data.get("isbn13", "") or "").strip().replace("-", "")
-    if (
-        isbn13
-        and not is_valid_isbn13(isbn13)
-        and not (is_test_mode() and isbn13 == TEST_ISBN)
-    ):
+    if isbn13 and not is_valid_isbn13(isbn13) and not (is_test_mode() and isbn13 == TEST_ISBN):
         return jsonify({"error": "Invalid ISBN-13"}), 400
 
     publication_year = None
@@ -358,25 +328,7 @@ def api_search_books():
         return jsonify({"books": [], "search_query": ""})
 
     try:
-        books = storage.search(query)
-        all_records = storage.get_reading_records()
-        latest_records: dict = {}
-        for r in all_records:
-            bid = r.get("book_id")
-            if bid:
-                if bid not in latest_records or r.get(
-                    "start_date", ""
-                ) >= latest_records[bid].get("start_date", ""):
-                    latest_records[bid] = r
-        for book in books:
-            record = latest_records.get(book.get("id"))
-            if record:
-                book["latest_status"] = record.get("status")
-        books = [
-            b
-            for b in books
-            if b.get("latest_status") in ["In Progress", "Completed", "Abandoned"]
-        ]
+        books = with_reading_status(storage.search(query), storage.get_reading_records())
         return jsonify({"books": books, "search_query": query})
     except Exception as exc:
         current_app.logger.error(f"api_search_books: search failed: {exc}")

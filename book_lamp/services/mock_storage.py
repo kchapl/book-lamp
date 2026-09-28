@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from book_lamp.utils.reading_status import READING_STATUSES
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,9 +40,7 @@ class MockStorage:
     def get_all_books(self) -> list[dict[str, Any]]:
         return self.books
 
-    def get_reading_records(
-        self, book_id: Optional[int] = None
-    ) -> list[dict[str, Any]]:
+    def get_reading_records(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
         records = []
         if book_id is None:
             records = list(self.reading_records)
@@ -145,20 +145,12 @@ class MockStorage:
 
                 if new_bisac and not is_dewey(new_bisac):
                     final_bisac: Optional[str] = new_bisac
-                    final_bisac_main: Optional[str] = bisac_main_category or book.get(
-                        "bisac_main_category"
-                    )
-                    final_bisac_sub: Optional[str] = bisac_sub_category or book.get(
-                        "bisac_sub_category"
-                    )
+                    final_bisac_main: Optional[str] = bisac_main_category or book.get("bisac_main_category")
+                    final_bisac_sub: Optional[str] = bisac_sub_category or book.get("bisac_sub_category")
                 else:
                     final_bisac = existing_bisac or new_bisac
-                    final_bisac_main = (
-                        book.get("bisac_main_category") or bisac_main_category
-                    )
-                    final_bisac_sub = (
-                        book.get("bisac_sub_category") or bisac_sub_category
-                    )
+                    final_bisac_main = book.get("bisac_main_category") or bisac_main_category
+                    final_bisac_sub = book.get("bisac_sub_category") or bisac_sub_category
 
                 book.update(
                     {
@@ -176,8 +168,7 @@ class MockStorage:
                         "bisac_sub_category": final_bisac_sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
-                        "physical_format": physical_format
-                        or book.get("physical_format"),
+                        "physical_format": physical_format or book.get("physical_format"),
                         "edition": edition or book.get("edition"),
                         "cover_url": cover_url or book.get("cover_url"),
                     }
@@ -265,9 +256,7 @@ class MockStorage:
         }
         self.reading_records.append(record)
         self.next_record_id += 1
-        logger.info(
-            f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={record['id']}"
-        )
+        logger.info(f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={record['id']}")
         return record
 
     def update_reading_record(
@@ -289,9 +278,7 @@ class MockStorage:
                         "rating": rating,
                     }
                 )
-                logger.info(
-                    f"READING_RECORD_UPDATED: id={record_id}, status_change='{old_status}'->'{status}'"
-                )
+                logger.info(f"READING_RECORD_UPDATED: id={record_id}, status_change='{old_status}'->'{status}'")
                 return record
         logger.error(f"Reading record with ID {record_id} not found")
         raise Exception(f"Reading record with ID {record_id} not found")
@@ -328,18 +315,14 @@ class MockStorage:
             logger.info(f"Book {book_id} is already in the reading list (MockStorage)")
             return
         pos = max((item["position"] for item in self.reading_list), default=0) + 1
-        self.reading_list.append(
-            {"book_id": book_id, "position": pos, "created_at": "2024-01-01T00:00:00"}
-        )
+        self.reading_list.append({"book_id": book_id, "position": pos, "created_at": "2024-01-01T00:00:00"})
         logger.info(f"Successfully added book {book_id} to reading list (MockStorage)")
 
     def remove_from_reading_list(self, book_id: int) -> None:
         for i, item in enumerate(self.reading_list):
             if item["book_id"] == book_id:
                 self.reading_list.pop(i)
-                logger.info(
-                    f"Successfully removed book {book_id} from reading list (MockStorage)"
-                )
+                logger.info(f"Successfully removed book {book_id} from reading list (MockStorage)")
                 break
         # Reassign positions
         for idx, item in enumerate(self.reading_list):
@@ -411,11 +394,7 @@ class MockStorage:
                             is_same_attempt = True
 
                         if is_same_attempt:
-                            if (
-                                ek_status == r_status
-                                and ek_start == r_start
-                                and ek_end == r_end
-                            ):
+                            if ek_status == r_status and ek_start == r_start and ek_end == r_end:
                                 is_duplicate = True
                             else:
                                 matched_record = r
@@ -430,8 +409,7 @@ class MockStorage:
                             "status": r_status,
                             "start_date": r_start,
                             "end_date": r_end,
-                            "rating": record_data.get("rating")
-                            or matched_record.get("rating", 0),
+                            "rating": record_data.get("rating") or matched_record.get("rating", 0),
                         }
                     )
                     logger.info(
@@ -457,9 +435,7 @@ class MockStorage:
         # 2. Add 'In Progress' record
         from datetime import date
 
-        self.add_reading_record(
-            book_id=book_id, status="In Progress", start_date=date.today().isoformat()
-        )
+        self.add_reading_record(book_id=book_id, status="In Progress", start_date=date.today().isoformat())
 
     def get_reading_history(self) -> list[dict[str, Any]]:
         """Retrieve all reading records joined with book metadata."""
@@ -467,11 +443,10 @@ class MockStorage:
         book_map = {b["id"]: b for b in self.books}
         # Use get_reading_records to ensure consistency with GoogleSheetsStorage
         records = self.get_reading_records()
-        valid_statuses = ["In Progress", "Completed", "Abandoned"]
         for record in records:
             # The reading log view should not show books that are in 'Plan to read' status.
             # The books in the reading log should be either in progress, completed or abandoned.
-            if record.get("status") not in valid_statuses:
+            if record.get("status") not in READING_STATUSES:
                 continue
 
             book = book_map.get(record["book_id"])

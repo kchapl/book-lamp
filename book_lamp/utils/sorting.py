@@ -6,6 +6,8 @@ for organising book collections.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
+from book_lamp.utils.reading_status import latest_record_by_book
+
 
 def _normalise_title_for_sort(title: str) -> str:
     """Normalise title for sorting by removing leading articles.
@@ -74,9 +76,7 @@ def _parse_author_name(author: str) -> Tuple[str, str]:
     return (first_author.lower(), "")
 
 
-def sort_by_author(
-    books: List[Dict[str, Any]], reverse: bool = False
-) -> List[Dict[str, Any]]:
+def sort_by_author(books: List[Dict[str, Any]], reverse: bool = False) -> List[Dict[str, Any]]:
     """Sort books alphabetically by author (last name, then first name).
 
     Handles multiple authors by using the first author for primary sort.
@@ -103,9 +103,7 @@ def sort_by_author(
     return sorted(books, key=sort_key, reverse=reverse)
 
 
-def sort_by_title(
-    books: List[Dict[str, Any]], reverse: bool = False
-) -> List[Dict[str, Any]]:
+def sort_by_title(books: List[Dict[str, Any]], reverse: bool = False) -> List[Dict[str, Any]]:
     """Sort books alphabetically by title.
 
     Ignores leading articles ("The", "A", "An") for sorting.
@@ -128,9 +126,7 @@ def sort_by_title(
     return sorted(books, key=sort_key, reverse=reverse)
 
 
-def sort_by_year(
-    books: List[Dict[str, Any]], reverse: bool = False
-) -> List[Dict[str, Any]]:
+def sort_by_year(books: List[Dict[str, Any]], reverse: bool = False) -> List[Dict[str, Any]]:
     """Sort books chronologically by publication year.
 
     Secondary sort: by title when publication years match.
@@ -158,9 +154,7 @@ def sort_by_year(
     return sorted(books, key=sort_key, reverse=reverse)
 
 
-def sort_by_category(
-    books: List[Dict[str, Any]], reverse: bool = False
-) -> List[Dict[str, Any]]:
+def sort_by_category(books: List[Dict[str, Any]], reverse: bool = False) -> List[Dict[str, Any]]:
     """Sort books by BISAC Category.
 
     Groups books by genre. Secondary sort: by title within same category.
@@ -181,9 +175,7 @@ def sort_by_category(
     return sorted(books, key=sort_key, reverse=reverse)
 
 
-def sort_by_date_added(
-    books: List[Dict[str, Any]], reverse: bool = True
-) -> List[Dict[str, Any]]:
+def sort_by_date_added(books: List[Dict[str, Any]], reverse: bool = True) -> List[Dict[str, Any]]:
     """Sort books by date added (created_at timestamp).
 
     Defaults to reverse=True to show most recently added first.
@@ -221,20 +213,9 @@ def sort_by_reading_date(
     Returns:
         Sorted list of books.
     """
-    # Create mapping of book_id to most recent reading record
-    records_by_book: Dict[int, Dict[str, Any]] = {}
-    for record in reading_records:
-        book_id = record.get("book_id")
-        if not book_id:
-            continue
-        if book_id not in records_by_book:
-            records_by_book[book_id] = record
-        else:
-            # Keep the most recent (latest start_date)
-            existing_date = records_by_book[book_id].get("start_date", "")
-            new_date = record.get("start_date", "")
-            if new_date > existing_date:
-                records_by_book[book_id] = record
+    # The same rule the catalogue and the dashboard use, so sort order cannot
+    # disagree with the Reading Status a Book is shown with.
+    records_by_book = latest_record_by_book(reading_records)
 
     def sort_key(book: Dict[str, Any]) -> str:
         book_id = book.get("id")
@@ -298,9 +279,7 @@ def sort_books(
             reading_records = []
         # Type narrowing: we know this is sort_by_reading_date which takes 3 args
         reading_date_func = cast(
-            Callable[
-                [List[Dict[str, Any]], List[Dict[str, Any]], bool], List[Dict[str, Any]]
-            ],
+            Callable[[List[Dict[str, Any]], List[Dict[str, Any]], bool], List[Dict[str, Any]]],
             sort_func,
         )
         return reading_date_func(books, reading_records, reverse)  # type: ignore[call-arg]
