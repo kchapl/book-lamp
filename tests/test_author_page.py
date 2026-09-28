@@ -160,7 +160,7 @@ def test_author_page_no_duplicate_books(authenticated_client):
 
 @pytest.mark.skipif(
     os.environ.get("TEST_MODE") == "1",
-    reason="Test expects unauthorized redirect but TEST_MODE forces authorised state"
+    reason="Test expects unauthorized redirect but TEST_MODE forces authorised state",
 )
 def test_author_page_unauthorised_redirect(client):
     """Unauthenticated access redirects to the unauthorised page."""

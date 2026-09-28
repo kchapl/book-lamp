@@ -43,9 +43,7 @@ def parse_publication_year(publish_date: Optional[str]) -> Optional[int]:
         return None
 
     # Split by common delimiters and look for a 4-digit number
-    for token in (
-        publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split()
-    ):
+    for token in publish_date.replace("-", " ").replace("/", " ").replace(",", " ").split():
         if len(token) == 4 and token.isdigit():
             return int(token)
     return None

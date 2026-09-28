@@ -28,9 +28,7 @@ def csrf_protect(f):
             if is_test_mode() or not session.get("user_id"):
                 return f(*args, **kwargs)
 
-            submitted_token = request.headers.get("X-CSRF-Token") or request.form.get(
-                "csrf_token"
-            )
+            submitted_token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
             session_token = session.get("csrf_token")
             if not session_token or submitted_token != session_token:
                 current_app.logger.warning(

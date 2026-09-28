@@ -18,9 +18,7 @@ def test_google_auth_success(client, mock_google_verify):
     }
 
     # Mock PostgresStorage.upsert_user if it's used
-    with patch(
-        "book_lamp.services.pg_storage.PostgresStorage.upsert_user"
-    ) as mock_upsert:
+    with patch("book_lamp.services.pg_storage.PostgresStorage.upsert_user") as mock_upsert:
         mock_upsert.return_value = 1
 
         response = client.post("/api/auth/google", json={"credential": "valid-jwt"})

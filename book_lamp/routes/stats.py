@@ -19,9 +19,7 @@ def api_reading_history():
     storage = get_storage()
 
     history = storage.get_reading_history()
-    all_statuses = sorted(
-        list(set(r.get("status") for r in history if r.get("status")))
-    )
+    all_statuses = sorted(list(set(r.get("status") for r in history if r.get("status"))))
 
     status_filter = request.args.get("status")
     if status_filter:
@@ -40,19 +38,13 @@ def api_reading_history():
             r
             for r in history
             if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
-            or (
-                not r.get("end_date")
-                and r.get("start_date")
-                and r.get("start_date")[:4] == year_filter
-            )
+            or (not r.get("end_date") and r.get("start_date") and r.get("start_date")[:4] == year_filter)
         ]
 
     sort_by = request.args.get("sort", "date_desc")
 
     if sort_by == "date_desc":
-        history.sort(
-            key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True
-        )
+        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True)
     elif sort_by == "date_asc":
         history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
     elif sort_by == "rating_desc":
@@ -130,7 +122,9 @@ def sync_diagnostics():
     """Return storage connectivity diagnostics."""
     storage = get_storage()
     is_healthy = storage.health_check() if hasattr(storage, "health_check") else True
-    return jsonify({
-        "status": "ok" if is_healthy else "error",
-        "storage": "postgres",
-    })
+    return jsonify(
+        {
+            "status": "ok" if is_healthy else "error",
+            "storage": "postgres",
+        }
+    )

@@ -145,9 +145,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "publish_date": publish_date,
         "thumbnail_url": thumbnail_url,
         "cover_url": cover_url,
-        "publisher": (
-            html.unescape(publisher_name) if publisher_name else publisher_name
-        ),
+        "publisher": (html.unescape(publisher_name) if publisher_name else publisher_name),
         "description": html.unescape(description) if description else description,
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
@@ -181,9 +179,7 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
         return None
 
     result = _parse_open_library_data(payload[key])
-    logger.debug(
-        f"Open Library returned data for {isbn13}: has_cover={bool(result.get('thumbnail_url'))}"
-    )
+    logger.debug(f"Open Library returned data for {isbn13}: has_cover={bool(result.get('thumbnail_url'))}")
     return result
 
 
@@ -193,19 +189,14 @@ def _lookup_open_library_cover_direct(isbn13: str) -> Optional[str]:
     url = f"https://covers.openlibrary.org/b/isbn/{isbn13}-M.jpg?default=false"
     try:
         response = session.head(url, timeout=5, allow_redirects=True)
-        if (
-            response.status_code == 200
-            and "image" in response.headers.get("Content-Type", "").lower()
-        ):
+        if response.status_code == 200 and "image" in response.headers.get("Content-Type", "").lower():
             return url
     except Exception:
         pass
     return None
 
 
-def _lookup_open_library_search(
-    title: str, author: Optional[str] = None
-) -> Optional[Dict[str, Optional[Any]]]:
+def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Optional[Dict[str, Optional[Any]]]:
     """Search Open Library by title and author to find a cover from a related edition."""
     session = _get_session()
     clean_title = _clean_title_for_search(title)
@@ -245,11 +236,7 @@ def _lookup_open_library_search(
                     "author": ", ".join(authors) if authors else None,
                     "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
                     "cover_url": f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg",
-                    "publish_date": (
-                        str(doc.get("first_publish_year"))
-                        if doc.get("first_publish_year")
-                        else None
-                    ),
+                    "publish_date": (str(doc.get("first_publish_year")) if doc.get("first_publish_year") else None),
                     "publisher": publishers[0] if publishers else None,
                 }
     except Exception as e:
@@ -257,9 +244,7 @@ def _lookup_open_library_search(
     return None
 
 
-def lookup_books_batch(
-    isbn13_list: List[str], force_refresh: bool = False
-) -> Dict[str, Optional[Dict[str, Any]]]:
+def lookup_books_batch(isbn13_list: List[str], force_refresh: bool = False) -> Dict[str, Optional[Dict[str, Any]]]:
     """Lookup metadata for multiple books via cache or Open Library in batches.
 
     Args:
@@ -295,9 +280,7 @@ def lookup_books_batch(
             logger.debug(f"Making Open Library API request for {len(chunk)} ISBNs")
             response = session.get(OPEN_LIBRARY_API, params=params, timeout=20)
             if response.status_code != 200:
-                logger.warning(
-                    f"Open Library API returned status {response.status_code}"
-                )
+                logger.warning(f"Open Library API returned status {response.status_code}")
                 continue
 
             payload = response.json()
@@ -321,9 +304,7 @@ def lookup_books_batch(
     return results
 
 
-def lookup_books_by_author(
-    author_name: str, max_results: int = 50
-) -> List[Dict[str, Any]]:
+def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict[str, Any]]:
     """Search Open Library for all books by a given author name.
 
     Returns deduplicated results with the latest edition per title, sorted
@@ -342,10 +323,7 @@ def lookup_books_by_author(
     params: Dict[str, str] = {
         "author": author_name,
         "limit": str(min(max_results, 100)),
-        "fields": (
-            "key,title,author_name,cover_i,first_publish_year,"
-            "isbn,publisher,subject,language"
-        ),
+        "fields": ("key,title,author_name,cover_i,first_publish_year," "isbn,publisher,subject,language"),
     }
 
     books: List[Dict[str, Any]] = []
@@ -381,11 +359,7 @@ def lookup_books_by_author(
                     break
 
             cover_id = doc.get("cover_i")
-            thumbnail_url = (
-                f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
-                if cover_id
-                else None
-            )
+            thumbnail_url = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
 
             doc_authors = doc.get("author_name") or []
             author_str = ", ".join(doc_authors) if doc_authors else author_name
@@ -439,9 +413,7 @@ def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     return None
 
 
-def _lookup_google_books_search(
-    title: str, author: Optional[str] = None
-) -> Optional[Dict[str, Optional[Any]]]:
+def _lookup_google_books_search(title: str, author: Optional[str] = None) -> Optional[Dict[str, Optional[Any]]]:
     """Search Google Books by title and author for covers."""
     session = _get_session()
     clean_title = _clean_title_for_search(title)
@@ -468,9 +440,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
     """Helper to parse a Google Books API volume item."""
     info = item.get("volumeInfo", {})
     image_links = info.get("imageLinks", {})
-    thumbnail = _upgrade_google_books_image(
-        image_links.get("thumbnail") or image_links.get("smallThumbnail")
-    )
+    thumbnail = _upgrade_google_books_image(image_links.get("thumbnail") or image_links.get("smallThumbnail"))
 
     from book_lamp.utils.books import parse_bisac_category
 
@@ -494,9 +464,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
     }
 
 
-def _lookup_itunes_search(
-    title: str, author: Optional[str] = None
-) -> Optional[Dict[str, Optional[Any]]]:
+def _lookup_itunes_search(title: str, author: Optional[str] = None) -> Optional[Dict[str, Optional[Any]]]:
     """Fallback search via iTunes Store for high-res eBook covers."""
     session = _get_session()
     clean_title = _clean_title_for_search(title)
@@ -609,17 +577,11 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
                 chunk = get_resp.raw.read(2000)
                 get_resp.close()
                 if len(chunk) > 1000:
-                    logger.debug(
-                        f"Found Amazon cover for {isbn13}: confirmed via partial download"
-                    )
+                    logger.debug(f"Found Amazon cover for {isbn13}: confirmed via partial download")
                     return url
-            logger.debug(
-                f"No valid cover on Amazon for {isbn13}: size={content_length}"
-            )
+            logger.debug(f"No valid cover on Amazon for {isbn13}: size={content_length}")
         else:
-            logger.debug(
-                f"No valid cover on Amazon for {isbn13}: status={response.status_code}"
-            )
+            logger.debug(f"No valid cover on Amazon for {isbn13}: status={response.status_code}")
     except Exception as e:
         logger.debug(f"Amazon lookup failed for {isbn13}: {e}")
 
@@ -640,10 +602,7 @@ def _lookup_penguin_cover(isbn13: str) -> Optional[str]:
         # Need to allow redirects as it might redirect to a specific size
         response = session.head(url, timeout=5, allow_redirects=True)
         # Check if it's actually an image and not a 404/placeholder
-        if (
-            response.status_code == 200
-            and "image" in response.headers.get("Content-Type", "").lower()
-        ):
+        if response.status_code == 200 and "image" in response.headers.get("Content-Type", "").lower():
             # Basic sanity check on size if available
             size = int(response.headers.get("Content-Length", 0))
             if size > 1000 or size == 0:  # Allow 0 if server doesn't provide length
@@ -654,9 +613,7 @@ def _lookup_penguin_cover(isbn13: str) -> Optional[str]:
     return None
 
 
-def _merge_metadata(
-    target: Dict[str, Any], source: Optional[Dict[str, Any]]
-) -> Dict[str, Any]:
+def _merge_metadata(target: Dict[str, Any], source: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Merge non-empty metadata fields from source into target."""
     if not source:
         return target
@@ -761,9 +718,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     }
 
 
-def enhance_books_batch(
-    books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False
-) -> int:
+def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False) -> int:
     """Enhance a list of books with missing metadata/covers in parallel.
 
     Updates the books list in-place.
@@ -817,15 +772,11 @@ def enhance_books_batch(
         if force_refresh or missing_fields or not has_cover:
             candidates.append(b)
             if force_refresh:
-                logger.debug(
-                    f"Candidate book (force refresh): {b.get('title', 'Unknown')}"
-                )
+                logger.debug(f"Candidate book (force refresh): {b.get('title', 'Unknown')}")
             elif not has_cover:
                 logger.debug(f"Candidate book (no cover): {b.get('title', 'Unknown')}")
             else:
-                logger.debug(
-                    f"Candidate book (missing: {missing_fields}): {b.get('title', 'Unknown')}"
-                )
+                logger.debug(f"Candidate book (missing: {missing_fields}): {b.get('title', 'Unknown')}")
         else:
             logger.debug(f"Skipping book (complete): {b.get('title', 'Unknown')}")
 
@@ -904,9 +855,7 @@ def enhance_books_batch(
             }
 
             for target, source_field in field_map.items():
-                if needs_update(target, book_item.get(target)) and info.get(
-                    source_field
-                ):
+                if needs_update(target, book_item.get(target)) and info.get(source_field):
                     val = info[source_field]
                     # Specific handling for strings/lengths
                     if isinstance(val, str):
@@ -929,9 +878,7 @@ def enhance_books_batch(
                     logger.debug(f"Updated publication_year for {title}: {year}")
 
             if not has_updates:
-                logger.debug(
-                    f"No updates made for {title} - all fields already present in result"
-                )
+                logger.debug(f"No updates made for {title} - all fields already present in result")
 
             return has_updates
         except Exception:

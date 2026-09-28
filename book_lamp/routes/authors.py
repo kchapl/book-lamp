@@ -63,13 +63,9 @@ def api_author_page(author_slug: str):
         try:
             external_books = lookup_books_by_author(display_author_name)
             owned_isbns = {
-                b.get("isbn13", "").replace("-", "").replace(" ", "")
-                for b in author_books
-                if b.get("isbn13")
+                b.get("isbn13", "").replace("-", "").replace(" ", "") for b in author_books if b.get("isbn13")
             }
-            owned_norm_titles = {
-                b.get("title", "").strip().lower() for b in author_books
-            }
+            owned_norm_titles = {b.get("title", "").strip().lower() for b in author_books}
 
             for ext_book in external_books:
                 isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
@@ -84,9 +80,7 @@ def api_author_page(author_slug: str):
                 unread_books.append(ext_book)
                 owned_norm_titles.add(norm_title)
         except Exception:
-            current_app.logger.warning(
-                f"Failed to fetch external books for author: {display_author_name}"
-            )
+            current_app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
 
     return jsonify(
         {

@@ -160,9 +160,7 @@ def test_libib_import_deduplication(authenticated_client):
     data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "libib.csv")}
 
     # First import
-    authenticated_client.post(
-        "/books/import", data=data, content_type="multipart/form-data"
-    )
+    authenticated_client.post("/books/import", data=data, content_type="multipart/form-data")
     _wait_for_latest_job()
 
     # Second import with same file

@@ -17,9 +17,7 @@ def test_stats_category_limit(client, authenticated_client):
             publication_year=2020,
             bisac_category=cat,
         )
-        storage.add_reading_record(
-            book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5
-        )
+        storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
 
     # Get stats API data
     resp = authenticated_client.get("/api/dashboard")
@@ -40,9 +38,7 @@ def test_stats_category_limit(client, authenticated_client):
             author="Author",
             bisac_category="FICTION / General",
         )
-        storage.add_reading_record(
-            book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5
-        )
+        storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
 
     resp = authenticated_client.get("/api/dashboard")
     data = resp.get_json()
@@ -79,9 +75,7 @@ def test_api_dashboard_endpoint(authenticated_client):
         physical_format="Hardcover",
         language="English",
     )
-    storage.add_reading_record(
-        book["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
-    )
+    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
 
     # Test API endpoint
     resp = authenticated_client.get("/api/dashboard")

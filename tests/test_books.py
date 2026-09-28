@@ -31,9 +31,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
                     "title": "Example Book",
                     "authors": [{"name": "Jane Doe"}],
                     "publish_date": "2001",
-                    "cover": {
-                        "medium": "https://covers.openlibrary.org/b/id/12345-M.jpg"
-                    },
+                    "cover": {"medium": "https://covers.openlibrary.org/b/id/12345-M.jpg"},
                 }
             }
 
@@ -41,9 +39,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
     mock_session.get.return_value = MockResp()
     mock_session.head.return_value = MockResp()
 
-    resp = authenticated_client.post(
-        "/api/books", json={"isbn": "9780306406157"}
-    )
+    resp = authenticated_client.post("/api/books", json={"isbn": "9780306406157"})
     assert resp.status_code == 201
     assert resp.get_json()["title"] == "Example Book"
 
@@ -53,9 +49,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
 
 def test_delete_book_success(authenticated_client):
     storage = get_storage()
-    book = storage.add_book(
-        isbn13="9780306406157", title="Test Book", author="Test Author"
-    )
+    book = storage.add_book(isbn13="9780306406157", title="Test Book", author="Test Author")
     book_id = book["id"]
 
     resp = authenticated_client.post(f"/api/books/{book_id}/delete")
@@ -65,9 +59,7 @@ def test_delete_book_success(authenticated_client):
 
 def test_edit_book_success(authenticated_client):
     storage = get_storage()
-    book = storage.add_book(
-        isbn13="9780306406157", title="Original Title", author="Original Author"
-    )
+    book = storage.add_book(isbn13="9780306406157", title="Original Title", author="Original Author")
 
     updated_data = {
         "isbn13": "9780306406157",
@@ -75,9 +67,7 @@ def test_edit_book_success(authenticated_client):
         "author": "Updated Author",
         "publication_year": "2022",
     }
-    resp = authenticated_client.post(
-        f"/api/books/{book['id']}/edit", json=updated_data
-    )
+    resp = authenticated_client.post(f"/api/books/{book['id']}/edit", json=updated_data)
     assert resp.status_code == 200
 
     updated_book = storage.get_book_by_id(book["id"])
@@ -95,13 +85,9 @@ def test_books_year_filter(authenticated_client):
     b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
 
     # b1 completed in 2024
-    storage.add_reading_record(
-        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
-    )
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 completed in 2023
-    storage.add_reading_record(
-        b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
-    )
+    storage.add_reading_record(b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4)
 
     # Filter by year 2024
     resp = authenticated_client.get("/api/books?year=2024")
@@ -128,13 +114,9 @@ def test_books_month_filter(authenticated_client):
     b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
 
     # b1 completed in January (any year)
-    storage.add_reading_record(
-        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
-    )
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 completed in February (any year)
-    storage.add_reading_record(
-        b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4
-    )
+    storage.add_reading_record(b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4)
 
     # Filter by month 1 (January)
     resp = authenticated_client.get("/api/books?month=1")
@@ -156,13 +138,9 @@ def test_books_category_filter(authenticated_client):
     """Test filtering the books API by BISAC category."""
     storage = get_storage()
     # Science category
-    b1 = storage.add_book(
-        isbn13="301", title="Science Book", author="A1", bisac_category="Science"
-    )
+    b1 = storage.add_book(isbn13="301", title="Science Book", author="A1", bisac_category="Science")
     # Fiction category
-    b2 = storage.add_book(
-        isbn13="302", title="Literature Book", author="A2", bisac_category="Fiction"
-    )
+    b2 = storage.add_book(isbn13="302", title="Literature Book", author="A2", bisac_category="Fiction")
 
     # Give them statuses so they show up in the library
     storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15")
@@ -187,13 +165,9 @@ def test_books_rating_filter(authenticated_client):
     b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
 
     # b1 rated 5
-    storage.add_reading_record(
-        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
-    )
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 rated 4
-    storage.add_reading_record(
-        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4
-    )
+    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
 
     # Filter by rating 5
     resp = authenticated_client.get("/api/books?rating=5")
@@ -214,9 +188,7 @@ def test_books_status_filter(authenticated_client):
     # b1 in progress
     storage.add_reading_record(b1["id"], "In Progress", "2024-01-01")
     # b2 completed
-    storage.add_reading_record(
-        b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
-    )
+    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
 
     # Filter by status "In Progress"
     resp = authenticated_client.get("/api/books?status=In+Progress")
@@ -230,9 +202,7 @@ def test_books_status_filter(authenticated_client):
 
 def test_books_filters_echoed_in_response(authenticated_client):
     """The API echoes the active filters so the SPA can render them."""
-    resp = authenticated_client.get(
-        "/api/books?status=Completed&year=2024&month=1&rating=5&category=Fiction"
-    )
+    resp = authenticated_client.get("/api/books?status=Completed&year=2024&month=1&rating=5&category=Fiction")
     assert resp.status_code == 200
     assert resp.get_json()["filters"] == {
         "status": "Completed",

@@ -85,9 +85,7 @@ def get_all_known_titles(storage: Any) -> List[str]:
     return list(b["title"] for b in storage.get_all_books())
 
 
-def refresh_recommendations(
-    storage: Any, llm_client: Any
-) -> Optional[List[Dict[str, Any]]]:
+def refresh_recommendations(storage: Any, llm_client: Any) -> Optional[List[Dict[str, Any]]]:
     """Regenerate and cache AI recommendations, returning the new list.
 
     Returns None if there are not enough liked books to generate useful
@@ -110,9 +108,7 @@ def refresh_recommendations(
     return list(recs)
 
 
-def get_or_refresh_recommendations(
-    storage: Any, llm_client: Any
-) -> List[Dict[str, Any]]:
+def get_or_refresh_recommendations(storage: Any, llm_client: Any) -> List[Dict[str, Any]]:
     """Return cached recommendations, regenerating them if stale.
 
     This is the primary entry point for the Flask route.

@@ -81,10 +81,7 @@ def create_app(test_config: Optional[dict] = None) -> Flask:
 
     secret_key = os.environ.get("SECRET_KEY")
     if not secret_key and not is_test_mode():
-        raise ValueError(
-            "SECRET_KEY environment variable is required. "
-            "Please set it in your .env file."
-        )
+        raise ValueError("SECRET_KEY environment variable is required. " "Please set it in your .env file.")
     elif not secret_key:
         secret_key = "test-only-insecure-key-do-not-use-in-production"
 

@@ -23,9 +23,7 @@ class LLMClient:
             )
             self.client = None
 
-    def generate_recommendations(
-        self, liked_books: list[dict], existing_books: list[str]
-    ) -> list[dict]:
+    def generate_recommendations(self, liked_books: list[dict], existing_books: list[str]) -> list[dict]:
         """Generate recommendations using an LLM via OpenAI SDK."""
         if not self.client:
             logger.warning("LLM_API_KEY is not set. Cannot generate recommendations.")

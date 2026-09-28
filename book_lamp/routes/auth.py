@@ -1,6 +1,7 @@
 """Authentication and CSRF routes."""
 
 import secrets
+
 from flask import Blueprint, current_app, jsonify, redirect, request, session, url_for
 
 from book_lamp.middleware.csrf import generate_csrf_token
