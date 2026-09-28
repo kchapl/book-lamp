@@ -69,8 +69,16 @@ function App() {
         };
 
         checkAuth();
+    }, []);
 
-        // Check sync status
+    useEffect(() => {
+        // The sync probe reports storage health, which needs a session. Probing
+        // unauthenticated earns a 401, and a 401 sends the browser to the
+        // sign-in page, which would then probe again.
+        if (!isAuthorized) {
+            return;
+        }
+
         const checkSync = async () => {
             try {
                 const diagnostics = await getSyncDiagnostics();
@@ -83,7 +91,7 @@ function App() {
         checkSync();
         const interval = setInterval(checkSync, 60000);
         return () => clearInterval(interval);
-    }, []);
+    }, [isAuthorized]);
 
     useEffect(() => {
         const root = document.documentElement;
