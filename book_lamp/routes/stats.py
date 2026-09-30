@@ -125,9 +125,17 @@ def update_settings():
 
 
 @stats_bp.route("/api/sync/diagnostics", methods=["GET"])
-@authorisation_required
 def sync_diagnostics():
-    """Return storage connectivity diagnostics."""
+    """Return storage connectivity diagnostics.
+
+    Public on purpose: the SPA polls this on every route, including the
+    anonymous home page. Requiring auth made it respond 401 to visitors,
+    which the API client turned into a redirect to /unauthorised and from
+    there into an endless auth loop. Exposes no user data, only liveness.
+    """
+    if not session.get("user_id"):
+        return jsonify({"status": "unauthenticated", "storage": "unauthenticated"})
+
     storage = get_storage()
     is_healthy = storage.health_check() if hasattr(storage, "health_check") else True
     return jsonify({
