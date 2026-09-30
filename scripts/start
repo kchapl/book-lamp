@@ -90,7 +90,22 @@ if [ "$host_network" -eq 1 ]; then
 fi
 
 log "Starting PostgreSQL"
-run_compose up -d db
+
+# podman-compose 1.3.0 tries to create the container even when it already
+# exists, then reports "the container name ... is already in use", although it
+# goes on to reuse the container (containers/podman-compose#1118). Start the
+# container that already exists instead, so a normal re-run is quiet. If it
+# cannot start - a stale container created on a bridge this host can no longer
+# program, say - fall back to `up`, which replaces it.
+db_container=""
+if [ "${compose[0]}" = "podman-compose" ]; then
+    db_container="$(run_compose ps -q 2>/dev/null | sed -n '1p')"
+fi
+if [ -n "$db_container" ]; then
+    run_compose start db || run_compose up -d db
+else
+    run_compose up -d db
+fi
 
 log "Waiting for PostgreSQL to accept connections"
 attempt=1
