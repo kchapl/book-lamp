@@ -5,7 +5,12 @@ import datetime
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
-from book_lamp.utils import parse_bisac_category
+from book_lamp.utils import (
+    UNKNOWN_CATEGORY,
+    category_label,
+    category_label_for_book,
+    normalise_bisac_category,
+)
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
 
@@ -102,12 +107,7 @@ def calculate_collection_stats(
 
     category_bins: Counter[str] = Counter()
     for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, _ = parse_bisac_category(bisac)
-            if main_cat:
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                category_bins[norm_cat] += 1
+        category_bins[category_label_for_book(b)] += 1
 
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
     category_distribution = all_categories_sorted[:10]
@@ -247,22 +247,20 @@ def calculate_collection_stats(
 
     category_details_list: List[Dict[str, Any]] = []
     for b in completed_books:
-        bisac = b.get("bisac_category")
-        if bisac:
-            main_cat, sub_cat = parse_bisac_category(bisac)
-            if main_cat:
-                norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
-                if not existing:
-                    existing = {
-                        "label": norm_cat,
-                        "count": 0,
-                        "subcategories": Counter(),
-                    }
-                    category_details_list.append(existing)
-                existing["count"] += 1
-                if sub_cat:
-                    existing["subcategories"][sub_cat] += 1
+        raw_category = b.get("bisac_category") or b.get("bisac_main_category")
+        major, sub_cat = normalise_bisac_category(raw_category)[1:]
+        norm_cat = category_label(major) if major else UNKNOWN_CATEGORY
+        existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
+        if not existing:
+            existing = {
+                "label": norm_cat,
+                "count": 0,
+                "subcategories": Counter(),
+            }
+            category_details_list.append(existing)
+        existing["count"] += 1
+        if sub_cat:
+            existing["subcategories"][sub_cat] += 1
 
     category_details_list.sort(key=lambda x: -x["count"])
     category_details = [

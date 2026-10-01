@@ -11,7 +11,13 @@ from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.services.storage_factory import TEST_ISBN, _mock_storage_singleton, get_storage, is_test_mode
-from book_lamp.utils import SORT_OPTIONS, is_valid_isbn13, parse_publication_year, sort_books
+from book_lamp.utils import (
+    SORT_OPTIONS,
+    category_label_for_book,
+    is_valid_isbn13,
+    parse_publication_year,
+    sort_books,
+)
 from book_lamp.utils.books import normalize_isbn
 from book_lamp.utils.reading_status import latest_record_by_book, with_reading_status
 
@@ -109,17 +115,13 @@ def api_list_books():
     if category_filter:
         filtered_books = []
         for b in books:
-            bisac = b.get("bisac_category")
-            if bisac and category_filter.lower() in str(bisac).lower():
+            if category_label_for_book(b).lower() == category_filter.lower():
                 filtered_books.append(b)
         books = filtered_books
 
     all_categories = set()
     for b in storage.get_all_books():
-        bisac = b.get("bisac_category")
-        if bisac:
-            top_level = str(bisac).split("/")[0].strip()
-            all_categories.add(top_level)
+        all_categories.add(category_label_for_book(b))
     sorted_categories = sorted(list(all_categories))
 
     return jsonify(
