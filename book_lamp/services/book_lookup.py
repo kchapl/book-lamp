@@ -7,6 +7,7 @@ import requests
 
 from book_lamp.utils.books import (
     isbn13_to_isbn10,
+    normalise_bisac_category,
     normalize_isbn,
 )
 
@@ -101,8 +102,6 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         first_pub = publisher_list[0] or {}
         publisher_name = first_pub.get("name")
 
-    from book_lamp.utils.books import parse_bisac_category
-
     description = data.get("notes")
     subjects = data.get("subjects") or []
     # Extract the name from the first subject if it's a dict, otherwise use it as-is
@@ -120,7 +119,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
             bisac = first_subject.strip() if first_subject else None
         # If it's some other type, bisac stays None
 
-    main_cat, sub_cat = parse_bisac_category(bisac)
+    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -442,10 +441,8 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
     image_links = info.get("imageLinks", {})
     thumbnail = _upgrade_google_books_image(image_links.get("thumbnail") or image_links.get("smallThumbnail"))
 
-    from book_lamp.utils.books import parse_bisac_category
-
     bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
-    main_cat, sub_cat = parse_bisac_category(bisac)
+    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
 
     return {
         "title": html.unescape(info.get("title", "")),
