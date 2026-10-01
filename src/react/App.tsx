@@ -76,6 +76,7 @@ function App() {
         // unauthenticated earns a 401, and a 401 sends the browser to the
         // sign-in page, which would then probe again.
         if (!isAuthorized) {
+            setSyncStatus('checking');
             return;
         }
 
