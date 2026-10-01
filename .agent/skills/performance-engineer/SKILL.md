@@ -1,6 +1,6 @@
 ---
 name: performance-engineer
-description: Guidelines and standards for ensuring high performance in the Book Lamp application, covering frontend web vitals, backend efficiency, and Google Sheets API optimization.
+description: Guidelines and standards for ensuring high performance in the Book Lamp application, covering frontend web vitals, PostgreSQL/backend efficiency and external API usage.
 ---
 
 # Performance Engineer Skill
@@ -20,7 +20,7 @@ We aim for "Good" ratings across all Google Core Web Vitals. Every page must be 
 
 ### Frontend Best Practices
 - **Asset Optimization**: Use modern image formats (WebP). Ensure images have `width` and `height` attributes to prevent CLS.
-- **Critical CSS**: Ensure CSS is lean. Avoid large frameworks; use scoped Vanilla CSS.
+- **Critical CSS**: Keep CSS lean; use the project's stylesheets (`book_lamp/static/css/` and `src/react/styles/`) rather than pulling in a heavy CSS framework.
 - **JavaScript Efficiency**: 
   - Minimise the use of third-party scripts.
   - Implement lazy loading for non-critical components and images.
@@ -29,13 +29,15 @@ We aim for "Good" ratings across all Google Core Web Vitals. Every page must be 
 
 ## 2. Backend & Data Performance
 
-Since our "database" is Google Sheets, minimizing latency and API overhead is critical.
+The primary datastore is PostgreSQL, reached through the `PostgresStorage`
+adapter. Keep database work efficient and off the request's critical path.
 
-### Google Sheets API Optimization
-- **Batching**: Never perform row-by-row updates in a loop. Use `batchUpdate` or `values.batchUpdate`.
-- **Minimise Fetching**: Only request the ranges and fields required. Avoid fetching the whole sheet if only a few rows are needed.
-- **Caching**: Implement caching mechanisms for frequently accessed but rarely changed data (e.g., Book lists) to avoid redundant API calls.
-- **Connection Stability**: Handle rate limiting (429 errors) gracefully with exponential backoff.
+### PostgreSQL Access
+- **Avoid N+1**: Fetch related rows in one query (or a small fixed number) rather than looping over per-row queries.
+- **Batch writes**: Use bulk operations for imports instead of row-by-row inserts.
+- **Index and filter**: Rely on the indexes Alembic adds; push filtering and sorting into SQL where practical and select only the columns you need.
+- **Pooling**: Reuse the connection pool; never open a connection per call.
+- **Background work**: Run long jobs (imports, metadata backfills) through the PostgreSQL-backed job queue instead of blocking a request.
 
 ### External API Integration (Book Lookups)
 - **Concurrency**: Use `asyncio` or threading to fetch data from multiple providers (Open Library, Google Books) in parallel.
@@ -47,14 +49,14 @@ Since our "database" is Google Sheets, minimizing latency and API overhead is cr
 Performance is a requirement. All changes must be verified to ensure they meet the project's performance standards.
 
 - **Efficiency Verification**: Use unit tests (refer to the **Testing** skill) to ensure backend operations use batching and avoid N+1 patterns.
-- **Auditing**: Perform manual Lighthouse audits for new features. Ensure the performance score remains 90+ and payloads fit within initial windows.
+- **Auditing**: There is no automated Lighthouse check in CI, so audit manually for new features. Aim for a 90+ performance score and keep payloads within initial budgets.
 - **Regressions**: Ensure no new feature or bug fix introduces performance regressions. If a bottleneck is suspected, use profiling tools (cProfile).
 
 ## 4. Architectural Patterns for Performance
 
 - **Lazy Loading Strategy**: Use `loading="lazy"` for book covers.
 - **Pagination/Virtualization**: For large book collections, implement server-side pagination or windowing to avoid DOM bloat.
-- **State Management**: Keep the frontend state lean. Avoid unnecessary re-renders in templates.
+- **State Management**: Keep the frontend state lean. Avoid unnecessary React re-renders.
 
 ## 5. Standard Tools & Measurement
 - **Chrome DevTools**: Use the Network and Performance tabs for debugging.
@@ -62,6 +64,6 @@ Performance is a requirement. All changes must be verified to ensure they meet t
 - **cProfile / line_profiler**: Use these for identifying bottlenecks in Python logic.
 
 ## 6. Performance "Gotchas" (Awareness)
-- **Google Sheets Latency**: API calls to Google Sheets typically take 200ms-1s. Minimize these in the request-response cycle.
-- **Template Bloat**: Large Jinja2 templates with deep loops can slow down server-side rendering.
-- **Unoptimized Search**: Regex-based searches on large datasets in memory can be slow; prefer literal searches or optimized indexing if the dataset grows.
+- **External API latency**: Book lookups against Open Library / Google Books can take hundreds of milliseconds. Cache results and keep them off the request's critical path where possible.
+- **Large client bundles**: Every route beyond `/` is code-split; keep new heavy dependencies out of the initial bundle and lazy-load them (for example the barcode scanner).
+- **Unoptimised Search**: Regex-based searches over large in-memory datasets can be slow; prefer literal, indexed searches as the collection grows.

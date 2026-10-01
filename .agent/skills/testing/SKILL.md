@@ -21,9 +21,9 @@ This skill provides the authoritative standards for testing within the Book Lamp
 We explicitly use **Unit Tests** and **Mock Integration Tests**. We do NOT perform End-to-End (E2E) testing (e.g., Playwright) as it is slow and prone to flakiness.
 
 ### Location and Execution
-- **Location**: All tests reside in the `tests/` directory.
-- **Execution**: Run with `poetry run pytest`.
-- **Environment**: Always use `TEST_MODE=1` to trigger mock storage and avoid real Google Sheets API interactions.
+- **Backend**: tests live in `tests/`. Run with `TEST_MODE=1 uv run pytest` (CI adds `--ignore=tests/test_pg_storage.py`, which needs a real database).
+- **Frontend**: vitest tests live beside the code in `src/react/**/__tests__/` and `src/ts/tests/`. Run with `npm run test`; type-check with `npx tsc --noEmit`.
+- **Environment**: always use `TEST_MODE=1` for the backend so `storage_factory` returns the in-memory `MockStorage` instead of `PostgresStorage`.
 
 ### Component-Specific Testing
 
@@ -32,10 +32,10 @@ We explicitly use **Unit Tests** and **Mock Integration Tests**. We do NOT perfo
     - Test edge cases and error handling explicitly.
 2.  **Routes and Entry Points**:
     - Use the Flask `test_client`.
-    - Mock underlying services (e.g., `GoogleSheetsStorage`) to isolate route logic from data persistence.
+    - Run under `TEST_MODE`, or mock `PostgresStorage`, to isolate route logic from data persistence.
     - Verify status codes, redirects, and key content in responses.
 3.  **Persistence (Adapters)**:
-    - Test adapters by following the **MockStorage** pattern or mocking specific API client methods (e.g., Google API `execute()` calls).
+    - Test adapters by following the **MockStorage** pattern, or mock the PostgreSQL connection/pool.
 4.  **Performance Efficiency**:
     - Use unit tests to verify backend efficiency (e.g., asserting that batch operations are used instead of N+1 patterns when importing data).
 

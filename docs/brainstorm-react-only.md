@@ -9,7 +9,7 @@ The app has already drifted a long way toward React. Today:
   - 15 Jinja templates in `book_lamp/templates/` (only `index.html` is technically reachable, and only on a broken build).
   - Legacy browser-form routes are gone (POSTs to `/books` etc. return 405), but ~29 backend tests still exercise the old form-post + full-page-HTML behaviour (`test_manual_entry.py`, `test_books.py`, `test_history.py`, `test_search.py`, `test_author_page.py`, parts of `test_libib_import.py`), all failing or asserting markup that no longer exists.
   - `src/ts/` legacy vanilla TS is still compiled by `npm run build` and copied into `static/` alongside the React bundle.
-  - Docs (`README`, `GEMINI.md`, `AGENT_CONTEXT.md`) still describe a dual template/React world, and `GEMINI.md` says "React 18" while the app is on React 19.2.
+  - Docs (`README` and the agent skills) still described a dual template/React world, and claimed "React 18" while the app is on React 19.2.
   - `book_lamp/static/react/index.html` is a committed build artefact whose script tags are re-written on each build.
 
 The ask — "remove use of Jinja2 templates so the app is entirely React" — is therefore less a porting job and more a **removal-and-rewiring job**. That opens several possible shapes, ranked below by value for cost.
@@ -38,7 +38,7 @@ The ask — "remove use of Jinja2 templates so the app is entirely React" — is
 **Cost.** Medium. Mechanical per test, but needs judgement about which behaviours lose coverage if only tested through React.
 
 ### 4. Docs honesty pass
-**What it is.** Update `README`, `GEMINI.md`, and `AGENT_CONTEXT.md` to describe the React-only architecture, correct "React 18" → 19, and remove legacy instructions like `build:ts`.
+**What it is.** Update `README` and the agent skills to describe the React-only architecture, correct "React 18" → 19, and remove legacy instructions like `build:ts`.
 
 **Why a demanding user (or agent) would notice.** AGENTS-style docs actively steer contributors and coding agents into editing the wrong layer today.
 
@@ -58,7 +58,7 @@ The ask — "remove use of Jinja2 templates so the app is entirely React" — is
 3. **`git rm -r book_lamp/templates`** (15 files). Nothing else in `book_lamp/` references them (verified: only `spa.py` called `render_template`).
 4. **Rebuild the shell**: `npm run build:react` so `static/react/index.html` is freshly generated.
 5. **Tests**: delete or rewrite the 29 failing template-era tests. Rewrite, don't delete, the ones guarding real logic: duplicate-ISBN add (`test_manual_entry.py`), filter logic (`test_books.py` — API equivalents already exist in `test_api_routes.py`, so deletion is acceptable there), import success/failure paths (`test_libib_import.py`, already partially migrated to the `/books/import` JSON+redirect behaviour). Add a small `test_spa.py` asserting `/`, `/books`, `/author/x`, and a bogus path all return 200 with the React shell, and that a missing shell yields 503.
-6. **Docs**: update `README`, `GEMINI.md`, `AGENT_CONTEXT.md` to the React-only reality (folds in idea #4).
+6. **Docs**: update `README` and the agent skills to the React-only reality (folds in idea #4).
 7. **Verify**: `uv run pytest` fully green; `npm test`; `npm run build`; boot the app and curl `/`, `/books`, `/unauthorised`, `/definitely-missing` for 200 + React shell.
 
 Rough scope: ~1,550 deleted lines (templates) + test churn + ~30 lines of Python edits. No user-visible behaviour change; the payoff is correct asset caching, a truthful test suite, and one frontend instead of three.

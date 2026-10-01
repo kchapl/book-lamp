@@ -1,132 +1,143 @@
 ---
 name: book-lamp-development
-description: Guidelines and workflows for developing the Book Lamp application, focusing on the PostgreSQL adapter pattern and project philosophy.
+description: Authoritative guide for developing, running and extending Book Lamp — the Flask-blueprint API, React SPA and PostgreSQL architecture, coding standards, build/run workflow, data model and security.
 ---
 
-# Book Lamp Development Skill
+# Book Lamp Development
 
-This skill provides comprehensive guidelines for developing, maintaining, and extending the Book Lamp application.
+Book Lamp is a self-hosted personal reading-history tracker: a Flask JSON API
+backed by PostgreSQL, serving a React single-page application.
 
-## Core Philosophy
+## Product philosophy
 
-Following the **Python Architecture Tutor** principles, we prioritise clarity, readability, and explicit structure:
+- **Clarity over cleverness**: prefer readable, explicit code and simple designs.
+- **Small, safe steps**: incremental edits backed by tests; avoid large, risky rewrites.
+- **User-centric**: optimise for reliability and maintainability before micro-optimisations.
+- **British English** in all comments, documentation and naming (`authorisation`, `colour`, `normalise`).
 
-### 1. Layered Architecture (Separation of Concerns)
-The project is structured into distinct layers to separate business logic from external side effects:
-- **Models/Entities**: Pure data structures (e.g., book dictionaries with defined keys).
-- **Adapters (Persistence)**: Isolated in `book_lamp/services/`. `PostgresStorage` is our primary adapter for PostgreSQL.
-- **Service Layer**: Pure logic that sits between entry points and adapters (e.g., `book_lookup.py`).
-- **Entry Points**: Flask routes in `app.py` and CLI commands.
+## Architecture
 
-### 2. Pure vs. Effectful Separation
-- **Pure Code**: Logic should be deterministic. It should not perform I/O or rely on system time directly.
-- **Effectful Code**: All I/O (PostgreSQL, network, filesystem, time) must be isolated at the edges in adapter classes or functions.
-- **Dependency Injection**: Inject adapters into logic or entry points to keep them decoupled.
+### Backend (Python / Flask)
 
-### 3. Mentorship & Readability
-- **Explicit over Implicit**: Avoid "magic". Prefer clear connections between components.
-- **British English**: All comments, documentation, and naming (where possible) MUST use British English (e.g., `serialise`, `colour`, `optimise`).
-- **Standard Library**: Prefer modern Python standards (e.g., `datetime.now(timezone.utc)`, `pathlib`).
+- The app is built by the `create_app()` factory in `book_lamp/__init__.py`.
+  `book_lamp/app.py` is only a thin WSGI shim that re-exports the app and common
+  helpers for compatibility with tests and scripts.
+- Routes are Blueprints in `book_lamp/routes/`, registered by
+  `book_lamp/routes/__init__.py`: `auth`, `books`, `reading_list`,
+  `reading_records`, `authors`, `stats`, `recommendations`, `jobs`, `spa`,
+  `testing`. Keep routes thin; delegate to services.
+- Middleware lives in `book_lamp/middleware/`: `auth`
+  (`@authorisation_required`) and `csrf` (`@csrf_protect`, `X-CSRF-Token`).
+- Services live in `book_lamp/services/`: storage adapters (`pg_storage`,
+  `mock_storage`, `storage_factory`), the PostgreSQL-backed `job_queue`,
+  `stats_calculator`, `book_lookup`, `search`, `recommendations` and
+  `llm_client`.
+- Pure helpers live in `book_lamp/utils/` (`books`, `authors`, `publishers`,
+  `reading_status`, `redirects`, `sorting`, `libib_import`).
+- There are **no Jinja templates**. The `spa` blueprint serves the built React
+  shell from `book_lamp/static/react/` for every page route. If the shell is
+  missing it returns HTTP 503 telling the operator to run `npm run build`.
 
-### 4. Frontend Architecture
-- **Type Safety**: All frontend logic MUST be written in TypeScript in `src/ts/`. Never edit the compiled `.js` files in `book_lamp/static/`.
-- **Separation of Concerns**: CSS and compiled JavaScript artifacts must be kept in dedicated files in `book_lamp/static/`.
-- **CSS**: Avoid inline styles or `<style>` blocks in HTML templates. Use descriptive filenames (e.g., `base.css`, `books.css`).
-- **HTML**: Keep templates focused on structure and Jinja2 logic. Extract all logic to TypeScript modules.
+### Frontend (React / TypeScript)
 
-## Documentation Standard
-- **Docstrings**: Use **Google Style** docstrings for all public functions and classes.
-- **Template**:
-  ```python
-  def function_name(param1: str) -> bool:
-      """Short summary of the function.
+- React 19 + TypeScript in `src/react/`, bundled by Vite into
+  `book_lamp/static/react/`. Never edit the built output directly.
+- Non-home routes are code-split with `React.lazy`; the home route stays eager
+  because it is the LCP element.
+- All API access goes through `src/react/services/api.ts`.
+- Styles: shared CSS in `book_lamp/static/css/`, component styles in
+  `src/react/styles/`.
+- `src/ts/` holds legacy vanilla modules that the SPA no longer loads. Do not
+  extend them; they are slated for removal.
 
-      Detailed description if necessary.
+## Setup and running
 
-      Args:
-          param1: Description of param1.
+- **`scripts/setup`** (once after cloning): installs the pinned toolchain with
+  `mise install`, the Python and Node dependencies, and creates `.env` if missing.
+- **`scripts/start`** (every run): starts the PostgreSQL container, applies the
+  Alembic migrations, builds the React SPA and serves everything through the
+  Flask development server on <http://127.0.0.1:5000>. `HOST` and `PORT`
+  override the bind address and port.
+- Manual equivalent: `mise install`; `uv sync --all-extras`; `npm ci`;
+  `npm run build`; `uv run flask --app book_lamp.app run --debug`.
+- Environment variables (see `.env.example`): `SECRET_KEY` (**required**),
+  `DATABASE_URL`, `GOOGLE_CLIENT_ID` (optional One Tap),
+  `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL` (optional recommendations).
 
-      Returns:
-          Description of the return value.
-      """
-  ```
+## Coding standards
 
-## Working with PostgresStorage
+### Python
 
-The `PostgresStorage` class in `book_lamp/services/postgres_storage.py` is the primary adapter for data.
+- Python 3.13.x, managed by `mise`. Run every command with `uv run`.
+- Format with `black` (120 columns) and `isort` (black profile, 120 columns).
+  Lint with `ruff`. Type-check with `mypy`, strict on public APIs; avoid `Any`.
+- Single responsibility per module, class and function; early returns; handle
+  errors and edge cases first.
+- Descriptive names: verbs for functions, nouns for variables. No abbreviations.
+- Document *why*, not *how*; do not comment the obvious.
+- Google-style docstrings on all public functions and classes.
+- **Pure vs effectful separation**: keep domain logic in deterministic functions
+  (no I/O, globals or direct time/randomness) and isolate effects (PostgreSQL,
+  network, filesystem, environment, time) at the edges. Inject effectful
+  collaborators rather than importing effects into the domain.
 
-### Database Schema
-- **books**: `id`, `isbn13`, `title`, `author`, `publication_year`, `thumbnail_url`, `created_at`
-- **reading_records**: `id`, `book_id`, `status`, `start_date`, `end_date`, `rating`, `created_at`
-- **users**: `id`, `email`, `created_at`
-- **reading_list**: `id`, `user_id`, `book_id`, `created_at`
-- **settings**: `id`, `user_id`, `key`, `value`, `created_at`
-- **recommendations**: `id`, `user_id`, `book_id`, `reason`, `created_at`
+### Frontend
 
-### Database Management
-- Schema is managed by Alembic migrations in the `alembic/` directory.
-- Use `alembic upgrade head` to apply migrations.
-- Use `alembic revision --autogenerate -m "description"` to create new migrations.
+- All UI is React + TypeScript under `src/react/`. Never edit compiled JS in
+  `book_lamp/static/react/`.
+- Keep components small and colocated; route all data access through
+  `src/react/services/api.ts`.
 
-### Extending the Schema
-1.  Create a new Alembic migration: `alembic revision --autogenerate -m "Add new table"`
-2.  Update the `PostgresStorage` class methods to handle new columns/tables.
-3.  Use parameterized queries for all database operations.
-4.  Test the migration with `alembic upgrade head` and `alembic downgrade -1`.
+### Structure rules
 
-### Handling IDs
-- IDs are auto-incrementing serial columns managed by PostgreSQL.
-- Foreign key constraints ensure referential integrity.
+- Keep Flask routes thin; delegate logic to services/use-cases.
+- Data is plain dictionaries produced by the PostgreSQL adapter — there are no
+  ORM models.
 
-## Testing Strategy
+## Data model and PostgreSQL
 
-Refer to the **Testing** skill for standards and patterns. All code must be verified with simple, high-coverage unit tests in the `tests/` directory.
+- Primary adapter: `PostgresStorage` in `book_lamp/services/pg_storage.py`.
+  `MockStorage` backs tests under `TEST_MODE`.
+- Tables: `books`, `authors`, `book_authors`, `reading_records`,
+  `reading_list`, `recommendations`, `settings`, `users`, `jobs`.
+- Schema is managed by Alembic migrations in `alembic/versions/`. Apply with
+  `uv run alembic upgrade head`; create with
+  `uv run alembic revision --autogenerate -m "description"`.
+- Use parameterised queries and connection pooling, and keep every database call
+  inside the adapter.
 
-## Security and Configuration
+## Authentication and security
 
-### Authentication
-- The application optionally uses **Google One Tap** for authentication.
-- No OAuth flow is required; users can use the app without Google login.
-- If Google One Tap is used, only `GOOGLE_CLIENT_ID` is needed.
+- Authentication is optional **Google One Tap**; only `GOOGLE_CLIENT_ID` is
+  needed. There is no OAuth flow.
+- Protect routes with `@authorisation_required` and mutations with
+  `@csrf_protect` (the SPA sends `X-CSRF-Token`).
+- Validate and sanitise all external input (requests, environment, forms). Never
+  pass unsanitised user input to a regular expression (ReDoS); use
+  `get_safe_redirect_target` for user-controlled redirects.
+- Never log or commit secrets or credentials.
 
-### Secrets and Sanitization
-- Never commit `.env` files or credentials.
-- **Required Environment Variables**:
-  - `SECRET_KEY`: For Flask session management.
-  - `DATABASE_URL`: PostgreSQL connection string.
-  - `GOOGLE_CLIENT_ID`: Optional Google One Tap Client ID.
-- **Input Sanitization**: Always strip and normalize user input (ISBNs, titles) before processing or storing.
+## Testing
 
-## Debugging and Diagnostics
+See the **testing** skill. In short: `TEST_MODE=1 uv run pytest` for the backend,
+`npm run test` (vitest) and `npx tsc --noEmit` for the frontend.
 
-### Common PostgreSQL Errors
-- **Connection Error**: Check if `DATABASE_URL` is correct and database is accessible.
-- **Migration Error**: Run `alembic upgrade head` to ensure schema is current.
-- **Constraint Violation**: Check foreign key relationships and data integrity.
-- **Pool Timeout**: Increase connection pool size or check database load.
+## Commits and change discipline
 
-### Logs
-- Application logs are configured with standard formatting. Check terminal output for database queries and connection pool status.
+- Semantic commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`).
+- Subject line at most 50 characters; body lines at most 72.
+- Make small, cohesive edits and verify each with tests. Add a regression test
+  for every bug fix.
+- Before finishing, run the same checks as CI:
+  - `TEST_MODE=1 uv run pytest --ignore=tests/test_pg_storage.py`
+  - `npm run test` and `npx tsc --noEmit`
+  - `uv run ruff check .`, `uv run black --check .`,
+    `uv run isort --check-only .`, `uv run mypy .`
 
-## Environment Setup
-1.  **Dependencies**: Run `mise install`, then `poetry install` for backend and `npm install` for frontend.
-2.  **Configuration**: Copy `.env.example` to `.env` and fill in `DATABASE_URL` and optional `GOOGLE_CLIENT_ID`.
-3.  **Database Setup**: Run `podman-compose up -d` to start PostgreSQL, then `poetry run alembic upgrade head`.
-4.  **Frontend Build**: Run `npm run build` to compile TypeScript to JavaScript.
-5.  **Initialization**: The database schema is automatically created by Alembic migrations.
-6.  **Local Run**: `poetry run flask --app book_lamp.app run --debug`.
+## Tooling summary
 
-## Commits and Change Discipline
-- Use **Semantic Commits** (e.g., `feat:`, `fix:`, `refactor:`, `docs:`).
-- Subject line: Max 50 characters.
-- Body lines: Max 72 characters.
-- Make small, cohesive edits. Verify each step with tests.
-
-## Tooling
-- **Tool Manager**: `mise` (manages Python, Node, and Poetry versions)
-- **Python**: 3.13.x
-- **Dependency Managers**: Poetry (`poetry run`) and NPM (`npm install`)
-- **Build**: TypeScript (`npm run build`) via `tsc`.
-- **Formatters**: `black`, `isort`
-- **Linters**: `ruff`, `mypy` (strict mode), `tsc` (strict mode)
-- **Testing**: `pytest` (backend) and `vitest` (frontend)
+- **Tool manager**: `mise` (Python, Node, uv versions).
+- **Python**: 3.13.x. **Dependencies**: `uv` (`uv sync`) and `npm` (`npm ci`).
+- **Build**: `npm run build` (`tsc` + Vite).
+- **Format/lint**: `black`, `isort`, `ruff`, `mypy`; `tsc` for TypeScript.
+- **Tests**: `pytest` (backend), `vitest` (frontend).
