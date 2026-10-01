@@ -4,7 +4,8 @@ export default defineConfig({
     test: {
         environment: 'jsdom',
         globals: true,
-        include: ['src/ts/**/*.test.ts'],
+        setupFiles: ['./vitest.setup.ts'],
+        include: ['src/ts/**/*.test.ts', 'src/react/**/*.test.ts', 'src/react/**/*.test.tsx'],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

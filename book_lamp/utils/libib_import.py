@@ -53,9 +53,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                 if k is None:
                     continue
                 clean_k = k.strip().lower().replace("_", " ").replace("-", " ")
-                if clean_k in [
-                    key.lower().replace("_", " ").replace("-", " ") for key in keys
-                ]:
+                if clean_k in [key.lower().replace("_", " ").replace("-", " ") for key in keys]:
                     val = row[k]
                     if val is None:
                         return ""
@@ -64,9 +62,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
 
         title = get_val(["Title", "Item Title"])
         author = get_val(["Author", "Creators", "Author(s)", "Item Author"])
-        isbn_val = get_val(
-            ["ISBN", "ISBN 13", "ISBN 10", "ean_isbn13", "upc_isbn10", "ean", "upc"]
-        )
+        isbn_val = get_val(["ISBN", "ISBN 13", "ISBN 10", "ean_isbn13", "upc_isbn10", "ean", "upc"])
         isbn = normalize_isbn(isbn_val)
         publish_date = get_val(["Publish Date"])
         rating_str = get_val(["Rating"])
@@ -83,9 +79,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         physical_format = get_val(["Physical Format", "Item Type"])
         edition = get_val(["Edition"])
 
-        thumbnail_url = get_val(
-            ["Thumbnail", "Image", "Image URL", "Cover", "Cover URL"]
-        )
+        thumbnail_url = get_val(["Thumbnail", "Image", "Image URL", "Cover", "Cover URL"])
         cover_url = get_val(["Large Image", "High Res Cover"])
 
         page_count = None
@@ -147,12 +141,8 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
             status = None
 
         # Prefer 'began' date, then 'added' date, then 'completed' date
-        start_date = (
-            date_began if date_began else (date_added if date_added else date_completed)
-        )
-        end_date = (
-            date_completed if date_completed else None
-        )  # Don't fill end_date if not completed
+        start_date = date_began if date_began else (date_added if date_added else date_completed)
+        end_date = date_completed if date_completed else None  # Don't fill end_date if not completed
 
         if status == "Completed" and not end_date:
             end_date = start_date

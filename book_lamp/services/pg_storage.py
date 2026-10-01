@@ -95,11 +95,7 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
                 time.sleep(wait_time)
             except Exception:
                 raise
-        raise (
-            last_exception
-            if last_exception
-            else OperationalError("Max retries exceeded")
-        )
+        raise (last_exception if last_exception else OperationalError("Max retries exceeded"))
 
     return wrapper
 
@@ -149,9 +145,7 @@ class PostgresStorage:
             GROUP BY b.id
         """
         with self.pool.connection() as conn:
-            rows = conn.execute(
-                query, [effective_user_id, effective_user_id]
-            ).fetchall()
+            rows = conn.execute(query, [effective_user_id, effective_user_id]).fetchall()
             books = []
             for row_raw in rows:
                 book = cast(Dict[str, Any], row_raw)
@@ -165,9 +159,7 @@ class PostgresStorage:
                 books.append(book)
             return books
 
-    def get_reading_records(
-        self, book_id: Optional[int] = None
-    ) -> list[dict[str, Any]]:
+    def get_reading_records(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return reading records for the current user, optionally filtered by book_id."""
         query = "SELECT * FROM reading_records WHERE user_id = %s"
         params: list[Any] = [self.user_id]
@@ -206,9 +198,7 @@ class PostgresStorage:
             row = cast(Dict[str, Any], row_raw)
             book = dict(row)
 
-            book["authors"] = (
-                row["author_names"] if row["author_names"] != [None] else []
-            )
+            book["authors"] = row["author_names"] if row["author_names"] != [None] else []
             book["author"] = book["author_names"][0] if book["author_names"] else ""
 
             return book
@@ -230,9 +220,7 @@ class PostgresStorage:
             row = cast(Dict[str, Any], row_raw)
             book = dict(row)
 
-            book["authors"] = (
-                row["author_names"] if row["author_names"] != [None] else []
-            )
+            book["authors"] = row["author_names"] if row["author_names"] != [None] else []
             book["author"] = book["author_names"][0] if book["author_names"] else ""
             return book
 
@@ -282,9 +270,7 @@ class PostgresStorage:
         return search_books(all_books, all_records, query)
 
     def get_recommendations(self) -> list[dict[str, Any]]:
-        query = (
-            "SELECT * FROM recommendations WHERE user_id = %s ORDER BY created_at DESC"
-        )
+        query = "SELECT * FROM recommendations WHERE user_id = %s ORDER BY created_at DESC"
         with self.pool.connection() as conn:
             rows = conn.execute(query, [self.user_id]).fetchall()
             return [dict(row) for row in rows]
@@ -293,10 +279,7 @@ class PostgresStorage:
         query = "SELECT key, value FROM settings WHERE user_id = %s"
         with self.pool.connection() as conn:
             rows = conn.execute(query, [self.user_id]).fetchall()
-            return {
-                cast(Dict[str, Any], row)["key"]: cast(Dict[str, Any], row)["value"]
-                for row in rows
-            }
+            return {cast(Dict[str, Any], row)["key"]: cast(Dict[str, Any], row)["value"] for row in rows}
 
     # Write operations
     def add_book(
@@ -375,9 +358,7 @@ class PostgresStorage:
                     # If for some reason ON CONFLICT didn't work, fetch existing
                     existing = cast(
                         Dict[str, Any],
-                        conn.execute(
-                            "SELECT id FROM books WHERE isbn13 = %s", [target_isbn]
-                        ).fetchone(),
+                        conn.execute("SELECT id FROM books WHERE isbn13 = %s", [target_isbn]).fetchone(),
                     )
                     if existing:
                         book_id = existing["id"]
@@ -391,9 +372,7 @@ class PostgresStorage:
 
         return self.get_book_by_id(book_id)  # type: ignore
 
-    def _update_book_authors(
-        self, conn: psycopg.Connection[Any], book_id: int, author_str: str
-    ) -> None:
+    def _update_book_authors(self, conn: psycopg.Connection[Any], book_id: int, author_str: str) -> None:
         """Helper to sync the authors table and book_authors link."""
         author_names = split_authors(author_str)
         # Clear existing links
@@ -405,9 +384,7 @@ class PostgresStorage:
                 "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
                 [name],
             )
-            author_row = conn.execute(
-                "SELECT id FROM authors WHERE name = %s", [name]
-            ).fetchone()
+            author_row = conn.execute("SELECT id FROM authors WHERE name = %s", [name]).fetchone()
             if author_row:
                 author_id = author_row["id"]
                 conn.execute(
@@ -460,20 +437,12 @@ class PostgresStorage:
 
                 if new_bisac and not is_dewey(new_bisac):
                     final_bisac = new_bisac
-                    final_bisac_main = (
-                        bisac_main_category or existing["bisac_main_category"]
-                    )
-                    final_bisac_sub = (
-                        bisac_sub_category or existing["bisac_sub_category"]
-                    )
+                    final_bisac_main = bisac_main_category or existing["bisac_main_category"]
+                    final_bisac_sub = bisac_sub_category or existing["bisac_sub_category"]
                 else:
                     final_bisac = existing_bisac or new_bisac
-                    final_bisac_main = (
-                        existing["bisac_main_category"] or bisac_main_category
-                    )
-                    final_bisac_sub = (
-                        existing["bisac_sub_category"] or bisac_sub_category
-                    )
+                    final_bisac_main = existing["bisac_main_category"] or bisac_main_category
+                    final_bisac_sub = existing["bisac_sub_category"] or bisac_sub_category
 
                 query = """
                     UPDATE books SET
@@ -567,13 +536,9 @@ class PostgresStorage:
             WHERE user_id = %s AND book_id = %s AND status = %s AND start_date = %s
         """
         with self.pool.connection() as conn:
-            existing = conn.execute(
-                existing_query, [self.user_id, book_id, status, start_date]
-            ).fetchone()
+            existing = conn.execute(existing_query, [self.user_id, book_id, status, start_date]).fetchone()
             if existing:
-                logger.info(
-                    f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'"
-                )
+                logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
                 # Return the existing record
                 records = self.get_reading_records(book_id=book_id)
                 for r in records:
@@ -586,16 +551,12 @@ class PostgresStorage:
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING *
             """
-            row_raw = conn.execute(
-                query, [self.user_id, book_id, status, start_date, end_date, rating]
-            ).fetchone()
+            row_raw = conn.execute(query, [self.user_id, book_id, status, start_date, end_date, rating]).fetchone()
             if not row_raw:
                 raise Exception("Failed to add reading record")
             row = cast(Dict[str, Any], row_raw)
 
-            logger.info(
-                f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={row['id']}"
-            )
+            logger.info(f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={row['id']}")
             return dict(row)
 
     def update_reading_record(
@@ -613,9 +574,7 @@ class PostgresStorage:
             RETURNING *
         """
         with self.pool.connection() as conn:
-            row_raw = conn.execute(
-                query, [status, start_date, end_date, rating, record_id, self.user_id]
-            ).fetchone()
+            row_raw = conn.execute(query, [status, start_date, end_date, rating, record_id, self.user_id]).fetchone()
             if not row_raw:
                 raise Exception(f"Reading record with ID {record_id} not found")
             row = cast(Dict[str, Any], row_raw)
@@ -674,9 +633,7 @@ class PostgresStorage:
                         [i + 1, self.user_id, row["book_id"]],
                     )
 
-            logger.info(
-                f"Successfully removed book {book_id} from reading list (Postgres)"
-            )
+            logger.info(f"Successfully removed book {book_id} from reading list (Postgres)")
 
     def update_reading_list_order(self, book_ids: list[int]) -> None:
         with self.pool.connection() as conn:
@@ -697,9 +654,7 @@ class PostgresStorage:
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
-                    row_raw = conn.execute(
-                        "SELECT id FROM books WHERE isbn13 = %s", [isbn13]
-                    ).fetchone()
+                    row_raw = conn.execute("SELECT id FROM books WHERE isbn13 = %s", [isbn13]).fetchone()
                     if row_raw:
                         row = cast(Dict[str, Any], row_raw)
                         book_id = row["id"]
@@ -801,11 +756,7 @@ class PostgresStorage:
                             ek_end = r["end_date"]
 
                             is_same_attempt = False
-                            if (
-                                ek_start
-                                and r_start
-                                and ek_start.isoformat() == str(r_start)
-                            ):
+                            if ek_start and r_start and ek_start.isoformat() == str(r_start):
                                 is_same_attempt = True
                             elif (
                                 r_status == "Completed"
@@ -823,19 +774,11 @@ class PostgresStorage:
                                     ek_status == r_status
                                     and (
                                         (not ek_start and not r_start)
-                                        or (
-                                            ek_start
-                                            and r_start
-                                            and ek_start.isoformat() == str(r_start)
-                                        )
+                                        or (ek_start and r_start and ek_start.isoformat() == str(r_start))
                                     )
                                     and (
                                         (not ek_end and not r_end)
-                                        or (
-                                            ek_end
-                                            and r_end
-                                            and ek_end.isoformat() == str(r_end)
-                                        )
+                                        or (ek_end and r_end and ek_end.isoformat() == str(r_end))
                                     )
                                 ):
                                     is_duplicate = True
@@ -891,9 +834,7 @@ class PostgresStorage:
     def save_recommendations(self, recommendations: list[dict[str, Any]]) -> None:
         with self.pool.connection() as conn:
             with conn.transaction():
-                conn.execute(
-                    "DELETE FROM recommendations WHERE user_id = %s", [self.user_id]
-                )
+                conn.execute("DELETE FROM recommendations WHERE user_id = %s", [self.user_id])
                 for rec in recommendations:
                     conn.execute(
                         "INSERT INTO recommendations (user_id, title, author, isbn13, justification) VALUES (%s, %s, %s, %s, %s)",

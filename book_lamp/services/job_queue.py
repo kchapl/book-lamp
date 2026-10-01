@@ -81,6 +81,7 @@ class JobQueue:
             return None
         try:
             from book_lamp.services.pg_storage import get_pool
+
             return get_pool()
         except Exception:
             return None
@@ -122,12 +123,12 @@ class JobQueue:
         if pool:
             try:
                 with pool.connection() as conn:
-                    row = conn.execute(
-                        "SELECT * FROM jobs WHERE id = %s", [job_id]
-                    ).fetchone()
+                    row = conn.execute("SELECT * FROM jobs WHERE id = %s", [job_id]).fetchone()
                     if row:
                         status_str = row.get("status", "pending")
-                        status = JobStatus(status_str) if status_str in [s.value for s in JobStatus] else JobStatus.PENDING
+                        status = (
+                            JobStatus(status_str) if status_str in [s.value for s in JobStatus] else JobStatus.PENDING
+                        )
                         return Job(
                             id=row["id"],
                             status=status,

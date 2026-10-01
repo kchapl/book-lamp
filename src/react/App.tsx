@@ -72,9 +72,9 @@ function App() {
     }, []);
 
     useEffect(() => {
-        // Only poll sync diagnostics for authenticated users. Fetching it
-        // anonymously used to return 401, which redirected the browser to
-        // /unauthorised and back into this same code, looping forever.
+        // The sync probe reports storage health, which needs a session. Probing
+        // unauthenticated earns a 401, and a 401 sends the browser to the
+        // sign-in page, which would then probe again.
         if (!isAuthorized) {
             setSyncStatus('checking');
             return;

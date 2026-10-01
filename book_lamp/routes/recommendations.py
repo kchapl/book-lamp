@@ -28,8 +28,6 @@ def api_recommendations():
     except Exception:
         current_app.logger.exception("Failed to generate recommendations")
         return (
-            jsonify(
-                {"recommendations": [], "error": "Failed to generate recommendations"}
-            ),
+            jsonify({"recommendations": [], "error": "Failed to generate recommendations"}),
             200,
         )

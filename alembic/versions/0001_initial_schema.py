@@ -14,18 +14,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        """
+    op.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id         SERIAL PRIMARY KEY,
             email      TEXT NOT NULL UNIQUE,
             name       TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS books (
             id                  SERIAL PRIMARY KEY,
             isbn13              TEXT NOT NULL UNIQUE,
@@ -46,27 +43,21 @@ def upgrade() -> None:
             cover_url           TEXT,
             created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS authors (
             id   SERIAL PRIMARY KEY,
             name TEXT NOT NULL UNIQUE
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS book_authors (
             book_id   INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
             author_id INTEGER NOT NULL REFERENCES authors(id) ON DELETE CASCADE,
             PRIMARY KEY (book_id, author_id)
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS reading_records (
             id         SERIAL PRIMARY KEY,
             user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -77,10 +68,8 @@ def upgrade() -> None:
             rating     INTEGER DEFAULT 0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS reading_list (
             user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             book_id    INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
@@ -88,10 +77,8 @@ def upgrade() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (user_id, book_id)
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS recommendations (
             id            SERIAL PRIMARY KEY,
             user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -101,18 +88,15 @@ def upgrade() -> None:
             justification TEXT,
             created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-    """
-    )
-    op.execute(
-        """
+    """)
+    op.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             key     TEXT NOT NULL,
             value   TEXT NOT NULL,
             PRIMARY KEY (user_id, key)
         )
-    """
-    )
+    """)
 
 
 def downgrade() -> None:

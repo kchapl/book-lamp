@@ -6,11 +6,36 @@ A personal reading history tracker.
 
 This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python, Node, uv).
 
+Two scripts cover the whole of the local setup:
+
+```bash
+scripts/setup   # once, after cloning
+scripts/start   # every time you want to run the app
+```
+
+**`scripts/setup`** installs the pinned toolchain with `mise install`, installs the
+Python and Node dependencies, and creates a `.env` from `.env.example` if one is
+missing. It is unprivileged: when it cannot find a container runtime it prints
+the command to install Docker Compose or podman-compose instead of running it, so
+you decide when to use `sudo`. Run it once after cloning; re-running is safe.
+
+**`scripts/start`** brings up the PostgreSQL container, waits for it to accept
+connections, applies the Alembic migrations, builds the React SPA and serves
+everything through the Flask development server on <http://127.0.0.1:5000>.
+`HOST` and `PORT` override the bind address and port. Containers and volumes are
+reused between runs, so the database keeps its data.
+
+On podman hosts whose kernel cannot program the compose bridge (nested containers
+and other minimal sandboxes), the database runs on the host network instead; see
+`compose.hostnet.yaml`.
+
+### Manual steps
+
 1. Install tools: `mise install`
 2. Install backend dependencies: `uv sync`
 3. Install frontend dependencies: `npm install`
-3. Compile TypeScript: `npm run build`
-4. Create `.env` file with required variables:
+4. Compile TypeScript: `npm run build`
+5. Create `.env` file with required variables:
    ```
    FLASK_DEBUG=True
    GOOGLE_CLIENT_ID=your_oauth_client_id
@@ -18,7 +43,7 @@ This project uses [mise](https://mise.jdx.dev/) to manage tool versions (Python,
 
    SECRET_KEY=your_secret_key
    ```
-5. Run the app: `uv run flask --app book_lamp.app run`
+6. Run the app: `uv run flask --app book_lamp.app run`
 
 ## Testing
 

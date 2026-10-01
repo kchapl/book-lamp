@@ -4,6 +4,7 @@ These tests require a running Postgres instance.
 In CI, pytest-docker will provide it via docker-compose.
 Locally, it uses the DATABASE_URL from .env or the default below.
 """
+
 import os
 
 import psycopg
@@ -50,16 +51,12 @@ def db_url(docker_ip, docker_services):
 
             return False
 
-    docker_services.wait_until_responsive(
-        timeout=30.0, pause=0.5, check=lambda: is_responsive(url)
-    )
+    docker_services.wait_until_responsive(timeout=30.0, pause=0.5, check=lambda: is_responsive(url))
 
     # Ensure the test database exists
     base_url = url.rsplit("/", 1)[0] + "/postgres"
     with psycopg.connect(base_url, autocommit=True) as conn:
-        exists = conn.execute(
-            "SELECT 1 FROM pg_database WHERE datname = 'book_lamp_test'"
-        ).fetchone()
+        exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = 'book_lamp_test'").fetchone()
         if not exists:
             conn.execute("CREATE DATABASE book_lamp_test")
 
@@ -95,20 +92,14 @@ def pg_storage(setup_database):
                 "TRUNCATE users, books, authors, reading_records, reading_list, settings, recommendations RESTART IDENTITY CASCADE"
             )
             # Create a default user
-            conn.execute(
-                "INSERT INTO users (id, email, name) VALUES (1, 'user1@example.com', 'User 1')"
-            )
-            conn.execute(
-                "INSERT INTO users (id, email, name) VALUES (2, 'user2@example.com', 'User 2')"
-            )
+            conn.execute("INSERT INTO users (id, email, name) VALUES (1, 'user1@example.com', 'User 1')")
+            conn.execute("INSERT INTO users (id, email, name) VALUES (2, 'user2@example.com', 'User 2')")
 
     return PostgresStorage(user_id=1)
 
 
 def test_add_book_and_get_by_isbn(pg_storage):
-    pg_storage.add_book(
-        isbn13="9780141036144", title="Brave New World", author="Aldous Huxley"
-    )
+    pg_storage.add_book(isbn13="9780141036144", title="Brave New World", author="Aldous Huxley")
 
     book = pg_storage.get_book_by_isbn("9780141036144")
     assert book is not None
@@ -119,9 +110,7 @@ def test_add_book_and_get_by_isbn(pg_storage):
 
 def test_upsert_book_idempotency(pg_storage):
     # First insert
-    pg_storage.upsert_book(
-        isbn13="9780141036144", title="Brave New World", author="Aldous Huxley"
-    )
+    pg_storage.upsert_book(isbn13="9780141036144", title="Brave New World", author="Aldous Huxley")
 
     # Second call (update)
     pg_storage.upsert_book(
@@ -132,9 +121,7 @@ def test_upsert_book_idempotency(pg_storage):
 
     # Directly check the database books table for the upsert result
     with pg_storage.pool.connection() as conn:
-        all_books = conn.execute(
-            "SELECT * FROM books WHERE isbn13 = '9780141036144'"
-        ).fetchall()
+        all_books = conn.execute("SELECT * FROM books WHERE isbn13 = '9780141036144'").fetchall()
     assert len(all_books) == 1
     assert all_books[0]["title"] == "Brave New World (Special Edition)"
 
@@ -144,17 +131,13 @@ def test_multi_user_isolation(pg_storage):
 
     # Add book for user 1
     book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
-    pg_storage.add_reading_record(
-        book_id=book["id"], status="Completed", start_date="2024-01-01"
-    )
+    pg_storage.add_reading_record(book_id=book["id"], status="Completed", start_date="2024-01-01")
 
     # Check user 2 sees no records
     assert len(storage2.get_reading_records()) == 0
 
     # Add record for user 2
-    storage2.add_reading_record(
-        book_id=book["id"], status="In Progress", start_date="2024-02-01"
-    )
+    storage2.add_reading_record(book_id=book["id"], status="In Progress", start_date="2024-02-01")
 
     assert len(pg_storage.get_reading_records()) == 1
     assert pg_storage.get_reading_records()[0]["status"] == "Completed"

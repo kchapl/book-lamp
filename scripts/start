@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#
+# Start Book Lamp locally.
+#
+# Brings up the PostgreSQL container, applies Alembic migrations, builds the
+# React SPA and serves the whole thing through the Flask development server.
+#
+# On podman hosts whose kernel cannot program the compose bridge (nested
+# containers and other minimal sandboxes), the database runs on the host
+# network instead; see compose.hostnet.yaml.
+#
+# Usage:
+#   scripts/start
+#
+# Environment overrides:
+#   HOST  Interface to bind (default 127.0.0.1)
+#   PORT  Port to bind (default 5000)
+
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_root"
+
+host="${HOST:-127.0.0.1}"
+port="${PORT:-5000}"
+
+log() {
+    printf '\033[1;34m==>\033[0m %s\n' "$1"
+}
+
+fail() {
+    printf '\033[1;31merror:\033[0m %s\n' "$1" >&2
+    exit 1
+}
+
+# Read the last assignment of a key from .env, matching python-dotenv: strip
+# an inline comment, surrounding whitespace and quotes.
+read_env_value() {
+    grep -E "^${1}=" .env 2>/dev/null |
+        tail -n1 |
+        cut -d= -f2- |
+        sed -E 's/[[:space:]]+#.*$//' |
+        sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//' |
+        sed -E "s/^[\"']//; s/[\"']\$//"
+}
+
+[ -f .env ] || fail "No .env file found. Copy .env.example to .env and fill it in."
+
+command -v uv >/dev/null 2>&1 || fail "uv is required but was not found on PATH (see mise.toml)."
+command -v npm >/dev/null 2>&1 || fail "npm is required but was not found on PATH."
+
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    compose=(docker compose)
+elif command -v podman-compose >/dev/null 2>&1; then
+    compose=(podman-compose)
+else
+    fail "Docker Compose (or podman-compose) is required to start the local database."
+fi
+
+# netavark, podman's bridge driver, programs the compose network with
+# nftables. Kernels without that support cannot start the database container on
+# the bridge, so hand the database the host network instead: it answers on
+# 127.0.0.1:5432, exactly where DATABASE_URL points, and no bridge is created.
+host_network=0
+if [ "${compose[0]}" = "podman-compose" ] && [ ! -e /sys/module/nf_tables ]; then
+    host_network=1
+fi
+
+compose_files=(-f compose.yaml)
+if [ "$host_network" -eq 1 ]; then
+    compose_files+=(-f compose.hostnet.yaml)
+fi
+
+run_compose() {
+    "${compose[@]}" "${compose_files[@]}" "$@"
+}
+
+if [ ! -d .venv ]; then
+    log "Installing Python dependencies (uv sync --all-extras)"
+    uv sync --all-extras
+fi
+
+if [ ! -d node_modules ]; then
+    log "Installing Node dependencies (npm install)"
+    npm install
+fi
+
+if [ "$host_network" -eq 1 ]; then
+    log "This kernel cannot program the compose bridge; using the host network for PostgreSQL"
+fi
+
+log "Starting PostgreSQL"
+
+# podman-compose 1.3.0 tries to create the container even when it already
+# exists, then reports "the container name ... is already in use", although it
+# goes on to reuse the container (containers/podman-compose#1118). Start the
+# container that already exists instead, so a normal re-run is quiet. If it
+# cannot start - a stale container created on a bridge this host can no longer
+# program, say - fall back to `up`, which replaces it.
+db_container=""
+if [ "${compose[0]}" = "podman-compose" ]; then
+    db_container="$(run_compose ps -q 2>/dev/null | sed -n '1p')"
+fi
+if [ -n "$db_container" ]; then
+    run_compose start db || run_compose up -d db
+else
+    run_compose up -d db
+fi
+
+log "Waiting for PostgreSQL to accept connections"
+attempt=1
+while :; do
+    if run_compose exec -T db pg_isready >/dev/null 2>&1 ||
+        run_compose exec db pg_isready >/dev/null 2>&1; then
+        break
+    fi
+
+    if [ "$attempt" -ge 30 ]; then
+        # A kernel that looked capable can still fail to start the container on
+        # the bridge, so fall back to the host network once before giving up.
+        if [ "$host_network" -eq 0 ] && [ "${compose[0]}" = "podman-compose" ]; then
+            log "PostgreSQL did not become ready; retrying on the host network"
+            host_network=1
+            compose_files+=(-f compose.hostnet.yaml)
+            run_compose up -d db
+            attempt=1
+            continue
+        fi
+        fail "PostgreSQL did not become ready within 30 seconds."
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 1
+done
+
+log "Applying database migrations (alembic upgrade head)"
+uv run alembic upgrade head
+
+log "Building the React SPA (npm run build:react)"
+npm run build:react
+
+flask_command=(uv run flask --app book_lamp.app run --host "$host" --port "$port")
+if [ "$(read_env_value FLASK_DEBUG | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+    flask_command+=(--debug)
+fi
+
+log "Starting Book Lamp on http://${host}:${port}"
+exec "${flask_command[@]}"

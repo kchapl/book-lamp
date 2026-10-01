@@ -1,44 +1,44 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
 
-// Mock the Html5Qrcode library
-jest.mock('html5-qrcode', () => {
-  const startMock = jest.fn().mockResolvedValue(undefined);
-  const stopMock = jest.fn().mockResolvedValue(undefined);
-  return {
-    Html5Qrcode: jest.fn().mockImplementation(() => ({
-      start: startMock,
-      stop: stopMock,
-    })),
-    __esModule: true,
-    startMock,
-    stopMock,
-  };
-});
+// The scanner library reaches for the camera; stub it out. It must be a real
+// constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
+// mock throws there, which the page swallows into its error state.
+vi.mock('html5-qrcode', () => ({
+    Html5Qrcode: class {
+        start = vi.fn().mockResolvedValue(undefined);
+        stop = vi.fn().mockResolvedValue(undefined);
+    },
+}));
 
 describe('AddBookPage barcode scanner', () => {
-  it('opens scanner UI when Scan button is clicked', async () => {
-    render(
-      <MemoryRouter>
-        <AddBookPage />
-      </MemoryRouter>
-    );
+    it('opens the scanner when the Scan button is clicked', async () => {
+        const { container } = render(
+            <MemoryRouter>
+                <AddBookPage />
+            </MemoryRouter>
+        );
 
-    // Initially, scanner container should be hidden
-    const scannerContainer = screen.getByRole('region', { name: /scanner/i })
-      .parentElement as HTMLElement;
-    expect(scannerContainer).toHaveStyle('display: none');
+        // The scanner container is hidden until scanning starts, so it is not in
+        // the accessibility tree and cannot be queried by role.
+        const scannerContainer = container.querySelector('.scanner-container') as HTMLElement;
+        expect(scannerContainer).toHaveStyle('display: none');
 
-    // Click the Scan button
-    const scanButton = screen.getByRole('button', { name: /📷 scan barcode/i });
-    fireEvent.click(scanButton);
+        fireEvent.click(screen.getByRole('button', { name: /scan barcode/i }));
 
-    // Wait for scanning state to become true and the container to be visible
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /stop scanner/i })).toBeInTheDocument();
-      expect(scannerContainer).toHaveStyle('display: block');
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /stop scanner/i })).toBeInTheDocument();
+            expect(scannerContainer).toHaveStyle('display: block');
+        });
+
+        // The scanner must stay open. A failed `new Html5Qrcode()` or start()
+        // flips scanning back off and shows an error, and the waitFor above can
+        // catch that transient state before it reverts.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(screen.getByRole('button', { name: /stop scanner/i })).toBeInTheDocument();
+        expect(screen.queryByText(/failed to start camera/i)).not.toBeInTheDocument();
     });
-  });
 });

@@ -39,17 +39,10 @@ def get_google_service(service_name: str, service_version: str) -> Any:
         raise ValueError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_KEY: {e}")
 
 
-def get_sheet_data(
-    service: Any, spreadsheet_id: str, range_name: str
-) -> List[List[str]]:
+def get_sheet_data(service: Any, spreadsheet_id: str, range_name: str) -> List[List[str]]:
     """Get data from a Google Sheets range."""
     try:
-        result = (
-            service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_name)
-            .execute()
-        )
+        result = service.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
         values = result.get("values", [])
         # Ensure all values are strings and return proper type
         return [[str(cell) for cell in row] for row in values]
@@ -74,9 +67,7 @@ def create_migration_batch() -> str:
     return batch_id
 
 
-def validate_migration(
-    storage: PostgresStorage, spreadsheet_id: str, sheets_service: Any
-) -> Dict[str, Any]:
+def validate_migration(storage: PostgresStorage, spreadsheet_id: str, sheets_service: Any) -> Dict[str, Any]:
     """Validate migration viability without making changes."""
     validation_results: Dict[str, Any] = {
         "valid": True,
@@ -106,9 +97,7 @@ def validate_migration(
         if tab_name == "Books" and data and len(data) > 1:
             for row in data[1:]:
                 if len(row) >= 2 and row[1]:  # Has ISBN
-                    validation_results["warnings"].append(
-                        f"Book '{row[2][:30]}...' has ISBN - may deduplicate"
-                    )
+                    validation_results["warnings"].append(f"Book '{row[2][:30]}...' has ISBN - may deduplicate")
                     break
 
         if tab_name == "ReadingRecords" and data and len(data) > 1:
@@ -120,9 +109,7 @@ def validate_migration(
                     break
 
     validation_results["book_count"] = validation_results.get("books_count", 0)
-    validation_results["record_count"] = validation_results.get(
-        "readingrecords_count", 0
-    )
+    validation_results["record_count"] = validation_results.get("readingrecords_count", 0)
 
     return validation_results
 
@@ -148,9 +135,7 @@ def rollback_migration(batch_id: str, user_id: int, dry_run: bool) -> int:
     return 0
 
 
-def migrate_books(
-    storage: PostgresStorage, rows: List[List[str]], dry_run: bool
-) -> int:
+def migrate_books(storage: PostgresStorage, rows: List[List[str]], dry_run: bool) -> int:
     """Migrate books from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
@@ -184,46 +169,22 @@ def migrate_books(
                 return None
 
         book_data = {
-            "isbn13": (
-                row[col_map.get("isbn13", 1)]
-                if len(row) > col_map.get("isbn13", 1)
-                else None
-            ),
+            "isbn13": (row[col_map.get("isbn13", 1)] if len(row) > col_map.get("isbn13", 1) else None),
             "title": row[title_col],
-            "author": (
-                row[col_map.get("author", 3)]
-                if len(row) > col_map.get("author", 3)
-                else None
-            ),
+            "author": (row[col_map.get("author", 3)] if len(row) > col_map.get("author", 3) else None),
             "publication_year": (
                 safe_int(row[col_map.get("publication_year", 4)])
                 if len(row) > col_map.get("publication_year", 4)
                 else None
             ),
             "thumbnail_url": (
-                row[col_map.get("thumbnail_url", 5)]
-                if len(row) > col_map.get("thumbnail_url", 5)
-                else None
+                row[col_map.get("thumbnail_url", 5)] if len(row) > col_map.get("thumbnail_url", 5) else None
             ),
-            "publisher": (
-                row[col_map.get("publisher", 6)]
-                if len(row) > col_map.get("publisher", 6)
-                else None
-            ),
-            "description": (
-                row[col_map.get("description", 8)]
-                if len(row) > col_map.get("description", 8)
-                else None
-            ),
-            "series": (
-                row[col_map.get("series", 9)]
-                if len(row) > col_map.get("series", 9)
-                else None
-            ),
+            "publisher": (row[col_map.get("publisher", 6)] if len(row) > col_map.get("publisher", 6) else None),
+            "description": (row[col_map.get("description", 8)] if len(row) > col_map.get("description", 8) else None),
+            "series": (row[col_map.get("series", 9)] if len(row) > col_map.get("series", 9) else None),
             "bisac_category": (
-                row[col_map.get("bisac_category", 10)]
-                if len(row) > col_map.get("bisac_category", 10)
-                else None
+                row[col_map.get("bisac_category", 10)] if len(row) > col_map.get("bisac_category", 10) else None
             ),
             "bisac_main_category": (
                 row[col_map.get("bisac_main_category", 11)]
@@ -231,35 +192,17 @@ def migrate_books(
                 else None
             ),
             "bisac_sub_category": (
-                row[col_map.get("bisac_sub_category", 12)]
-                if len(row) > col_map.get("bisac_sub_category", 12)
-                else None
+                row[col_map.get("bisac_sub_category", 12)] if len(row) > col_map.get("bisac_sub_category", 12) else None
             ),
-            "language": (
-                row[col_map.get("language", 13)]
-                if len(row) > col_map.get("language", 13)
-                else None
-            ),
+            "language": (row[col_map.get("language", 13)] if len(row) > col_map.get("language", 13) else None),
             "page_count": (
-                safe_int(row[col_map.get("page_count", 14)])
-                if len(row) > col_map.get("page_count", 14)
-                else None
+                safe_int(row[col_map.get("page_count", 14)]) if len(row) > col_map.get("page_count", 14) else None
             ),
             "physical_format": (
-                row[col_map.get("physical_format", 15)]
-                if len(row) > col_map.get("physical_format", 15)
-                else None
+                row[col_map.get("physical_format", 15)] if len(row) > col_map.get("physical_format", 15) else None
             ),
-            "edition": (
-                row[col_map.get("edition", 16)]
-                if len(row) > col_map.get("edition", 16)
-                else None
-            ),
-            "cover_url": (
-                row[col_map.get("cover_url", 17)]
-                if len(row) > col_map.get("cover_url", 17)
-                else None
-            ),
+            "edition": (row[col_map.get("edition", 16)] if len(row) > col_map.get("edition", 16) else None),
+            "cover_url": (row[col_map.get("cover_url", 17)] if len(row) > col_map.get("cover_url", 17) else None),
         }
 
         if dry_run:
@@ -269,23 +212,13 @@ def migrate_books(
                 isbn13=str(book_data["isbn13"]) if book_data["isbn13"] else "",
                 title=str(book_data["title"]),
                 author=str(book_data["author"]) if book_data["author"] else "",
-                publication_year=(
-                    cast(int, book_data["publication_year"])
-                    if book_data["publication_year"]
-                    else None
-                ),
-                thumbnail_url=(
-                    cast(str, book_data["thumbnail_url"])
-                    if book_data["thumbnail_url"]
-                    else None
-                ),
+                publication_year=(cast(int, book_data["publication_year"]) if book_data["publication_year"] else None),
+                thumbnail_url=(cast(str, book_data["thumbnail_url"]) if book_data["thumbnail_url"] else None),
                 publisher=cast(Optional[str], book_data["publisher"]),
                 description=cast(Optional[str], book_data["description"]),
                 series=cast(Optional[str], book_data["series"]),
                 bisac_category=cast(Optional[str], book_data["bisac_category"]),
-                bisac_main_category=cast(
-                    Optional[str], book_data["bisac_main_category"]
-                ),
+                bisac_main_category=cast(Optional[str], book_data["bisac_main_category"]),
                 bisac_sub_category=cast(Optional[str], book_data["bisac_sub_category"]),
                 language=cast(Optional[str], book_data["language"]),
                 page_count=cast(Optional[int], book_data["page_count"]),
@@ -294,18 +227,14 @@ def migrate_books(
                 cover_url=cast(Optional[str], book_data["cover_url"]),
             )
             if book_data["description"]:
-                print(
-                    f"  Added description for: {cast(str, book_data['title'])[:30]}..."
-                )
+                print(f"  Added description for: {cast(str, book_data['title'])[:30]}...")
 
         books_added += 1
 
     return books_added
 
 
-def migrate_reading_records(
-    storage: PostgresStorage, rows: List[List[str]], dry_run: bool
-) -> int:
+def migrate_reading_records(storage: PostgresStorage, rows: List[List[str]], dry_run: bool) -> int:
     """Migrate reading records from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
@@ -360,14 +289,8 @@ def migrate_reading_records(
             storage.add_reading_record(
                 book_id=cast(int, record_data["book_id"]) or 0,
                 status=str(record_data["status"]),
-                start_date=(
-                    str(record_data["start_date"]) if record_data["start_date"] else ""
-                ),
-                end_date=(
-                    cast(str, record_data["end_date"])
-                    if record_data["end_date"]
-                    else None
-                ),
+                start_date=(str(record_data["start_date"]) if record_data["start_date"] else ""),
+                end_date=(cast(str, record_data["end_date"]) if record_data["end_date"] else None),
                 rating=cast(int, record_data["rating"]) or 0,
             )
 
@@ -376,9 +299,7 @@ def migrate_reading_records(
     return records_added
 
 
-def migrate_reading_list(
-    storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool
-) -> int:
+def migrate_reading_list(storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool) -> int:
     """Migrate reading list from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
@@ -425,9 +346,7 @@ def migrate_reading_list(
     return list_added
 
 
-def migrate_settings(
-    storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool
-) -> int:
+def migrate_settings(storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool) -> int:
     """Migrate settings from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
@@ -449,9 +368,7 @@ def migrate_settings(
     return settings_added
 
 
-def migrate_recommendations(
-    storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool
-) -> int:
+def migrate_recommendations(storage: PostgresStorage, rows: List[List[str]], user_id: int, dry_run: bool) -> int:
     """Migrate recommendations from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
@@ -482,15 +399,9 @@ def migrate_recommendations(
 
 def main() -> None:
     """Main migration function."""
-    parser = argparse.ArgumentParser(
-        description="Migrate data from Google Sheets to PostgreSQL"
-    )
-    parser.add_argument(
-        "--spreadsheet-id", required=True, help="Google Sheets spreadsheet ID"
-    )
-    parser.add_argument(
-        "--user-email", required=True, help="User email for the migration"
-    )
+    parser = argparse.ArgumentParser(description="Migrate data from Google Sheets to PostgreSQL")
+    parser.add_argument("--spreadsheet-id", required=True, help="Google Sheets spreadsheet ID")
+    parser.add_argument("--user-email", required=True, help="User email for the migration")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -539,9 +450,7 @@ def main() -> None:
         # Validate first if requested
         if args.validate_only:
             print("Validating migration...")
-            validation = validate_migration(
-                storage, args.spreadsheet_id, sheets_service
-            )
+            validation = validate_migration(storage, args.spreadsheet_id, sheets_service)
             print("\n=== Validation Results ===")
             print(f"Valid: {validation['valid']}")
             print("\nNotes:")
@@ -551,14 +460,10 @@ def main() -> None:
                 print("\nWarnings:")
                 for warning in validation["warnings"]:
                     print(f"  - {warning}")
-            print(
-                f"\nTotal records to migrate: {validation['book_count']} books, {validation['record_count']} records"
-            )
+            print(f"\nTotal records to migrate: {validation['book_count']} books, {validation['record_count']} records")
             return
 
-        print(
-            f"{'DRY RUN: ' if args.dry_run else ''}Starting migration from spreadsheet {args.spreadsheet_id}"
-        )
+        print(f"{'DRY RUN: ' if args.dry_run else ''}Starting migration from spreadsheet {args.spreadsheet_id}")
         print(f"User email: {args.user_email}")
 
         # Create batch for tracking
@@ -593,9 +498,7 @@ def main() -> None:
                 continue
 
             count = migrate_func(storage, data, args.dry_run)
-            print(
-                f"  {tab_name}: {count} records {'would be ' if args.dry_run else ''}migrated"
-            )
+            print(f"  {tab_name}: {count} records {'would be ' if args.dry_run else ''}migrated")
             total_migrated += count
 
         print(f"\n{'DRY RUN: ' if args.dry_run else ''}Migration complete!")

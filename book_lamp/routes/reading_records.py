@@ -72,14 +72,10 @@ def api_update_reading_record(record_id: int):
             end_date=end_date,
             rating=rating,
         )
-        current_app.logger.info(
-            f"RECORD_UPDATED (API): record_id={record_id}, status='{status}'"
-        )
+        current_app.logger.info(f"RECORD_UPDATED (API): record_id={record_id}, status='{status}'")
         return jsonify({"success": True})
     except Exception:
-        current_app.logger.exception(
-            f"api_update_reading_record: failed for record_id={record_id}"
-        )
+        current_app.logger.exception(f"api_update_reading_record: failed for record_id={record_id}")
         return jsonify({"error": "Failed to update reading record"}), 500
 
 
@@ -111,9 +107,7 @@ def api_start_reading(book_id: int):
     storage = get_storage()
     try:
         storage.start_reading(book_id)
-        current_app.logger.info(
-            f"START_READING (API): book_id={book_id}, new_status='In Progress'"
-        )
+        current_app.logger.info(f"START_READING (API): book_id={book_id}, new_status='In Progress'")
         return jsonify({"success": True})
     except Exception:
         current_app.logger.exception(f"api_start_reading: failed for book_id={book_id}")

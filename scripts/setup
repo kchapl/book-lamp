@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# Prepare a freshly cloned checkout of Book Lamp.
+#
+# Installs the pinned toolchain (Python, Node, uv via mise) plus the Python and
+# Node dependencies, and creates a .env file if one is missing. Run this once
+# after cloning, then use scripts/start to run the app.
+#
+# Usage:
+#   scripts/setup
+
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_root"
+
+log() {
+    printf '\033[1;34m==>\033[0m %s\n' "$1"
+}
+
+warn() {
+    printf '\033[1;33mwarning:\033[0m %s\n' "$1" >&2
+}
+
+fail() {
+    printf '\033[1;31merror:\033[0m %s\n' "$1" >&2
+    exit 1
+}
+
+# Print the Podman install command for the detected platform. Setup is kept
+# unprivileged, so the user runs this themselves rather than blocking on sudo.
+print_container_runtime_hint() {
+    printf '    Install one of them:\n'
+
+    case "$(uname -s)" in
+        Linux)
+            os_id="$(
+                grep -E '^(ID|ID_LIKE)=' /etc/os-release 2>/dev/null |
+                    cut -d= -f2- |
+                    tr -d '"' |
+                    tr '[:upper:]' '[:lower:]'
+            )"
+            case "$os_id" in
+                *debian* | *ubuntu*) printf '      sudo apt-get install -y podman podman-compose\n' ;;
+                *fedora* | *rhel* | *centos*) printf '      sudo dnf install -y podman podman-compose\n' ;;
+                *arch*) printf '      sudo pacman -S --noconfirm podman podman-compose\n' ;;
+                *suse*) printf '      sudo zypper install -y podman podman-compose\n' ;;
+                *alpine*) printf '      sudo apk add podman podman-compose\n' ;;
+                *) printf '      install podman and podman-compose with your package manager\n' ;;
+            esac
+            ;;
+        Darwin)
+            printf '      brew install podman podman-compose\n'
+            printf '      podman machine init && podman machine start\n'
+            ;;
+        *)
+            printf '      install Docker Desktop, or podman and podman-compose\n'
+            ;;
+    esac
+}
+
+command -v mise >/dev/null 2>&1 ||
+    fail "mise is required but was not found on PATH. Install it from https://mise.jdx.dev/ and re-run."
+
+# mise refuses to apply an untrusted config file; trusting the checkout is safe
+# here because the user cloned it deliberately.
+mise trust >/dev/null 2>&1 || true
+
+log "Installing the toolchain from mise.toml (mise install)"
+mise install
+
+log "Installing Python dependencies (uv sync --all-extras)"
+mise exec -- uv sync --all-extras
+
+log "Installing Node dependencies (npm ci)"
+mise exec -- npm ci
+
+created_env=false
+if [ ! -f .env ]; then
+    [ -f .env.example ] || fail "No .env.example to copy from."
+    log "Creating .env from .env.example"
+    grep -v '^\[TEMPLATE\]' .env.example >.env
+    created_env=true
+fi
+
+container_runtime=""
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    container_runtime="Docker Compose"
+elif command -v podman-compose >/dev/null 2>&1; then
+    container_runtime="podman-compose"
+else
+    warn "Neither Docker Compose nor podman-compose was found; scripts/start needs one to run PostgreSQL."
+    print_container_runtime_hint
+fi
+
+log "Setup complete."
+[ "$container_runtime" = "" ] || printf '    - Database runtime: %s\n' "$container_runtime"
+if [ "$created_env" = true ]; then
+    printf '    - Created .env — review it and set SECRET_KEY, GOOGLE_CLIENT_ID and LLM_API_KEY.\n'
+fi
+printf '    - If uv and npm are not already on your PATH, activate mise in your shell.\n'
+printf '\nRun the app with: scripts/start\n'

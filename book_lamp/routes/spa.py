@@ -1,6 +1,7 @@
 """SPA routing and static assets serving."""
 
 import os
+
 from flask import Blueprint, Response, current_app, redirect, request, send_from_directory, url_for
 
 spa_bp = Blueprint("spa", __name__)
@@ -33,9 +34,7 @@ def connect():
 def favicon():
     """Serve favicon from static folder."""
     static_folder = current_app.static_folder or "static"
-    return send_from_directory(
-        static_folder, "favicon.png", mimetype="image/png"
-    )
+    return send_from_directory(static_folder, "favicon.png", mimetype="image/png")
 
 
 @spa_bp.route("/<path:fallback>", methods=["GET"])

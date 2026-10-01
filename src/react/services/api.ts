@@ -1,6 +1,7 @@
 import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord, AuthStatus } from '../types';
 
 const API_BASE = '/api';
+const UNAUTHORISED_PATH = '/unauthorised';
 
 function getCsrfToken(): string | null {
     const metaTag = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
@@ -72,11 +73,11 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
     if (!response.ok) {
         if (response.status === 401) {
-            // /unauthorised is served by the SPA catch-all, so navigating to
-            // it boots this module again. Redirect only when we are somewhere
-            // else, otherwise the page reloads itself in an endless loop.
-            if (window.location.pathname !== '/unauthorised') {
-                window.location.href = '/unauthorised';
+            // Never steer the browser to the page it is already on: /unauthorised
+            // would ask the session-bearing endpoints again, get another 401, and
+            // reload itself forever.
+            if (window.location.pathname !== UNAUTHORISED_PATH) {
+                window.location.href = UNAUTHORISED_PATH;
             }
             throw new Error('Unauthorized');
         }

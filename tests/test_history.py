@@ -13,9 +13,7 @@ def test_get_reading_history_empty(authenticated_client):
 def test_get_reading_history_populated(authenticated_client):
     """Test reading history with records; reading list items are excluded."""
     storage = get_storage()
-    book = storage.add_book(
-        isbn13="1", title="Pride and Prejudice", author="Jane Austen"
-    )
+    book = storage.add_book(isbn13="1", title="Pride and Prejudice", author="Jane Austen")
     storage.add_reading_record(
         book_id=book["id"],
         status="Completed",
@@ -41,9 +39,7 @@ def test_reading_history_filtering(authenticated_client):
     b1 = storage.add_book(isbn13="1", title="Book 1", author="A1")
     b2 = storage.add_book(isbn13="2", title="Book 2", author="A2")
 
-    storage.add_reading_record(
-        b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5
-    )
+    storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5)
     storage.add_reading_record(b2["id"], "In Progress", "2023-02-01")
 
     # Filter by status
@@ -114,9 +110,7 @@ def test_update_reading_record(authenticated_client):
     """Test updating an existing reading record."""
     storage = get_storage()
     book = storage.add_book(isbn13="1", title="Test Book", author="Author")
-    record = storage.add_reading_record(
-        book_id=book["id"], status="In Progress", start_date="2024-01-01"
-    )
+    record = storage.add_reading_record(book_id=book["id"], status="In Progress", start_date="2024-01-01")
 
     response = authenticated_client.post(
         f"/api/reading-records/{record['id']}/edit",
@@ -137,14 +131,10 @@ def test_delete_reading_record(authenticated_client):
     """Test deleting a reading record."""
     storage = get_storage()
     book = storage.add_book(isbn13="1", title="Test Book", author="Author")
-    record = storage.add_reading_record(
-        book_id=book["id"], status="In Progress", start_date="2024-01-01"
-    )
+    record = storage.add_reading_record(book_id=book["id"], status="In Progress", start_date="2024-01-01")
 
     assert len(storage.get_reading_records()) == 1
-    response = authenticated_client.post(
-        f"/api/reading-records/{record['id']}/delete"
-    )
+    response = authenticated_client.post(f"/api/reading-records/{record['id']}/delete")
     assert response.status_code == 200
     assert len(storage.get_reading_records()) == 0
 
@@ -186,12 +176,8 @@ def test_reading_history_year_filter(authenticated_client):
     b1 = storage.add_book(isbn13="1", title="2024 Book", author="A1")
     b2 = storage.add_book(isbn13="2", title="2023 Book", author="A2")
 
-    storage.add_reading_record(
-        b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5
-    )
-    storage.add_reading_record(
-        b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4
-    )
+    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    storage.add_reading_record(b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4)
 
     # Filter by year 2024
     response = authenticated_client.get("/api/history?year=2024")

@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from book_lamp.utils import parse_bisac_category
 from book_lamp.utils.publishers import normalize_publisher
+from book_lamp.utils.reading_status import with_reading_status
 
 
 def calculate_collection_stats(
@@ -32,23 +33,7 @@ def calculate_collection_stats(
             continue
     avg_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0.0
 
-    latest_records: Dict[Any, Dict[str, Any]] = {}
-    for r in all_records:
-        bid = r.get("book_id")
-        if bid:
-            if bid not in latest_records or r.get("start_date", "") > latest_records[
-                bid
-            ].get("start_date", ""):
-                latest_records[bid] = r
-
-    allowed_statuses = {"In Progress", "Completed", "Abandoned"}
-    statuses = []
-    for b in books:
-        bid = b.get("id")
-        if bid in latest_records:
-            status = latest_records[bid].get("status")
-            if status in allowed_statuses:
-                statuses.append(status)
+    statuses = [book["latest_status"] for book in with_reading_status(books, all_records)]
     status_counts = Counter(statuses)
 
     rating_counts: Counter[int] = Counter()
@@ -79,13 +64,9 @@ def calculate_collection_stats(
             norm_pub = normalize_publisher(b["publisher"])
             if norm_pub:
                 all_publishers.append(norm_pub)
-    top_publishers = sorted(
-        Counter(all_publishers).items(), key=lambda x: (-x[1], x[0])
-    )[:5]
+    top_publishers = sorted(Counter(all_publishers).items(), key=lambda x: (-x[1], x[0]))[:5]
 
-    completed_records_for_dates = [
-        r for r in all_records if r.get("status") == "Completed" and r.get("end_date")
-    ]
+    completed_records_for_dates = [r for r in all_records if r.get("status") == "Completed" and r.get("end_date")]
 
     yearly_counts: Counter[str] = Counter()
     for r in completed_records_for_dates:
@@ -115,9 +96,7 @@ def calculate_collection_stats(
     for i in range(1, 13):
         idx_str = f"{i:02d}"
         name = calendar.month_name[i][:3]
-        ordered_months.append(
-            {"index": i, "name": name, "count": monthly_counts[idx_str]}
-        )
+        ordered_months.append({"index": i, "name": name, "count": monthly_counts[idx_str]})
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
@@ -136,11 +115,7 @@ def calculate_collection_stats(
         other_total = sum(count for label, count in all_categories_sorted[10:])
         category_distribution.append(("Other", other_total))
 
-    max_category_count = (
-        max(count for label, count in category_distribution)
-        if category_distribution
-        else 1
-    )
+    max_category_count = max(count for label, count in category_distribution) if category_distribution else 1
 
     total_pages_read = 0
     for b in completed_books:
@@ -177,11 +152,7 @@ def calculate_collection_stats(
             except (ValueError, TypeError):
                 pass
 
-    avg_reading_time_days = (
-        total_reading_days / len(completed_records_for_dates)
-        if completed_records_for_dates
-        else 0
-    )
+    avg_reading_time_days = total_reading_days / len(completed_records_for_dates) if completed_records_for_dates else 0
 
     current_year = datetime.datetime.now().year
     current_streak = 0
@@ -192,9 +163,7 @@ def calculate_collection_stats(
         date_str = r.get("end_date", "")
         if date_str and len(date_str) >= 7:
             year_month = date_str[:7]
-            completions_by_month[year_month] = (
-                completions_by_month.get(year_month, 0) + 1
-            )
+            completions_by_month[year_month] = completions_by_month.get(year_month, 0) + 1
 
     if completions_by_month:
         check_date = datetime.date(current_year, datetime.datetime.now().month, 1)
@@ -215,11 +184,7 @@ def calculate_collection_stats(
             for i in range(1, len(sorted_months)):
                 prev = datetime.date.fromisoformat(sorted_months[i - 1] + "-01")
                 curr = datetime.date.fromisoformat(sorted_months[i] + "-01")
-                expected = (
-                    prev.replace(month=prev.month + 1)
-                    if prev.month < 12
-                    else datetime.date(prev.year + 1, 1, 1)
-                )
+                expected = prev.replace(month=prev.month + 1) if prev.month < 12 else datetime.date(prev.year + 1, 1, 1)
                 if curr == expected:
                     streak += 1
                 else:
@@ -233,9 +198,7 @@ def calculate_collection_stats(
     books_last_year = yearly_counts.get(previous_year_str, 0)
 
     if books_last_year > 0:
-        percentage_change = round(
-            ((books_this_year - books_last_year) / books_last_year) * 100, 1
-        )
+        percentage_change = round(((books_this_year - books_last_year) / books_last_year) * 100, 1)
     else:
         percentage_change = 100.0 if books_this_year > 0 else 0.0
 
@@ -246,9 +209,7 @@ def calculate_collection_stats(
     }
 
     months_with_data = len(completions_by_month) if completions_by_month else 1
-    reading_pace_monthly = (
-        round(total_books / months_with_data, 2) if months_with_data > 0 else 0
-    )
+    reading_pace_monthly = round(total_books / months_with_data, 2) if months_with_data > 0 else 0
     reading_pace_annualised = round(reading_pace_monthly * 12, 1)
 
     format_bins: Counter[str] = Counter()
@@ -257,8 +218,7 @@ def calculate_collection_stats(
         if fmt:
             format_bins[fmt] += 1
     format_distribution = [
-        {"label": label, "count": count}
-        for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
+        {"label": label, "count": count} for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
     ]
 
     language_bins: Counter[str] = Counter()
@@ -267,8 +227,7 @@ def calculate_collection_stats(
         if lang:
             language_bins[lang] += 1
     language_distribution = [
-        {"label": label, "count": count}
-        for label, count in sorted(language_bins.items(), key=lambda x: -x[1])
+        {"label": label, "count": count} for label, count in sorted(language_bins.items(), key=lambda x: -x[1])
     ]
 
     series_bins: Dict[str, List[str]] = {}
@@ -293,9 +252,7 @@ def calculate_collection_stats(
             main_cat, sub_cat = parse_bisac_category(bisac)
             if main_cat:
                 norm_cat = main_cat.title() if len(main_cat) > 3 else main_cat.upper()
-                existing = next(
-                    (c for c in category_details_list if c["label"] == norm_cat), None
-                )
+                existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
                 if not existing:
                     existing = {
                         "label": norm_cat,
@@ -312,10 +269,7 @@ def calculate_collection_stats(
         {
             "label": c["label"],
             "count": c["count"],
-            "subcategories": [
-                {"name": name, "count": count}
-                for name, count in c["subcategories"].most_common(5)
-            ],
+            "subcategories": [{"name": name, "count": count} for name, count in c["subcategories"].most_common(5)],
         }
         for c in category_details_list[:10]
     ]
@@ -331,9 +285,7 @@ def calculate_collection_stats(
 
     goal_progress_percent = 0.0
     if yearly_goal and yearly_goal > 0:
-        goal_progress_percent = min(
-            round((books_this_year / yearly_goal) * 100, 1), 100.0
-        )
+        goal_progress_percent = min(round((books_this_year / yearly_goal) * 100, 1), 100.0)
 
     return {
         "total_books": total_books,
@@ -342,16 +294,9 @@ def calculate_collection_stats(
         "avg_rating": avg_rating,
         "status_counts": dict(status_counts),
         "rating_distribution": rating_distribution,
-        "top_authors": [
-            {"name": name, "count": count} for name, count in top_authors
-        ],
-        "top_publishers": [
-            {"name": name, "count": count} for name, count in top_publishers
-        ],
-        "category_distribution": [
-            {"label": label, "count": count}
-            for label, count in category_distribution
-        ],
+        "top_authors": [{"name": name, "count": count} for name, count in top_authors],
+        "top_publishers": [{"name": name, "count": count} for name, count in top_publishers],
+        "category_distribution": [{"label": label, "count": count} for label, count in category_distribution],
         "max_category_count": max_category_count,
         "yearly_counts": sorted_years,
         "max_year_count": max_year_count,

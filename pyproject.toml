@@ -77,3 +77,10 @@ exclude = "(^\\.venv/|^tests/fixtures/)"
 [[tool.mypy.overrides]]
 module = "googleapiclient.*"
 ignore_missing_imports = true
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120

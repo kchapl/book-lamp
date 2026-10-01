@@ -116,9 +116,7 @@ def test_refresh_returns_none_when_no_liked_books():
 
 def test_refresh_returns_none_when_llm_returns_empty():
     books = [{"id": 1, "title": "Dune", "author": "Herbert"}]
-    records = [
-        {"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}
-    ]
+    records = [{"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}]
     storage = _make_storage(books=books, records=records)
     llm = _make_llm(recs=[])
     result = refresh_recommendations(storage, llm)
@@ -128,9 +126,7 @@ def test_refresh_returns_none_when_llm_returns_empty():
 
 def test_refresh_saves_and_returns_recs():
     books = [{"id": 1, "title": "Dune", "author": "Herbert"}]
-    records = [
-        {"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}
-    ]
+    records = [{"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}]
     new_recs = [
         {
             "title": "Foundation",
@@ -163,9 +159,7 @@ def test_returns_cache_when_fresh():
 def test_refreshes_when_stale():
     old_recs = [{"title": "Old Book", "created_at": _stale_ts()}]
     books = [{"id": 1, "title": "Dune", "author": "Herbert"}]
-    records = [
-        {"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}
-    ]
+    records = [{"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"}]
     new_recs = [
         {
             "title": "Foundation",

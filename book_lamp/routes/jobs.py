@@ -17,9 +17,7 @@ logger = logging.getLogger("book_lamp")
 jobs_bp = Blueprint("jobs", __name__)
 
 
-def _background_import_books(
-    job_id: str, content: str, fetch_metadata: bool, user_id: int
-):
+def _background_import_books(job_id: str, content: str, fetch_metadata: bool, user_id: int):
     """Background task: import books from Libib CSV."""
     logger.info(f"Background job {job_id}: parsing CSV content...")
 
@@ -37,9 +35,7 @@ def _background_import_books(
         if fetch_metadata and items:
             from book_lamp.services.book_lookup import enhance_books_batch
 
-            logger.info(
-                f"Background job {job_id}: enhancing {len(items)} items with metadata..."
-            )
+            logger.info(f"Background job {job_id}: enhancing {len(items)} items with metadata...")
             books = [item["book"] for item in items]
             enhanced_count = enhance_books_batch(books)
 
@@ -85,9 +81,7 @@ def import_books():
 
     try:
         content = file.read().decode("utf-8")
-        fetch_metadata = (
-            request.form.get("fetch_metadata") in ["on", "true", "1"]
-        )
+        fetch_metadata = request.form.get("fetch_metadata") in ["on", "true", "1"]
 
         user_id = session.get("user_id") or 1
         job_id = job_queue.submit_job(

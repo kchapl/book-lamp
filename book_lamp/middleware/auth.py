@@ -16,17 +16,13 @@ def authorisation_required(f):
 
         user_id = session.get("user_id")
         if not user_id and not is_test_mode():
-            current_app.logger.warning(
-                f"Authorisation failed for {f.__name__}: no user_id in session"
-            )
+            current_app.logger.warning(f"Authorisation failed for {f.__name__}: no user_id in session")
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("spa.spa_page", fallback="unauthorised"))
 
         if not get_storage().is_authorised():
-            current_app.logger.warning(
-                f"Authorisation failed for {f.__name__}: storage not authorised"
-            )
+            current_app.logger.warning(f"Authorisation failed for {f.__name__}: storage not authorised")
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect(url_for("spa.spa_page", fallback="unauthorised"))

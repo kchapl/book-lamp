@@ -1,0 +1,10 @@
+# Overlay for podman hosts whose kernel cannot program netavark's nftables
+# rules (nested containers, minimal sandboxes). The database shares the host
+# network, so it answers on 127.0.0.1:5432 exactly where DATABASE_URL points,
+# and no bridge is created. scripts/start applies this automatically when it
+# detects the limitation, or after a failed bridge attempt:
+#
+#   podman-compose -f compose.yaml -f compose.hostnet.yaml up -d db
+services:
+  db:
+    network_mode: host

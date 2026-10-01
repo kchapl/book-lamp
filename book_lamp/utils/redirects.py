@@ -1,6 +1,7 @@
 """URL and safe redirect utilities."""
 
 from urllib.parse import urlparse
+
 from flask import request, url_for
 
 
