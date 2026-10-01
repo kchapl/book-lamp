@@ -658,9 +658,9 @@ lighthouse http://localhost:5000/history --output html --output-path ./reports/h
 ## Integration with Book Lamp
 
 When designing pages for Book Lamp:
-- **Consistency**: Follow existing design patterns in `book_lamp/static/base.css` and `books.css`.
-- **Separation**: Keep CSS in dedicated files in `book_lamp/static/`.
-- **Templates**: Work with Jinja2 templates in `book_lamp/templates/`.
+- **Consistency**: Follow existing design patterns in `book_lamp/static/css/` (for example `base.css`, `books.css`).
+- **Separation**: Keep shared CSS in dedicated files in `book_lamp/static/css/` and component styles in `src/react/styles/`.
+- **Components**: Build UI as React components in `src/react/`; the app has no Jinja templates.
 - **British English**: All language shown in the UI MUST be in **British English** (e.g., "Colour", "Organise", "Authorise", "Catalogue").
 - **Accessibility**: All new pages MUST meet accessibility standards and score 90+ in Lighthouse audits.
 

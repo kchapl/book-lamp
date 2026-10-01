@@ -47,12 +47,11 @@ Books require comprehensive metadata for proper cataloguing and retrieval:
 Reading records track an individual's interaction with books:
 
 #### Status Tracking
-- **Status**: Current reading state:
-  - `to_read`: Bookmarked for future reading
-  - `reading`: Currently being read
-  - `completed`: Finished reading
-  - `abandoned`: Started but did not finish
-  - `on_hold`: Temporarily paused
+- **Status**: the state of a Book's Current Reading Record. Book Lamp has exactly three Reading Statuses (see `CONTEXT.md`):
+  - **In Progress**: currently being read
+  - **Completed**: finished reading
+  - **Abandoned**: started but not finished
+- Books the reader intends to read next live on the **Reading List**, which carries no Reading Status. There is no "on hold" or "to read" status.
 
 #### Temporal Data
 - **Start Date**: When reading began (ISO 8601 format: YYYY-MM-DD).
@@ -212,12 +211,11 @@ When primary sort values are equal:
 
 ### Reading Status Organisation
 
-Group books by reading status for personal library management:
-- **To Read**: Future reading queue
-- **Currently Reading**: Active reading list
-- **Completed**: Finished books (may be sorted by completion date)
-- **Abandoned**: Books not finished
-- **On Hold**: Temporarily paused
+Group books by their Reading Status for the reading log:
+- **Reading List**: Books the reader intends to read next (no Reading Status).
+- **In Progress**: Books currently being read.
+- **Completed**: Finished books (sorted by completion date).
+- **Abandoned**: Books started but not finished.
 
 ## Data Quality and Validation
 
@@ -250,7 +248,7 @@ Group books by reading status for personal library management:
 **Optional but Valuable**:
 - Description
 - Series information
-- Dewey Decimal Classification
+- BISAC category (`bisac_category`, with validated `bisac_main_category` / `bisac_sub_category`)
 - Page count
 - Language
 - Edition
@@ -295,7 +293,7 @@ Prioritise search relevance by field importance:
 
 Track meaningful metrics:
 - **Total Books**: Count of unique books in collection
-- **Reading Status Distribution**: Count by status (to_read, reading, completed, etc.)
+- **Reading Status Distribution**: Count by status (In Progress, Completed, Abandoned)
 - **Publication Year Range**: Oldest and newest books
 - **Author Diversity**: Number of unique authors
 - **Completion Rate**: Percentage of books completed vs. total
@@ -329,22 +327,23 @@ Book Lamp is a **personal reading log**, not a catalogue of books the reader own
 #### Consequences for Feature Design
 
 - The author page shows **all books the reader has read by that author**, then shows further books by that author that the reader **has not yet read** — both framed around reading, not ownership.
-- A book entry in the `Books` sheet represents a book that appeared in the reading history at some point. It is not an asset record.
-- The `ReadingRecords` sheet is the authoritative source of reading activity; the `Books` sheet is supporting metadata.
+- A row in the `books` table represents a work that appeared in the reading history at some point. It is not an asset record.
+- The `reading_records` table is the authoritative source of reading activity; the `books` table is supporting metadata.
 
 
 
 ### Book Schema
-- Fields: `id`, `isbn13`, `title`, `author`, `publication_year`, `thumbnail_url`, `created_at`, `publisher`, `description`, `series`, `dewey_decimal`
-- **Primary Identifier**: `isbn13`
+- Fields (PostgreSQL `books` table): `id`, `isbn13`, `title`, `author`, `publication_year`, `publisher`, `description`, `series`, `thumbnail_url`, `cover_url`, `language`, `page_count`, `physical_format`, `edition`, `bisac_category`, `bisac_main_category`, `bisac_sub_category`, `created_at`
+- **Primary Identifier**: `isbn13` (the internal `id` is the serial key)
 - **Display Fields**: `title`, `author`, `thumbnail_url`
-- **Classification**: `dewey_decimal` for subject organisation
+- **Classification**: `bisac_category` with validated `bisac_main_category` / `bisac_sub_category`. Dewey values are legacy import artefacts and are not treated as categories.
+- **Authors**: stored in the `authors` / `book_authors` tables as well as the denormalised `author` column.
 
 ### Reading Record Schema
-- Fields: `id`, `book_id`, `status`, `start_date`, `end_date`, `rating`, `created_at`
-- **Relationship**: `book_id` links to book record
-- **Status Values**: `to_read`, `reading`, `completed`, `abandoned`, `on_hold`
-- **Temporal Tracking**: `start_date`, `end_date` for reading timeline
+- Fields (PostgreSQL `reading_records` table): `id`, `book_id`, `status`, `start_date`, `end_date`, `rating`, `created_at`
+- **Relationship**: `book_id` links to the `books` record.
+- **Status Values**: `In Progress`, `Completed`, `Abandoned` (title case, exactly these three).
+- **Temporal Tracking**: `start_date`, `end_date` for the reading timeline.
 
 ### Best Practices for Book Lamp
 - **British English**: Use British spelling in UI text (e.g., "Organise", "Colour", "Catalogue").
