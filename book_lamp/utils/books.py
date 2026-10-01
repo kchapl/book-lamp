@@ -138,3 +138,153 @@ def parse_bisac_category(bisac: Optional[str]) -> tuple[Optional[str], Optional[
         return parts[0].strip(), parts[1].strip()
 
     return bisac_str, None
+
+
+UNKNOWN_CATEGORY = "Unknown"
+
+# Category names that should reach the chart with a stable, canonical spelling
+# rather than being title-cased ad hoc (and so short ones like "ART" survive the
+# language-code filter below).
+STABLE_CATEGORIES = {
+    "fiction": "FICTION",
+    "history": "HISTORY",
+    "biography & autobiography": "BIOGRAPHY & AUTOBIOGRAPHY",
+    "biography": "BIOGRAPHY & AUTOBIOGRAPHY",
+    "autobiography": "BIOGRAPHY & AUTOBIOGRAPHY",
+    "science": "SCIENCE",
+    "political science": "POLITICAL SCIENCE",
+    "literary criticism": "LITERARY CRITICISM",
+    "social science": "SOCIAL SCIENCE",
+    "computers": "COMPUTERS",
+    "philosophy": "PHILOSOPHY",
+    "religion": "RELIGION",
+    "art": "ART",
+    "poetry": "POETRY",
+    "drama": "DRAMA",
+    "business & economics": "BUSINESS & ECONOMICS",
+    "business": "BUSINESS & ECONOMICS",
+    "economics": "BUSINESS & ECONOMICS",
+    "self-help": "SELF-HELP",
+    "psychology": "PSYCHOLOGY",
+    "education": "EDUCATION",
+    "juvenile fiction": "JUVENILE FICTION",
+    "juvenile nonfiction": "JUVENILE NONFICTION",
+}
+
+# Values that are not categories at all, whatever field they arrived in.
+_NON_CATEGORY_VALUES = {
+    "book",
+    "books",
+    "ebook",
+    "e-book",
+    "print",
+    "audio",
+    "unknown",
+    "paperback",
+    "hardcover",
+}
+
+
+def is_dewey_category(value: object) -> bool:
+    """Return True for Dewey-like numeric category values such as '823.914'."""
+    if value is None:
+        return False
+
+    text = str(value).strip()
+    if not text or not any(char.isdigit() for char in text):
+        return False
+    return all(char.isdigit() or char in "./ " for char in text)
+
+
+def is_language_code(value: object) -> bool:
+    """Return True for short language codes (e.g. 'en', 'eng', 'pt-BR')."""
+    if value is None:
+        return False
+
+    text = str(value).strip()
+    if not text:
+        return False
+    return bool(re.fullmatch(r"[a-zA-Z]{2,3}(?:[-_][a-zA-Z]{2})?", text))
+
+
+def normalise_major_bisac(value: object) -> Optional[str]:
+    """Extract a valid, canonical major book category, or None when the value
+    is not a real category (Dewey numbers, language codes, formats, page counts).
+    """
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    main_cat, _ = parse_bisac_category(text)
+    if not main_cat:
+        return None
+
+    main_cat = main_cat.strip()
+    lower_main = main_cat.lower()
+
+    # Reject values that are not categories at all.
+    if is_dewey_category(main_cat) or main_cat.isdigit():
+        return None
+    if lower_main in _NON_CATEGORY_VALUES:
+        return None
+
+    # Map known categories to a stable spelling BEFORE the language-code check so
+    # short valid names like "ART", "DRAMA" and "POETRY" are not rejected.
+    if lower_main in STABLE_CATEGORIES:
+        return STABLE_CATEGORIES[lower_main]
+
+    if is_language_code(main_cat):
+        return None
+
+    return main_cat.upper()
+
+
+def normalise_bisac_category(
+    category: object,
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Return ``(full_category, major_category, sub_category)`` when valid.
+
+    Anything that fails validation collapses to ``(None, None, None)`` so callers
+    can fall back to an "Unknown" bucket rather than displaying junk.
+    """
+    if category is None:
+        return None, None, None
+
+    text = str(category).strip()
+    if not text:
+        return None, None, None
+
+    major, sub_category = parse_bisac_category(text)
+    major = normalise_major_bisac(major)
+    if not major:
+        return None, None, None
+
+    sub_category = sub_category.strip() if sub_category else None
+    if sub_category and (is_dewey_category(sub_category) or is_language_code(sub_category) or sub_category.isdigit()):
+        sub_category = None
+
+    full_category = f"{major} / {sub_category}" if sub_category else major
+    return full_category, major, sub_category
+
+
+def category_label(value: object) -> str:
+    """Return the display label for a category, or "Unknown" when invalid."""
+    major = normalise_major_bisac(value)
+    if not major:
+        return UNKNOWN_CATEGORY
+    return major.title() if len(major) > 3 else major.upper()
+
+
+def category_label_for_book(book: dict) -> str:
+    """Return the chart/filter label for a book.
+
+    Prefers the validated ``bisac_main_category`` and falls back to the raw
+    ``bisac_category`` so rows written before normalisation still classify.
+    """
+    major = normalise_major_bisac(book.get("bisac_main_category"))
+    if major is None:
+        major = normalise_major_bisac(book.get("bisac_category"))
+    return category_label(major)
