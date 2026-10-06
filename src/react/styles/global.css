@@ -39,6 +39,11 @@
     padding: 1rem;
 }
 
+.lookup-notice {
+    color: var(--md-sys-color-on-surface-variant);
+    padding: 1rem;
+}
+
 .btn {
     --btn-container-color: var(--md-sys-color-primary);
     --btn-label-color: var(--md-sys-color-on-primary);

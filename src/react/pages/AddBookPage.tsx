@@ -13,6 +13,7 @@ const AddBookPage: React.FC = () => {
     const [publisher, setPublisher] = useState('');
     const [year, setYear] = useState('');
     const [isbnError, setIsbnError] = useState<string | null>(null);
+    const [isbnNotice, setIsbnNotice] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
     const [addToReadingListChecked, setAddToReadingListChecked] = useState(false);
@@ -83,19 +84,26 @@ const AddBookPage: React.FC = () => {
 
         setLoading(true);
         setIsbnError(null);
+        setIsbnNotice(null);
         
         try {
             const book = await lookupISBN(cleanIsbn);
-            if (book) {
+            // A partial result (e.g. only an ISBN and a cover) is not usable: it
+            // carries no title or author, so the form below would stay hidden and
+            // the page would appear unchanged. Treat that as "not found" and fall
+            // back to manual entry so the user always gets somewhere to type.
+            if (book && (book.title || book.author)) {
                 setTitle(book.title || '');
                 setAuthor(book.author || '');
                 setPublisher(book.publisher || '');
                 setYear(book.publication_year ? String(book.publication_year) : '');
             } else {
+                setIsbnNotice('No details found for that ISBN. Fill them in below.');
                 setShowManualEntry(true);
             }
         } catch (err) {
             console.error('Lookup error:', err);
+            setIsbnNotice('Could not look up that ISBN. Fill the details in below.');
             setShowManualEntry(true);
         } finally {
             setLoading(false);
@@ -176,6 +184,7 @@ const AddBookPage: React.FC = () => {
 
                 {scannerError && <p className="error-message">{scannerError}</p>}
                 {isbnError && <p className="error-message">{isbnError}</p>}
+                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
             </div>
 
             {(showManualEntry || title || author) && (
