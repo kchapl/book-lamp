@@ -15,6 +15,27 @@ def test_parse_publication_year():
     assert parse_publication_year(None) is None
 
 
+@patch("book_lamp.services.book_lookup._lookup_google_books")
+@patch("book_lamp.services.book_lookup._lookup_open_library")
+def test_lookup_upgrades_isbn10_to_isbn13(mock_open_library, mock_google_books):
+    """A 10-digit ISBN is upgraded to ISBN-13 before hitting the metadata APIs."""
+    from book_lamp.services.book_lookup import lookup_book_by_isbn13
+
+    mock_open_library.return_value = {
+        "title": "Upgraded Book",
+        "author": "Someone",
+        "thumbnail_url": "https://covers.openlibrary.org/b/id/1-M.jpg",
+    }
+    mock_google_books.return_value = None
+
+    result = lookup_book_by_isbn13("0143127741")
+
+    assert mock_open_library.call_args[0][0] == "9780143127741"
+    assert mock_google_books.call_args[0][0] == "9780143127741"
+    assert result["isbn13"] == "9780143127741"
+    assert result["title"] == "Upgraded Book"
+
+
 @patch("book_lamp.services.book_lookup._get_session")
 def test_add_book_success(mock_session_factory, authenticated_client):
     storage = get_storage()

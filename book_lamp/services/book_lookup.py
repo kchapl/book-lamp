@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from book_lamp.utils.books import (
+    isbn10_to_isbn13,
     isbn13_to_isbn10,
     normalise_bisac_category,
     normalize_isbn,
@@ -629,6 +630,13 @@ def lookup_book_by_isbn13(
 ) -> Optional[Dict[str, Optional[Any]]]:
     """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
+    # The external metadata APIs index by ISBN-13, so a 10-digit ISBN (a valid
+    # input for the Add Book form) must be upgraded first. Without this the
+    # lookup returns partial or empty data for ISBN-10s.
+    if len(clean_isbn) == 10:
+        converted = isbn10_to_isbn13(clean_isbn)
+        if converted:
+            clean_isbn = converted
     best: Dict[str, Any] = {"isbn13": clean_isbn}
 
     if title:

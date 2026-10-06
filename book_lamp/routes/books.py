@@ -18,7 +18,7 @@ from book_lamp.utils import (
     parse_publication_year,
     sort_books,
 )
-from book_lamp.utils.books import normalize_isbn
+from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
 from book_lamp.utils.reading_status import latest_record_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
@@ -150,6 +150,10 @@ def api_create_book():
     data = request.get_json(silent=True) or {}
 
     isbn = normalize_isbn(str(data.get("isbn", "") or ""))
+    # Store a canonical ISBN-13: the form accepts ISBN-10s, and keeping the
+    # 10-digit form would break de-duplication against 13-digit entries.
+    if len(isbn) == 10:
+        isbn = isbn10_to_isbn13(isbn) or isbn
     title = str(data.get("title", "") or "").strip()
     author = str(data.get("author", "") or "").strip()
 
@@ -358,6 +362,11 @@ def api_lookup_isbn():
 
     try:
         data = lookup_book_by_isbn13(isbn)
+        if data:
+            # The form edits publication_year, but the metadata services report a
+            # free-text publish_date; expose the parsed year so it can prefill.
+            if data.get("publication_year") is None:
+                data["publication_year"] = parse_publication_year(data.get("publish_date"))
         return jsonify(data)
     except Exception as exc:
         current_app.logger.error(f"api_lookup_isbn: lookup failed for {isbn}: {exc}")

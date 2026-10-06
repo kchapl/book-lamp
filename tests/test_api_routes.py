@@ -5,6 +5,7 @@ All tests use TEST_MODE=1 so no real PostgreSQL connection is required.
 """
 
 import json
+from unittest.mock import patch
 
 from book_lamp.app import get_storage
 
@@ -33,6 +34,17 @@ def test_api_create_book_manual_entry(authenticated_client):
     body = _json(resp)
     assert body["title"] == "My New Book"
     assert body["author"] == "Some Author"
+
+
+def test_api_create_book_upgrades_isbn10(authenticated_client):
+    """POST /api/books with an ISBN-10 stores the equivalent ISBN-13."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"title": "Ten Digit", "author": "Someone", "isbn": "0143127741"},
+    )
+    assert resp.status_code == 201
+    assert resp.get_json()["isbn13"] == "9780143127741"
+    assert get_storage().get_book_by_isbn("9780143127741") is not None
 
 
 def test_api_create_book_isbn_test_mode(authenticated_client):
@@ -176,6 +188,24 @@ def test_api_lookup_isbn_missing_param(authenticated_client):
     """GET /api/books/lookup without isbn returns 400."""
     resp = authenticated_client.get("/api/books/lookup")
     assert resp.status_code == 400
+
+
+@patch("book_lamp.services.book_lookup.lookup_book_by_isbn13")
+def test_api_lookup_isbn_adds_publication_year(mock_lookup, authenticated_client):
+    """The lookup response exposes publication_year parsed from publish_date."""
+    mock_lookup.return_value = {
+        "isbn13": "9780306406157",
+        "title": "Example Book",
+        "author": "Jane Doe",
+        "publish_date": "Sep 08, 2015",
+    }
+
+    resp = authenticated_client.get("/api/books/lookup?isbn=9780306406157")
+
+    assert resp.status_code == 200
+    body = _json(resp)
+    assert body["publication_year"] == 2015
+    assert body["title"] == "Example Book"
 
 
 # ---------------------------------------------------------------------------
