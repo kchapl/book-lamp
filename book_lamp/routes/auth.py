@@ -10,6 +10,20 @@ from book_lamp.services.storage_factory import is_test_mode
 
 auth_bp = Blueprint("auth", __name__)
 
+# Values shipped in documentation and templates. When one of these is still in
+# place, Google sign-in has not actually been configured, and attempting the
+# token exchange would fail with an opaque 401 that looks like a bad login.
+PLACEHOLDER_GOOGLE_CLIENT_IDS = {
+    "",
+    "your_google_client_id_here",
+    "your_oauth_client_id",
+}
+
+
+def is_google_sign_in_configured(client_id: str | None) -> bool:
+    """Return True when ``client_id`` is a real Google OAuth client ID."""
+    return (client_id or "").strip() not in PLACEHOLDER_GOOGLE_CLIENT_IDS
+
 
 @auth_bp.route("/api/csrf-token", methods=["GET"])
 def get_csrf_token():
@@ -25,7 +39,11 @@ def auth_status():
     """Return current session authentication status and configuration."""
     user_id = session.get("user_id")
     is_authenticated = bool(user_id) or is_test_mode()
-    google_client_id = current_app.config.get("GOOGLE_CLIENT_ID") or ""
+    google_client_id = (current_app.config.get("GOOGLE_CLIENT_ID") or "").strip()
+    if not is_google_sign_in_configured(google_client_id):
+        # Never hand a placeholder to Google Identity Services: it renders a
+        # dead button that looks like a login failure.
+        google_client_id = ""
 
     user_info = None
     if user_id:
@@ -49,6 +67,21 @@ def google_one_tap_login():
     """Verify a Google One Tap credential JWT and create a session."""
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
+
+    if not is_google_sign_in_configured(current_app.config.get("GOOGLE_CLIENT_ID")):
+        current_app.logger.error(
+            "Google sign-in is not configured: set GOOGLE_CLIENT_ID in .env to a real "
+            "OAuth client ID (see README) and restart the app."
+        )
+        return (
+            jsonify(
+                {
+                    "error": "Google sign-in is not configured. "
+                    "Set GOOGLE_CLIENT_ID in .env to a real OAuth client ID and restart the app."
+                }
+            ),
+            503,
+        )
 
     data = request.get_json(silent=True) or {}
     credential = data.get("credential")

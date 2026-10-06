@@ -35,15 +35,29 @@ and other minimal sandboxes), the database runs on the host network instead; see
 2. Install backend dependencies: `uv sync`
 3. Install frontend dependencies: `npm install`
 4. Compile TypeScript: `npm run build`
-5. Create `.env` file with required variables:
+5. Create a `.env` file with the required variables:
    ```
    FLASK_DEBUG=True
    GOOGLE_CLIENT_ID=your_oauth_client_id
-   GOOGLE_CLIENT_SECRET=your_oauth_client_secret
-
    SECRET_KEY=your_secret_key
    ```
 6. Run the app: `uv run flask --app book_lamp.app run`
+
+### Signing in locally
+
+Book Lamp signs readers in with Google One Tap, so a real OAuth client ID is
+required — the app has no local username/password or dev-login path.
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
+   create an OAuth 2.0 client of type **Web application**.
+2. Add `http://localhost:5000` (and `http://127.0.0.1:5000`) under
+   **Authorized JavaScript origins**. No redirect URI is needed.
+3. Copy the client ID (it ends in `.apps.googleusercontent.com`) into
+   `GOOGLE_CLIENT_ID` in `.env` and restart the app.
+
+If `GOOGLE_CLIENT_ID` is left at the placeholder, the sign-in button is not
+rendered and `POST /api/auth/google` answers `503` explaining that sign-in is
+unconfigured, rather than a confusing `401`.
 
 ## Testing
 

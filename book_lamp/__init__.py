@@ -11,6 +11,7 @@ from flask import Flask, request, session
 
 from book_lamp.middleware.csrf import add_csrf_token_header
 from book_lamp.routes import register_blueprints
+from book_lamp.routes.auth import is_google_sign_in_configured
 from book_lamp.services.storage_factory import is_test_mode
 
 load_dotenv()
@@ -123,6 +124,12 @@ def create_app(test_config: Optional[dict] = None) -> Flask:
 
     if test_config:
         app.config.update(test_config)
+
+    if not is_google_sign_in_configured(app.config.get("GOOGLE_CLIENT_ID")):
+        logging.getLogger(__name__).warning(
+            "GOOGLE_CLIENT_ID is not configured: Google sign-in is disabled. "
+            "Set it in .env to a real OAuth client ID (see README) and restart."
+        )
 
     # Middleware
     app.after_request(add_csrf_token_header)

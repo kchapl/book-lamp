@@ -44,3 +44,22 @@ def test_google_auth_invalid_credential(client, mock_google_verify):
     response = client.post("/api/auth/google", json={"credential": "invalid-jwt"})
     assert response.status_code == 401
     assert response.get_json() == {"error": "Invalid credential"}
+
+
+def test_google_auth_reports_unconfigured_client_id(app, client, monkeypatch):
+    """A placeholder client ID is a config problem, not a bad login."""
+    monkeypatch.setitem(app.config, "GOOGLE_CLIENT_ID", "your_google_client_id_here")
+
+    response = client.post("/api/auth/google", json={"credential": "valid-jwt"})
+
+    assert response.status_code == 503
+    assert "not configured" in response.get_json()["error"]
+
+
+def test_auth_status_hides_placeholder_client_id(app, client, monkeypatch):
+    """Never hand a placeholder to Google Identity Services."""
+    monkeypatch.setitem(app.config, "GOOGLE_CLIENT_ID", "your_google_client_id_here")
+
+    response = client.get("/api/auth/status")
+
+    assert response.get_json()["google_client_id"] == ""

@@ -10,8 +10,14 @@ PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Ensure test mode while modules import; avoids race with fixtures
+# Ensure test mode while modules import; avoids race with fixtures.
+# Several test modules import book_lamp.app at module scope, which builds the
+# Flask app (and reads GOOGLE_CLIENT_ID) at import time, before any fixture runs.
+# Set the credentials here so the app is built with a configured client ID.
 os.environ["TEST_MODE"] = "1"
+os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["GOOGLE_CLIENT_ID"] = "dummy-client-id"
+os.environ["GOOGLE_CLIENT_SECRET"] = "dummy-client-secret"
 
 
 @pytest.fixture
