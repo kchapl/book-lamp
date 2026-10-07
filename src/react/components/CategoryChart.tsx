@@ -18,17 +18,17 @@ interface CategoryChartProps {
     onCategoryClick?: (category: string) => void;
 }
 
+/* Subject colours are derived from the design tokens, so the treemap stays in
+   the same palette as the rest of the app however many categories appear. */
 const CATEGORY_COLORS = [
     'var(--md-sys-color-primary)',
     'var(--md-sys-color-secondary)',
     'var(--md-sys-color-tertiary)',
-    'var(--md-sys-color-error)',
-    '#4CAF50', // green
-    '#FF9800', // orange
-    '#9C27B0', // purple
-    '#00BCD4', // cyan
-    '#E91E63', // pink
-    '#795548', // brown
+    'color-mix(in srgb, var(--md-sys-color-primary) 55%, var(--md-sys-color-secondary))',
+    'color-mix(in srgb, var(--md-sys-color-secondary) 60%, var(--md-sys-color-tertiary))',
+    'color-mix(in srgb, var(--md-sys-color-tertiary) 60%, var(--md-sys-color-primary))',
+    'color-mix(in srgb, var(--md-sys-color-primary) 45%, var(--md-sys-color-surface-container-highest))',
+    'color-mix(in srgb, var(--md-sys-color-secondary) 45%, var(--md-sys-color-surface-container-highest))',
 ];
 
 const CategoryChart: React.FC<CategoryChartProps> = ({

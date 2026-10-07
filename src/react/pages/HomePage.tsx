@@ -2,8 +2,28 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import GoogleAuth from '../components/GoogleAuth';
+import BookExhibit from '../components/BookExhibit';
+import Icon, { IconName } from '../components/Icon';
 import { getRecommendations } from '../services/api';
 import type { Book } from '../types';
+
+const FEATURES: { icon: IconName; title: string; body: string }[] = [
+    {
+        icon: 'books',
+        title: 'Track reading',
+        body: 'Keep a record of the books you have read, are reading, or mean to read next.',
+    },
+    {
+        icon: 'chart',
+        title: 'See the whole shelf',
+        body: 'A dashboard that shows your collection by status, pace, ratings and subjects.',
+    },
+    {
+        icon: 'bookmark',
+        title: 'Plan what is next',
+        body: 'Queue books on a reading list and start the next one when you are ready.',
+    },
+];
 
 const HomePage: React.FC = () => {
     const { isAuthorized } = useContext(AppContext);
@@ -32,70 +52,63 @@ const HomePage: React.FC = () => {
     };
 
     return (
-        <div className="home-page">
+        <div className="home-page page">
             <section className="hero">
-                <h1>Welcome to Book Lamp</h1>
-                <p>Track your reading journey, discover new books, and manage your personal library.</p>
+                <p className="eyebrow label-placard">The reading room</p>
+                <h1>Your books, kept like an exhibition.</h1>
+                <p>
+                    Book Lamp is a quiet record of what you have read: the collection on the
+                    shelves, the reading list ahead of you, and a dashboard that shows how it
+                    all adds up.
+                </p>
                 {isAuthorized ? (
                     <div className="hero-actions">
-                        <Link to="/books" className="btn btn-primary">My Books</Link>
-                        <Link to="/dashboard" className="btn btn-secondary">View Statistics</Link>
+                        <Link to="/books" className="btn btn-primary">
+                            <Icon name="books" size="sm" />
+                            Browse the collection
+                        </Link>
+                        <Link to="/dashboard" className="btn btn-outline">
+                            <Icon name="chart" size="sm" />
+                            Open the dashboard
+                        </Link>
                     </div>
                 ) : (
-                    <div className="auth-card" style={{ maxWidth: '400px', margin: '1.5rem auto 0', padding: '1.5rem', background: 'var(--card-bg, #fff)', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                        <p style={{ margin: '0 0 1rem', fontSize: '0.95rem', color: 'var(--text-muted, #666)' }}>
-                            Sign in with Google to start tracking your reading history:
-                        </p>
+                    <div className="auth-card">
+                        <p>Sign in with Google to open your reading room:</p>
                         <GoogleAuth />
                     </div>
                 )}
             </section>
 
-            <section className="features">
-                <div className="feature-card">
-                    <h3>📚 Track Reading</h3>
-                    <p>Keep track of books you've read, are currently reading, or want to read.</p>
-                </div>
-                <div className="feature-card">
-                    <h3>📊 Statistics</h3>
-                    <p>View insights about your reading habits, favourite authors, and more.</p>
-                </div>
-                <div className="feature-card">
-                    <h3>📱 Mobile Friendly</h3>
-                    <p>Access your library from any device, anywhere.</p>
-                </div>
+            <section className="features" aria-label="What Book Lamp does">
+                {FEATURES.map((feature) => (
+                    <article className="feature-card" key={feature.title}>
+                        <Icon name={feature.icon} size="lg" />
+                        <h3>{feature.title}</h3>
+                        <p>{feature.body}</p>
+                    </article>
+                ))}
             </section>
 
             {loading ? (
-                <div className="recommendations-loading">
-                    <div className="skeleton-cards">
+                <section className="recommendations" aria-busy="true">
+                    <h2>Recommended for you</h2>
+                    <div className="skeleton-grid">
                         {[1, 2, 3].map((i) => (
                             <div key={i} className="skeleton-card">
-                                <div className="skeleton-image"></div>
-                                <div className="skeleton-title"></div>
-                                <div className="skeleton-author"></div>
+                                <div className="skeleton-image" />
+                                <div className="skeleton-title" />
+                                <div className="skeleton-author" />
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
             ) : recommendations.length > 0 ? (
                 <section className="recommendations">
-                    <h2>Recommended for You</h2>
-                    <div className="book-grid">
+                    <h2>Recommended for you</h2>
+                    <div className="exhibit-grid">
                         {recommendations.map((book) => (
-                            <Link
-                                key={book.id}
-                                to={`/books/${book.id}`}
-                                className="book-card"
-                            >
-                                {book.thumbnail_url ? (
-                                    <img src={book.thumbnail_url} alt={book.title} />
-                                ) : (
-                                    <div className="book-placeholder">📖</div>
-                                )}
-                                <h3>{book.title}</h3>
-                                <p>{book.author || 'Unknown Author'}</p>
-                            </Link>
+                            <BookExhibit key={book.id} book={book} />
                         ))}
                     </div>
                 </section>

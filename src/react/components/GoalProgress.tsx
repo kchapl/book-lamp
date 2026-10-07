@@ -11,25 +11,17 @@ const GoalProgress: React.FC<GoalProgressProps> = ({ current, goal, year = new D
     const remaining = Math.max(goal - current, 0);
     const isComplete = current >= goal;
 
-    // Calculate the circumference for the circular progress
     const radius = 45;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     return (
-        <div className="goal-progress">
-            <div className="goal-circle">
-                <svg viewBox="0 0 100 100" className="progress-ring">
+        <div className="goal">
+            <div className="goal-ring">
+                <svg viewBox="0 0 100 100" width="104" height="104" aria-hidden="true">
+                    <circle className="ring-bg" cx="50" cy="50" r={radius} strokeWidth="8" fill="none" />
                     <circle
-                        className="progress-ring-bg"
-                        cx="50"
-                        cy="50"
-                        r={radius}
-                        strokeWidth="8"
-                        fill="none"
-                    />
-                    <circle
-                        className={`progress-ring-fill ${isComplete ? 'complete' : ''}`}
+                        className={`ring-fill ${isComplete ? 'is-complete' : ''}`}
                         cx="50"
                         cy="50"
                         r={radius}
@@ -38,7 +30,6 @@ const GoalProgress: React.FC<GoalProgressProps> = ({ current, goal, year = new D
                         strokeDasharray={circumference}
                         strokeDashoffset={strokeDashoffset}
                         strokeLinecap="round"
-                        transform="rotate(-90 50 50)"
                     />
                 </svg>
                 <div className="goal-center">
@@ -47,24 +38,16 @@ const GoalProgress: React.FC<GoalProgressProps> = ({ current, goal, year = new D
                 </div>
             </div>
             <div className="goal-details">
-                <div className="goal-title">
-                    {year} Reading Goal
-                </div>
-                <div className="goal-stats">
-                    <span className="goal-current">{current}</span>
+                <span className="goal-title">{year} reading goal</span>
+                <span className="goal-stats">
+                    <span className="goal-current numeric">{current}</span>
                     <span className="goal-separator">/</span>
-                    <span className="goal-target">{goal}</span>
-                </div>
+                    <span className="goal-target numeric">{goal}</span>
+                </span>
                 {!isComplete && remaining > 0 && (
-                    <div className="goal-remaining">
-                        {remaining} more to reach your goal
-                    </div>
+                    <span className="goal-remaining numeric">{remaining} more to reach your goal</span>
                 )}
-                {isComplete && (
-                    <div className="goal-achieved">
-                        Goal achieved! 🎉
-                    </div>
-                )}
+                {isComplete && <span className="goal-achieved">Goal reached</span>}
             </div>
         </div>
     );

@@ -78,6 +78,8 @@ export interface Stats {
     };
     reading_pace_monthly?: number;
     reading_pace_annualised?: number;
+    /** ISO date of the most recent reading record, or null when there are none. */
+    last_record_date?: string | null;
 }
 
 export interface HistoryFilters {

@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBookDetail, updateBook, deleteBook, createReadingRecord, updateReadingRecord, deleteReadingRecord, addToReadingList, removeFromReadingList } from '../services/api';
-import type { Book, ReadingRecord } from '../types';
+import {
+    getBookDetail,
+    updateBook,
+    deleteBook,
+    createReadingRecord,
+    addToReadingList,
+    removeFromReadingList,
+} from '../services/api';
+import Icon from '../components/Icon';
+import { statusClass } from '../utils/status';
+import type { Book } from '../types';
 
 const BookDetailPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
@@ -83,106 +92,168 @@ const BookDetailPage: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="loading">Loading...</div>;
+        return <div className="loading">Loading…</div>;
     }
 
     if (error || !book) {
-        return <div className="error-message">{error || 'Book not found'}</div>;
+        return <div className="page"><p className="error-message">{error || 'Book not found'}</p></div>;
     }
 
+    const cover = book.cover_url || book.thumbnail_url;
+    const currentStatus = book.latest_status ?? book.reading_records?.[0]?.status;
+
     return (
-        <div className="book-detail-page">
-            <button onClick={() => navigate(-1)} className="btn btn-back">← Back</button>
+        <div className="book-detail-page page">
+            <button onClick={() => navigate(-1)} className="btn btn-text btn-back">
+                <Icon name="arrow-left" size="sm" />
+                Back
+            </button>
 
             {isEditing ? (
                 <div className="edit-form">
-                    <h2>Edit Book</h2>
-                    <label>
-                        Title:
+                    <h2>Edit exhibit</h2>
+                    <label className="field">
+                        <span className="field-label">Title</span>
                         <input
                             type="text"
                             value={editForm.title || ''}
                             onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                         />
                     </label>
-                    <label>
-                        Author:
+                    <label className="field">
+                        <span className="field-label">Author</span>
                         <input
                             type="text"
                             value={editForm.author || ''}
                             onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
                         />
                     </label>
-                    <label>
-                        ISBN:
+                    <label className="field">
+                        <span className="field-label">ISBN</span>
                         <input
                             type="text"
                             value={editForm.isbn13 || ''}
                             onChange={(e) => setEditForm({ ...editForm, isbn13: e.target.value })}
                         />
                     </label>
-                    <label>
-                        Publisher:
+                    <label className="field">
+                        <span className="field-label">Publisher</span>
                         <input
                             type="text"
                             value={editForm.publisher || ''}
                             onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
                         />
                     </label>
-                    <label>
-                        Year:
+                    <label className="field">
+                        <span className="field-label">Year</span>
                         <input
                             type="number"
                             value={editForm.publication_year || ''}
-                            onChange={(e) => setEditForm({ ...editForm, publication_year: parseInt(e.target.value) || undefined })}
+                            onChange={(e) =>
+                                setEditForm({
+                                    ...editForm,
+                                    publication_year: parseInt(e.target.value) || undefined,
+                                })
+                            }
                         />
                     </label>
                     <div className="form-actions">
-                        <button onClick={handleSaveEdit} className="btn btn-primary">Save</button>
-                        <button onClick={() => setIsEditing(false)} className="btn">Cancel</button>
+                        <button onClick={handleSaveEdit} className="btn btn-primary">
+                            Save
+                        </button>
+                        <button onClick={() => setIsEditing(false)} className="btn btn-text">
+                            Cancel
+                        </button>
                     </div>
                 </div>
             ) : (
                 <>
-                    <div className="book-header">
-                        {book.cover_url ? (
-                            <img src={book.cover_url} alt={book.title} className="book-cover-large" />
+                    <section className="book-header">
+                        {cover ? (
+                            <img src={cover} alt="" className="book-cover-large" />
                         ) : (
-                            <div className="book-placeholder-large">📖</div>
+                            <div className="book-placeholder-large" aria-hidden="true">
+                                📖
+                            </div>
                         )}
                         <div className="book-meta">
+                            {currentStatus && (
+                                <span className={`status-badge ${statusClass(currentStatus)}`}>
+                                    {currentStatus}
+                                </span>
+                            )}
                             <h1>{book.title}</h1>
                             <p className="author">by {book.author || 'Unknown Author'}</p>
-                            {book.publisher && <p className="publisher">{book.publisher}</p>}
-                            {book.publication_year && <p className="year">{book.publication_year}</p>}
-                            {book.isbn13 && <p className="isbn">ISBN: {book.isbn13}</p>}
-                            {book.bisac_category && <p className="category">{book.bisac_category}</p>}
-                            {book.description && <p className="description">{book.description}</p>}
+
+                            <dl className="placard">
+                                {book.publisher && (
+                                    <div className="placard-row">
+                                        <dt>Publisher</dt>
+                                        <dd>{book.publisher}</dd>
+                                    </div>
+                                )}
+                                {book.publication_year && (
+                                    <div className="placard-row">
+                                        <dt>Published</dt>
+                                        <dd className="numeric">{book.publication_year}</dd>
+                                    </div>
+                                )}
+                                {book.isbn13 && (
+                                    <div className="placard-row">
+                                        <dt>ISBN</dt>
+                                        <dd className="numeric">{book.isbn13}</dd>
+                                    </div>
+                                )}
+                                {book.bisac_category && (
+                                    <div className="placard-row">
+                                        <dt>Subject</dt>
+                                        <dd>{book.bisac_category}</dd>
+                                    </div>
+                                )}
+                                {book.series && (
+                                    <div className="placard-row">
+                                        <dt>Series</dt>
+                                        <dd>{book.series}</dd>
+                                    </div>
+                                )}
+                            </dl>
+
+                            {book.description && (
+                                <p className="description">{book.description}</p>
+                            )}
                         </div>
-                    </div>
+                    </section>
 
                     <div className="book-actions">
-                        <button onClick={() => setIsEditing(true)} className="btn">Edit Book</button>
+                        <button onClick={() => setIsEditing(true)} className="btn btn-outline">
+                            Edit
+                        </button>
                         <button
                             onClick={handleToggleReadingList}
-                            className={`btn ${book.is_planned ? 'btn-secondary' : 'btn-primary'}`}
+                            className={`btn ${book.is_planned ? 'btn-tonal' : 'btn-primary'}`}
                         >
-                            {book.is_planned ? 'Remove from Reading List' : 'Add to Reading List'}
+                            <Icon name="bookmark" size="sm" />
+                            {book.is_planned ? 'Remove from reading list' : 'Add to reading list'}
                         </button>
-                        <button onClick={() => setShowDeleteConfirm(true)} className="btn btn-danger">Delete Book</button>
+                        <button onClick={() => setShowDeleteConfirm(true)} className="btn btn-danger">
+                            Delete
+                        </button>
                     </div>
 
-                    <section className="reading-records">
-                        <h2>Reading History</h2>
-                        <button onClick={() => setShowAddRecord(true)} className="btn btn-primary">
-                            + Add Reading Record
-                        </button>
+                    <section className="reading-records section">
+                        <div className="row-between">
+                            <h2>Reading history</h2>
+                            <button onClick={() => setShowAddRecord(true)} className="btn btn-outline">
+                                <Icon name="plus" size="sm" />
+                                Add reading record
+                            </button>
+                        </div>
 
                         {showAddRecord && (
                             <div className="add-record-form">
-                                <h3>Add Reading Record</h3>
-                                <label>
-                                    Status:
+                                <h3>Add reading record</h3>
+                                <label className="field">
+                                    <span className="field-label">Status</span>
                                     <select
                                         value={newRecord.status}
                                         onChange={(e) => setNewRecord({ ...newRecord, status: e.target.value })}
@@ -192,19 +263,25 @@ const BookDetailPage: React.FC = () => {
                                         <option value="Abandoned">Abandoned</option>
                                     </select>
                                 </label>
-                                <label>
-                                    Rating (1-5):
+                                <label className="field">
+                                    <span className="field-label">Rating (1–5)</span>
                                     <input
                                         type="number"
                                         min="1"
                                         max="5"
                                         value={newRecord.rating}
-                                        onChange={(e) => setNewRecord({ ...newRecord, rating: parseInt(e.target.value) || 0 })}
+                                        onChange={(e) =>
+                                            setNewRecord({ ...newRecord, rating: parseInt(e.target.value) || 0 })
+                                        }
                                     />
                                 </label>
                                 <div className="form-actions">
-                                    <button onClick={handleAddRecord} className="btn btn-primary">Add</button>
-                                    <button onClick={() => setShowAddRecord(false)} className="btn">Cancel</button>
+                                    <button onClick={handleAddRecord} className="btn btn-primary">
+                                        Add
+                                    </button>
+                                    <button onClick={() => setShowAddRecord(false)} className="btn btn-text">
+                                        Cancel
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -213,10 +290,15 @@ const BookDetailPage: React.FC = () => {
                             <div className="records-list">
                                 {book.reading_records.map((record) => (
                                     <div key={record.id} className="record-item">
-                                        <span className={`status-badge status-${record.status.toLowerCase().replace(' ', '-')}`}>
+                                        <span className={`status-badge ${statusClass(record.status)}`}>
                                             {record.status}
                                         </span>
-                                        {record.rating && <span className="rating">⭐ {record.rating}/5</span>}
+                                        {record.rating ? (
+                                            <span className="rating-stars" aria-label={`${record.rating} out of 5`}>
+                                                {'★'.repeat(record.rating)}
+                                                {'☆'.repeat(5 - record.rating)}
+                                            </span>
+                                        ) : null}
                                         <span className="dates">
                                             {record.start_date} → {record.end_date || 'Present'}
                                         </span>
@@ -225,7 +307,10 @@ const BookDetailPage: React.FC = () => {
                                 ))}
                             </div>
                         ) : (
-                            <p>No reading records yet.</p>
+                            <div className="empty-state">
+                                <h2>No reading records yet</h2>
+                                <p>Record the first attempt at this book to begin its history.</p>
+                            </div>
                         )}
                     </section>
                 </>
@@ -233,12 +318,18 @@ const BookDetailPage: React.FC = () => {
 
             {showDeleteConfirm && (
                 <div className="modal-overlay">
-                    <div className="modal">
-                        <h3>Delete Book?</h3>
-                        <p>Are you sure you want to delete "{book.title}"? This action cannot be undone.</p>
+                    <div className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+                        <h3 id="delete-title">Delete this book?</h3>
+                        <p>
+                            This removes “{book.title}” and its reading history. This cannot be undone.
+                        </p>
                         <div className="modal-actions">
-                            <button onClick={handleDelete} className="btn btn-danger">Delete</button>
-                            <button onClick={() => setShowDeleteConfirm(false)} className="btn">Cancel</button>
+                            <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-text">
+                                Cancel
+                            </button>
+                            <button onClick={handleDelete} className="btn btn-danger">
+                                Delete
+                            </button>
                         </div>
                     </div>
                 </div>

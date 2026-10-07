@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { getReadingList, reorderReadingList, removeFromReadingList, startReading } from '../services/api';
+import Icon from '../components/Icon';
 import type { ReadingListItem } from '../types';
 
 interface SortableItemProps {
@@ -44,9 +45,15 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
 
     return (
         <div ref={setNodeRef} style={style} className="reading-list-item">
-            <div className="drag-handle" {...attributes} {...listeners}>
-                ⋮⋮
-            </div>
+            <button
+                type="button"
+                className="drag-handle btn-icon"
+                aria-label={`Reorder ${book.title}`}
+                {...attributes}
+                {...listeners}
+            >
+                <Icon name="grip" />
+            </button>
             {book.thumbnail_url ? (
                 <img src={book.thumbnail_url} alt={book.title} className="item-thumbnail" />
             ) : (
@@ -136,9 +143,14 @@ const ReadingListPage: React.FC = () => {
     };
 
     return (
-        <div className="reading-list-page">
-            <h1>Reading List</h1>
-            <p className="subtitle">Drag to reorder your reading list</p>
+        <div className="reading-list-page page">
+            <header className="page-header">
+                <div>
+                    <p className="eyebrow label-placard">What is next</p>
+                    <h1>Reading List</h1>
+                    <p className="subtitle">Drag to reorder the queue.</p>
+                </div>
+            </header>
 
             {loading ? (
                 <div className="loading">Loading...</div>

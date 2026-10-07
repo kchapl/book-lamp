@@ -1,0 +1,363 @@
+/* =============================================================================
+   BOOK LAMP — DESIGN TOKENS
+   The single source of truth for colour, type, shape, motion and space.
+   See docs/design-language.md. Nothing else in the app defines these values.
+   ============================================================================= */
+
+:root {
+    /* -------------------------------------------------------------------------
+       COLOUR ROLES — LIGHT ("paper")
+       Lamp green primary, brass secondary, oxblood tertiary, warm paper surfaces.
+       ------------------------------------------------------------------------- */
+
+    /* Primary — the lamp shade */
+    --md-sys-color-primary: #1f4d3a;
+    --md-sys-color-on-primary: #ffffff;
+    --md-sys-color-primary-container: #c6e8d5;
+    --md-sys-color-on-primary-container: #05271b;
+
+    /* Secondary — brass */
+    --md-sys-color-secondary: #8a6a2f;
+    --md-sys-color-on-secondary: #ffffff;
+    --md-sys-color-secondary-container: #f2e2c2;
+    --md-sys-color-on-secondary-container: #2b1f06;
+
+    /* Tertiary — book cloth / oxblood */
+    --md-sys-color-tertiary: #7c3b46;
+    --md-sys-color-on-tertiary: #ffffff;
+    --md-sys-color-tertiary-container: #f7d9dc;
+    --md-sys-color-on-tertiary-container: #3b0d15;
+
+    /* Error */
+    --md-sys-color-error: #a3241c;
+    --md-sys-color-on-error: #ffffff;
+    --md-sys-color-error-container: #f8dad6;
+    --md-sys-color-on-error-container: #400d09;
+
+    /* Surfaces — warm paper */
+    --md-sys-color-surface: #fbf7f0;
+    --md-sys-color-on-surface: #1e1b16;
+    --md-sys-color-surface-variant: #e7e0d2;
+    --md-sys-color-on-surface-variant: #57503f;
+    --md-sys-color-surface-container-lowest: #ffffff;
+    --md-sys-color-surface-container-low: #f6f0e4;
+    --md-sys-color-surface-container: #f0e9db;
+    --md-sys-color-surface-container-high: #e9e1d1;
+    --md-sys-color-surface-container-highest: #e2d9c7;
+    --md-sys-color-outline: #867e6d;
+    --md-sys-color-outline-variant: #d7cebc;
+
+    --md-sys-color-background: #fbf7f0;
+    --md-sys-color-on-background: #1e1b16;
+
+    /* Inverse */
+    --md-sys-color-inverse-surface: #33302a;
+    --md-sys-color-inverse-on-surface: #f4efe6;
+    --md-sys-color-inverse-primary: #9bd3b8;
+
+    /* Shadow & scrim */
+    --md-sys-color-shadow: #000000;
+    --md-sys-color-scrim: #000000;
+    --md-sys-color-surface-tint: #1f4d3a;
+
+    /* Reading-status roles, named so status is never ad-hoc colour */
+    --bl-status-completed: var(--md-sys-color-primary);
+    --bl-status-completed-container: var(--md-sys-color-primary-container);
+    --bl-status-completed-on-container: var(--md-sys-color-on-primary-container);
+    --bl-status-in-progress: var(--md-sys-color-secondary);
+    --bl-status-in-progress-container: var(--md-sys-color-secondary-container);
+    --bl-status-in-progress-on-container: var(--md-sys-color-on-secondary-container);
+    --bl-status-abandoned: var(--md-sys-color-error);
+    --bl-status-abandoned-container: var(--md-sys-color-error-container);
+    --bl-status-abandoned-on-container: var(--md-sys-color-on-error-container);
+    --bl-status-planned: var(--md-sys-color-tertiary);
+    --bl-status-planned-container: var(--md-sys-color-tertiary-container);
+    --bl-status-planned-on-container: var(--md-sys-color-on-tertiary-container);
+
+    /* -------------------------------------------------------------------------
+       TYPOGRAPHY
+       Fraunces (serif) for display/headline and Book titles — the museum voice.
+       Roboto (sans) for title/body/label — the instrument voice.
+       ------------------------------------------------------------------------- */
+
+    --bl-font-display: 'Fraunces', 'Fraunces Fallback', Georgia, serif;
+    --bl-font-ui: 'Roboto', 'Roboto Fallback', system-ui, -apple-system, sans-serif;
+
+    --bl-tracking-placard: 0.14em;
+
+    --md-sys-typescale-display-large-font: var(--bl-font-display);
+    --md-sys-typescale-display-medium-font: var(--bl-font-display);
+    --md-sys-typescale-display-small-font: var(--bl-font-display);
+    --md-sys-typescale-headline-large-font: var(--bl-font-display);
+    --md-sys-typescale-headline-medium-font: var(--bl-font-display);
+    --md-sys-typescale-headline-small-font: var(--bl-font-display);
+    --md-sys-typescale-title-large-font: var(--bl-font-ui);
+    --md-sys-typescale-title-medium-font: var(--bl-font-ui);
+    --md-sys-typescale-title-small-font: var(--bl-font-ui);
+    --md-sys-typescale-body-large-font: var(--bl-font-ui);
+    --md-sys-typescale-body-medium-font: var(--bl-font-ui);
+    --md-sys-typescale-body-small-font: var(--bl-font-ui);
+    --md-sys-typescale-label-large-font: var(--bl-font-ui);
+    --md-sys-typescale-label-medium-font: var(--bl-font-ui);
+    --md-sys-typescale-label-small-font: var(--bl-font-ui);
+
+    --md-sys-typescale-display-large-size: 57px;
+    --md-sys-typescale-display-large-line-height: 62px;
+    --md-sys-typescale-display-large-weight: 500;
+    --md-sys-typescale-display-large-tracking: -0.5px;
+
+    --md-sys-typescale-display-medium-size: 45px;
+    --md-sys-typescale-display-medium-line-height: 52px;
+    --md-sys-typescale-display-medium-weight: 500;
+    --md-sys-typescale-display-medium-tracking: -0.25px;
+
+    --md-sys-typescale-display-small-size: 36px;
+    --md-sys-typescale-display-small-line-height: 44px;
+    --md-sys-typescale-display-small-weight: 500;
+    --md-sys-typescale-display-small-tracking: 0;
+
+    --md-sys-typescale-headline-large-size: 32px;
+    --md-sys-typescale-headline-large-line-height: 40px;
+    --md-sys-typescale-headline-large-weight: 500;
+    --md-sys-typescale-headline-large-tracking: 0;
+
+    --md-sys-typescale-headline-medium-size: 28px;
+    --md-sys-typescale-headline-medium-line-height: 36px;
+    --md-sys-typescale-headline-medium-weight: 500;
+    --md-sys-typescale-headline-medium-tracking: 0;
+
+    --md-sys-typescale-headline-small-size: 24px;
+    --md-sys-typescale-headline-small-line-height: 32px;
+    --md-sys-typescale-headline-small-weight: 500;
+    --md-sys-typescale-headline-small-tracking: 0;
+
+    --md-sys-typescale-title-large-size: 22px;
+    --md-sys-typescale-title-large-line-height: 28px;
+    --md-sys-typescale-title-large-weight: 500;
+    --md-sys-typescale-title-large-tracking: 0;
+
+    --md-sys-typescale-title-medium-size: 16px;
+    --md-sys-typescale-title-medium-line-height: 24px;
+    --md-sys-typescale-title-medium-weight: 500;
+    --md-sys-typescale-title-medium-tracking: 0.15px;
+
+    --md-sys-typescale-title-small-size: 14px;
+    --md-sys-typescale-title-small-line-height: 20px;
+    --md-sys-typescale-title-small-weight: 500;
+    --md-sys-typescale-title-small-tracking: 0.1px;
+
+    --md-sys-typescale-body-large-size: 16px;
+    --md-sys-typescale-body-large-line-height: 24px;
+    --md-sys-typescale-body-large-weight: 400;
+    --md-sys-typescale-body-large-tracking: 0.5px;
+
+    --md-sys-typescale-body-medium-size: 14px;
+    --md-sys-typescale-body-medium-line-height: 20px;
+    --md-sys-typescale-body-medium-weight: 400;
+    --md-sys-typescale-body-medium-tracking: 0.25px;
+
+    --md-sys-typescale-body-small-size: 12px;
+    --md-sys-typescale-body-small-line-height: 16px;
+    --md-sys-typescale-body-small-weight: 400;
+    --md-sys-typescale-body-small-tracking: 0.4px;
+
+    --md-sys-typescale-label-large-size: 14px;
+    --md-sys-typescale-label-large-line-height: 20px;
+    --md-sys-typescale-label-large-weight: 500;
+    --md-sys-typescale-label-large-tracking: 0.1px;
+
+    --md-sys-typescale-label-medium-size: 12px;
+    --md-sys-typescale-label-medium-line-height: 16px;
+    --md-sys-typescale-label-medium-weight: 500;
+    --md-sys-typescale-label-medium-tracking: 0.5px;
+
+    --md-sys-typescale-label-small-size: 11px;
+    --md-sys-typescale-label-small-line-height: 16px;
+    --md-sys-typescale-label-small-weight: 500;
+    --md-sys-typescale-label-small-tracking: 0.5px;
+
+    /* -------------------------------------------------------------------------
+       SHAPE
+       ------------------------------------------------------------------------- */
+
+    --md-sys-shape-corner-extra-small: 4px;
+    --md-sys-shape-corner-small: 8px;
+    --md-sys-shape-corner-medium: 12px;
+    --md-sys-shape-corner-large: 16px;
+    --md-sys-shape-corner-extra-large: 28px;
+    --md-sys-shape-corner-full: 9999px;
+
+    --md-sys-shape-xs: 4px;
+    --md-sys-shape-sm: 8px;
+    --md-sys-shape-md: 12px;
+    --md-sys-shape-lg: 16px;
+    --md-sys-shape-xl: 28px;
+    --md-sys-shape-full: 9999px;
+
+    /* -------------------------------------------------------------------------
+       SPACE — 4px base scale used for all padding, gap and rhythm
+       ------------------------------------------------------------------------- */
+
+    --bl-space-1: 4px;
+    --bl-space-2: 8px;
+    --bl-space-3: 12px;
+    --bl-space-4: 16px;
+    --bl-space-5: 24px;
+    --bl-space-6: 32px;
+    --bl-space-7: 48px;
+    --bl-space-8: 64px;
+
+    /* -------------------------------------------------------------------------
+       ELEVATION — warm-tinted shadow (paper lamp light, not grey)
+       ------------------------------------------------------------------------- */
+
+    --bl-shadow-color: 60, 42, 20;
+    --md-sys-elevation-1: 0 1px 2px rgba(var(--bl-shadow-color), 0.14), 0 1px 3px 1px rgba(var(--bl-shadow-color), 0.08);
+    --md-sys-elevation-2: 0 2px 4px rgba(var(--bl-shadow-color), 0.16), 0 4px 10px 2px rgba(var(--bl-shadow-color), 0.1);
+    --md-sys-elevation-3: 0 6px 12px rgba(var(--bl-shadow-color), 0.16), 0 2px 6px rgba(var(--bl-shadow-color), 0.12);
+    --md-sys-elevation-4: 0 8px 16px rgba(var(--bl-shadow-color), 0.18), 0 4px 10px rgba(var(--bl-shadow-color), 0.12);
+    --md-sys-elevation-5: 0 12px 24px rgba(var(--bl-shadow-color), 0.2), 0 6px 12px rgba(var(--bl-shadow-color), 0.14);
+
+    /* -------------------------------------------------------------------------
+       MOTION
+       ------------------------------------------------------------------------- */
+
+    --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.0, 0, 0.2, 1);
+    --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 1, 1);
+    --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0.2, 1);
+    --md-sys-motion-easing-standard-decelerate: cubic-bezier(0.0, 0, 0.2, 1);
+    --md-sys-motion-easing-standard-accelerate: cubic-bezier(0.3, 0, 1, 1);
+    --md-sys-motion-easing-linear: linear;
+
+    --md-sys-motion-duration-short1: 50ms;
+    --md-sys-motion-duration-short2: 100ms;
+    --md-sys-motion-duration-medium1: 200ms;
+    --md-sys-motion-duration-medium2: 300ms;
+    --md-sys-motion-duration-long1: 400ms;
+    --md-sys-motion-duration-long2: 500ms;
+    --md-sys-motion-duration-extra-long1: 600ms;
+
+    /* -------------------------------------------------------------------------
+       STATE LAYERS
+       ------------------------------------------------------------------------- */
+
+    --md-sys-state-hover-state-layer-opacity: 0.08;
+    --md-sys-state-focus-state-layer-opacity: 0.12;
+    --md-sys-state-pressed-state-layer-opacity: 0.12;
+    --md-sys-state-dragged-state-layer-opacity: 0.16;
+}
+
+/* =============================================================================
+   DARK ROLES — "ink"
+   Applied before JavaScript runs when the OS prefers dark, and by [data-theme].
+   ============================================================================= */
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --md-sys-color-primary: #9bd3b8;
+        --md-sys-color-on-primary: #06301f;
+        --md-sys-color-primary-container: #123a2c;
+        --md-sys-color-on-primary-container: #b7ebd1;
+
+        --md-sys-color-secondary: #ddc08a;
+        --md-sys-color-on-secondary: #3a2c10;
+        --md-sys-color-secondary-container: #554118;
+        --md-sys-color-on-secondary-container: #f7e0b4;
+
+        --md-sys-color-tertiary: #eeb4bb;
+        --md-sys-color-on-tertiary: #4a1620;
+        --md-sys-color-tertiary-container: #63323a;
+        --md-sys-color-on-tertiary-container: #ffd9dd;
+
+        --md-sys-color-error: #f2b8b5;
+        --md-sys-color-on-error: #601410;
+        --md-sys-color-error-container: #8c1d18;
+        --md-sys-color-on-error-container: #f9dedc;
+
+        --md-sys-color-surface: #14120f;
+        --md-sys-color-on-surface: #e8e2d6;
+        --md-sys-color-surface-variant: #4a453c;
+        --md-sys-color-on-surface-variant: #ccc4b2;
+        --md-sys-color-surface-container-lowest: #0f0d0b;
+        --md-sys-color-surface-container-low: #1c1a16;
+        --md-sys-color-surface-container: #201d19;
+        --md-sys-color-surface-container-high: #2b2823;
+        --md-sys-color-surface-container-highest: #36322c;
+        --md-sys-color-outline: #968d7c;
+        --md-sys-color-outline-variant: #4a453c;
+
+        --md-sys-color-background: #14120f;
+        --md-sys-color-on-background: #e8e2d6;
+
+        --md-sys-color-inverse-surface: #e8e2d6;
+        --md-sys-color-inverse-on-surface: #33302a;
+        --md-sys-color-inverse-primary: #2f6b52;
+
+        --md-sys-color-surface-tint: #9bd3b8;
+
+        --bl-shadow-color: 0, 0, 0;
+    }
+}
+
+[data-theme='dark'] {
+    --md-sys-color-primary: #9bd3b8;
+    --md-sys-color-on-primary: #06301f;
+    --md-sys-color-primary-container: #123a2c;
+    --md-sys-color-on-primary-container: #b7ebd1;
+
+    --md-sys-color-secondary: #ddc08a;
+    --md-sys-color-on-secondary: #3a2c10;
+    --md-sys-color-secondary-container: #554118;
+    --md-sys-color-on-secondary-container: #f7e0b4;
+
+    --md-sys-color-tertiary: #eeb4bb;
+    --md-sys-color-on-tertiary: #4a1620;
+    --md-sys-color-tertiary-container: #63323a;
+    --md-sys-color-on-tertiary-container: #ffd9dd;
+
+    --md-sys-color-error: #f2b8b5;
+    --md-sys-color-on-error: #601410;
+    --md-sys-color-error-container: #8c1d18;
+    --md-sys-color-on-error-container: #f9dedc;
+
+    --md-sys-color-surface: #14120f;
+    --md-sys-color-on-surface: #e8e2d6;
+    --md-sys-color-surface-variant: #4a453c;
+    --md-sys-color-on-surface-variant: #ccc4b2;
+    --md-sys-color-surface-container-lowest: #0f0d0b;
+    --md-sys-color-surface-container-low: #1c1a16;
+    --md-sys-color-surface-container: #201d19;
+    --md-sys-color-surface-container-high: #2b2823;
+    --md-sys-color-surface-container-highest: #36322c;
+    --md-sys-color-outline: #968d7c;
+    --md-sys-color-outline-variant: #4a453c;
+
+    --md-sys-color-background: #14120f;
+    --md-sys-color-on-background: #e8e2d6;
+
+    --md-sys-color-inverse-surface: #e8e2d6;
+    --md-sys-color-inverse-on-surface: #33302a;
+    --md-sys-color-inverse-primary: #2f6b52;
+
+    --md-sys-color-surface-tint: #9bd3b8;
+
+    --bl-shadow-color: 0, 0, 0;
+}
+
+/* =============================================================================
+   LEGACY ALIASES
+   A few short names older markup still references. They point at MD3 roles;
+   prefer the role directly in new code.
+   ============================================================================= */
+
+:root {
+    --primary: var(--md-sys-color-primary);
+    --primary-light: var(--md-sys-color-primary);
+    --bg: var(--md-sys-color-surface);
+    --text: var(--md-sys-color-on-surface);
+    --text-muted: var(--md-sys-color-on-surface-variant);
+    --card-bg: var(--md-sys-color-surface-container-low);
+    --glass: var(--md-sys-color-surface-container);
+    --glass-border: var(--md-sys-color-outline-variant);
+}

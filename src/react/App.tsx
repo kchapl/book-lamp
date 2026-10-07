@@ -95,19 +95,13 @@ function App() {
     }, [isAuthorized]);
 
     useEffect(() => {
+        // Resolve the theme to a concrete light/dark value and always set it, so
+        // an explicit choice cannot be overridden by the OS preference. Before
+        // this effect runs, tokens.css falls back to `prefers-color-scheme`.
         const root = document.documentElement;
-        if (theme === 'dark') {
-            root.setAttribute('data-theme', 'dark');
-        } else if (theme === 'light') {
-            root.removeAttribute('data-theme');
-        } else {
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (prefersDark) {
-                root.setAttribute('data-theme', 'dark');
-            } else {
-                root.removeAttribute('data-theme');
-            }
-        }
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+        root.setAttribute('data-theme', resolved);
     }, [theme]);
 
     const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
