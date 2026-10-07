@@ -11,7 +11,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src/react'),
+      '@': path.resolve(import.meta.dirname, 'src/react'),
     },
   },
   server: {
