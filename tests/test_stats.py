@@ -99,6 +99,22 @@ def test_api_dashboard_endpoint(authenticated_client):
     assert "format_distribution" in data
     assert "language_distribution" in data
     assert "category_details" in data
+    assert "last_record_date" in data
+
+
+def test_dashboard_last_record_date_tracks_the_latest_reading(authenticated_client):
+    """The dashboard's as-of date is the most recent reading activity."""
+    storage = get_storage()
+
+    older = storage.add_book(isbn13="9780000000101", title="Older", author="Author")
+    storage.add_reading_record(older["id"], "In Progress", "2023-05-01", None)
+
+    recent = storage.add_book(isbn13="9780000000102", title="Recent", author="Author")
+    storage.add_reading_record(recent["id"], "Completed", "2024-03-01", "2024-03-10", rating=5)
+
+    resp = authenticated_client.get("/api/dashboard")
+    assert resp.status_code == 200
+    assert resp.get_json()["last_record_date"] == "2024-03-10"
 
 
 def test_api_stats_redirect(authenticated_client):

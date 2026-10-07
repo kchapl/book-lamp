@@ -285,6 +285,20 @@ def calculate_collection_stats(
     if yearly_goal and yearly_goal > 0:
         goal_progress_percent = min(round((books_this_year / yearly_goal) * 100, 1), 100.0)
 
+    # The date of the most recent reading activity. Reading Statuses are recorded
+    # at most daily, so the dashboard states this date rather than implying a live
+    # feed. Reading dates, not write timestamps: an import should not read as
+    # "updated today".
+    last_record_date: Optional[str] = None
+    for r in all_records:
+        for key in ("end_date", "start_date"):
+            value = r.get(key)
+            if not value:
+                continue
+            text = value.isoformat()[:10] if isinstance(value, datetime.date) else str(value)[:10]
+            if last_record_date is None or text > last_record_date:
+                last_record_date = text
+
     return {
         "total_books": total_books,
         "total_authors": total_authors,
@@ -316,4 +330,5 @@ def calculate_collection_stats(
         "year_comparison": year_comparison,
         "reading_pace_monthly": reading_pace_monthly,
         "reading_pace_annualised": reading_pace_annualised,
+        "last_record_date": last_record_date,
     }
