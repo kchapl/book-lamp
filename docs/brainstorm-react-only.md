@@ -8,7 +8,7 @@ The app has already drifted a long way toward React. Today:
 - **A full legacy layer survives in the repo** and is now misleading:
   - 15 Jinja templates in `book_lamp/templates/` (only `index.html` is technically reachable, and only on a broken build).
   - Legacy browser-form routes are gone (POSTs to `/books` etc. return 405), but ~29 backend tests still exercise the old form-post + full-page-HTML behaviour (`test_manual_entry.py`, `test_books.py`, `test_history.py`, `test_search.py`, `test_author_page.py`, parts of `test_libib_import.py`), all failing or asserting markup that no longer exists.
-  - `src/ts/` legacy vanilla TS is still compiled by `npm run build` and copied into `static/` alongside the React bundle.
+  - ~~`src/ts/` legacy vanilla TS is still compiled by `npm run build` and copied into `static/` alongside the React bundle.~~ **Removed** (see idea #2): `npm run build` is now Vite-only.
   - Docs (`README` and the agent skills) still described a dual template/React world, and claimed "React 18" while the app is on React 19.2.
   - `book_lamp/static/react/index.html` is a committed build artefact whose script tags are re-written on each build.
 
@@ -23,12 +23,14 @@ The ask — "remove use of Jinja2 templates so the app is entirely React" — is
 
 **Cost.** Low-to-medium. One focused change to `spa.py` + app factory, `git rm` of templates, a test-sweep, and docs. Nothing user-visible changes.
 
-### 2. De-legacy the frontend build
+### 2. De-legacy the frontend build — done
 **What it is.** Drop the vanilla-TS `src/ts/` pipeline from `npm run build` (`tsc && cp -r book_lamp/static/ts/* book_lamp/static/ && vite build` becomes just `vite build`), delete `src/ts/` and its compiled copies in `book_lamp/static/`.
 
 **Why a demanding user would notice.** Smaller deploys and no half-legacy global namespace (`src/ts/base-ui.ts` even exposes functions to "templates"); `tsc` build time drops; a newcomer reads one frontend, not two.
 
 **Cost.** Low. Mostly deletions plus verifying the React app doesn't import anything from `src/ts/` (I checked: it doesn't).
+
+**Done (Oct 2026).** `npm run build` is now just `vite build`. `src/ts/`, the `book_lamp/static/ts/` output, the flattened `static/*.js` copies and the `declarations.d.ts` shim are all deleted. React's `*.css` ambient types now come from `vite/client` through `src/react/vite-env.d.ts`; the `html5-qrcode` shim was redundant because the package ships its own types.
 
 ### 3. Clean up the test suite to match the SPA reality
 **What it is.** Rewrite the ~29 failing legacy-HTML tests as JSON-API tests (most equivalent coverage already exists in `test_api_routes.py`) or delete them; keep meaningful regressions (e.g. duplicate-ISBN handling, filter logic) as API-level tests rather than HTML-string assertions.
@@ -56,7 +58,7 @@ The ask — "remove use of Jinja2 templates so the app is entirely React" — is
 1. **`book_lamp/__init__.py`**: remove `template_folder="templates"` from the `Flask(...)` factory call.
 2. **`book_lamp/routes/spa.py`**: remove `render_template` import; replace `_serve_spa`'s fallback branch with a plain error response, e.g. return a 503 `Response("SPA build missing: run 'npm run build'", mimetype="text/plain")` if `static/react/index.html` is absent.
 3. **`git rm -r book_lamp/templates`** (15 files). Nothing else in `book_lamp/` references them (verified: only `spa.py` called `render_template`).
-4. **Rebuild the shell**: `npm run build:react` so `static/react/index.html` is freshly generated.
+4. **Rebuild the shell**: `npm run build` so `static/react/index.html` is freshly generated.
 5. **Tests**: delete or rewrite the 29 failing template-era tests. Rewrite, don't delete, the ones guarding real logic: duplicate-ISBN add (`test_manual_entry.py`), filter logic (`test_books.py` — API equivalents already exist in `test_api_routes.py`, so deletion is acceptable there), import success/failure paths (`test_libib_import.py`, already partially migrated to the `/books/import` JSON+redirect behaviour). Add a small `test_spa.py` asserting `/`, `/books`, `/author/x`, and a bogus path all return 200 with the React shell, and that a missing shell yields 503.
 6. **Docs**: update `README` and the agent skills to the React-only reality (folds in idea #4).
 7. **Verify**: `uv run pytest` fully green; `npm test`; `npm run build`; boot the app and curl `/`, `/books`, `/unauthorised`, `/definitely-missing` for 200 + React shell.

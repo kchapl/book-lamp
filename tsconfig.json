@@ -12,16 +12,12 @@
         "skipLibCheck": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
-        "outDir": "book_lamp/static",
-        "rootDir": "src",
         "jsx": "react-jsx",
         "paths": {
             "@/*": ["./src/react/*"]
         }
     },
     "include": [
-        "src/ts/**/*.ts",
-        "src/ts/**/*.tsx",
         "src/react/**/*.ts",
         "src/react/**/*.tsx"
     ],

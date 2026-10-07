@@ -34,7 +34,7 @@ and other minimal sandboxes), the database runs on the host network instead; see
 1. Install tools: `mise install`
 2. Install backend dependencies: `uv sync`
 3. Install frontend dependencies: `npm install`
-4. Compile TypeScript: `npm run build`
+4. Build the React SPA: `npm run build`
 5. Create a `.env` file with the required variables:
    ```
    FLASK_DEBUG=True

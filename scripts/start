@@ -136,8 +136,8 @@ done
 log "Applying database migrations (alembic upgrade head)"
 uv run alembic upgrade head
 
-log "Building the React SPA (npm run build:react)"
-npm run build:react
+log "Building the React SPA (npm run build)"
+npm run build
 
 flask_command=(uv run flask --app book_lamp.app run --host "$host" --port "$port")
 if [ "$(read_env_value FLASK_DEBUG | tr '[:upper:]' '[:lower:]')" = "true" ]; then

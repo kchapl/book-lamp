@@ -4,12 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc && cp -r book_lamp/static/ts/* book_lamp/static/ && vite build",
-    "build:ts": "tsc && cp -r book_lamp/static/ts/* book_lamp/static/",
+    "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "build:react": "vite build",
     "dev": "vite"
   },
   "devDependencies": {
