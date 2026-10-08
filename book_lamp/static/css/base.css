@@ -7,20 +7,20 @@
 /* Font metric fallbacks keep first paint close to the real faces so the swap
    (display=optional) cannot shift layout. */
 @font-face {
-    font-family: 'Roboto Fallback';
+    font-family: 'Inter Fallback';
     src: local('Arial');
     size-adjust: 100%;
-    ascent-override: 92.78%;
-    descent-override: 24.44%;
+    ascent-override: 96.88%;
+    descent-override: 24.12%;
     line-gap-override: 0%;
 }
 
 @font-face {
-    font-family: 'Fraunces Fallback';
+    font-family: 'Newsreader Fallback';
     src: local('Georgia');
-    size-adjust: 98%;
-    ascent-override: 96%;
-    descent-override: 26%;
+    size-adjust: 97%;
+    ascent-override: 93%;
+    descent-override: 25%;
     line-gap-override: 0%;
 }
 
@@ -84,7 +84,7 @@ button {
 }
 
 :focus-visible {
-    outline: 3px solid var(--md-sys-color-secondary);
+    outline: 2px solid var(--md-sys-color-primary);
     outline-offset: 2px;
     border-radius: var(--md-sys-shape-corner-extra-small);
 }
@@ -198,8 +198,8 @@ button {
 }
 
 .nav-links a.active {
-    color: var(--md-sys-color-on-primary-container);
-    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-surface);
+    background-color: var(--md-sys-color-surface-container-high);
 }
 
 .nav-links a .icon svg {
@@ -369,7 +369,7 @@ button {
     font-weight: 700;
     letter-spacing: var(--bl-tracking-placard);
     text-transform: uppercase;
-    color: var(--md-sys-color-secondary);
+    color: var(--md-sys-color-on-surface-variant);
     margin: 0 0 var(--bl-space-2);
 }
 

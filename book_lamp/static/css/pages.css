@@ -18,12 +18,8 @@
     overflow: hidden;
     padding: var(--bl-space-8) var(--bl-space-6);
     border-radius: var(--md-sys-shape-corner-extra-large);
-    background:
-        radial-gradient(90% 120% at 8% 0%, color-mix(in srgb, var(--md-sys-color-secondary) 22%, transparent), transparent 60%),
-        radial-gradient(110% 130% at 100% 10%, color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent), transparent 55%),
-        var(--md-sys-color-surface-container-low);
+    background-color: var(--md-sys-color-surface-container-low);
     border: 1px solid var(--md-sys-color-outline-variant);
-    box-shadow: var(--md-sys-elevation-1);
     min-height: 24rem;
     display: flex;
     flex-direction: column;
@@ -513,9 +509,7 @@
     display: flex;
     gap: var(--bl-space-4);
     padding: var(--bl-space-4);
-    background:
-        linear-gradient(135deg, color-mix(in srgb, var(--md-sys-color-secondary) 12%, transparent), transparent 60%),
-        var(--md-sys-color-surface-container-low);
+    background-color: var(--md-sys-color-surface-container-low);
     border: 1px solid var(--md-sys-color-outline-variant);
     border-left: 3px solid var(--bl-status-in-progress);
     border-radius: var(--md-sys-shape-corner-medium);

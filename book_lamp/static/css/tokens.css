@@ -6,60 +6,60 @@
 
 :root {
     /* -------------------------------------------------------------------------
-       COLOUR ROLES — LIGHT ("paper")
-       Lamp green primary, brass secondary, oxblood tertiary, warm paper surfaces.
+       COLOUR ROLES — LIGHT
+       Neutral paper and ink, one forest accent, amber for in-progress. Flat
+       surfaces separated by hairlines rather than a stack of tonal tints.
        ------------------------------------------------------------------------- */
 
-    /* Primary — the lamp shade */
-    --md-sys-color-primary: #1f4d3a;
+    /* Primary — the accent */
+    --md-sys-color-primary: #0f7a55;
     --md-sys-color-on-primary: #ffffff;
-    --md-sys-color-primary-container: #c6e8d5;
-    --md-sys-color-on-primary-container: #05271b;
+    --md-sys-color-primary-container: #e7f3ee;
+    --md-sys-color-on-primary-container: #04301f;
 
-    /* Secondary — brass. Darkened from #8a6a2f so brass text
-       (e.g. the author line) clears 4.5:1 on the paper surfaces. */
-    --md-sys-color-secondary: #7f6127;
+    /* Secondary — amber. In Progress, and the quiet accent label. */
+    --md-sys-color-secondary: #9a5b12;
     --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #f2e2c2;
-    --md-sys-color-on-secondary-container: #2b1f06;
+    --md-sys-color-secondary-container: #fdf0d5;
+    --md-sys-color-on-secondary-container: #3a2a06;
 
-    /* Tertiary — book cloth / oxblood */
-    --md-sys-color-tertiary: #7c3b46;
+    /* Tertiary — muted indigo for occasional emphasis. */
+    --md-sys-color-tertiary: #44506b;
     --md-sys-color-on-tertiary: #ffffff;
-    --md-sys-color-tertiary-container: #f7d9dc;
-    --md-sys-color-on-tertiary-container: #3b0d15;
+    --md-sys-color-tertiary-container: #e5e8f0;
+    --md-sys-color-on-tertiary-container: #1c2333;
 
     /* Error */
-    --md-sys-color-error: #a3241c;
+    --md-sys-color-error: #b91c1c;
     --md-sys-color-on-error: #ffffff;
-    --md-sys-color-error-container: #f8dad6;
-    --md-sys-color-on-error-container: #400d09;
+    --md-sys-color-error-container: #fee2e2;
+    --md-sys-color-on-error-container: #7a271a;
 
-    /* Surfaces — warm paper */
-    --md-sys-color-surface: #fbf7f0;
-    --md-sys-color-on-surface: #1e1b16;
-    --md-sys-color-surface-variant: #e7e0d2;
-    --md-sys-color-on-surface-variant: #57503f;
+    /* Surfaces — neutral, never warm beige */
+    --md-sys-color-surface: #fafafa;
+    --md-sys-color-on-surface: #0a0a0a;
+    --md-sys-color-surface-variant: #f4f4f5;
+    --md-sys-color-on-surface-variant: #52525b;
     --md-sys-color-surface-container-lowest: #ffffff;
-    --md-sys-color-surface-container-low: #f6f0e4;
-    --md-sys-color-surface-container: #f0e9db;
-    --md-sys-color-surface-container-high: #e9e1d1;
-    --md-sys-color-surface-container-highest: #e2d9c7;
-    --md-sys-color-outline: #867e6d;
-    --md-sys-color-outline-variant: #d7cebc;
+    --md-sys-color-surface-container-low: #ffffff;
+    --md-sys-color-surface-container: #f4f4f5;
+    --md-sys-color-surface-container-high: #ececee;
+    --md-sys-color-surface-container-highest: #e4e4e7;
+    --md-sys-color-outline: #a1a1aa;
+    --md-sys-color-outline-variant: #e4e4e7;
 
-    --md-sys-color-background: #fbf7f0;
-    --md-sys-color-on-background: #1e1b16;
+    --md-sys-color-background: #fafafa;
+    --md-sys-color-on-background: #0a0a0a;
 
     /* Inverse */
-    --md-sys-color-inverse-surface: #33302a;
-    --md-sys-color-inverse-on-surface: #f4efe6;
-    --md-sys-color-inverse-primary: #9bd3b8;
+    --md-sys-color-inverse-surface: #18181b;
+    --md-sys-color-inverse-on-surface: #fafafa;
+    --md-sys-color-inverse-primary: #4fd1a5;
 
     /* Shadow & scrim */
     --md-sys-color-shadow: #000000;
     --md-sys-color-scrim: #000000;
-    --md-sys-color-surface-tint: #1f4d3a;
+    --md-sys-color-surface-tint: #0f7a55;
 
     /* Reading-status roles, named so status is never ad-hoc colour */
     --bl-status-completed: var(--md-sys-color-primary);
@@ -77,12 +77,12 @@
 
     /* -------------------------------------------------------------------------
        TYPOGRAPHY
-       Fraunces (serif) for display/headline and Book titles — the museum voice.
-       Roboto (sans) for title/body/label — the instrument voice.
+       Newsreader (serif) for display/headline and Book titles — the editorial
+       voice. Inter (grotesque) for title/body/label — the instrument voice.
        ------------------------------------------------------------------------- */
 
-    --bl-font-display: 'Fraunces', 'Fraunces Fallback', Georgia, serif;
-    --bl-font-ui: 'Roboto', 'Roboto Fallback', system-ui, -apple-system, sans-serif;
+    --bl-font-display: 'Newsreader', 'Newsreader Fallback', Georgia, serif;
+    --bl-font-ui: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
     --bl-tracking-placard: 0.14em;
 
@@ -150,17 +150,17 @@
     --md-sys-typescale-body-large-size: 16px;
     --md-sys-typescale-body-large-line-height: 24px;
     --md-sys-typescale-body-large-weight: 400;
-    --md-sys-typescale-body-large-tracking: 0.5px;
+    --md-sys-typescale-body-large-tracking: 0.2px;
 
     --md-sys-typescale-body-medium-size: 14px;
     --md-sys-typescale-body-medium-line-height: 20px;
     --md-sys-typescale-body-medium-weight: 400;
-    --md-sys-typescale-body-medium-tracking: 0.25px;
+    --md-sys-typescale-body-medium-tracking: 0.1px;
 
     --md-sys-typescale-body-small-size: 12px;
     --md-sys-typescale-body-small-line-height: 16px;
     --md-sys-typescale-body-small-weight: 400;
-    --md-sys-typescale-body-small-tracking: 0.4px;
+    --md-sys-typescale-body-small-tracking: 0.2px;
 
     --md-sys-typescale-label-large-size: 14px;
     --md-sys-typescale-label-large-line-height: 20px;
@@ -185,14 +185,14 @@
     --md-sys-shape-corner-small: 8px;
     --md-sys-shape-corner-medium: 12px;
     --md-sys-shape-corner-large: 16px;
-    --md-sys-shape-corner-extra-large: 28px;
+    --md-sys-shape-corner-extra-large: 20px;
     --md-sys-shape-corner-full: 9999px;
 
     --md-sys-shape-xs: 4px;
     --md-sys-shape-sm: 8px;
     --md-sys-shape-md: 12px;
     --md-sys-shape-lg: 16px;
-    --md-sys-shape-xl: 28px;
+    --md-sys-shape-xl: 20px;
     --md-sys-shape-full: 9999px;
 
     /* -------------------------------------------------------------------------
@@ -209,15 +209,16 @@
     --bl-space-8: 64px;
 
     /* -------------------------------------------------------------------------
-       ELEVATION — warm-tinted shadow (paper lamp light, not grey)
+       ELEVATION — quiet, neutral shadows. Depth is carried by hairlines first,
+       shadow only where something genuinely floats (menus, modals, the FAB).
        ------------------------------------------------------------------------- */
 
-    --bl-shadow-color: 60, 42, 20;
-    --md-sys-elevation-1: 0 1px 2px rgba(var(--bl-shadow-color), 0.14), 0 1px 3px 1px rgba(var(--bl-shadow-color), 0.08);
-    --md-sys-elevation-2: 0 2px 4px rgba(var(--bl-shadow-color), 0.16), 0 4px 10px 2px rgba(var(--bl-shadow-color), 0.1);
-    --md-sys-elevation-3: 0 6px 12px rgba(var(--bl-shadow-color), 0.16), 0 2px 6px rgba(var(--bl-shadow-color), 0.12);
-    --md-sys-elevation-4: 0 8px 16px rgba(var(--bl-shadow-color), 0.18), 0 4px 10px rgba(var(--bl-shadow-color), 0.12);
-    --md-sys-elevation-5: 0 12px 24px rgba(var(--bl-shadow-color), 0.2), 0 6px 12px rgba(var(--bl-shadow-color), 0.14);
+    --bl-shadow-color: 0, 0, 0;
+    --md-sys-elevation-1: 0 1px 2px rgba(var(--bl-shadow-color), 0.05);
+    --md-sys-elevation-2: 0 2px 4px rgba(var(--bl-shadow-color), 0.06), 0 4px 12px rgba(var(--bl-shadow-color), 0.05);
+    --md-sys-elevation-3: 0 8px 24px rgba(var(--bl-shadow-color), 0.10), 0 2px 6px rgba(var(--bl-shadow-color), 0.06);
+    --md-sys-elevation-4: 0 12px 32px rgba(var(--bl-shadow-color), 0.14), 0 4px 10px rgba(var(--bl-shadow-color), 0.08);
+    --md-sys-elevation-5: 0 16px 40px rgba(var(--bl-shadow-color), 0.18);
 
     /* -------------------------------------------------------------------------
        MOTION
@@ -250,100 +251,96 @@
 }
 
 /* =============================================================================
-   DARK ROLES — "ink"
+   DARK ROLES
    Applied before JavaScript runs when the OS prefers dark, and by [data-theme].
    ============================================================================= */
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) {
-        --md-sys-color-primary: #9bd3b8;
-        --md-sys-color-on-primary: #06301f;
-        --md-sys-color-primary-container: #123a2c;
-        --md-sys-color-on-primary-container: #b7ebd1;
+        --md-sys-color-primary: #4fd1a5;
+        --md-sys-color-on-primary: #04241a;
+        --md-sys-color-primary-container: #10352a;
+        --md-sys-color-on-primary-container: #a7f3d0;
 
-        --md-sys-color-secondary: #ddc08a;
-        --md-sys-color-on-secondary: #3a2c10;
-        --md-sys-color-secondary-container: #554118;
+        --md-sys-color-secondary: #e3c07f;
+        --md-sys-color-on-secondary: #3a2a06;
+        --md-sys-color-secondary-container: #4a3413;
         --md-sys-color-on-secondary-container: #f7e0b4;
 
-        --md-sys-color-tertiary: #eeb4bb;
-        --md-sys-color-on-tertiary: #4a1620;
-        --md-sys-color-tertiary-container: #63323a;
-        --md-sys-color-on-tertiary-container: #ffd9dd;
+        --md-sys-color-tertiary: #a8b6e0;
+        --md-sys-color-on-tertiary: #1c2333;
+        --md-sys-color-tertiary-container: #2a3350;
+        --md-sys-color-on-tertiary-container: #dbe3f7;
 
         --md-sys-color-error: #f2b8b5;
         --md-sys-color-on-error: #601410;
         --md-sys-color-error-container: #8c1d18;
         --md-sys-color-on-error-container: #f9dedc;
 
-        --md-sys-color-surface: #14120f;
-        --md-sys-color-on-surface: #e8e2d6;
-        --md-sys-color-surface-variant: #4a453c;
-        --md-sys-color-on-surface-variant: #ccc4b2;
-        --md-sys-color-surface-container-lowest: #0f0d0b;
-        --md-sys-color-surface-container-low: #1c1a16;
-        --md-sys-color-surface-container: #201d19;
-        --md-sys-color-surface-container-high: #2b2823;
-        --md-sys-color-surface-container-highest: #36322c;
-        --md-sys-color-outline: #968d7c;
-        --md-sys-color-outline-variant: #4a453c;
+        --md-sys-color-surface: #0b0b0c;
+        --md-sys-color-on-surface: #f4f4f5;
+        --md-sys-color-surface-variant: #27272a;
+        --md-sys-color-on-surface-variant: #a1a1aa;
+        --md-sys-color-surface-container-lowest: #050506;
+        --md-sys-color-surface-container-low: #121214;
+        --md-sys-color-surface-container: #17171a;
+        --md-sys-color-surface-container-high: #1e1e22;
+        --md-sys-color-surface-container-highest: #26262b;
+        --md-sys-color-outline: #71717a;
+        --md-sys-color-outline-variant: #27272a;
 
-        --md-sys-color-background: #14120f;
-        --md-sys-color-on-background: #e8e2d6;
+        --md-sys-color-background: #0b0b0c;
+        --md-sys-color-on-background: #f4f4f5;
 
-        --md-sys-color-inverse-surface: #e8e2d6;
-        --md-sys-color-inverse-on-surface: #33302a;
-        --md-sys-color-inverse-primary: #2f6b52;
+        --md-sys-color-inverse-surface: #f4f4f5;
+        --md-sys-color-inverse-on-surface: #18181b;
+        --md-sys-color-inverse-primary: #0f7a55;
 
-        --md-sys-color-surface-tint: #9bd3b8;
-
-        --bl-shadow-color: 0, 0, 0;
+        --md-sys-color-surface-tint: #4fd1a5;
     }
 }
 
 [data-theme='dark'] {
-    --md-sys-color-primary: #9bd3b8;
-    --md-sys-color-on-primary: #06301f;
-    --md-sys-color-primary-container: #123a2c;
-    --md-sys-color-on-primary-container: #b7ebd1;
+    --md-sys-color-primary: #4fd1a5;
+    --md-sys-color-on-primary: #04241a;
+    --md-sys-color-primary-container: #10352a;
+    --md-sys-color-on-primary-container: #a7f3d0;
 
-    --md-sys-color-secondary: #ddc08a;
-    --md-sys-color-on-secondary: #3a2c10;
-    --md-sys-color-secondary-container: #554118;
+    --md-sys-color-secondary: #e3c07f;
+    --md-sys-color-on-secondary: #3a2a06;
+    --md-sys-color-secondary-container: #4a3413;
     --md-sys-color-on-secondary-container: #f7e0b4;
 
-    --md-sys-color-tertiary: #eeb4bb;
-    --md-sys-color-on-tertiary: #4a1620;
-    --md-sys-color-tertiary-container: #63323a;
-    --md-sys-color-on-tertiary-container: #ffd9dd;
+    --md-sys-color-tertiary: #a8b6e0;
+    --md-sys-color-on-tertiary: #1c2333;
+    --md-sys-color-tertiary-container: #2a3350;
+    --md-sys-color-on-tertiary-container: #dbe3f7;
 
     --md-sys-color-error: #f2b8b5;
     --md-sys-color-on-error: #601410;
     --md-sys-color-error-container: #8c1d18;
     --md-sys-color-on-error-container: #f9dedc;
 
-    --md-sys-color-surface: #14120f;
-    --md-sys-color-on-surface: #e8e2d6;
-    --md-sys-color-surface-variant: #4a453c;
-    --md-sys-color-on-surface-variant: #ccc4b2;
-    --md-sys-color-surface-container-lowest: #0f0d0b;
-    --md-sys-color-surface-container-low: #1c1a16;
-    --md-sys-color-surface-container: #201d19;
-    --md-sys-color-surface-container-high: #2b2823;
-    --md-sys-color-surface-container-highest: #36322c;
-    --md-sys-color-outline: #968d7c;
-    --md-sys-color-outline-variant: #4a453c;
+    --md-sys-color-surface: #0b0b0c;
+    --md-sys-color-on-surface: #f4f4f5;
+    --md-sys-color-surface-variant: #27272a;
+    --md-sys-color-on-surface-variant: #a1a1aa;
+    --md-sys-color-surface-container-lowest: #050506;
+    --md-sys-color-surface-container-low: #121214;
+    --md-sys-color-surface-container: #17171a;
+    --md-sys-color-surface-container-high: #1e1e22;
+    --md-sys-color-surface-container-highest: #26262b;
+    --md-sys-color-outline: #71717a;
+    --md-sys-color-outline-variant: #27272a;
 
-    --md-sys-color-background: #14120f;
-    --md-sys-color-on-background: #e8e2d6;
+    --md-sys-color-background: #0b0b0c;
+    --md-sys-color-on-background: #f4f4f5;
 
-    --md-sys-color-inverse-surface: #e8e2d6;
-    --md-sys-color-inverse-on-surface: #33302a;
-    --md-sys-color-inverse-primary: #2f6b52;
+    --md-sys-color-inverse-surface: #f4f4f5;
+    --md-sys-color-inverse-on-surface: #18181b;
+    --md-sys-color-inverse-primary: #0f7a55;
 
-    --md-sys-color-surface-tint: #9bd3b8;
-
-    --bl-shadow-color: 0, 0, 0;
+    --md-sys-color-surface-tint: #4fd1a5;
 }
 
 /* =============================================================================

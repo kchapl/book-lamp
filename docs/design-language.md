@@ -29,14 +29,13 @@ The two sentences to hold in mind:
 Colour is defined once, as Material 3 roles, in `static/css/tokens.css`. Nothing
 else defines colour values.
 
-- **Lamp green** (`primary`) — the banker's-lamp shade. Brand, primary actions,
-  progress, Completed.
-- **Brass** (`secondary`) — the metal. Rules, frames, In Progress, secondary
-  actions.
-- **Oxblood** (`tertiary`) — book cloth. Occasional emphasis, highlight surfaces.
+- **Forest** (`primary`) — the accent. Brand, primary actions, progress,
+  Completed.
+- **Amber** (`secondary`) — In Progress, and the quiet accent label.
+- **Indigo** (`tertiary`) — occasional emphasis, highlight surfaces.
 - **Error** — reserved for destructive actions and genuine failures only.
-- **Paper** (`surface*`) — warm off-white paper, never pure grey. Dark theme is
-  ink, not black.
+- **Neutral** (`surface*`) — white and cool grey, separated by hairlines rather
+  than a stack of tonal tints. Dark theme is a neutral ink, not a warm brown.
 
 Contrast targets: body text ≥ 4.5:1, large text and UI borders ≥ 3:1. Status is
 never carried by colour alone — every condition chip has a text label.
@@ -45,9 +44,9 @@ never carried by colour alone — every condition chip has a text label.
 
 Two faces, no more.
 
-- **Fraunces** (serif) — `display`, `headline`, and every Book title. This is the
-  museum voice: wall labels and exhibit names.
-- **Roboto** (sans) — `title`, `body`, `label`. This is the instrument voice:
+- **Newsreader** (serif) — `display`, `headline`, and every Book title. This is
+  the editorial voice: wall labels and exhibit names.
+- **Inter** (grotesque) — `title`, `body`, `label`. This is the instrument voice:
   controls, metadata, numbers.
 
 The MD3 type scale is unchanged in size; only the display and headline families
@@ -62,8 +61,9 @@ Numbers that sit in columns or change in place (counts, dates, page totals) use
 - **Shape** follows the MD3 corner scale (`--md-sys-shape-corner-*`). Exhibits
   use `corner-medium`; the big mounts use `corner-large`; buttons and chips are
   `full`.
-- **Elevation** is warm-tinted shadow, not grey. Level 1 is the plinth; level 2
-  is a card lifting on hover; level 3 is a modal.
+- **Elevation** is quiet and neutral. Depth is carried by hairlines first;
+  shadow is reserved for what genuinely floats (menus, modals, the FAB). Cards
+  separate with a 1px border and darken that border on hover instead of lifting.
 - **Space** uses the `--bl-space-*` scale (4 → 64). Page gutters come from
   `.page`; section rhythm from `.section`.
 
@@ -91,7 +91,7 @@ Defined in `static/css/components.css`:
 | --- | --- | --- |
 | Button | `.btn` + `.btn-primary` / `.btn-tonal` / `.btn-outline` / `.btn-text` / `.btn-danger` | `--btn-*` custom properties drive the variants. |
 | Icon button | `.btn-icon` | 48px target, circular state layer. |
-| Floating action button | `.fab` | A screen's primary action, fixed bottom-right; one per screen. |
+| Floating action button | `.fab`, `.fab-slot` | A screen's primary action; a pill that sticks to the foot of the page column. One per screen. |
 | Chip | `.chip`, `.chip-status` | Filter chips and condition chips. |
 | Field | `.field`, `.field-input`, `.field-label` | Labels above, warm container, brass focus ring. |
 | Exhibit | `.exhibit` | The book card. Plinth + framed cover + placard. |

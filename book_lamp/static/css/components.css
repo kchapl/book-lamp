@@ -47,9 +47,9 @@
     transition: opacity var(--md-sys-motion-duration-short1) var(--md-sys-motion-easing-standard);
 }
 
-.btn:hover { box-shadow: var(--md-sys-elevation-2); }
+.btn:hover { box-shadow: none; }
 .btn:hover::before { opacity: var(--md-sys-state-hover-state-layer-opacity); }
-.btn:active { box-shadow: var(--md-sys-elevation-1); }
+.btn:active { box-shadow: none; }
 .btn:active::before { opacity: var(--md-sys-state-pressed-state-layer-opacity); }
 .btn:disabled,
 .btn[aria-disabled='true'] {
@@ -175,7 +175,7 @@
     gap: var(--bl-space-2);
     height: 56px;
     padding: 0 var(--bl-space-5) 0 var(--bl-space-4);
-    border-radius: var(--md-sys-shape-corner-large);
+    border-radius: var(--md-sys-shape-corner-full);
     background-color: var(--md-sys-color-primary);
     color: var(--md-sys-color-on-primary);
     font-family: var(--bl-font-ui);
@@ -196,7 +196,7 @@
 .fab:active { transform: translateY(0); }
 
 .fab:focus-visible {
-    outline: 3px solid var(--md-sys-color-secondary);
+    outline: 2px solid var(--md-sys-color-primary);
     outline-offset: 3px;
 }
 
@@ -370,8 +370,8 @@ input:focus,
 select:focus,
 textarea:focus {
     outline: none;
-    border-color: var(--md-sys-color-secondary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-secondary) 24%, transparent);
+    border-color: var(--md-sys-color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 20%, transparent);
 }
 
 input::placeholder,
@@ -383,7 +383,7 @@ select {
     appearance: none;
     -webkit-appearance: none;
     padding-right: var(--bl-space-7);
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2357503f'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2371717a'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right var(--bl-space-3) center;
     background-size: 1.25em;
@@ -488,24 +488,9 @@ textarea {
                 border-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
 }
 
-.exhibit::after {
-    /* Brass hairline that warms on hover — the frame catching the lamp. */
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    border: 1px solid transparent;
-    transition: border-color var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard);
-    pointer-events: none;
-}
-
 .exhibit:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--md-sys-elevation-2);
-}
-
-.exhibit:hover::after {
-    border-color: color-mix(in srgb, var(--md-sys-color-secondary) 55%, transparent);
+    transform: translateY(-3px);
+    border-color: var(--md-sys-color-outline);
 }
 
 .exhibit-plinth {
@@ -517,11 +502,7 @@ textarea {
     padding: var(--bl-space-4);
     margin-bottom: var(--bl-space-4);
     border-radius: var(--md-sys-shape-corner-small);
-    background:
-        radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--md-sys-color-surface-container-highest) 90%, transparent), transparent),
-        var(--md-sys-color-surface-container-high);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 40%, transparent),
-                inset 0 -14px 24px -18px rgba(var(--bl-shadow-color), 0.5);
+    background-color: var(--md-sys-color-surface-container);
 }
 
 .exhibit-cover {
@@ -529,7 +510,7 @@ textarea {
     max-height: 100%;
     object-fit: contain;
     border-radius: 2px;
-    box-shadow: var(--md-sys-elevation-3);
+    box-shadow: var(--md-sys-elevation-2);
     transition: transform var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
 }
 
