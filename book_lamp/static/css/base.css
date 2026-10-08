@@ -214,7 +214,8 @@ button {
     margin-left: auto;
 }
 
-/* Sync liveness dot — storage health, deliberately quiet. */
+/* Sync problem dot — shown only when the storage probe fails, so a healthy
+   sync is quiet rather than a permanent badge. */
 .sync-badge {
     display: inline-flex;
     align-items: center;
@@ -222,15 +223,10 @@ button {
     width: 10px;
     height: 10px;
     border-radius: var(--md-sys-shape-corner-full);
-    background-color: var(--md-sys-color-primary);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
-    margin-right: var(--bl-space-2);
-    cursor: help;
-}
-
-.sync-badge.sync-error {
     background-color: var(--md-sys-color-error);
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-error) 18%, transparent);
+    margin-right: var(--bl-space-2);
+    cursor: help;
 }
 
 .theme-selector {
@@ -269,7 +265,9 @@ button {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.mobile-menu-toggle {
+.main-nav .mobile-menu-toggle {
+    /* Scoped to outrank `.btn-icon` (components.css loads after base.css and
+       also sets display), so the toggle stays hidden above the breakpoint. */
     display: none;
 }
 
@@ -521,7 +519,7 @@ button {
         padding: var(--bl-space-3) var(--bl-space-4);
     }
 
-    .mobile-menu-toggle {
+    .main-nav .mobile-menu-toggle {
         display: inline-flex;
         margin-left: auto;
     }

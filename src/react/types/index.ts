@@ -31,7 +31,7 @@ export interface ReadingRecord {
 }
 
 export interface ReadingListItem {
-    book_id: number;
+    id: number;
     title: string;
     author: string;
     thumbnail_url?: string;

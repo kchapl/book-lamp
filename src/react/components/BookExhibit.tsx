@@ -7,6 +7,12 @@ interface BookExhibitProps {
     book: Book;
     /** Where the exhibit links. Defaults to the Book's detail page. */
     to?: string;
+    /**
+     * Heading level for the title. Use `h2` when the grid is the page's main
+     * content (so the heading order stays h1 → h2) and `h3` when it sits under
+     * its own section heading. Defaults to `h3`.
+     */
+    titleAs?: 'h2' | 'h3';
 }
 
 /**
@@ -14,8 +20,9 @@ interface BookExhibitProps {
  * with the title, author and an accession line. Used by the collection grid,
  * the home page and publisher pages so every Book reads the same way.
  */
-const BookExhibit: React.FC<BookExhibitProps> = ({ book, to }) => {
+const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) => {
     const cover = book.cover_url || book.thumbnail_url;
+    const Title = titleAs;
 
     return (
         <Link to={to ?? `/books/${book.id}`} className="exhibit">
@@ -29,7 +36,7 @@ const BookExhibit: React.FC<BookExhibitProps> = ({ book, to }) => {
                 )}
             </div>
             <div className="exhibit-placard">
-                <h3 className="exhibit-title">{book.title}</h3>
+                <Title className="exhibit-title">{book.title}</Title>
                 <p className="exhibit-author">{book.author || 'Unknown author'}</p>
                 <div className="exhibit-meta">
                     {book.latest_status && (

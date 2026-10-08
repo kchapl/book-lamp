@@ -65,14 +65,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <Icon name={mobileMenuOpen ? 'close' : 'menu'} />
                     </button>
 
-                    {mobileMenuOpen && (
-                        <div
-                            className="mobile-menu-backdrop"
-                            onClick={() => setMobileMenuOpen(false)}
-                            aria-hidden="true"
-                        />
-                    )}
-
                     <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
                         {NAV_ITEMS.map((item) => (
                             <li key={item.path}>
@@ -89,12 +81,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </ul>
 
                     <div className="nav-actions">
-                        {syncStatus === 'ok' && (
-                            <span className="sync-badge" title="Sync healthy" aria-label="Sync healthy" />
-                        )}
                         {syncStatus === 'error' && (
                             <span
-                                className="sync-badge sync-error"
+                                className="sync-badge"
+                                role="img"
                                 title="Sync problem — check storage"
                                 aria-label="Sync problem"
                             />
@@ -132,15 +122,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </div>
 
                         {isAuthorized ? (
-                            <>
-                                <Link to="/books/new" className="btn btn-primary">
-                                    <Icon name="plus" size="sm" />
-                                    <span className="btn-label">Add Book</span>
-                                </Link>
-                                <button className="btn btn-text" onClick={logoutUser} aria-label="Sign out">
-                                    <span className="btn-label">Sign out</span>
-                                </button>
-                            </>
+                            <button className="btn btn-text" onClick={logoutUser} aria-label="Sign out">
+                                <span className="btn-label">Sign out</span>
+                            </button>
                         ) : (
                             <Link to="/unauthorised" className="btn btn-outline">
                                 Sign in
@@ -149,6 +133,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     </div>
                 </nav>
             </header>
+
+            {mobileMenuOpen && (
+                <div
+                    className="mobile-menu-backdrop"
+                    onClick={() => setMobileMenuOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
 
             {jobIndicator && (
                 <div className="job-indicator" data-job-id={jobIndicator} role="status">
@@ -160,7 +152,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <main className="main-content">{children}</main>
 
             <footer className="site-footer">
-                <p>Book Lamp &copy; {new Date().getFullYear()} — your reading room</p>
+                <p>Book Lamp &copy; {new Date().getFullYear()}</p>
             </footer>
         </div>
     );

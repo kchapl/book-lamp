@@ -16,8 +16,9 @@
     --md-sys-color-primary-container: #c6e8d5;
     --md-sys-color-on-primary-container: #05271b;
 
-    /* Secondary — brass */
-    --md-sys-color-secondary: #8a6a2f;
+    /* Secondary — brass. Darkened from #8a6a2f so brass text
+       (e.g. the author line) clears 4.5:1 on the paper surfaces. */
+    --md-sys-color-secondary: #7f6127;
     --md-sys-color-on-secondary: #ffffff;
     --md-sys-color-secondary-container: #f2e2c2;
     --md-sys-color-on-secondary-container: #2b1f06;

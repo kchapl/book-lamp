@@ -19,16 +19,33 @@ interface CategoryChartProps {
 }
 
 /* Subject colours are derived from the design tokens, so the treemap stays in
-   the same palette as the rest of the app however many categories appear. */
-const CATEGORY_COLORS = [
-    'var(--md-sys-color-primary)',
-    'var(--md-sys-color-secondary)',
-    'var(--md-sys-color-tertiary)',
-    'color-mix(in srgb, var(--md-sys-color-primary) 55%, var(--md-sys-color-secondary))',
-    'color-mix(in srgb, var(--md-sys-color-secondary) 60%, var(--md-sys-color-tertiary))',
-    'color-mix(in srgb, var(--md-sys-color-tertiary) 60%, var(--md-sys-color-primary))',
-    'color-mix(in srgb, var(--md-sys-color-primary) 45%, var(--md-sys-color-surface-container-highest))',
-    'color-mix(in srgb, var(--md-sys-color-secondary) 45%, var(--md-sys-color-surface-container-highest))',
+   the same palette as the rest of the app however many categories appear. Each
+   tile carries its matching `on-` role as text: the token roles flip lightness
+   between light and dark, so a hard-coded label colour would fail one theme. */
+const CATEGORY_COLORS: { background: string; color: string }[] = [
+    { background: 'var(--md-sys-color-primary)', color: 'var(--md-sys-color-on-primary)' },
+    { background: 'var(--md-sys-color-secondary)', color: 'var(--md-sys-color-on-secondary)' },
+    { background: 'var(--md-sys-color-tertiary)', color: 'var(--md-sys-color-on-tertiary)' },
+    {
+        background: 'color-mix(in srgb, var(--md-sys-color-primary) 55%, var(--md-sys-color-secondary))',
+        color: 'var(--md-sys-color-on-primary)',
+    },
+    {
+        background: 'color-mix(in srgb, var(--md-sys-color-secondary) 60%, var(--md-sys-color-tertiary))',
+        color: 'var(--md-sys-color-on-secondary)',
+    },
+    {
+        background: 'color-mix(in srgb, var(--md-sys-color-tertiary) 60%, var(--md-sys-color-primary))',
+        color: 'var(--md-sys-color-on-tertiary)',
+    },
+    {
+        background: 'color-mix(in srgb, var(--md-sys-color-primary) 60%, var(--md-sys-color-tertiary))',
+        color: 'var(--md-sys-color-on-primary)',
+    },
+    {
+        background: 'color-mix(in srgb, var(--md-sys-color-secondary) 55%, var(--md-sys-color-primary))',
+        color: 'var(--md-sys-color-on-secondary)',
+    },
 ];
 
 const CategoryChart: React.FC<CategoryChartProps> = ({
@@ -70,7 +87,11 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
     };
 
     const getColor = (index: number): string => {
-        return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+        return CATEGORY_COLORS[index % CATEGORY_COLORS.length].background;
+    };
+
+    const getTextColor = (index: number): string => {
+        return CATEGORY_COLORS[index % CATEGORY_COLORS.length].color;
     };
 
     const totalBooks = categories.reduce((sum, c) => sum + c.count, 0);
@@ -159,6 +180,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                                     style={{
                                         height: `${percentage}%`,
                                         backgroundColor: getColor(idx),
+                                        color: getTextColor(idx),
                                     }}
                                 >
                                     <div className="category-content">

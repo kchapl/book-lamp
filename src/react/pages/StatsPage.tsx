@@ -245,33 +245,28 @@ const StatsPage: React.FC = () => {
                     </section>
                 )}
 
-                <section className="panel span-2" aria-labelledby="months-heading">
-                    <h2 id="months-heading" className="panel-title">
-                        Completions by month
-                        <span className="panel-note">all years</span>
+                <section className="panel" aria-labelledby="ratings-heading">
+                    <h2 id="ratings-heading" className="panel-title">
+                        Ratings
                     </h2>
-                    {maxMonthCount > 1 || stats.monthly_counts.some((m) => m.count > 0) ? (
-                        <div className="column-chart">
-                            {stats.monthly_counts.map((month) => (
-                                <div key={month.index} className="column" title={`${month.name}: ${month.count}`}>
-                                    <span className="column-value numeric">{month.count || ''}</span>
-                                    <div className="column-track">
-                                        <div
-                                            className="column-fill"
-                                            style={columnHeight((month.count / maxMonthCount) * 100)}
-                                        />
-                                    </div>
-                                    <span className="column-label">{month.name}</span>
+                    <div className="bar-list">
+                        {stats.rating_distribution.map(([rating, count]) => (
+                            <div key={rating} className="bar-row">
+                                <span className="bar-label rating-stars">
+                                    {'★'.repeat(rating)}
+                                    {'☆'.repeat(5 - rating)}
+                                </span>
+                                <div className="bar-track">
+                                    <div className="bar-fill" style={barWidth((count / maxRatingCount) * 100)} />
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="no-data">No completions recorded yet.</p>
-                    )}
+                                <span className="bar-value numeric">{count}</span>
+                            </div>
+                        ))}
+                    </div>
                 </section>
             </div>
 
-            <div className="dashboard-grid">
+            <div className="dashboard-grid dashboard-grid-split">
                 <section className="panel" aria-labelledby="years-heading">
                     <h2 id="years-heading" className="panel-title">
                         Completions by year
@@ -296,24 +291,29 @@ const StatsPage: React.FC = () => {
                     )}
                 </section>
 
-                <section className="panel" aria-labelledby="ratings-heading">
-                    <h2 id="ratings-heading" className="panel-title">
-                        Ratings
+                <section className="panel" aria-labelledby="months-heading">
+                    <h2 id="months-heading" className="panel-title">
+                        Completions by month
+                        <span className="panel-note">all years</span>
                     </h2>
-                    <div className="bar-list">
-                        {stats.rating_distribution.map(([rating, count]) => (
-                            <div key={rating} className="bar-row">
-                                <span className="bar-label rating-stars">
-                                    {'★'.repeat(rating)}
-                                    {'☆'.repeat(5 - rating)}
-                                </span>
-                                <div className="bar-track">
-                                    <div className="bar-fill" style={barWidth((count / maxRatingCount) * 100)} />
+                    {maxMonthCount > 1 || stats.monthly_counts.some((m) => m.count > 0) ? (
+                        <div className="column-chart">
+                            {stats.monthly_counts.map((month) => (
+                                <div key={month.index} className="column" title={`${month.name}: ${month.count}`}>
+                                    <span className="column-value numeric">{month.count || ''}</span>
+                                    <div className="column-track">
+                                        <div
+                                            className="column-fill"
+                                            style={columnHeight((month.count / maxMonthCount) * 100)}
+                                        />
+                                    </div>
+                                    <span className="column-label">{month.name}</span>
                                 </div>
-                                <span className="bar-value numeric">{count}</span>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="no-data">No completions recorded yet.</p>
+                    )}
                 </section>
             </div>
 

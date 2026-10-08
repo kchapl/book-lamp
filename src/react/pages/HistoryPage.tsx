@@ -3,6 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getHistory } from '../services/api';
 import type { ReadingRecord, HistoryFilters } from '../types';
 
+const formatDate = (iso: string | null | undefined): string => {
+    if (!iso) return '—';
+    const date = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return iso;
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 const HistoryPage: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [history, setHistory] = useState<ReadingRecord[]>([]);
@@ -70,7 +77,11 @@ const HistoryPage: React.FC = () => {
 
             <div className="history-controls">
                 <div className="filter-controls">
+                    <label className="sr-only" htmlFor="history-status">
+                        Filter by status
+                    </label>
                     <select
+                        id="history-status"
                         value={filters.status || ''}
                         onChange={(e) => handleFilterChange('status', e.target.value)}
                     >
@@ -80,7 +91,11 @@ const HistoryPage: React.FC = () => {
                         ))}
                     </select>
 
+                    <label className="sr-only" htmlFor="history-rating">
+                        Filter by rating
+                    </label>
                     <select
+                        id="history-rating"
                         value={filters.rating?.toString() || ''}
                         onChange={(e) => handleFilterChange('min_rating', e.target.value)}
                     >
@@ -92,7 +107,11 @@ const HistoryPage: React.FC = () => {
                         <option value="1">1+ Stars</option>
                     </select>
 
+                    <label className="sr-only" htmlFor="history-sort">
+                        Sort history
+                    </label>
                     <select
+                        id="history-sort"
                         value={filters.sort || 'date_desc'}
                         onChange={(e) => handleFilterChange('sort', e.target.value)}
                     >
@@ -122,9 +141,9 @@ const HistoryPage: React.FC = () => {
                 <div className="history-list">
                     {Object.entries(groupedHistory).map(([bookTitle, records]) => (
                         <div key={bookTitle} className="history-group">
-                            <h3 className="group-title">
+                            <h2 className="group-title">
                                 <Link to={`/books/${records[0].book_id}`}>{bookTitle}</Link>
-                            </h3>
+                            </h2>
                             <div className="records-list">
                                 {records.map((record) => (
                                     <div key={record.id} className="history-record">
@@ -132,11 +151,12 @@ const HistoryPage: React.FC = () => {
                                             <span className={`status-badge status-${record.status.toLowerCase().replace(' ', '-')}`}>
                                                 {record.status}
                                             </span>
-                                            {record.rating && (
+                                            {record.rating ? (
                                                 <span className="rating">{'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}</span>
-                                            )}
+                                            ) : null}
                                             <span className="dates">
-                                                {record.start_date} - {record.end_date || 'Present'}
+                                                {formatDate(record.start_date)} –{' '}
+                                                {record.end_date ? formatDate(record.end_date) : 'Present'}
                                             </span>
                                         </div>
                                         {record.notes && (

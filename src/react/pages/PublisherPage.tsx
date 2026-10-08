@@ -55,7 +55,7 @@ const PublisherPage: React.FC = () => {
             {data.books.length > 0 ? (
                 <div className="exhibit-grid">
                     {data.books.map((book) => (
-                        <BookExhibit key={book.id} book={book} />
+                        <BookExhibit key={book.id} book={book} titleAs="h2" />
                     ))}
                 </div>
             ) : (

@@ -84,7 +84,7 @@ const BooksPage: React.FC = () => {
                     <h1>My Books</h1>
                     {!loading && (
                         <p className="text-muted">
-                            {books.length} {books.length === 1 ? 'exhibit' : 'exhibits'}
+                            {books.length} {books.length === 1 ? 'book' : 'books'}
                             {activeQuery ? ` matching “${activeQuery}”` : ''}
                         </p>
                     )}
@@ -188,12 +188,21 @@ const BooksPage: React.FC = () => {
             ) : (
                 <div className="exhibit-grid">
                     {books.map((book) => (
-                        <BookExhibit key={book.id} book={book} />
+                        <BookExhibit key={book.id} book={book} titleAs="h2" />
                     ))}
                 </div>
             )}
 
             {error && <p className="error-message">{error}</p>}
+
+            {!loading && books.length > 0 && (
+                <div className="fab-slot">
+                    <Link to="/books/new" className="fab">
+                        <Icon name="plus" size="sm" />
+                        <span>Add book</span>
+                    </Link>
+                </div>
+            )}
         </div>
     );
 };

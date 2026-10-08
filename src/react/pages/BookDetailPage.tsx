@@ -111,7 +111,7 @@ const BookDetailPage: React.FC = () => {
 
             {isEditing ? (
                 <div className="edit-form">
-                    <h2>Edit exhibit</h2>
+                    <h2>Edit book</h2>
                     <label className="field">
                         <span className="field-label">Title</span>
                         <input

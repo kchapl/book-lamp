@@ -3,27 +3,9 @@ import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import GoogleAuth from '../components/GoogleAuth';
 import BookExhibit from '../components/BookExhibit';
-import Icon, { IconName } from '../components/Icon';
+import Icon from '../components/Icon';
 import { getRecommendations } from '../services/api';
 import type { Book } from '../types';
-
-const FEATURES: { icon: IconName; title: string; body: string }[] = [
-    {
-        icon: 'books',
-        title: 'Track reading',
-        body: 'Keep a record of the books you have read, are reading, or mean to read next.',
-    },
-    {
-        icon: 'chart',
-        title: 'See the whole shelf',
-        body: 'A dashboard that shows your collection by status, pace, ratings and subjects.',
-    },
-    {
-        icon: 'bookmark',
-        title: 'Plan what is next',
-        body: 'Queue books on a reading list and start the next one when you are ready.',
-    },
-];
 
 const HomePage: React.FC = () => {
     const { isAuthorized } = useContext(AppContext);
@@ -55,7 +37,7 @@ const HomePage: React.FC = () => {
         <div className="home-page page">
             <section className="hero">
                 <p className="eyebrow label-placard">The reading room</p>
-                <h1>Your books, kept like an exhibition.</h1>
+                <h1>Your books.</h1>
                 <p>
                     Book Lamp is a quiet record of what you have read: the collection on the
                     shelves, the reading list ahead of you, and a dashboard that shows how it
@@ -78,16 +60,6 @@ const HomePage: React.FC = () => {
                         <GoogleAuth />
                     </div>
                 )}
-            </section>
-
-            <section className="features" aria-label="What Book Lamp does">
-                {FEATURES.map((feature) => (
-                    <article className="feature-card" key={feature.title}>
-                        <Icon name={feature.icon} size="lg" />
-                        <h3>{feature.title}</h3>
-                        <p>{feature.body}</p>
-                    </article>
-                ))}
             </section>
 
             {loading ? (

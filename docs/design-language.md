@@ -91,6 +91,7 @@ Defined in `static/css/components.css`:
 | --- | --- | --- |
 | Button | `.btn` + `.btn-primary` / `.btn-tonal` / `.btn-outline` / `.btn-text` / `.btn-danger` | `--btn-*` custom properties drive the variants. |
 | Icon button | `.btn-icon` | 48px target, circular state layer. |
+| Floating action button | `.fab` | A screen's primary action, fixed bottom-right; one per screen. |
 | Chip | `.chip`, `.chip-status` | Filter chips and condition chips. |
 | Field | `.field`, `.field-input`, `.field-label` | Labels above, warm container, brass focus ring. |
 | Exhibit | `.exhibit` | The book card. Plinth + framed cover + placard. |

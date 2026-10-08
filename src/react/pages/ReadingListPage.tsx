@@ -35,7 +35,7 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: book.book_id });
+    } = useSortable({ id: book.id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -60,14 +60,14 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
                 <div className="item-placeholder">📖</div>
             )}
             <div className="item-info">
-                <h3>{book.title}</h3>
+                <h2>{book.title}</h2>
                 <p>{book.author}</p>
             </div>
             <div className="item-actions">
-                <button onClick={() => onStartReading(book.book_id)} className="btn btn-primary">
+                <button onClick={() => onStartReading(book.id)} className="btn btn-primary">
                     Start Reading
                 </button>
-                <button onClick={() => onRemove(book.book_id)} className="btn btn-danger">
+                <button onClick={() => onRemove(book.id)} className="btn btn-danger">
                     Remove
                 </button>
             </div>
@@ -110,14 +110,14 @@ const ReadingListPage: React.FC = () => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
-        const oldIndex = books.findIndex((b) => b.book_id === active.id);
-        const newIndex = books.findIndex((b) => b.book_id === over.id);
+        const oldIndex = books.findIndex((b) => b.id === active.id);
+        const newIndex = books.findIndex((b) => b.id === over.id);
 
         const newBooks = arrayMove(books, oldIndex, newIndex);
         setBooks(newBooks);
 
         try {
-            await reorderReadingList(newBooks.map((b) => b.book_id));
+            await reorderReadingList(newBooks.map((b) => b.id));
         } catch (err) {
             console.error('Failed to save new order:', err);
             loadReadingList();
@@ -127,7 +127,7 @@ const ReadingListPage: React.FC = () => {
     const handleRemove = async (bookId: number) => {
         try {
             await removeFromReadingList(bookId);
-            setBooks(books.filter((b) => b.book_id !== bookId));
+            setBooks(books.filter((b) => b.id !== bookId));
         } catch (err) {
             console.error('Failed to remove book:', err);
         }
@@ -136,7 +136,7 @@ const ReadingListPage: React.FC = () => {
     const handleStartReading = async (bookId: number) => {
         try {
             await startReading(bookId);
-            setBooks(books.filter((b) => b.book_id !== bookId));
+            setBooks(books.filter((b) => b.id !== bookId));
         } catch (err) {
             console.error('Failed to start reading:', err);
         }
@@ -166,11 +166,11 @@ const ReadingListPage: React.FC = () => {
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
                 >
-                    <SortableContext items={books.map((b) => b.book_id)} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={books.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                         <div className="reading-list">
                             {books.map((book) => (
                                 <SortableItem
-                                    key={book.book_id}
+                                    key={book.id}
                                     book={book}
                                     onRemove={handleRemove}
                                     onStartReading={handleStartReading}
