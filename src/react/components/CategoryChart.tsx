@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../ui';
 
 interface Subcategory {
     name: string;
@@ -103,20 +104,17 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
             return (
                 <div className="category-treemap">
                     <div className="category-breadcrumb">
-                        <button
-                            className="btn btn-text"
-                            onClick={() => setExpandedCategory(null)}
-                        >
+                        <Button variant="text" onClick={() => setExpandedCategory(null)}>
                             ← Back to categories
-                        </button>
+                        </Button>
                         <span className="breadcrumb-title">{category.label}</span>
                         <span className="breadcrumb-count">{category.count} books</span>
-                        <button
-                            className="btn btn-text"
+                        <Button
+                            variant="text"
                             onClick={(e) => handleCategoryLinkClick(category.label, e)}
                         >
                             View all →
-                        </button>
+                        </Button>
                     </div>
                     <div className="subcategory-grid">
                         {category.subcategories.map((sub, idx) => {

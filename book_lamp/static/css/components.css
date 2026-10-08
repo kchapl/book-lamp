@@ -5,7 +5,14 @@
    ============================================================================= */
 
 /* =============================================================================
-   BUTTONS — MD3 variants driven by --btn-* custom properties
+   BUTTONS — SUPERSEDED by @material/web (see src/react/ui/index.tsx)
+
+   Every button in the app is now an `md-*-button`, themeable from the same
+   tokens below. These rules are kept only while the migration settles: nothing
+   in `src/react` applies `.btn` or `.btn-icon` any more, so they can be deleted
+   wholesale once the Material Web controls have been eyeballed in the browser.
+   `.btn-danger` and `.btn-label` are still applied as hooks on the new controls
+   and are re-pointed further down this file.
    ============================================================================= */
 
 .btn {
@@ -1061,6 +1068,7 @@ textarea {
     margin-bottom: var(--bl-space-5);
 }
 
+.info-box h2,
 .info-box h3,
 .info-box-title {
     margin-top: 0;
@@ -1113,6 +1121,52 @@ textarea {
 .icon svg {
     width: 24px;
     height: 24px;
+}
+
+/* =============================================================================
+   MATERIAL WEB INTEGRATION
+   The library sizes the slotted icon element itself (`[slot=icon]`), so the SVG
+   inside must fill that box rather than keep our default 24px, which would
+   overflow the control. Applies to buttons, icon buttons, chips and the FAB.
+   ============================================================================= */
+
+.icon[slot] {
+    align-items: center;
+    justify-content: center;
+}
+
+.icon[slot] svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Text fields and selects stretch to the column they are placed in, matching
+   the old native inputs which were `width: 100%`. */
+md-outlined-text-field,
+md-filled-text-field,
+md-outlined-select,
+md-filled-select {
+    width: 100%;
+}
+
+md-dialog {
+    --md-dialog-container-shape: var(--md-sys-shape-corner-large);
+}
+
+md-linear-progress {
+    width: 100%;
+    --md-linear-progress-track-height: 10px;
+    --md-linear-progress-active-indicator-height: 10px;
+}
+
+/* Material Web has no danger variant; this re-points an outlined button at the
+   error role for destructive actions. */
+md-outlined-button.btn-danger {
+    --md-outlined-button-label-text-color: var(--md-sys-color-error);
+    --md-outlined-button-outline-color: color-mix(in srgb, var(--md-sys-color-error) 45%, transparent);
+    --md-outlined-button-hover-label-text-color: var(--md-sys-color-error);
+    --md-outlined-button-hover-outline-color: var(--md-sys-color-error);
+    --md-outlined-button-focus-label-text-color: var(--md-sys-color-error);
 }
 
 .icon-sm svg { width: 18px; height: 18px; }

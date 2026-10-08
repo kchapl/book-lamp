@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppContext } from '../App';
 import Icon, { IconName } from './Icon';
+import { Button, IconButton } from '../ui';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -56,14 +57,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         Book Lamp
                     </Link>
 
-                    <button
-                        className="mobile-menu-toggle btn-icon"
+                    <IconButton
+                        icon={mobileMenuOpen ? 'close' : 'menu'}
+                        className="mobile-menu-toggle"
                         onClick={() => setMobileMenuOpen((open) => !open)}
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={mobileMenuOpen}
-                    >
-                        <Icon name={mobileMenuOpen ? 'close' : 'menu'} />
-                    </button>
+                    />
 
                     <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
                         {NAV_ITEMS.map((item) => (
@@ -91,21 +91,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         )}
 
                         <div className="theme-selector">
-                            <button
-                                className="btn-icon"
+                            <IconButton
+                                icon={theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor'}
                                 onClick={() => setShowThemeMenu((open) => !open)}
                                 aria-label="Change theme"
                                 aria-expanded={showThemeMenu}
                                 aria-haspopup="menu"
-                            >
-                                <Icon name={theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor'} />
-                            </button>
+                            />
                             {showThemeMenu && (
                                 <div className="theme-menu" role="menu">
                                     {THEME_OPTIONS.map((option) => (
-                                        <button
+                                        <Button
                                             key={option.value}
-                                            className={`btn btn-text ${theme === option.value ? 'active' : ''}`}
+                                            variant="text"
+                                            icon={option.icon}
+                                            className={theme === option.value ? 'active' : undefined}
                                             role="menuitemradio"
                                             aria-checked={theme === option.value}
                                             onClick={() => {
@@ -113,22 +113,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                                 setShowThemeMenu(false);
                                             }}
                                         >
-                                            <Icon name={option.icon} size="sm" />
                                             <span>{option.label}</span>
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
                             )}
                         </div>
 
                         {isAuthorized ? (
-                            <button className="btn btn-text" onClick={logoutUser} aria-label="Sign out">
+                            <Button variant="text" onClick={logoutUser} aria-label="Sign out">
                                 <span className="btn-label">Sign out</span>
-                            </button>
+                            </Button>
                         ) : (
-                            <Link to="/unauthorised" className="btn btn-outline">
+                            <Button variant="outlined" to="/unauthorised">
                                 Sign in
-                            </Link>
+                            </Button>
                         )}
                     </div>
                 </nav>

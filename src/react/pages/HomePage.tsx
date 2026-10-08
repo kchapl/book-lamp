@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import GoogleAuth from '../components/GoogleAuth';
 import BookExhibit from '../components/BookExhibit';
-import Icon from '../components/Icon';
+import { Button } from '../ui';
 import { getRecommendations } from '../services/api';
 import type { Book } from '../types';
 
@@ -45,14 +44,12 @@ const HomePage: React.FC = () => {
                 </p>
                 {isAuthorized ? (
                     <div className="hero-actions">
-                        <Link to="/books" className="btn btn-primary">
-                            <Icon name="books" size="sm" />
+                        <Button variant="filled" icon="books" to="/books">
                             Browse the collection
-                        </Link>
-                        <Link to="/dashboard" className="btn btn-outline">
-                            <Icon name="chart" size="sm" />
+                        </Button>
+                        <Button variant="outlined" icon="chart" to="/dashboard">
                             Open the dashboard
-                        </Link>
+                        </Button>
                     </div>
                 ) : (
                     <div className="auth-card">

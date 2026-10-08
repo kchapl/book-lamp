@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getHistory } from '../services/api';
+import { Button, Select, SelectOption } from '../ui';
 import type { ReadingRecord, HistoryFilters } from '../types';
 
 const formatDate = (iso: string | null | undefined): string => {
@@ -77,54 +78,48 @@ const HistoryPage: React.FC = () => {
 
             <div className="history-controls">
                 <div className="filter-controls">
-                    <label className="sr-only" htmlFor="history-status">
-                        Filter by status
-                    </label>
-                    <select
+                    <Select
                         id="history-status"
+                        label="Status"
                         value={filters.status || ''}
-                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('status', value)}
                     >
-                        <option value="">All Statuses</option>
+                        <SelectOption value="">All Statuses</SelectOption>
                         {statuses.map((status) => (
-                            <option key={status} value={status}>{status}</option>
+                            <SelectOption key={status} value={status}>{status}</SelectOption>
                         ))}
-                    </select>
+                    </Select>
 
-                    <label className="sr-only" htmlFor="history-rating">
-                        Filter by rating
-                    </label>
-                    <select
+                    <Select
                         id="history-rating"
+                        label="Rating"
                         value={filters.rating?.toString() || ''}
-                        onChange={(e) => handleFilterChange('min_rating', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('min_rating', value)}
                     >
-                        <option value="">All Ratings</option>
-                        <option value="5">5 Stars</option>
-                        <option value="4">4+ Stars</option>
-                        <option value="3">3+ Stars</option>
-                        <option value="2">2+ Stars</option>
-                        <option value="1">1+ Stars</option>
-                    </select>
+                        <SelectOption value="">All Ratings</SelectOption>
+                        <SelectOption value="5">5 Stars</SelectOption>
+                        <SelectOption value="4">4+ Stars</SelectOption>
+                        <SelectOption value="3">3+ Stars</SelectOption>
+                        <SelectOption value="2">2+ Stars</SelectOption>
+                        <SelectOption value="1">1+ Stars</SelectOption>
+                    </Select>
 
-                    <label className="sr-only" htmlFor="history-sort">
-                        Sort history
-                    </label>
-                    <select
+                    <Select
                         id="history-sort"
+                        label="Sort"
                         value={filters.sort || 'date_desc'}
-                        onChange={(e) => handleFilterChange('sort', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('sort', value)}
                     >
-                        <option value="date_desc">Newest First</option>
-                        <option value="date_asc">Oldest First</option>
-                        <option value="rating_desc">Highest Rated</option>
-                        <option value="title">Title</option>
-                    </select>
+                        <SelectOption value="date_desc">Newest First</SelectOption>
+                        <SelectOption value="date_asc">Oldest First</SelectOption>
+                        <SelectOption value="rating_desc">Highest Rated</SelectOption>
+                        <SelectOption value="title">Title</SelectOption>
+                    </Select>
 
                     {hasActiveFilters && (
-                        <button className="btn btn-text" onClick={clearFilters}>
+                        <Button variant="text" onClick={clearFilters}>
                             Clear Filters
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -135,7 +130,7 @@ const HistoryPage: React.FC = () => {
                 <div className="empty-state">
                     <h2>No reading history</h2>
                     <p>Start reading to build your history.</p>
-                    <Link to="/books" className="btn btn-primary">Browse Books</Link>
+                    <Button variant="filled" to="/books">Browse Books</Button>
                 </div>
             ) : (
                 <div className="history-list">

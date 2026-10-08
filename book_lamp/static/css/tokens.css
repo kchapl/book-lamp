@@ -84,6 +84,14 @@
     --bl-font-display: 'Newsreader', 'Newsreader Fallback', Georgia, serif;
     --bl-font-ui: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
+    /* Material Web reads these two reference roles for the type inside its
+       shadow roots, so the components inherit our faces instead of Roboto. */
+    --md-ref-typeface-brand: var(--bl-font-display);
+    --md-ref-typeface-plain: var(--bl-font-ui);
+    --md-ref-typeface-weight-regular: 400;
+    --md-ref-typeface-weight-medium: 500;
+    --md-ref-typeface-weight-bold: 600;
+
     --bl-tracking-placard: 0.14em;
 
     --md-sys-typescale-display-large-font: var(--bl-font-display);

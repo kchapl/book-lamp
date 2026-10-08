@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAuthorPage, addToReadingList } from '../services/api';
+import { Button } from '../ui';
 import type { AuthorPage } from '../types';
 
 const AuthorPage: React.FC = () => {
@@ -116,13 +117,13 @@ const AuthorPage: React.FC = () => {
                                         <span className="year">({book.publication_year})</span>
                                     )}
                                 </div>
-                                <button 
-                                    className="btn btn-primary btn-sm"
+                                <Button
+                                    variant="filled"
                                     onClick={() => handleAddToReadingList(book.id!)}
                                     disabled={addingBook === book.id}
                                 >
                                     {addingBook === book.id ? 'Adding...' : 'Add to Reading List'}
-                                </button>
+                                </Button>
                             </div>
                         ))}
                     </div>

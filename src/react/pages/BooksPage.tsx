@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getBooks, searchBooks } from '../services/api';
 import BookExhibit from '../components/BookExhibit';
 import Icon from '../components/Icon';
+import { Button, Fab, Select, SelectOption, TextField } from '../ui';
 import type { Book, BooksFilters } from '../types';
 
 const BooksPage: React.FC = () => {
@@ -93,71 +94,62 @@ const BooksPage: React.FC = () => {
 
             <div className="books-controls">
                 <form className="search-form" onSubmit={handleSearch} role="search">
-                    <label className="sr-only" htmlFor="book-search">
-                        Search books
-                    </label>
-                    <input
+                    <TextField
                         id="book-search"
+                        label="Search books"
                         type="search"
                         placeholder="Search by title, author or ISBN…"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onValueChange={setSearchQuery}
                     />
-                    <button type="submit" className="btn btn-primary">
-                        <Icon name="search" size="sm" />
+                    <Button variant="filled" icon="search" type="submit">
                         Search
-                    </button>
+                    </Button>
                 </form>
 
                 <div className="filter-controls">
-                    <label className="sr-only" htmlFor="filter-status">
-                        Filter by status
-                    </label>
-                    <select
+                    <Select
                         id="filter-status"
+                        label="Status"
                         value={filters.status}
-                        onChange={(e) => handleFilterChange('status', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('status', value)}
                     >
-                        <option value="">All statuses</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Abandoned">Abandoned</option>
-                    </select>
+                        <SelectOption value="">All statuses</SelectOption>
+                        <SelectOption value="In Progress">In Progress</SelectOption>
+                        <SelectOption value="Completed">Completed</SelectOption>
+                        <SelectOption value="Abandoned">Abandoned</SelectOption>
+                    </Select>
 
-                    <label className="sr-only" htmlFor="filter-category">
-                        Filter by category
-                    </label>
-                    <select
+                    <Select
                         id="filter-category"
+                        label="Category"
                         value={filters.category}
-                        onChange={(e) => handleFilterChange('category', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('category', value)}
                     >
-                        <option value="">All categories</option>
+                        <SelectOption value="">All categories</SelectOption>
                         {categories.map((cat) => (
-                            <option key={cat} value={cat}>
+                            <SelectOption key={cat} value={cat}>
                                 {cat}
-                            </option>
+                            </SelectOption>
                         ))}
-                    </select>
+                    </Select>
 
-                    <label className="sr-only" htmlFor="filter-sort">
-                        Sort books
-                    </label>
-                    <select
+                    <Select
                         id="filter-sort"
+                        label="Sort"
                         value={sortBy}
-                        onChange={(e) => handleFilterChange('sort', e.target.value)}
+                        onValueChange={(value) => handleFilterChange('sort', value)}
                     >
-                        <option value="reading_date">Reading date</option>
-                        <option value="title">Title</option>
-                        <option value="author">Author</option>
-                        <option value="rating">Rating</option>
-                    </select>
+                        <SelectOption value="reading_date">Reading date</SelectOption>
+                        <SelectOption value="title">Title</SelectOption>
+                        <SelectOption value="author">Author</SelectOption>
+                        <SelectOption value="rating">Rating</SelectOption>
+                    </Select>
 
                     {(hasActiveFilters || activeQuery) && (
-                        <button type="button" className="btn btn-text" onClick={clearFilters}>
+                        <Button variant="text" onClick={clearFilters}>
                             Clear
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -180,10 +172,9 @@ const BooksPage: React.FC = () => {
                             ? 'Nothing matches those filters. Try widening the search.'
                             : 'Add your first book to begin the collection.'}
                     </p>
-                    <Link to="/books/new" className="btn btn-primary">
-                        <Icon name="plus" size="sm" />
+                    <Button variant="filled" icon="plus" to="/books/new">
                         Add a book
-                    </Link>
+                    </Button>
                 </div>
             ) : (
                 <div className="exhibit-grid">
@@ -197,10 +188,7 @@ const BooksPage: React.FC = () => {
 
             {!loading && books.length > 0 && (
                 <div className="fab-slot">
-                    <Link to="/books/new" className="fab">
-                        <Icon name="plus" size="sm" />
-                        <span>Add book</span>
-                    </Link>
+                    <Fab icon="plus" label="Add book" to="/books/new" />
                 </div>
             )}
         </div>

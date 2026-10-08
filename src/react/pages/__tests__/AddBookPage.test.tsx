@@ -1,3 +1,15 @@
+/**
+ * AddBookPage drives Material Web controls.
+ *
+ * Two things changed with that migration and shape this file:
+ *
+ * - Labels and placeholders live inside the component's shadow root, so
+ *   `getByLabelText` / `getByPlaceholderText` can no longer see them. Fields
+ *   are addressed by the id the page assigns the host element.
+ * - The host carries no implicit ARIA role, so buttons are found by their
+ *   slotted label text (slotted content stays in the light DOM) and then
+ *   resolved to the nearest Material Web button.
+ */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -23,6 +35,9 @@ vi.mock('../../services/api', () => ({
 
 const lookup = vi.mocked(lookupISBN);
 
+const BUTTON_SELECTOR =
+    'md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button';
+
 const renderPage = () =>
     render(
         <MemoryRouter>
@@ -30,9 +45,24 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
+/** A Material Web text field host, addressed by the id the page gives it. */
+const field = (id: string) =>
+    document.getElementById(id) as (HTMLElement & { value: string }) | null;
+
+/** The Material Web button whose visible label matches. */
+const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
+
+/** Type into a Material Web field: set the host value, then report the input. */
+function typeInto(id: string, value: string) {
+    const input = field(id);
+    if (!input) throw new Error(`No field #${id}`);
+    input.value = value;
+    fireEvent.input(input);
+}
+
 async function doLookup(isbn: string) {
-    fireEvent.change(screen.getByPlaceholderText(/enter isbn/i), { target: { value: isbn } });
-    fireEvent.click(screen.getByRole('button', { name: /lookup isbn/i }));
+    typeInto('isbn', isbn);
+    fireEvent.click(button(/lookup isbn/i));
 }
 
 beforeEach(() => {
@@ -48,10 +78,10 @@ describe('AddBookPage barcode scanner', () => {
         const scannerContainer = container.querySelector('.scanner-container') as HTMLElement;
         expect(scannerContainer).toHaveStyle('display: none');
 
-        fireEvent.click(screen.getByRole('button', { name: /scan barcode/i }));
+        fireEvent.click(button(/scan barcode/i));
 
         await waitFor(() => {
-            expect(screen.getByRole('button', { name: /stop scanner/i })).toBeInTheDocument();
+            expect(screen.getByText(/stop scanner/i)).toBeInTheDocument();
             expect(scannerContainer).toHaveStyle('display: block');
         });
 
@@ -59,7 +89,7 @@ describe('AddBookPage barcode scanner', () => {
         // flips scanning back off and shows an error, and the waitFor above can
         // catch that transient state before it reverts.
         await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(screen.getByRole('button', { name: /stop scanner/i })).toBeInTheDocument();
+        expect(screen.getByText(/stop scanner/i)).toBeInTheDocument();
         expect(screen.queryByText(/failed to start camera/i)).not.toBeInTheDocument();
     });
 });
@@ -78,9 +108,9 @@ describe('AddBookPage ISBN lookup', () => {
         await doLookup('9780143127741');
 
         await waitFor(() => {
-            expect(screen.getByLabelText(/title/i)).toHaveValue('The Body Keeps the Score');
+            expect(field('title')?.value).toBe('The Body Keeps the Score');
         });
-        expect(screen.getByLabelText(/author/i)).toHaveValue('Bessel van der Kolk');
+        expect(field('author')?.value).toBe('Bessel van der Kolk');
     });
 
     it('falls back to manual entry when only partial data is returned', async () => {
@@ -92,7 +122,7 @@ describe('AddBookPage ISBN lookup', () => {
         await doLookup('0143127741');
 
         await waitFor(() => {
-            expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
+            expect(field('title')).toBeInTheDocument();
         });
         expect(screen.getByText(/no details found/i)).toBeInTheDocument();
     });
@@ -104,7 +134,7 @@ describe('AddBookPage ISBN lookup', () => {
         await doLookup('9780306406157');
 
         await waitFor(() => {
-            expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
+            expect(field('title')).toBeInTheDocument();
         });
         expect(screen.getByText(/could not look up/i)).toBeInTheDocument();
     });

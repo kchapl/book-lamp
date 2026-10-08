@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button, Checkbox } from '../ui';
 
 const ImportBooksPage: React.FC = () => {
     const navigate = useNavigate();
@@ -73,7 +74,7 @@ const ImportBooksPage: React.FC = () => {
             <p>Import your reading history from a Libib CSV export.</p>
 
             <div className="info-box">
-                <h3>📋 How to Export from Libib</h3>
+                <h2>📋 How to Export from Libib</h2>
                 <ol>
                     <li>Log in to your Libib account</li>
                     <li>Go to your library and click "Export"</li>
@@ -90,37 +91,26 @@ const ImportBooksPage: React.FC = () => {
                         accept=".csv"
                         onChange={handleFileChange}
                         className="file-input"
+                        aria-label="Libib CSV export file"
                     />
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="btn"
-                    >
+                    <Button variant="tonal" onClick={() => fileInputRef.current?.click()}>
                         Choose File
-                    </button>
+                    </Button>
                     <span className="file-name">
                         {file ? file.name : 'No file selected'}
                     </span>
                 </div>
 
                 <label className="checkbox-label">
-                    <input
-                        type="checkbox"
-                        checked={fetchMetadata}
-                        onChange={(e) => setFetchMetadata(e.target.checked)}
-                    />
+                    <Checkbox checked={fetchMetadata} onCheckedChange={setFetchMetadata} />
                     Fetch missing book covers and metadata (recommended)
                 </label>
 
                 {error && <p className="error-message">{error}</p>}
 
-                <button
-                    type="submit"
-                    disabled={loading || !file}
-                    className="btn btn-primary"
-                >
+                <Button type="submit" disabled={loading || !file}>
                     {loading ? 'Importing...' : 'Import Books'}
-                </button>
+                </Button>
             </form>
         </div>
     );

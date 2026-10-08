@@ -5,6 +5,7 @@ import type { Book, Stats } from '../types';
 import CategoryChart from '../components/CategoryChart';
 import GoalProgress from '../components/GoalProgress';
 import Icon from '../components/Icon';
+import { Button, LinearProgress } from '../ui';
 import { statusClass } from '../utils/status';
 
 const STATUS_ORDER = ['Completed', 'In Progress', 'Abandoned'] as const;
@@ -67,8 +68,6 @@ const StatsPage: React.FC = () => {
     const maxFormatCount = stats.format_distribution?.[0]?.count || 1;
     const maxLanguageCount = stats.language_distribution?.[0]?.count || 1;
     const maxRatingCount = Math.max(...stats.rating_distribution.map(([, count]) => count), 1);
-    const meterWidth = (value: number): React.CSSProperties =>
-        ({ '--meter-width': `${value}%` } as React.CSSProperties);
     const barWidth = (value: number): React.CSSProperties =>
         ({ '--bar-width': `${value}%` } as React.CSSProperties);
     const columnHeight = (value: number): React.CSSProperties =>
@@ -126,9 +125,9 @@ const StatsPage: React.FC = () => {
                             No book is currently in progress. Start one from your reading list and it
                             will appear here.
                         </p>
-                        <Link to="/reading-list" className="btn btn-outline">
+                        <Button variant="outlined" to="/reading-list">
                             Open the reading list
-                        </Link>
+                        </Button>
                     </div>
                 )}
             </section>
@@ -156,9 +155,10 @@ const StatsPage: React.FC = () => {
                                     <span className="status-card-name">{status}</span>
                                     <span className="status-card-value numeric">{count}</span>
                                 </div>
-                                <div className="meter" role="presentation">
-                                    <div className="meter-fill" style={meterWidth(share)} />
-                                </div>
+                                <LinearProgress
+                                    percent={share}
+                                    aria-label={`${status}: ${share.toFixed(0)}%`}
+                                />
                                 <span className="status-card-share">
                                     <span className="numeric">{`${share.toFixed(0)}%`}</span>
                                     <span>of books with a status</span>

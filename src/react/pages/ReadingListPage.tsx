@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
     DndContext,
     closestCenter,
@@ -18,7 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { getReadingList, reorderReadingList, removeFromReadingList, startReading } from '../services/api';
-import Icon from '../components/Icon';
+import { Button, IconButton } from '../ui';
 import type { ReadingListItem } from '../types';
 
 interface SortableItemProps {
@@ -45,15 +45,13 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
 
     return (
         <div ref={setNodeRef} style={style} className="reading-list-item">
-            <button
-                type="button"
-                className="drag-handle btn-icon"
+            <IconButton
+                icon="grip"
+                className="drag-handle"
                 aria-label={`Reorder ${book.title}`}
-                {...attributes}
-                {...listeners}
-            >
-                <Icon name="grip" />
-            </button>
+                {...(attributes as object)}
+                {...(listeners as object)}
+            />
             {book.thumbnail_url ? (
                 <img src={book.thumbnail_url} alt={book.title} className="item-thumbnail" />
             ) : (
@@ -64,12 +62,10 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
                 <p>{book.author}</p>
             </div>
             <div className="item-actions">
-                <button onClick={() => onStartReading(book.id)} className="btn btn-primary">
-                    Start Reading
-                </button>
-                <button onClick={() => onRemove(book.id)} className="btn btn-danger">
+                <Button onClick={() => onStartReading(book.id)}>Start Reading</Button>
+                <Button variant="outlined" className="btn-danger" onClick={() => onRemove(book.id)}>
                     Remove
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -158,7 +154,7 @@ const ReadingListPage: React.FC = () => {
                 <div className="empty-state">
                     <h2>Your reading list is empty</h2>
                     <p>Add books from your collection or when browsing.</p>
-                    <Link to="/books" className="btn btn-primary">Browse Books</Link>
+                    <Button variant="filled" to="/books">Browse Books</Button>
                 </div>
             ) : (
                 <DndContext

@@ -103,12 +103,14 @@ interface IconProps {
     className?: string;
     size?: 'sm' | 'md' | 'lg';
     title?: string;
+    /** Slot name, for handing the icon to a Material Web component. */
+    slot?: string;
 }
 
-const Icon: React.FC<IconProps> = ({ name, className, size = 'md', title }) => {
+const Icon: React.FC<IconProps> = ({ name, className, size = 'md', title, slot }) => {
     const classes = ['icon', size !== 'md' ? `icon-${size}` : '', className].filter(Boolean).join(' ');
     return (
-        <span className={classes} aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
+        <span className={classes} slot={slot} aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
             {title && <span className="sr-only">{title}</span>}
             <svg viewBox="0 0 24 24" fill="currentColor" focusable="false" aria-hidden="true">
                 {PATHS[name]}

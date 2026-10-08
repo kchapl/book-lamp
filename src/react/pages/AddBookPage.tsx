@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupISBN, createBook, addToReadingList } from '../services/api';
+import { Button, Checkbox, TextField } from '../ui';
 import type { Book } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
@@ -147,35 +148,23 @@ const AddBookPage: React.FC = () => {
             <h1>Add a Book</h1>
 
             <div className="isbn-section">
-                <label>
-                    ISBN:
-                    <input
-                        type="text"
-                        placeholder="Enter ISBN (10 or 13 digits)"
-                        value={isbn}
-                        onChange={(e) => setIsbn(e.target.value)}
-                    />
-                </label>
+                <TextField
+                    id="isbn"
+                    label="ISBN"
+                    placeholder="Enter ISBN (10 or 13 digits)"
+                    value={isbn}
+                    onValueChange={setIsbn}
+                />
                 <div className="isbn-actions">
-                    <button
-                        onClick={() => handleLookup(isbn)}
-                        disabled={loading}
-                        className="btn btn-primary"
-                    >
+                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
                         {loading ? 'Looking up...' : 'Lookup ISBN'}
-                    </button>
-                    <button
-                        onClick={scanning ? stopScanner : startScanner}
-                        className="btn"
-                    >
+                    </Button>
+                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
                         {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
-                    </button>
-                    <button
-                        onClick={() => setShowManualEntry(true)}
-                        className="btn btn-text"
-                    >
+                    </Button>
+                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
                         Enter manually
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
@@ -189,62 +178,50 @@ const AddBookPage: React.FC = () => {
 
             {(showManualEntry || title || author) && (
                 <form onSubmit={handleSubmit} className="add-book-form">
-                    <label>
-                        Title *
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                        />
-                    </label>
+                    <TextField
+                        id="title"
+                        label="Title"
+                        required
+                        value={title}
+                        onValueChange={setTitle}
+                    />
                     
-                    <label>
-                        Author *
-                        <input
-                            type="text"
-                            value={author}
-                            onChange={(e) => setAuthor(e.target.value)}
-                            required
-                        />
-                    </label>
+                    <TextField
+                        id="author"
+                        label="Author"
+                        required
+                        value={author}
+                        onValueChange={setAuthor}
+                    />
                     
-                    <label>
-                        Publisher
-                        <input
-                            type="text"
-                            value={publisher}
-                            onChange={(e) => setPublisher(e.target.value)}
-                        />
-                    </label>
+                    <TextField
+                        id="publisher"
+                        label="Publisher"
+                        value={publisher}
+                        onValueChange={setPublisher}
+                    />
                     
-                    <label>
-                        Publication Year
-                        <input
-                            type="number"
-                            value={year}
-                            onChange={(e) => setYear(e.target.value)}
-                            min="1000"
-                            max={new Date().getFullYear()}
-                        />
-                    </label>
+                    <TextField
+                        id="year"
+                        label="Publication Year"
+                        type="number"
+                        value={year}
+                        onValueChange={setYear}
+                        min="1000"
+                        max={new Date().getFullYear()}
+                    />
 
                     <label className="checkbox-label">
-                        <input
-                            type="checkbox"
+                        <Checkbox
                             checked={addToReadingListChecked}
-                            onChange={(e) => setAddToReadingListChecked(e.target.checked)}
+                            onCheckedChange={setAddToReadingListChecked}
                         />
                         Add to reading list
                     </label>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="btn btn-primary"
-                    >
+                    <Button type="submit" disabled={loading}>
                         {loading ? 'Adding...' : 'Add Book'}
-                    </button>
+                    </Button>
                 </form>
             )}
         </div>

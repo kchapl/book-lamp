@@ -8,7 +8,7 @@ import {
     addToReadingList,
     removeFromReadingList,
 } from '../services/api';
-import Icon from '../components/Icon';
+import { Button, Dialog, Select, SelectOption, TextField } from '../ui';
 import { statusClass } from '../utils/status';
 import type { Book } from '../types';
 
@@ -104,66 +104,54 @@ const BookDetailPage: React.FC = () => {
 
     return (
         <div className="book-detail-page page">
-            <button onClick={() => navigate(-1)} className="btn btn-text btn-back">
-                <Icon name="arrow-left" size="sm" />
+            <Button variant="text" icon="arrow-left" className="btn-back" onClick={() => navigate(-1)}>
                 Back
-            </button>
+            </Button>
 
             {isEditing ? (
                 <div className="edit-form">
                     <h2>Edit book</h2>
-                    <label className="field">
-                        <span className="field-label">Title</span>
-                        <input
-                            type="text"
-                            value={editForm.title || ''}
-                            onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                        />
-                    </label>
-                    <label className="field">
-                        <span className="field-label">Author</span>
-                        <input
-                            type="text"
-                            value={editForm.author || ''}
-                            onChange={(e) => setEditForm({ ...editForm, author: e.target.value })}
-                        />
-                    </label>
-                    <label className="field">
-                        <span className="field-label">ISBN</span>
-                        <input
-                            type="text"
-                            value={editForm.isbn13 || ''}
-                            onChange={(e) => setEditForm({ ...editForm, isbn13: e.target.value })}
-                        />
-                    </label>
-                    <label className="field">
-                        <span className="field-label">Publisher</span>
-                        <input
-                            type="text"
-                            value={editForm.publisher || ''}
-                            onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
-                        />
-                    </label>
-                    <label className="field">
-                        <span className="field-label">Year</span>
-                        <input
-                            type="number"
-                            value={editForm.publication_year || ''}
-                            onChange={(e) =>
-                                setEditForm({
-                                    ...editForm,
-                                    publication_year: parseInt(e.target.value) || undefined,
-                                })
-                            }
-                        />
-                    </label>
+                    <TextField
+                        id="edit-title"
+                        label="Title"
+                        value={editForm.title || ''}
+                        onValueChange={(value) => setEditForm({ ...editForm, title: value })}
+                    />
+                    <TextField
+                        id="edit-author"
+                        label="Author"
+                        value={editForm.author || ''}
+                        onValueChange={(value) => setEditForm({ ...editForm, author: value })}
+                    />
+                    <TextField
+                        id="edit-isbn"
+                        label="ISBN"
+                        value={editForm.isbn13 || ''}
+                        onValueChange={(value) => setEditForm({ ...editForm, isbn13: value })}
+                    />
+                    <TextField
+                        id="edit-publisher"
+                        label="Publisher"
+                        value={editForm.publisher || ''}
+                        onValueChange={(value) => setEditForm({ ...editForm, publisher: value })}
+                    />
+                    <TextField
+                        id="edit-year"
+                        label="Year"
+                        type="number"
+                        value={editForm.publication_year ? String(editForm.publication_year) : ''}
+                        onValueChange={(value) =>
+                            setEditForm({
+                                ...editForm,
+                                publication_year: parseInt(value) || undefined,
+                            })
+                        }
+                    />
                     <div className="form-actions">
-                        <button onClick={handleSaveEdit} className="btn btn-primary">
-                            Save
-                        </button>
-                        <button onClick={() => setIsEditing(false)} className="btn btn-text">
+                        <Button onClick={handleSaveEdit}>Save</Button>
+                        <Button variant="text" onClick={() => setIsEditing(false)}>
                             Cancel
-                        </button>
+                        </Button>
                     </div>
                 </div>
             ) : (
@@ -225,63 +213,62 @@ const BookDetailPage: React.FC = () => {
                     </section>
 
                     <div className="book-actions">
-                        <button onClick={() => setIsEditing(true)} className="btn btn-outline">
+                        <Button variant="outlined" onClick={() => setIsEditing(true)}>
                             Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant={book.is_planned ? 'tonal' : 'filled'}
+                            icon="bookmark"
                             onClick={handleToggleReadingList}
-                            className={`btn ${book.is_planned ? 'btn-tonal' : 'btn-primary'}`}
                         >
-                            <Icon name="bookmark" size="sm" />
                             {book.is_planned ? 'Remove from reading list' : 'Add to reading list'}
-                        </button>
-                        <button onClick={() => setShowDeleteConfirm(true)} className="btn btn-danger">
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            className="btn-danger"
+                            onClick={() => setShowDeleteConfirm(true)}
+                        >
                             Delete
-                        </button>
+                        </Button>
                     </div>
 
                     <section className="reading-records section">
                         <div className="row-between">
                             <h2>Reading history</h2>
-                            <button onClick={() => setShowAddRecord(true)} className="btn btn-outline">
-                                <Icon name="plus" size="sm" />
+                            <Button variant="outlined" icon="plus" onClick={() => setShowAddRecord(true)}>
                                 Add reading record
-                            </button>
+                            </Button>
                         </div>
 
                         {showAddRecord && (
                             <div className="add-record-form">
                                 <h3>Add reading record</h3>
-                                <label className="field">
-                                    <span className="field-label">Status</span>
-                                    <select
-                                        value={newRecord.status}
-                                        onChange={(e) => setNewRecord({ ...newRecord, status: e.target.value })}
-                                    >
-                                        <option value="Completed">Completed</option>
-                                        <option value="In Progress">In Progress</option>
-                                        <option value="Abandoned">Abandoned</option>
-                                    </select>
-                                </label>
-                                <label className="field">
-                                    <span className="field-label">Rating (1–5)</span>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="5"
-                                        value={newRecord.rating}
-                                        onChange={(e) =>
-                                            setNewRecord({ ...newRecord, rating: parseInt(e.target.value) || 0 })
-                                        }
-                                    />
-                                </label>
+                                <Select
+                                    id="record-status"
+                                    label="Status"
+                                    value={newRecord.status}
+                                    onValueChange={(value) => setNewRecord({ ...newRecord, status: value })}
+                                >
+                                    <SelectOption value="Completed">Completed</SelectOption>
+                                    <SelectOption value="In Progress">In Progress</SelectOption>
+                                    <SelectOption value="Abandoned">Abandoned</SelectOption>
+                                </Select>
+                                <TextField
+                                    id="record-rating"
+                                    label="Rating (1–5)"
+                                    type="number"
+                                    min="1"
+                                    max="5"
+                                    value={String(newRecord.rating)}
+                                    onValueChange={(value) =>
+                                        setNewRecord({ ...newRecord, rating: parseInt(value) || 0 })
+                                    }
+                                />
                                 <div className="form-actions">
-                                    <button onClick={handleAddRecord} className="btn btn-primary">
-                                        Add
-                                    </button>
-                                    <button onClick={() => setShowAddRecord(false)} className="btn btn-text">
+                                    <Button onClick={handleAddRecord}>Add</Button>
+                                    <Button variant="text" onClick={() => setShowAddRecord(false)}>
                                         Cancel
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         )}
@@ -316,24 +303,25 @@ const BookDetailPage: React.FC = () => {
                 </>
             )}
 
-            {showDeleteConfirm && (
-                <div className="modal-overlay">
-                    <div className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-                        <h3 id="delete-title">Delete this book?</h3>
-                        <p>
-                            This removes “{book.title}” and its reading history. This cannot be undone.
-                        </p>
-                        <div className="modal-actions">
-                            <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-text">
-                                Cancel
-                            </button>
-                            <button onClick={handleDelete} className="btn btn-danger">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Dialog
+                open={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                headline="Delete this book?"
+                actions={
+                    <>
+                        <Button variant="text" onClick={() => setShowDeleteConfirm(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="filled" className="btn-danger" onClick={handleDelete}>
+                            Delete
+                        </Button>
+                    </>
+                }
+            >
+                <p>
+                    This removes “{book.title}” and its reading history. This cannot be undone.
+                </p>
+            </Dialog>
         </div>
     );
 };
