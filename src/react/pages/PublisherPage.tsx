@@ -1,34 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams } from 'react-router-dom';
 import { getPublisherPage } from '../services/api';
 import BookExhibit from '../components/BookExhibit';
+import { useResource } from '../hooks/useResource';
 import type { PublisherPage as PublisherPageData } from '../types';
 
 const PublisherPage: React.FC = () => {
     const { publisherSlug } = useParams<{ publisherSlug: string }>();
-    const [data, setData] = useState<PublisherPageData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (publisherSlug) {
-            loadPublisherPage(publisherSlug);
-        }
-    }, [publisherSlug]);
-
-    const loadPublisherPage = async (slug: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await getPublisherPage(slug);
-            setData(result);
-        } catch (err) {
-            console.error('Failed to load publisher page:', err);
-            setError('Failed to load publisher information');
-        } finally {
-            setLoading(false);
-        }
+    const loadPublisherPage = async () => {
+        if (!publisherSlug) throw new Error('No publisher slug in the route');
+        return getPublisherPage(publisherSlug);
     };
+
+    const { data, loading, error } = useResource<PublisherPageData>(loadPublisherPage, [
+        publisherSlug,
+    ], { errorMessage: 'Failed to load publisher information' });
 
     if (loading) {
         return <div className="loading">Loading…</div>;

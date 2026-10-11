@@ -1,81 +1,70 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getBooks, searchBooks } from '../services/api';
 import BookExhibit from '../components/BookExhibit';
 import Icon from '../components/Icon';
 import { Button, Fab, Select, SelectOption, TextField } from '../ui';
+import { useResource } from '../hooks/useResource';
+import { useUrlFilters } from '../hooks/useUrlFilters';
 import type { Book, BooksFilters } from '../types';
 
+/**
+ * The filters this page keeps in the URL. `q` is deliberately not one of them:
+ * the search box holds its own state and is written only on submit, so typing
+ * does not refetch.
+ */
+const FILTER_KEYS = ['status', 'year', 'month', 'rating', 'category', 'sort'] as const;
+
+/** Every filter empty, for writing a search that replaces them. */
+const NO_FILTERS: Record<string, string> = Object.fromEntries(
+    FILTER_KEYS.map((key) => [key, ''])
+);
+
 const BooksPage: React.FC = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const [books, setBooks] = useState<Book[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [categories, setCategories] = useState<string[]>([]);
+    const [searchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState('reading_date');
-
-    const filters: BooksFilters = {
-        status: searchParams.get('status') || '',
-        year: searchParams.get('year') || '',
-        month: searchParams.get('month') || '',
-        rating: searchParams.get('rating') || '',
-        category: searchParams.get('category') || '',
-    };
-
-    useEffect(() => {
-        loadBooks();
-    }, [searchParams]);
+    const {
+        values: filters,
+        set: setUrlFilters,
+        clear: clearUrlFilters,
+    } = useUrlFilters(FILTER_KEYS);
 
     const loadBooks = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const query = searchParams.get('q');
-            if (query) {
-                const data = await searchBooks(query);
-                setBooks(data.books || []);
-            } else {
-                const data = await getBooks(filters);
-                setBooks(data.books || []);
-                setCategories(data.categories || []);
-                if (data.sort) setSortBy(data.sort);
-            }
-        } catch (err) {
-            console.error('Failed to load books:', err);
-            setError('Failed to load books');
-        } finally {
-            setLoading(false);
+        const query = searchParams.get('q');
+        if (query) {
+            const data = await searchBooks(query);
+            return { books: data.books || [], categories: [] as string[] };
         }
+        const data = await getBooks(filters);
+        return { books: data.books || [], categories: data.categories || [] };
     };
+
+    const { data, loading, error } = useResource(loadBooks, [searchParams], {
+        errorMessage: 'Failed to load books',
+    });
+
+    const books = data?.books ?? [];
+    const categories = data?.categories ?? [];
+
+    /** Apply a filter, leaving search mode: the search box is not a filter. */
+    const applyFilter = (update: Record<string, string>) => setUrlFilters({ ...update, q: '' });
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchQuery.trim()) {
-            setSearchParams({ q: searchQuery.trim() });
-        } else {
-            setSearchParams({});
-        }
-    };
-
-    const handleFilterChange = (key: string, value: string) => {
-        const newParams = new URLSearchParams(searchParams);
-        if (value) {
-            newParams.set(key, value);
-        } else {
-            newParams.delete(key);
-        }
-        newParams.delete('q'); // Clear search when applying filters
-        setSearchParams(newParams);
+        // A search replaces the filters; an empty one clears everything.
+        setUrlFilters({ ...NO_FILTERS, q: searchQuery.trim() });
     };
 
     const clearFilters = () => {
-        setSearchParams({});
+        clearUrlFilters();
         setSearchQuery('');
     };
 
     const activeQuery = searchParams.get('q');
-    const hasActiveFilters = Object.values(filters).some((v) => v);
+    // Sorting is not a filter: choosing one must not make "Clear" appear.
+    const hasActiveFilters = (['status', 'year', 'month', 'rating', 'category'] as const).some(
+        (key) => filters[key]
+    );
 
     return (
         <div className="books-page page">
@@ -112,7 +101,7 @@ const BooksPage: React.FC = () => {
                         id="filter-status"
                         label="Status"
                         value={filters.status}
-                        onValueChange={(value) => handleFilterChange('status', value)}
+                        onValueChange={(value) => applyFilter({ status: value })}
                     >
                         <SelectOption value="">All statuses</SelectOption>
                         <SelectOption value="In Progress">In Progress</SelectOption>
@@ -124,7 +113,7 @@ const BooksPage: React.FC = () => {
                         id="filter-category"
                         label="Category"
                         value={filters.category}
-                        onValueChange={(value) => handleFilterChange('category', value)}
+                        onValueChange={(value) => applyFilter({ category: value })}
                     >
                         <SelectOption value="">All categories</SelectOption>
                         {categories.map((cat) => (
@@ -137,13 +126,15 @@ const BooksPage: React.FC = () => {
                     <Select
                         id="filter-sort"
                         label="Sort"
-                        value={sortBy}
-                        onValueChange={(value) => handleFilterChange('sort', value)}
+                        value={filters.sort || 'reading_date'}
+                        onValueChange={(value) => applyFilter({ sort: value })}
                     >
+                        {/* Only sorts the server implements (see SORT_OPTIONS). There
+                            is no rating sort, and offering one silently fell back to
+                            the default order. */}
                         <SelectOption value="reading_date">Reading date</SelectOption>
                         <SelectOption value="title">Title</SelectOption>
                         <SelectOption value="author">Author</SelectOption>
-                        <SelectOption value="rating">Rating</SelectOption>
                     </Select>
 
                     {(hasActiveFilters || activeQuery) && (

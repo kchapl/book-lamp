@@ -1,66 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getHistory } from '../services/api';
 import { Button, Select, SelectOption } from '../ui';
-import type { ReadingRecord, HistoryFilters } from '../types';
+import { useResource } from '../hooks/useResource';
+import { useUrlFilters } from '../hooks/useUrlFilters';
+import { formatDate } from '../utils/format';
+import type { HistoryFilters } from '../types';
 
-const formatDate = (iso: string | null | undefined): string => {
-    if (!iso) return '—';
-    const date = new Date(`${iso}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return iso;
-    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-};
+/** The reading log's filters, as they appear in the URL. */
+const FILTER_KEYS = ['status', 'min_rating', 'year', 'sort'] as const;
 
 const HistoryPage: React.FC = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const [history, setHistory] = useState<ReadingRecord[]>([]);
-    const [statuses, setStatuses] = useState<string[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [editingRecord, setEditingRecord] = useState<ReadingRecord | null>(null);
-    const [editForm, setEditForm] = useState({});
+    const [searchParams] = useSearchParams();
+    const { values, set: setUrlFilters, clear } = useUrlFilters(FILTER_KEYS);
 
+    // The URL holds strings; the log's rating floor is a number on the wire.
     const filters: Partial<HistoryFilters> = {
-        status: searchParams.get('status') || undefined,
-        rating: searchParams.get('min_rating') ? parseInt(searchParams.get('min_rating')!) : undefined,
-        year: searchParams.get('year') || undefined,
-        sort: searchParams.get('sort') || 'date_desc',
+        status: values.status || undefined,
+        min_rating: values.min_rating ? parseInt(values.min_rating) : undefined,
+        year: values.year || undefined,
+        sort: values.sort || 'date_desc',
     };
-
-    useEffect(() => {
-        loadHistory();
-    }, [searchParams]);
 
     const loadHistory = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getHistory(filters);
-            setHistory(data.history || []);
-            setStatuses(data.statuses || []);
-        } catch (err) {
-            console.error('Failed to load history:', err);
-            setError('Failed to load history');
-        } finally {
-            setLoading(false);
-        }
+        const data = await getHistory(filters);
+        return { history: data.history || [], statuses: data.statuses || [] };
     };
 
-    const handleFilterChange = (key: string, value: string) => {
-        const newParams = new URLSearchParams(searchParams);
-        if (value) {
-            newParams.set(key, value);
-        } else {
-            newParams.delete(key);
-        }
-        setSearchParams(newParams);
-    };
+    const { data, loading, error } = useResource(loadHistory, [searchParams], {
+        errorMessage: 'Failed to load history',
+    });
 
-    const clearFilters = () => {
-        setSearchParams({});
-    };
-
-    const hasActiveFilters = filters.status || filters.rating || filters.year;
+    const history = data?.history ?? [];
+    const statuses = data?.statuses ?? [];
+    const hasActiveFilters = values.status || values.min_rating || values.year;
 
     // Group history by book
     const groupedHistory = history.reduce((acc, record) => {
@@ -70,7 +43,7 @@ const HistoryPage: React.FC = () => {
         }
         acc[bookTitle].push(record);
         return acc;
-    }, {} as Record<string, ReadingRecord[]>);
+    }, {} as Record<string, typeof history>);
 
     return (
         <div className="history-page">
@@ -81,8 +54,8 @@ const HistoryPage: React.FC = () => {
                     <Select
                         id="history-status"
                         label="Status"
-                        value={filters.status || ''}
-                        onValueChange={(value) => handleFilterChange('status', value)}
+                        value={values.status}
+                        onValueChange={(value) => setUrlFilters({ status: value })}
                     >
                         <SelectOption value="">All Statuses</SelectOption>
                         {statuses.map((status) => (
@@ -93,8 +66,8 @@ const HistoryPage: React.FC = () => {
                     <Select
                         id="history-rating"
                         label="Rating"
-                        value={filters.rating?.toString() || ''}
-                        onValueChange={(value) => handleFilterChange('min_rating', value)}
+                        value={values.min_rating}
+                        onValueChange={(value) => setUrlFilters({ min_rating: value })}
                     >
                         <SelectOption value="">All Ratings</SelectOption>
                         <SelectOption value="5">5 Stars</SelectOption>
@@ -107,8 +80,8 @@ const HistoryPage: React.FC = () => {
                     <Select
                         id="history-sort"
                         label="Sort"
-                        value={filters.sort || 'date_desc'}
-                        onValueChange={(value) => handleFilterChange('sort', value)}
+                        value={values.sort || 'date_desc'}
+                        onValueChange={(value) => setUrlFilters({ sort: value })}
                     >
                         <SelectOption value="date_desc">Newest First</SelectOption>
                         <SelectOption value="date_asc">Oldest First</SelectOption>
@@ -117,7 +90,7 @@ const HistoryPage: React.FC = () => {
                     </Select>
 
                     {hasActiveFilters && (
-                        <Button variant="text" onClick={clearFilters}>
+                        <Button variant="text" onClick={clear}>
                             Clear Filters
                         </Button>
                     )}
@@ -125,7 +98,7 @@ const HistoryPage: React.FC = () => {
             </div>
 
             {loading ? (
-                <div className="loading">Loading...</div>
+                <div className="loading">Loading…</div>
             ) : history.length === 0 ? (
                 <div className="empty-state">
                     <h2>No reading history</h2>

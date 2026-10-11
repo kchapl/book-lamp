@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     getBookDetail,
@@ -9,48 +9,34 @@ import {
     removeFromReadingList,
 } from '../services/api';
 import { Button, Dialog, Select, SelectOption, TextField } from '../ui';
+import { useResource } from '../hooks/useResource';
 import { statusClass } from '../utils/status';
 import type { Book } from '../types';
 
 const BookDetailPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
-    const [book, setBook] = useState<Book | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Book>>({});
     const [showAddRecord, setShowAddRecord] = useState(false);
     const [newRecord, setNewRecord] = useState({ status: 'Completed', rating: 5 });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    useEffect(() => {
-        if (bookId) {
-            loadBook(parseInt(bookId));
-        }
-    }, [bookId]);
-
-    const loadBook = async (id: number) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getBookDetail(id);
-            setBook(data);
-            setEditForm(data);
-        } catch (err) {
-            console.error('Failed to load book:', err);
-            setError('Failed to load book');
-        } finally {
-            setLoading(false);
-        }
+    const loadBook = async () => {
+        if (!bookId) throw new Error('No book id in the route');
+        return getBookDetail(Number(bookId));
     };
+
+    const { data: book, loading, error, reload } = useResource(loadBook, [bookId], {
+        errorMessage: 'Failed to load book',
+    });
 
     const handleSaveEdit = async () => {
         if (!bookId) return;
         try {
-            await updateBook(parseInt(bookId), editForm);
+            await updateBook(Number(bookId), editForm);
             setIsEditing(false);
-            loadBook(parseInt(bookId));
+            reload();
         } catch (err) {
             console.error('Failed to update book:', err);
         }
@@ -59,7 +45,7 @@ const BookDetailPage: React.FC = () => {
     const handleDelete = async () => {
         if (!bookId) return;
         try {
-            await deleteBook(parseInt(bookId));
+            await deleteBook(Number(bookId));
             navigate('/books');
         } catch (err) {
             console.error('Failed to delete book:', err);
@@ -69,9 +55,9 @@ const BookDetailPage: React.FC = () => {
     const handleAddRecord = async () => {
         if (!bookId) return;
         try {
-            await createReadingRecord(parseInt(bookId), newRecord);
+            await createReadingRecord(Number(bookId), newRecord);
             setShowAddRecord(false);
-            loadBook(parseInt(bookId));
+            reload();
         } catch (err) {
             console.error('Failed to add record:', err);
         }
@@ -81,11 +67,11 @@ const BookDetailPage: React.FC = () => {
         if (!bookId || !book) return;
         try {
             if (book.is_planned) {
-                await removeFromReadingList(parseInt(bookId));
+                await removeFromReadingList(Number(bookId));
             } else {
-                await addToReadingList(parseInt(bookId));
+                await addToReadingList(Number(bookId));
             }
-            loadBook(parseInt(bookId));
+            reload();
         } catch (err) {
             console.error('Failed to toggle reading list:', err);
         }
@@ -213,7 +199,13 @@ const BookDetailPage: React.FC = () => {
                     </section>
 
                     <div className="book-actions">
-                        <Button variant="outlined" onClick={() => setIsEditing(true)}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => {
+                                setEditForm(book);
+                                setIsEditing(true);
+                            }}
+                        >
                             Edit
                         </Button>
                         <Button

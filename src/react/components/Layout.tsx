@@ -92,7 +92,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                         <div className="theme-selector">
                             <IconButton
-                                icon={theme === 'dark' ? 'moon' : theme === 'light' ? 'sun' : 'monitor'}
+                                icon="contrast"
                                 onClick={() => setShowThemeMenu((open) => !open)}
                                 aria-label="Change theme"
                                 aria-expanded={showThemeMenu}

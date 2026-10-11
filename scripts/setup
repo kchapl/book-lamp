@@ -30,7 +30,7 @@ fail() {
 # Print the Podman install command for the detected platform. Setup is kept
 # unprivileged, so the user runs this themselves rather than blocking on sudo.
 print_container_runtime_hint() {
-    printf '    Install one of them:\n'
+    printf '    Install it:\n'
 
     case "$(uname -s)" in
         Linux)
@@ -54,7 +54,7 @@ print_container_runtime_hint() {
             printf '      podman machine init && podman machine start\n'
             ;;
         *)
-            printf '      install Docker Desktop, or podman and podman-compose\n'
+            printf '      install podman and podman-compose\n'
             ;;
     esac
 }
@@ -84,12 +84,10 @@ if [ ! -f .env ]; then
 fi
 
 container_runtime=""
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    container_runtime="Docker Compose"
-elif command -v podman-compose >/dev/null 2>&1; then
+if command -v podman-compose >/dev/null 2>&1; then
     container_runtime="podman-compose"
 else
-    warn "Neither Docker Compose nor podman-compose was found; scripts/start needs one to run PostgreSQL."
+    warn "podman-compose was not found; scripts/start needs it to run PostgreSQL."
     print_container_runtime_hint
 fi
 

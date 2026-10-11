@@ -84,7 +84,12 @@ export interface Stats {
 
 export interface HistoryFilters {
     status: string;
-    rating: number;
+    /**
+     * Minimum rating. Named `min_rating` to match the Reading Log's query
+     * parameter: it is a floor, where the collection's `rating` is an exact
+     * match, and one name for both would hide that.
+     */
+    min_rating: number;
     year: string;
     sort: string;
 }
@@ -95,6 +100,8 @@ export interface BooksFilters {
     month: string;
     rating: string;
     category: string;
+    /** One of the server's sorts; mirrored back in `sort_options`. */
+    sort: string;
 }
 
 export interface Job {

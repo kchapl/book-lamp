@@ -49,20 +49,15 @@ read_env_value() {
 command -v uv >/dev/null 2>&1 || fail "uv is required but was not found on PATH (see mise.toml)."
 command -v npm >/dev/null 2>&1 || fail "npm is required but was not found on PATH."
 
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    compose=(docker compose)
-elif command -v podman-compose >/dev/null 2>&1; then
-    compose=(podman-compose)
-else
-    fail "Docker Compose (or podman-compose) is required to start the local database."
-fi
+command -v podman-compose >/dev/null 2>&1 ||
+    fail "podman-compose is required to start the local database."
 
 # netavark, podman's bridge driver, programs the compose network with
 # nftables. Kernels without that support cannot start the database container on
 # the bridge, so hand the database the host network instead: it answers on
 # 127.0.0.1:5432, exactly where DATABASE_URL points, and no bridge is created.
 host_network=0
-if [ "${compose[0]}" = "podman-compose" ] && [ ! -e /sys/module/nf_tables ]; then
+if [ ! -e /sys/module/nf_tables ]; then
     host_network=1
 fi
 
@@ -72,7 +67,7 @@ if [ "$host_network" -eq 1 ]; then
 fi
 
 run_compose() {
-    "${compose[@]}" "${compose_files[@]}" "$@"
+    podman-compose "${compose_files[@]}" "$@"
 }
 
 if [ ! -d .venv ]; then
@@ -97,10 +92,7 @@ log "Starting PostgreSQL"
 # container that already exists instead, so a normal re-run is quiet. If it
 # cannot start - a stale container created on a bridge this host can no longer
 # program, say - fall back to `up`, which replaces it.
-db_container=""
-if [ "${compose[0]}" = "podman-compose" ]; then
-    db_container="$(run_compose ps -q 2>/dev/null | sed -n '1p')"
-fi
+db_container="$(run_compose ps -q 2>/dev/null | sed -n '1p')"
 if [ -n "$db_container" ]; then
     run_compose start db || run_compose up -d db
 else
@@ -118,7 +110,7 @@ while :; do
     if [ "$attempt" -ge 30 ]; then
         # A kernel that looked capable can still fail to start the container on
         # the bridge, so fall back to the host network once before giving up.
-        if [ "$host_network" -eq 0 ] && [ "${compose[0]}" = "podman-compose" ]; then
+        if [ "$host_network" -eq 0 ]; then
             log "PostgreSQL did not become ready; retrying on the host network"
             host_network=1
             compose_files+=(-f compose.hostnet.yaml)
