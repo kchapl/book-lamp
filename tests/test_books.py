@@ -99,6 +99,51 @@ def _titles(payload):
     return {b["title"] for b in payload["books"]}
 
 
+def _two_books_out_of_title_order(authenticated_client):
+    """Two Books whose title order and reading-date order disagree.
+
+    "Apple" was started first, "Zebra" most recently, so a title sort and the
+    default reading-date sort give opposite answers. A Book needs a Reading
+    Status to be listed at all.
+    """
+    storage = get_storage()
+    apple = storage.add_book(isbn13="301", title="Apple", author="A1")
+    zebra = storage.add_book(isbn13="302", title="Zebra", author="A2")
+    storage.add_reading_record(apple["id"], "Completed", "2024-01-01", "2024-01-10")
+    storage.add_reading_record(zebra["id"], "Completed", "2024-02-01", "2024-02-10")
+
+
+def test_books_sort_by_title(authenticated_client):
+    """The `sort` parameter reorders the catalogue (see SORT_OPTIONS).
+
+    The collection page keeps its sort in the URL and sends it here; nothing
+    pinned that the request carried it, so a page that dropped it looked fine.
+    """
+    _two_books_out_of_title_order(authenticated_client)
+
+    resp = authenticated_client.get("/api/books?sort=title")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert [b["title"] for b in payload["books"]] == ["Apple", "Zebra"]
+    assert payload["sort"] == "title"
+
+
+def test_books_unknown_sort_falls_back_to_reading_date(authenticated_client):
+    """A sort the server does not implement silently becomes the default.
+
+    This is why the collection page offers only the server's sorts: a `rating`
+    option was offered and quietly returned the default order.
+    """
+    _two_books_out_of_title_order(authenticated_client)
+
+    resp = authenticated_client.get("/api/books?sort=rating")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["sort"] == "reading_date"
+    # Most recently read first, which is not the order a title sort gives.
+    assert [b["title"] for b in payload["books"]] == ["Zebra", "Apple"]
+
+
 def test_books_year_filter(authenticated_client):
     """Test filtering the books API by year completed."""
     storage = get_storage()

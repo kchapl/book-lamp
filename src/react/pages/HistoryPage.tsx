@@ -22,7 +22,9 @@ const HistoryPage: React.FC = () => {
 
     const filters: Partial<HistoryFilters> = {
         status: searchParams.get('status') || undefined,
-        rating: searchParams.get('min_rating') ? parseInt(searchParams.get('min_rating')!) : undefined,
+        // Same name here, in the URL and on the wire, so the filter cannot be
+        // sent under a name the route does not read.
+        min_rating: searchParams.get('min_rating') ? parseInt(searchParams.get('min_rating')!) : undefined,
         year: searchParams.get('year') || undefined,
         sort: searchParams.get('sort') || 'date_desc',
     };
@@ -60,7 +62,7 @@ const HistoryPage: React.FC = () => {
         setSearchParams({});
     };
 
-    const hasActiveFilters = filters.status || filters.rating || filters.year;
+    const hasActiveFilters = filters.status || filters.min_rating || filters.year;
 
     // Group history by book
     const groupedHistory = history.reduce((acc, record) => {
@@ -93,7 +95,7 @@ const HistoryPage: React.FC = () => {
                     <Select
                         id="history-rating"
                         label="Rating"
-                        value={filters.rating?.toString() || ''}
+                        value={filters.min_rating?.toString() || ''}
                         onValueChange={(value) => handleFilterChange('min_rating', value)}
                     >
                         <SelectOption value="">All Ratings</SelectOption>

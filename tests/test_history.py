@@ -49,6 +49,32 @@ def test_reading_history_filtering(authenticated_client):
     assert response.get_json()["filters"]["status"] == "Completed"
 
 
+def test_reading_history_min_rating_filter(authenticated_client):
+    """The Reading Log's rating filter is a floor, and is sent as `min_rating`.
+
+    The page used to send the same value as `rating`, which this route does not
+    read, so the filter never reached the server.
+    """
+    storage = get_storage()
+    b1 = storage.add_book(isbn13="1", title="Five Stars", author="A1")
+    b2 = storage.add_book(isbn13="2", title="Three Stars", author="A2")
+    b3 = storage.add_book(isbn13="3", title="Unrated", author="A3")
+
+    storage.add_reading_record(b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5)
+    storage.add_reading_record(b2["id"], "Completed", "2023-01-01", "2023-01-03", rating=3)
+    storage.add_reading_record(b3["id"], "Completed", "2023-01-01", "2023-01-04")
+
+    response = authenticated_client.get("/api/history?min_rating=4")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert [r["book_title"] for r in payload["history"]] == ["Five Stars"]
+    assert payload["filters"]["rating"] == 4
+
+    # A name the route does not read must not look like it filtered anything.
+    response = authenticated_client.get("/api/history?rating=4")
+    assert len(response.get_json()["history"]) == 3
+
+
 def test_reading_history_sorting(authenticated_client):
     """Test sorting results."""
     storage = get_storage()

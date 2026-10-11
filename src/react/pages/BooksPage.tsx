@@ -13,14 +13,17 @@ const BooksPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [categories, setCategories] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState('reading_date');
 
+    // The URL is the single source of truth for the sort. It used to also live in
+    // local state that the response overwrote, so picking a sort snapped back on
+    // the next load.
     const filters: BooksFilters = {
         status: searchParams.get('status') || '',
         year: searchParams.get('year') || '',
         month: searchParams.get('month') || '',
         rating: searchParams.get('rating') || '',
         category: searchParams.get('category') || '',
+        sort: searchParams.get('sort') || '',
     };
 
     useEffect(() => {
@@ -39,7 +42,6 @@ const BooksPage: React.FC = () => {
                 const data = await getBooks(filters);
                 setBooks(data.books || []);
                 setCategories(data.categories || []);
-                if (data.sort) setSortBy(data.sort);
             }
         } catch (err) {
             console.error('Failed to load books:', err);
@@ -75,7 +77,10 @@ const BooksPage: React.FC = () => {
     };
 
     const activeQuery = searchParams.get('q');
-    const hasActiveFilters = Object.values(filters).some((v) => v);
+    // Sorting is not a filter: choosing one must not make "Clear" appear.
+    const hasActiveFilters = (['status', 'year', 'month', 'rating', 'category'] as const).some(
+        (key) => filters[key]
+    );
 
     return (
         <div className="books-page page">
@@ -137,13 +142,15 @@ const BooksPage: React.FC = () => {
                     <Select
                         id="filter-sort"
                         label="Sort"
-                        value={sortBy}
+                        value={filters.sort || 'reading_date'}
                         onValueChange={(value) => handleFilterChange('sort', value)}
                     >
+                        {/* Only sorts the server implements (see SORT_OPTIONS). There
+                            is no rating sort, and offering one silently fell back to
+                            the default order. */}
                         <SelectOption value="reading_date">Reading date</SelectOption>
                         <SelectOption value="title">Title</SelectOption>
                         <SelectOption value="author">Author</SelectOption>
-                        <SelectOption value="rating">Rating</SelectOption>
                     </Select>
 
                     {(hasActiveFilters || activeQuery) && (
