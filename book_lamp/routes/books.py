@@ -1,9 +1,11 @@
 """Books catalog management routes."""
 
+import csv
+import io
 import logging
 from typing import Union
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, Response, current_app, jsonify, request, session
 
 from book_lamp.middleware.auth import authorisation_required
 from book_lamp.middleware.csrf import csrf_protect
@@ -54,6 +56,90 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
     except Exception:
         logger.exception(f"Background job {job_id} failed")
         raise
+
+
+def _safe_csv_cell(value):
+    """Prevent spreadsheet programs from evaluating exported text as a formula."""
+    if isinstance(value, str) and value.lstrip(" \t\r\n")[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
+@books_bp.route("/api/export/csv", methods=["GET"])
+@authorisation_required
+def api_export_csv():
+    """Download the current user's books and reading history as CSV."""
+    storage = get_storage()
+    books = storage.get_all_books()
+    records_by_book: dict[int, list[dict]] = {}
+    for record in storage.get_reading_records():
+        records_by_book.setdefault(record["book_id"], []).append(record)
+
+    reading_list = {item["book_id"]: item["position"] for item in storage.get_reading_list()}
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "ISBN-13",
+            "Title",
+            "Author",
+            "Publication year",
+            "Publisher",
+            "Series",
+            "Description",
+            "Category",
+            "Language",
+            "Page count",
+            "Format",
+            "Edition",
+            "Thumbnail URL",
+            "Cover URL",
+            "Reading status",
+            "Start date",
+            "End date",
+            "Rating",
+            "On reading list",
+            "Reading list position",
+        ]
+    )
+    for book in books:
+        records = records_by_book.get(book["id"]) or [None]
+        authors = book.get("authors") or [book.get("author", "")]
+        for record in records:
+            writer.writerow(
+                _safe_csv_cell(value)
+                for value in [
+                    book.get("isbn13", ""),
+                    book.get("title", ""),
+                    ", ".join(authors),
+                    book.get("publication_year", ""),
+                    book.get("publisher", ""),
+                    book.get("series", ""),
+                    book.get("description", ""),
+                    book.get("bisac_category", ""),
+                    book.get("language", ""),
+                    book.get("page_count", ""),
+                    book.get("physical_format", ""),
+                    book.get("edition", ""),
+                    book.get("thumbnail_url", ""),
+                    book.get("cover_url", ""),
+                    record.get("status", "") if record else "",
+                    record.get("start_date", "") if record else "",
+                    record.get("end_date", "") if record else "",
+                    record.get("rating", "") if record else "",
+                    "Yes" if book["id"] in reading_list else "No",
+                    reading_list.get(book["id"], ""),
+                ]
+            )
+
+    return Response(
+        "\ufeff" + output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=book-lamp-export.csv",
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @books_bp.route("/api/books", methods=["GET"])

@@ -121,9 +121,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </div>
 
                         {isAuthorized ? (
-                            <Button variant="text" onClick={logoutUser} aria-label="Sign out">
-                                <span className="btn-label">Sign out</span>
-                            </Button>
+                            <>
+                                <Button
+                                    variant="text"
+                                    onClick={() => window.location.assign('/api/export/csv')}
+                                    aria-label="Export my data as CSV"
+                                >
+                                    <span className="btn-label">Export CSV</span>
+                                </Button>
+                                <Button variant="text" onClick={logoutUser} aria-label="Sign out">
+                                    <span className="btn-label">Sign out</span>
+                                </Button>
+                            </>
                         ) : (
                             <Button variant="outlined" to="/unauthorised">
                                 Sign in

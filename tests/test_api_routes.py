@@ -4,6 +4,8 @@ Each test exercises a new /api/* endpoint that the React SPA calls.
 All tests use TEST_MODE=1 so no real PostgreSQL connection is required.
 """
 
+import csv
+import io
 import json
 from unittest.mock import patch
 
@@ -17,6 +19,78 @@ from book_lamp.app import get_storage
 def _json(resp):
     """Decode a Flask test response as JSON."""
     return json.loads(resp.data)
+
+
+# ---------------------------------------------------------------------------
+# Data export
+# ---------------------------------------------------------------------------
+
+
+def test_api_export_csv_includes_books_reading_records_and_reading_list(authenticated_client):
+    """The authenticated CSV export contains catalogue, history, and list data."""
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780306406157",
+        title="Exported Book",
+        author="Jane Doe, John Smith",
+        publication_year=2020,
+        publisher="Example Press",
+        description="A book for export",
+        series="Example Series",
+        bisac_category="FICTION / General",
+        language="eng",
+        page_count=240,
+        physical_format="Paperback",
+        edition="2nd",
+        thumbnail_url="https://example.com/thumb.jpg",
+        cover_url="https://example.com/cover.jpg",
+    )
+    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-10", 5)
+    storage.add_reading_record(book["id"], "In Progress", "2025-02-03")
+    storage.add_to_reading_list(book["id"])
+
+    response = authenticated_client.get("/api/export/csv")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+    assert response.headers["Content-Disposition"] == "attachment; filename=book-lamp-export.csv"
+    assert response.headers["Cache-Control"] == "private, no-store"
+    assert response.data.startswith(b"\xef\xbb\xbf")
+
+    rows = list(csv.DictReader(io.StringIO(response.data.decode("utf-8-sig"))))
+    assert len(rows) == 2
+    assert rows[0]["ISBN-13"] == "9780306406157"
+    assert rows[0]["Title"] == "Exported Book"
+    assert rows[0]["Author"] == "Jane Doe, John Smith"
+    assert rows[0]["Description"] == "A book for export"
+    assert rows[0]["Reading status"] == "Completed"
+    assert rows[0]["Start date"] == "2024-01-01"
+    assert rows[0]["Rating"] == "5"
+    assert rows[0]["On reading list"] == "Yes"
+    assert rows[0]["Reading list position"] == "1"
+    assert rows[1]["Reading status"] == "In Progress"
+    assert rows[1]["End date"] == ""
+
+
+def test_api_export_csv_escapes_spreadsheet_formulas(authenticated_client):
+    """Exported user-controlled text cannot execute as a spreadsheet formula."""
+    storage = get_storage()
+    storage.add_book(isbn13="9780306406157", title='=HYPERLINK("https://example.com")', author="+SUM(1,1)")
+
+    response = authenticated_client.get("/api/export/csv")
+    rows = list(csv.DictReader(io.StringIO(response.data.decode("utf-8-sig"))))
+
+    assert rows[0]["Title"] == '\'=HYPERLINK("https://example.com")'
+    assert rows[0]["Author"] == "'+SUM(1,1)"
+
+
+def test_api_export_csv_requires_authentication(client, monkeypatch):
+    """CSV export does not expose a reader's data to anonymous requests."""
+    monkeypatch.setattr("book_lamp.middleware.auth.is_test_mode", lambda: False)
+    response = client.get("/api/export/csv")
+
+    assert response.status_code == 401
+    assert response.json == {"error": "Unauthorized"}
 
 
 # ---------------------------------------------------------------------------
