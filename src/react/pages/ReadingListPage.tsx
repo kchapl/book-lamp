@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import {
     DndContext,
     closestCenter,
@@ -19,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { getReadingList, reorderReadingList, removeFromReadingList, startReading } from '../services/api';
 import { Button, IconButton } from '../ui';
+import { useResource } from '../hooks/useResource';
 import type { ReadingListItem } from '../types';
 
 interface SortableItemProps {
@@ -72,10 +72,18 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
 };
 
 const ReadingListPage: React.FC = () => {
-    const navigate = useNavigate();
-    const [books, setBooks] = useState<ReadingListItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const loadReadingList = async () => (await getReadingList()).books || [];
+
+    const { data, loading, error, reload } = useResource(loadReadingList, [], {
+        errorMessage: 'Failed to load reading list',
+    });
+
+    // A write shows its effect at once, while the request is in flight. The
+    // override is dropped as soon as a fresh list arrives, so the server stays
+    // the source of truth and a failed write falls back to what it holds.
+    const [pending, setPending] = useState<ReadingListItem[] | null>(null);
+    useEffect(() => setPending(null), [data]);
+    const books = pending ?? data ?? [];
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -84,57 +92,45 @@ const ReadingListPage: React.FC = () => {
         })
     );
 
-    useEffect(() => {
-        loadReadingList();
-    }, []);
-
-    const loadReadingList = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getReadingList();
-            setBooks(data.books || []);
-        } catch (err) {
-            console.error('Failed to load reading list:', err);
-            setError('Failed to load reading list');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
         const oldIndex = books.findIndex((b) => b.id === active.id);
         const newIndex = books.findIndex((b) => b.id === over.id);
+        if (oldIndex < 0 || newIndex < 0) return;
 
-        const newBooks = arrayMove(books, oldIndex, newIndex);
-        setBooks(newBooks);
+        const next = arrayMove(books, oldIndex, newIndex);
+        setPending(next);
 
         try {
-            await reorderReadingList(newBooks.map((b) => b.id));
+            await reorderReadingList(next.map((b) => b.id));
         } catch (err) {
             console.error('Failed to save new order:', err);
-            loadReadingList();
+        } finally {
+            reload();
         }
     };
 
     const handleRemove = async (bookId: number) => {
+        setPending(books.filter((b) => b.id !== bookId));
         try {
             await removeFromReadingList(bookId);
-            setBooks(books.filter((b) => b.id !== bookId));
         } catch (err) {
             console.error('Failed to remove book:', err);
+        } finally {
+            reload();
         }
     };
 
     const handleStartReading = async (bookId: number) => {
+        setPending(books.filter((b) => b.id !== bookId));
         try {
             await startReading(bookId);
-            setBooks(books.filter((b) => b.id !== bookId));
         } catch (err) {
             console.error('Failed to start reading:', err);
+        } finally {
+            reload();
         }
     };
 
@@ -149,7 +145,7 @@ const ReadingListPage: React.FC = () => {
             </header>
 
             {loading ? (
-                <div className="loading">Loading...</div>
+                <div className="loading">Loading…</div>
             ) : books.length === 0 ? (
                 <div className="empty-state">
                     <h2>Your reading list is empty</h2>

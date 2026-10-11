@@ -1,59 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { getStats, getBooks } from '../services/api';
-import type { Book, Stats } from '../types';
+import type { Book } from '../types';
 import CategoryChart from '../components/CategoryChart';
 import GoalProgress from '../components/GoalProgress';
 import Icon from '../components/Icon';
 import { Button, LinearProgress } from '../ui';
+import { useResource } from '../hooks/useResource';
 import { statusClass } from '../utils/status';
+import { formatDate } from '../utils/format';
 
 const STATUS_ORDER = ['Completed', 'In Progress', 'Abandoned'] as const;
 
 const formatNumber = (value: number | undefined | null, fallback = '—'): string =>
     value === undefined || value === null ? fallback : value.toLocaleString();
 
-const formatDate = (iso: string | null | undefined): string => {
-    if (!iso) return 'no entries yet';
-    const date = new Date(`${iso}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return iso;
-    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-};
-
 const StatsPage: React.FC = () => {
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [currentBooks, setCurrentBooks] = useState<Book[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        loadDashboard();
-    }, []);
-
     const loadDashboard = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const [statsData, inProgress] = await Promise.all([
-                getStats(),
-                // The dashboard's hero is the books currently being read. A failure
-                // here must not take down the whole board, so it is handled apart.
-                getBooks({ status: 'In Progress' }).catch(() => ({ books: [] as Book[] })),
-            ]);
-            setStats(statsData);
-            setCurrentBooks(inProgress.books || []);
-        } catch (err) {
-            console.error('Failed to load stats:', err);
-            setError('Failed to load the dashboard');
-        } finally {
-            setLoading(false);
-        }
+        const [stats, inProgress] = await Promise.all([
+            getStats(),
+            // The dashboard's hero is the books currently being read. A failure
+            // here must not take down the whole board, so it is handled apart.
+            getBooks({ status: 'In Progress' }).catch(() => ({ books: [] as Book[] })),
+        ]);
+        return { stats, currentBooks: inProgress.books || [] };
     };
+
+    const { data, loading, error } = useResource(loadDashboard, [], {
+        errorMessage: 'Failed to load the dashboard',
+    });
 
     if (loading) {
         return <div className="loading">Loading…</div>;
     }
 
+    const stats = data?.stats;
     if (error || !stats) {
         return (
             <div className="page">
@@ -61,6 +42,8 @@ const StatsPage: React.FC = () => {
             </div>
         );
     }
+
+    const currentBooks = data?.currentBooks ?? [];
 
     const statusTotal = STATUS_ORDER.reduce((sum, status) => sum + (stats.status_counts[status] || 0), 0);
     const maxYearCount = stats.max_year_count || 1;
@@ -86,7 +69,7 @@ const StatsPage: React.FC = () => {
                 </div>
                 <p className="as-of" title="The date of your most recent reading record">
                     <Icon name="clock" size="sm" />
-                    Last entry {formatDate(stats.last_record_date)}
+                    Last entry {formatDate(stats.last_record_date, 'no entries yet')}
                 </p>
             </header>
 

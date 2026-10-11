@@ -1,36 +1,27 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useContext } from 'react';
 import { AppContext } from '../App';
 import GoogleAuth from '../components/GoogleAuth';
 import BookExhibit from '../components/BookExhibit';
 import { Button } from '../ui';
 import { getRecommendations } from '../services/api';
-import type { Book } from '../types';
+import { useResource } from '../hooks/useResource';
 
 const HomePage: React.FC = () => {
     const { isAuthorized } = useContext(AppContext);
-    const [recommendations, setRecommendations] = useState<Book[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (isAuthorized) {
-            loadRecommendations();
-        }
-    }, [isAuthorized]);
 
     const loadRecommendations = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await getRecommendations();
-            setRecommendations(data.recommendations || []);
-        } catch (err) {
-            console.error('Failed to load recommendations:', err);
-            setError('Failed to load recommendations');
-        } finally {
-            setLoading(false);
-        }
+        const data = await getRecommendations();
+        return data.recommendations || [];
     };
+
+    // Recommendations need a session, so the resource stays disabled — and not
+    // loading — until the visitor is signed in.
+    const { data, loading, error } = useResource(loadRecommendations, [isAuthorized], {
+        enabled: isAuthorized,
+        errorMessage: 'Failed to load recommendations',
+    });
+
+    const recommendations = data ?? [];
 
     return (
         <div className="home-page page">

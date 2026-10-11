@@ -1,41 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAuthorPage, addToReadingList } from '../services/api';
 import { Button } from '../ui';
+import { useResource } from '../hooks/useResource';
 import type { AuthorPage } from '../types';
 
 const AuthorPage: React.FC = () => {
     const { authorSlug } = useParams<{ authorSlug: string }>();
-    const [data, setData] = useState<AuthorPage | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [addingBook, setAddingBook] = useState<number | null>(null);
 
-    useEffect(() => {
-        if (authorSlug) {
-            loadAuthorPage(authorSlug);
-        }
-    }, [authorSlug]);
-
-    const loadAuthorPage = async (slug: string) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await getAuthorPage(slug);
-            setData(result);
-        } catch (err) {
-            console.error('Failed to load author page:', err);
-            setError('Failed to load author information');
-        } finally {
-            setLoading(false);
-        }
+    const loadAuthorPage = async () => {
+        if (!authorSlug) throw new Error('No author slug in the route');
+        return getAuthorPage(authorSlug);
     };
+
+    const { data, loading, error, reload } = useResource(loadAuthorPage, [authorSlug], {
+        errorMessage: 'Failed to load author information',
+    });
 
     const handleAddToReadingList = async (bookId: number) => {
         setAddingBook(bookId);
         try {
             await addToReadingList(bookId);
-            loadAuthorPage(authorSlug!);
+            reload();
         } catch (err) {
             console.error('Failed to add to reading list:', err);
         } finally {
@@ -44,11 +31,15 @@ const AuthorPage: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="loading">Loading...</div>;
+        return <div className="loading">Loading…</div>;
     }
 
     if (error || !data) {
-        return <div className="error-message">{error || 'Author not found'}</div>;
+        return (
+            <div className="page">
+                <p className="error-message">{error || 'Author not found'}</p>
+            </div>
+        );
     }
 
     return (
