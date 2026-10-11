@@ -17,6 +17,7 @@ export type IconName =
     | 'sun'
     | 'moon'
     | 'monitor'
+    | 'contrast'
     | 'check'
     | 'alert'
     | 'plus'
@@ -67,6 +68,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
         <>
             <path d="M3 4h18v11H3V4Zm2 2v7h14V6H5Z" />
             <path d="M8 17h8v2H8v-2Z" />
+        </>
+    ),
+    contrast: (
+        <>
+            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" />
+            <path d="M12 4a8 8 0 0 0 0 16V4Z" />
         </>
     ),
     check: <path d="M9.6 16.2 5.4 12l-1.4 1.4 5.6 5.6 12-12-1.4-1.4-10.6 10.6Z" />,

@@ -37,11 +37,6 @@ const HomePage: React.FC = () => {
             <section className="hero">
                 <p className="eyebrow label-placard">The reading room</p>
                 <h1>Your books.</h1>
-                <p>
-                    Book Lamp is a quiet record of what you have read: the collection on the
-                    shelves, the reading list ahead of you, and a dashboard that shows how it
-                    all adds up.
-                </p>
                 {isAuthorized ? (
                     <div className="hero-actions">
                         <Button variant="filled" icon="books" to="/books">
