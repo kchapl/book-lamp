@@ -1,11 +1,12 @@
 """PostgreSQL storage integration tests.
 
-These tests require a running Postgres instance.
-In CI, pytest-docker will provide it via docker-compose.
-Locally, it uses the DATABASE_URL from .env or the default below.
+These tests need a running Postgres, which pytest-docker provides by bringing up
+compose.yaml with podman-compose. A host that cannot start containers skips them
+(see `podman_services` in conftest) rather than erroring.
 """
 
 import os
+import shutil
 
 import psycopg
 import pytest
@@ -14,30 +15,18 @@ from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
 
-
-def _docker_available():
-    """Check if docker-compose is available for pytest-docker."""
-    import subprocess
-
-    for cmd in ["docker-compose", "podman-compose"]:
-        try:
-            subprocess.run([cmd, "--version"], capture_output=True, check=True)
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            continue
-    return False
-
-
+# The compose command is only the first hurdle: whether the runtime can actually
+# start a container is settled by the `podman_services` fixture.
 pytestmark = pytest.mark.skipif(
-    not _docker_available(),
-    reason="docker-compose/podman-compose not available",
+    shutil.which("podman-compose") is None,
+    reason="podman-compose is not installed",
 )
 
 
 @pytest.fixture(scope="session")
-def db_url(docker_ip, docker_services):
+def db_url(docker_ip, podman_services):
     """Get the database URL for tests, waiting for the container to be ready."""
-    port = docker_services.port_for("db", 5432)
+    port = podman_services.port_for("db", 5432)
     url = f"postgresql://book_lamp:book_lamp@{docker_ip}:{port}/book_lamp_test"
 
     # Wait for postgres to be ready
@@ -51,7 +40,7 @@ def db_url(docker_ip, docker_services):
 
             return False
 
-    docker_services.wait_until_responsive(timeout=30.0, pause=0.5, check=lambda: is_responsive(url))
+    podman_services.wait_until_responsive(timeout=30.0, pause=0.5, check=lambda: is_responsive(url))
 
     # Ensure the test database exists
     base_url = url.rsplit("/", 1)[0] + "/postgres"
