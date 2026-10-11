@@ -15,9 +15,9 @@ scripts/start   # every time you want to run the app
 
 **`scripts/setup`** installs the pinned toolchain with `mise install`, installs the
 Python and Node dependencies, and creates a `.env` from `.env.example` if one is
-missing. It is unprivileged: when it cannot find a container runtime it prints
-the command to install Docker Compose or podman-compose instead of running it, so
-you decide when to use `sudo`. Run it once after cloning; re-running is safe.
+missing. It is unprivileged: when it cannot find podman-compose it prints the
+command to install podman and podman-compose instead of running it, so you decide
+when to use `sudo`. Run it once after cloning; re-running is safe.
 
 **`scripts/start`** brings up the PostgreSQL container, waits for it to accept
 connections, applies the Alembic migrations, builds the React SPA and serves
