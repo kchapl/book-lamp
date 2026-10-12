@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import split_authors
-from book_lamp.utils.books import normalize_isbn
+from book_lamp.utils.books import Category, normalize_isbn, resolve_category
 
 logger = logging.getLogger(__name__)
 
@@ -304,6 +304,19 @@ class PostgresStorage:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
             with conn.transaction():
+                # This statement is also the create path's conflict path, so a
+                # stored category outranks an incoming Dewey code here too
+                # (see ADR-0002).
+                existing_raw = conn.execute(
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category FROM books WHERE isbn13 = %s",
+                    [target_isbn],
+                ).fetchone()
+                stored = Category.from_mapping(cast(Dict[str, Any], existing_raw)) if existing_raw else Category()
+                resolved = resolve_category(
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    stored,
+                )
+
                 # First try atomic upsert
                 query = """
                     INSERT INTO books (
@@ -343,9 +356,9 @@ class PostgresStorage:
                             publisher,
                             description,
                             series,
-                            bisac_category,
-                            bisac_main_category,
-                            bisac_sub_category,
+                            resolved.category,
+                            resolved.main,
+                            resolved.sub,
                             language,
                             page_count,
                             physical_format,
@@ -423,26 +436,12 @@ class PostgresStorage:
                     raise Exception(f"Book with ID {book_id} not found")
                 existing = cast(Dict[str, Any], existing_raw)
 
-                def is_dewey(val: Any) -> bool:
-                    if not val:
-                        return False
-                    return all(c.isdigit() or c in ". " for c in str(val))
-
-                new_bisac = bisac_category
-                existing_bisac = existing["bisac_category"]
-
-                final_bisac: Optional[str]
-                final_bisac_main: Optional[str]
-                final_bisac_sub: Optional[str]
-
-                if new_bisac and not is_dewey(new_bisac):
-                    final_bisac = new_bisac
-                    final_bisac_main = bisac_main_category or existing["bisac_main_category"]
-                    final_bisac_sub = bisac_sub_category or existing["bisac_sub_category"]
-                else:
-                    final_bisac = existing_bisac or new_bisac
-                    final_bisac_main = existing["bisac_main_category"] or bisac_main_category
-                    final_bisac_sub = existing["bisac_sub_category"] or bisac_sub_category
+                # The triple resolves through the one rule, shared with the
+                # in-memory adapter and the import paths (see ADR-0002).
+                resolved = resolve_category(
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    Category.from_mapping(existing),
+                )
 
                 query = """
                     UPDATE books SET
@@ -463,9 +462,9 @@ class PostgresStorage:
                         publisher or existing["publisher"],
                         description or existing["description"],
                         series or existing["series"],
-                        final_bisac,
-                        final_bisac_main,
-                        final_bisac_sub,
+                        resolved.category,
+                        resolved.main,
+                        resolved.sub,
                         language or existing["language"],
                         page_count or existing["page_count"],
                         physical_format or existing["physical_format"],
@@ -654,10 +653,20 @@ class PostgresStorage:
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
-                    row_raw = conn.execute("SELECT id FROM books WHERE isbn13 = %s", [isbn13]).fetchone()
+                    row_raw = conn.execute(
+                        "SELECT id, bisac_category, bisac_main_category, bisac_sub_category FROM books WHERE isbn13 = %s",
+                        [isbn13],
+                    ).fetchone()
                     if row_raw:
                         row = cast(Dict[str, Any], row_raw)
                         book_id = row["id"]
+
+                        # An imported Dewey code must not undo a category this
+                        # Book already has (see ADR-0002).
+                        resolved = resolve_category(
+                            Category.from_mapping(book_data),
+                            Category.from_mapping(row),
+                        )
 
                         # Update book (simplified for bulk)
                         query = """
@@ -679,9 +688,9 @@ class PostgresStorage:
                                 book_data.get("publisher"),
                                 book_data.get("description"),
                                 book_data.get("series"),
-                                book_data.get("bisac_category"),
-                                book_data.get("bisac_main_category"),
-                                book_data.get("bisac_sub_category"),
+                                resolved.category,
+                                resolved.main,
+                                resolved.sub,
                                 book_data.get("language"),
                                 book_data.get("page_count"),
                                 book_data.get("physical_format"),

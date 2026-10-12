@@ -173,6 +173,34 @@ def test_api_update_book_success(authenticated_client):
     assert updated["title"] == "New Title"
 
 
+def test_api_update_book_rewrites_the_category_pair(authenticated_client):
+    """A new category from the edit form brings its major and sub with it.
+
+    The form sends the full category and nothing else, so the pair is derived
+    from it rather than left behind on the category being replaced (ADR-0002).
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="444",
+        title="T",
+        author="A",
+        bisac_category="HISTORY / Ancient / General",
+        bisac_main_category="HISTORY",
+        bisac_sub_category="Ancient / General",
+    )
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={"title": "T", "author": "A", "bisac_category": "FICTION / Literary"},
+    )
+    assert resp.status_code == 200
+
+    updated = storage.get_book_by_id(book["id"])
+    assert updated["bisac_category"] == "FICTION / Literary"
+    assert updated["bisac_main_category"] == "FICTION"
+    assert updated["bisac_sub_category"] == "Literary"
+
+
 def test_api_update_book_missing_fields(authenticated_client):
     """POST /api/books/<id>/edit without title+author returns 400."""
     storage = get_storage()

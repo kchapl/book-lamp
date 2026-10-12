@@ -1,5 +1,6 @@
 import re
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, NamedTuple, Optional
 
 
 def normalize_isbn(isbn: str) -> str:
@@ -288,3 +289,63 @@ def category_label_for_book(book: dict) -> str:
     if major is None:
         major = normalise_major_bisac(book.get("bisac_category"))
     return category_label(major)
+
+
+class Category(NamedTuple):
+    """A Book's category as it is stored: the full value, and the major category
+    and sub-category it is made of.
+
+    The three columns are one fact about a Book, so they travel together. A
+    caller that knows only the full value leaves the other two as ``None``;
+    :func:`resolve_category` derives them.
+    """
+
+    category: Optional[str] = None
+    main: Optional[str] = None
+    sub: Optional[str] = None
+
+    @classmethod
+    def from_fields(
+        cls,
+        category: Optional[str],
+        main: Optional[str] = None,
+        sub: Optional[str] = None,
+    ) -> "Category":
+        """Build the triple from the separate values a write carries."""
+        return cls(category, main, sub)
+
+    @classmethod
+    def from_mapping(cls, book: Mapping[str, Any]) -> "Category":
+        """Read the triple from a stored Book row or an incoming payload."""
+        return cls(
+            book.get("bisac_category"),
+            book.get("bisac_main_category"),
+            book.get("bisac_sub_category"),
+        )
+
+
+def resolve_category(incoming: Category, existing: Category) -> Category:
+    """Return the category to store when ``incoming`` is written over ``existing``.
+
+    The rule is one sentence long: a Dewey code never displaces a stored
+    category, and anything else incoming wins outright. A Dewey code — or
+    nothing at all — may only fill a gap, which is what stops the enrichment
+    backfill from undoing a real category with a raw classification number.
+
+    The winner's main and sub come from ``incoming`` where it supplies them, and
+    are otherwise derived from the winning value, so the three columns cannot
+    disagree about what the Book is. The derivation never rewrites the winning
+    value itself; it only fills the pair beside it.
+    """
+    winner = (incoming.category or "").strip()
+
+    if not winner:
+        # Nothing incoming: the stored triple stands.
+        return Category(existing.category, existing.main or incoming.main, existing.sub or incoming.sub)
+
+    if is_dewey_category(winner) and existing.category:
+        # A classification number, with a real category there to protect.
+        return existing
+
+    _, derived_main, derived_sub = normalise_bisac_category(winner)
+    return Category(winner, incoming.main or derived_main, incoming.sub or derived_sub)

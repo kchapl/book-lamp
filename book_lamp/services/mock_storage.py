@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from book_lamp.utils.books import Category, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -134,23 +135,12 @@ class MockStorage:
 
         for book in self.books:
             if book["id"] == book_id:
-                # Mirror BISAC prioritization logic
-                new_bisac = bisac_category
-                existing_bisac = book.get("bisac_category")
-
-                def is_dewey(val):
-                    if not val:
-                        return False
-                    return all(c.isdigit() or c in ". " for c in str(val))
-
-                if new_bisac and not is_dewey(new_bisac):
-                    final_bisac: Optional[str] = new_bisac
-                    final_bisac_main: Optional[str] = bisac_main_category or book.get("bisac_main_category")
-                    final_bisac_sub: Optional[str] = bisac_sub_category or book.get("bisac_sub_category")
-                else:
-                    final_bisac = existing_bisac or new_bisac
-                    final_bisac_main = book.get("bisac_main_category") or bisac_main_category
-                    final_bisac_sub = book.get("bisac_sub_category") or bisac_sub_category
+                # The triple resolves through the one rule, shared with the
+                # Postgres adapter and the import paths (see ADR-0002).
+                resolved = resolve_category(
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    Category.from_mapping(book),
+                )
 
                 book.update(
                     {
@@ -163,9 +153,9 @@ class MockStorage:
                         "publisher": publisher or book.get("publisher"),
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
-                        "bisac_category": final_bisac,
-                        "bisac_main_category": final_bisac_main,
-                        "bisac_sub_category": final_bisac_sub,
+                        "bisac_category": resolved.category,
+                        "bisac_main_category": resolved.main,
+                        "bisac_sub_category": resolved.sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
                         "physical_format": physical_format or book.get("physical_format"),

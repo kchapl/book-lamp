@@ -1,5 +1,6 @@
 from .books import (
     UNKNOWN_CATEGORY,
+    Category,
     category_label,
     category_label_for_book,
     is_valid_isbn13,
@@ -7,6 +8,7 @@ from .books import (
     normalise_major_bisac,
     parse_bisac_category,
     parse_publication_year,
+    resolve_category,
 )
 from .reading_status import (
     READING_STATUSES,
@@ -17,6 +19,7 @@ from .sorting import SORT_OPTIONS, sort_books
 
 __all__ = [
     "UNKNOWN_CATEGORY",
+    "Category",
     "category_label",
     "category_label_for_book",
     "is_valid_isbn13",
@@ -24,6 +27,7 @@ __all__ = [
     "normalise_major_bisac",
     "parse_bisac_category",
     "parse_publication_year",
+    "resolve_category",
     "READING_STATUSES",
     "latest_record_by_book",
     "with_reading_status",

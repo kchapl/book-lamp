@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from book_lamp.utils.books import (
+    is_dewey_category,
     isbn10_to_isbn13,
     isbn13_to_isbn10,
     normalise_bisac_category,
@@ -741,10 +742,10 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
             # OR if we just want the latest from API
             return True
 
-        # Special case for BISAC transition: allow updating if current value is numeric
+        # Special case for BISAC transition: a stored Dewey code is worth
+        # fetching over, so the lookup can replace it with a real category.
         if field == "bisac_category" and not is_empty(current_val):
-            # If it looks like a Dewey code (only digits/dots/spaces), mark as updateable
-            if all(c.isdigit() or c in ". " for c in str(current_val)):
+            if is_dewey_category(current_val):
                 return True
         return is_empty(current_val)
 

@@ -222,3 +222,126 @@ def test_recommendations_round_trip(pg_storage):
     saved = pg_storage.get_recommendations()
     assert len(saved) == 2
     assert saved[0]["title"] in ["Rec 1", "Rec 2"]
+
+
+def test_upsert_book_does_not_replace_a_real_category(pg_storage):
+    """A Dewey code must not undo a category the Book already has (ADR-0002)."""
+    pg_storage.add_book(
+        isbn13="9780141036144",
+        title="Brave New World",
+        author="Aldous Huxley",
+        bisac_category="FICTION / General",
+        bisac_main_category="FICTION",
+        bisac_sub_category="General",
+    )
+
+    pg_storage.upsert_book(
+        isbn13="9780141036144",
+        title="Brave New World",
+        author="Aldous Huxley",
+        bisac_category="823.914",
+        bisac_main_category="823.914",
+    )
+
+    book = pg_storage.get_book_by_isbn("9780141036144")
+    assert book["bisac_category"] == "FICTION / General"
+    assert book["bisac_main_category"] == "FICTION"
+
+
+def test_bulk_import_does_not_replace_a_real_category(pg_storage):
+    """The enrichment backfill writes through bulk_import; it must not clobber.
+
+    This is the Postgres half of `test_enhance_books_preserves_bisac`, which only
+    ever ran against the in-memory adapter.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780141036144",
+        title="Brave New World",
+        author="Aldous Huxley",
+        bisac_category="HISTORY / Europe",
+        bisac_main_category="HISTORY",
+        bisac_sub_category="Europe",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780141036144",
+                    "title": "Brave New World",
+                    "author": "Aldous Huxley",
+                    "publication_year": 1932,
+                    "bisac_category": "823.914",
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    updated = pg_storage.get_book_by_id(book["id"])
+    assert updated["bisac_category"] == "HISTORY / Europe"
+    assert updated["bisac_main_category"] == "HISTORY"
+
+
+def test_bulk_import_keeps_a_category_when_the_row_carries_none(pg_storage):
+    """An import row with no category must not erase the stored one.
+
+    The in-memory adapter already preserved it; Postgres wrote NULL over it.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780141036144",
+        title="Brave New World",
+        author="Aldous Huxley",
+        bisac_category="FICTION / General",
+        bisac_main_category="FICTION",
+        bisac_sub_category="General",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780141036144",
+                    "title": "Brave New World",
+                    "author": "Aldous Huxley",
+                    "publication_year": 1932,
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    updated = pg_storage.get_book_by_id(book["id"])
+    assert updated["bisac_category"] == "FICTION / General"
+    assert updated["bisac_main_category"] == "FICTION"
+
+
+def test_bulk_import_replaces_a_dewey_category(pg_storage):
+    """The other half of the rule: a real category still replaces a Dewey one."""
+    book = pg_storage.add_book(
+        isbn13="9780141036144",
+        title="Brave New World",
+        author="Aldous Huxley",
+        bisac_category="823.914",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780141036144",
+                    "title": "Brave New World",
+                    "author": "Aldous Huxley",
+                    "publication_year": 1932,
+                    "bisac_category": "FICTION / General",
+                    "bisac_main_category": "FICTION",
+                    "bisac_sub_category": "General",
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    updated = pg_storage.get_book_by_id(book["id"])
+    assert updated["bisac_category"] == "FICTION / General"
+    assert updated["bisac_main_category"] == "FICTION"
