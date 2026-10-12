@@ -109,8 +109,8 @@ def _two_books_out_of_title_order(authenticated_client):
     storage = get_storage()
     apple = storage.add_book(isbn13="301", title="Apple", author="A1")
     zebra = storage.add_book(isbn13="302", title="Zebra", author="A2")
-    storage.add_reading_record(apple["id"], "Completed", "2024-01-01", "2024-01-10")
-    storage.add_reading_record(zebra["id"], "Completed", "2024-02-01", "2024-02-10")
+    storage.add_reading(apple["id"], "Completed", "2024-01-01", "2024-01-10")
+    storage.add_reading(zebra["id"], "Completed", "2024-02-01", "2024-02-10")
 
 
 def test_books_sort_by_title(authenticated_client):
@@ -151,9 +151,9 @@ def test_books_year_filter(authenticated_client):
     b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
 
     # b1 completed in 2024
-    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 completed in 2023
-    storage.add_reading_record(b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4)
+    storage.add_reading(b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4)
 
     # Filter by year 2024
     resp = authenticated_client.get("/api/books?year=2024")
@@ -164,7 +164,7 @@ def test_books_year_filter(authenticated_client):
 
     # An 'In Progress' book started in 2024 must be excluded
     b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
-    storage.add_reading_record(b3["id"], "In Progress", "2024-01-01")
+    storage.add_reading(b3["id"], "In Progress", "2024-01-01")
     resp = authenticated_client.get("/api/books?year=2024")
     assert "2024 In Progress" not in _titles(resp.get_json())
 
@@ -180,9 +180,9 @@ def test_books_month_filter(authenticated_client):
     b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
 
     # b1 completed in January (any year)
-    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 completed in February (any year)
-    storage.add_reading_record(b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4)
+    storage.add_reading(b2["id"], "Completed", "2023-02-01", "2023-02-28", rating=4)
 
     # Filter by month 1 (January)
     resp = authenticated_client.get("/api/books?month=1")
@@ -191,7 +191,7 @@ def test_books_month_filter(authenticated_client):
 
     # An 'In Progress' book started in January must be excluded
     b3 = storage.add_book(isbn13="203", title="January In Progress", author="A3")
-    storage.add_reading_record(b3["id"], "In Progress", "2024-01-05")
+    storage.add_reading(b3["id"], "In Progress", "2024-01-05")
     resp = authenticated_client.get("/api/books?month=1")
     assert "January In Progress" not in _titles(resp.get_json())
 
@@ -209,8 +209,8 @@ def test_books_category_filter(authenticated_client):
     b2 = storage.add_book(isbn13="302", title="Literature Book", author="A2", bisac_category="Fiction")
 
     # Give them statuses so they show up in the library
-    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15")
-    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15")
+    storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15")
+    storage.add_reading(b2["id"], "Completed", "2024-01-01", "2024-01-15")
 
     # Filter by Science
     resp = authenticated_client.get("/api/books?category=Science")
@@ -231,9 +231,9 @@ def test_books_rating_filter(authenticated_client):
     b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
 
     # b1 rated 5
-    storage.add_reading_record(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     # b2 rated 4
-    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
+    storage.add_reading(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
 
     # Filter by rating 5
     resp = authenticated_client.get("/api/books?rating=5")
@@ -252,9 +252,9 @@ def test_books_status_filter(authenticated_client):
     b2 = storage.add_book(isbn13="502", title="Completed Book", author="A2")
 
     # b1 in progress
-    storage.add_reading_record(b1["id"], "In Progress", "2024-01-01")
+    storage.add_reading(b1["id"], "In Progress", "2024-01-01")
     # b2 completed
-    storage.add_reading_record(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
+    storage.add_reading(b2["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
 
     # Filter by status "In Progress"
     resp = authenticated_client.get("/api/books?status=In+Progress")

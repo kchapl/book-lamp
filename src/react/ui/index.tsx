@@ -15,7 +15,7 @@
  * `--md-sys-color-*` and `--md-ref-typeface-*` custom properties that
  * `tokens.css` already defines.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon, { type IconName } from '../components/Icon';
 
@@ -50,6 +50,12 @@ import '@material/web/fab/fab.js';
  * stale even though it is only attached once per element. There is deliberately
  * no dependency array: a re-render re-attaches, which is cheap and keeps the
  * element reference honest if React swaps the node.
+ *
+ * It is a layout effect rather than a passive one. A passive effect runs after
+ * paint, which leaves a window where a control that mounted out of an async
+ * state update — the readings section waiting on its Book, say — is in the DOM
+ * and clickable before its listener exists, so a click in that window is lost.
+ * Attaching in the commit phase closes the window.
  */
 function useMdListener<T extends HTMLElement>(
     type: string,
@@ -59,7 +65,7 @@ function useMdListener<T extends HTMLElement>(
     const handlerRef = useRef(handler);
     handlerRef.current = handler;
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const element = ref.current;
         if (!element) return;
         const listener = (event: Event) => handlerRef.current?.(element, event);
@@ -189,7 +195,7 @@ export interface TextFieldProps extends MdBaseProps {
     label: string;
     value: string;
     onValueChange: (value: string) => void;
-    type?: 'text' | 'search' | 'number' | 'email' | 'password' | 'tel' | 'url' | 'textarea';
+    type?: 'text' | 'search' | 'number' | 'email' | 'password' | 'tel' | 'url' | 'date' | 'textarea';
     placeholder?: string;
     name?: string;
     required?: boolean;

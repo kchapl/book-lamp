@@ -32,6 +32,9 @@ dev = [
     "pytest-docker>=3.2",
     "google-api-python-client>=2.197",
 ]
+mcp = [
+    "fastmcp>=4.1",
+]
 
 [build-system]
 requires = ["hatchling"]

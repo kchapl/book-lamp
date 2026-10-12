@@ -14,11 +14,11 @@ export interface Book {
     latest_status?: string;
     is_owned?: boolean;
     in_reading_list?: boolean;
-    reading_records?: ReadingRecord[];
+    readings?: Reading[];
     is_planned?: boolean;
 }
 
-export interface ReadingRecord {
+export interface Reading {
     id: number;
     book_id: number;
     book_title?: string;
@@ -78,7 +78,7 @@ export interface Stats {
     };
     reading_pace_monthly?: number;
     reading_pace_annualised?: number;
-    /** ISO date of the most recent reading record, or null when there are none. */
+    /** ISO date of the most recent reading, or null when there are none. */
     last_record_date?: string | null;
 }
 

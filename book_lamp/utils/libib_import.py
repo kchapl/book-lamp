@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from book_lamp.utils.books import normalize_isbn
+from book_lamp.utils.readings import ENDING_STATUSES
 
 
 def normalize_date(date_str: str) -> str:
@@ -32,7 +33,7 @@ def normalize_date(date_str: str) -> str:
 
 
 def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
-    """Parse Libib CSV content into a list of book and reading record data.
+    """Parse Libib CSV content into a list of book and reading data.
 
     Expected columns:
     Title, Author, ISBN, UPC, LCCN, Item Type, Publish Date, Publisher,
@@ -108,7 +109,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
             except (ValueError, TypeError):
                 rating = 0
 
-        # Reading Record Logic
+        # Reading Logic
         # If we have a completed date, it's definitely Completed.
         # If we only have an added date, we'll assume it's Completed on that day for the sake of history,
         # unless it's very recent? Actually, let's just use what's there.
@@ -137,15 +138,12 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
             status = "In Progress"
 
         if libib_status and "not begun" in libib_status.lower():
-            # If not begun, don't create a reading record, just the book.
+            # If not begun, don't create a reading, just the book.
             status = None
 
         # Prefer 'began' date, then 'added' date, then 'completed' date
         start_date = date_began if date_began else (date_added if date_added else date_completed)
         end_date = date_completed if date_completed else None  # Don't fill end_date if not completed
-
-        if status == "Completed" and not end_date:
-            end_date = start_date
 
         # Sanity check: Start date shouldn't be after end date
         if start_date and end_date and start_date > end_date:
@@ -158,6 +156,11 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
             from datetime import date
 
             start_date = date.today().isoformat()
+
+        # A Reading that has ended always says when it ended, so nothing above
+        # may leave an ending status open (see book_lamp.utils.readings).
+        if status in ENDING_STATUSES and not end_date:
+            end_date = start_date
 
         results.append(
             {

@@ -23,3 +23,16 @@ export function statusClass(status?: string): StatusClass {
 
 /** The three statuses that give a Book a Reading Status, in reading order. */
 export const READING_STATUSES = ['In Progress', 'Completed', 'Abandoned'] as const;
+
+/**
+ * The statuses that end a Reading, so a Reading carrying one knows its end date.
+ *
+ * Mirrors `ENDING_STATUSES` in `book_lamp/utils/readings.py`, which is where the
+ * rule is enforced for every writer.
+ */
+export const ENDING_STATUSES = ['Completed', 'Abandoned'] as const;
+
+/** Whether a Reading carrying this status has ended. */
+export function endsReading(status: string): boolean {
+    return (ENDING_STATUSES as readonly string[]).includes(status);
+}

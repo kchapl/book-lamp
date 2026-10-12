@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import uuid
+from datetime import date
 from typing import Any, Dict, List, Optional, cast
 
 from dotenv import load_dotenv
@@ -14,6 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.utils.readings import ENDING_STATUSES
 
 # Load environment variables from .env file
 load_dotenv()
@@ -234,8 +236,8 @@ def migrate_books(storage: PostgresStorage, rows: List[List[str]], dry_run: bool
     return books_added
 
 
-def migrate_reading_records(storage: PostgresStorage, rows: List[List[str]], dry_run: bool) -> int:
-    """Migrate reading records from Sheets data."""
+def migrate_readings(storage: PostgresStorage, rows: List[List[str]], dry_run: bool) -> int:
+    """Migrate readings from Sheets data."""
     if len(rows) < 2:  # No data rows
         return 0
 
@@ -279,14 +281,20 @@ def migrate_reading_records(storage: PostgresStorage, rows: List[List[str]], dry
             "rating": safe_int(row[5]),
         }
 
+        # The storage seam refuses a Reading that has ended without an end date
+        # (ADR-0003). A Sheets row whose Date Completed is blank gets the same
+        # fallback the Libib importer applies, rather than aborting the migration.
+        if record_data["status"] in ENDING_STATUSES and not record_data["end_date"]:
+            record_data["end_date"] = record_data["start_date"] or date.today().isoformat()
+
         if dry_run:
-            print(f"DRY RUN: Would add reading record: {record_data['status']}")
+            print(f"DRY RUN: Would add reading: {record_data['status']}")
         else:
             if record_data["book_id"] is None:
                 print(f"SKIP: Invalid book_id in row: {row}")
                 continue
 
-            storage.add_reading_record(
+            storage.add_reading(
                 book_id=cast(int, record_data["book_id"]) or 0,
                 status=str(record_data["status"]),
                 start_date=(str(record_data["start_date"]) if record_data["start_date"] else ""),
@@ -472,7 +480,7 @@ def main() -> None:
         # Get data from each tab
         tabs = {
             "Books": ("Books!A:S", migrate_books),
-            "ReadingRecords": ("ReadingRecords!A:G", migrate_reading_records),
+            "ReadingRecords": ("ReadingRecords!A:G", migrate_readings),
             "ReadingList": (
                 "ReadingList!A:C",
                 lambda s, r, d: migrate_reading_list(s, r, user_id or 0, d),

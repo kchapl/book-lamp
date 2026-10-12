@@ -21,7 +21,7 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
-from book_lamp.utils.reading_status import latest_record_by_book, with_reading_status
+from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
 books_bp = Blueprint("books", __name__)
@@ -72,7 +72,7 @@ def api_export_csv():
     storage = get_storage()
     books = storage.get_all_books()
     records_by_book: dict[int, list[dict]] = {}
-    for record in storage.get_reading_records():
+    for record in storage.get_readings():
         records_by_book.setdefault(record["book_id"], []).append(record)
 
     reading_list = {item["book_id"]: item["position"] for item in storage.get_reading_list()}
@@ -149,15 +149,15 @@ def api_list_books():
     storage = get_storage()
 
     books = storage.get_all_books()
-    all_records = storage.get_reading_records()
+    all_records = storage.get_readings()
 
     sort_by = request.args.get("sort", "reading_date")
     if sort_by not in SORT_OPTIONS:
         sort_by = "reading_date"
 
-    books = sort_books(books, sort_by=sort_by, reading_records=all_records)
+    books = sort_books(books, sort_by=sort_by, readings=all_records)
 
-    latest_records = latest_record_by_book(all_records)
+    latest_records = latest_reading_by_book(all_records)
     books = with_reading_status(books, all_records)
 
     status_filter = request.args.get("status")
@@ -339,9 +339,9 @@ def api_book_detail(book_id: int):
     if not book:
         return jsonify({"error": "Book not found"}), 404
 
-    all_records = storage.get_reading_records()
-    book["reading_records"] = [r for r in all_records if r["book_id"] == book_id]
-    book["reading_records"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
+    all_records = storage.get_readings()
+    book["readings"] = [r for r in all_records if r["book_id"] == book_id]
+    book["readings"].sort(key=lambda r: r.get("start_date", ""), reverse=True)
 
     rl_items = storage.get_reading_list()
     is_planned = any(item["book_id"] == book_id for item in rl_items)
@@ -420,7 +420,7 @@ def api_search_books():
         return jsonify({"books": [], "search_query": ""})
 
     try:
-        books = with_reading_status(storage.search(query), storage.get_reading_records())
+        books = with_reading_status(storage.search(query), storage.get_readings())
         return jsonify({"books": books, "search_query": query})
     except Exception as exc:
         current_app.logger.error(f"api_search_books: search failed: {exc}")

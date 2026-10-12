@@ -12,7 +12,7 @@ from .books import (
 )
 from .reading_status import (
     READING_STATUSES,
-    latest_record_by_book,
+    latest_reading_by_book,
     with_reading_status,
 )
 from .sorting import SORT_OPTIONS, sort_books
@@ -29,7 +29,7 @@ __all__ = [
     "parse_publication_year",
     "resolve_category",
     "READING_STATUSES",
-    "latest_record_by_book",
+    "latest_reading_by_book",
     "with_reading_status",
     "sort_books",
     "SORT_OPTIONS",

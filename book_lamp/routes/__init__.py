@@ -7,7 +7,7 @@ from book_lamp.routes.authors import authors_bp
 from book_lamp.routes.books import books_bp
 from book_lamp.routes.jobs import jobs_bp
 from book_lamp.routes.reading_list import reading_list_bp
-from book_lamp.routes.reading_records import reading_records_bp
+from book_lamp.routes.readings import readings_bp
 from book_lamp.routes.recommendations import recommendations_bp
 from book_lamp.routes.spa import spa_bp
 from book_lamp.routes.stats import stats_bp
@@ -19,7 +19,7 @@ def register_blueprints(app: Flask) -> None:
     """Register all application blueprints with the Flask app."""
     app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
-    app.register_blueprint(reading_records_bp)
+    app.register_blueprint(readings_bp)
     app.register_blueprint(reading_list_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(authors_bp)

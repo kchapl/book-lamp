@@ -77,7 +77,7 @@ describe('StatsPage reading-status board', () => {
     it('states when the collection was last updated instead of implying a live feed', async () => {
         renderPage();
 
-        const asOf = await screen.findByTitle(/most recent reading record/i);
+        const asOf = await screen.findByTitle(/most recent reading/i);
         expect(asOf).toHaveTextContent(/Last entry/);
         expect(asOf).toHaveTextContent(/2024/);
         expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();

@@ -20,7 +20,7 @@ def calculate_collection_stats(
     all_records: List[Dict[str, Any]],
     settings: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Compute collection statistics from book and reading record lists (pure)."""
+    """Compute collection statistics from book and reading lists (pure)."""
     completed_records = [r for r in all_records if r.get("status") == "Completed"]
     completed_book_ids = {r.get("book_id") for r in completed_records}
     completed_books = [b for b in books if b.get("id") in completed_book_ids]

@@ -74,7 +74,7 @@ class Book:
 
 
 @dataclass
-class ReadingRecord:
+class Reading:
     """Represents a reading log entry."""
 
     id: Optional[int] = None
@@ -94,7 +94,7 @@ class ReadingRecord:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ReadingRecord":
+    def from_dict(cls, data: Dict[str, Any]) -> "Reading":
         return cls(
             id=data.get("id"),
             user_id=data.get("user_id"),

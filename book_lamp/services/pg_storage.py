@@ -12,6 +12,7 @@ from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import split_authors
 from book_lamp.utils.books import Category, normalize_isbn, resolve_category
+from book_lamp.utils.readings import require_end_date
 
 logger = logging.getLogger(__name__)
 
@@ -130,14 +131,14 @@ class PostgresStorage:
     def get_all_books(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return all books known to the system for a given user.
 
-        In multi-user model, returns only books the user has interacted with via reading_records.
+        In multi-user model, returns only books the user has interacted with via readings.
         If user_id is provided, uses that; otherwise uses the instance user_id.
         """
         effective_user_id = user_id or self.user_id
         query = """
             SELECT DISTINCT b.*, array_agg(a.name) as author_names
             FROM books b
-            LEFT JOIN reading_records rr ON b.id = rr.book_id AND rr.user_id = %s
+            LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
             LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
             LEFT JOIN book_authors ba ON b.id = ba.book_id
             LEFT JOIN authors a ON ba.author_id = a.id
@@ -159,9 +160,9 @@ class PostgresStorage:
                 books.append(book)
             return books
 
-    def get_reading_records(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
-        """Return reading records for the current user, optionally filtered by book_id."""
-        query = "SELECT * FROM reading_records WHERE user_id = %s"
+    def get_readings(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
+        """Return readings for the current user, optionally filtered by book_id."""
+        query = "SELECT * FROM readings WHERE user_id = %s"
         params: list[Any] = [self.user_id]
 
         if book_id is not None:
@@ -237,10 +238,10 @@ class PostgresStorage:
             return [dict(row) for row in rows]
 
     def get_reading_history(self) -> list[dict[str, Any]]:
-        """Retrieve all reading records joined with book metadata."""
+        """Retrieve all readings joined with book metadata."""
         query = """
             SELECT rr.*, b.title as book_title, b.author as book_author, b.thumbnail_url as book_thumbnail_url
-            FROM reading_records rr
+            FROM readings rr
             JOIN books b ON rr.book_id = b.id
             WHERE rr.user_id = %s AND rr.status IN ('In Progress', 'Completed', 'Abandoned')
             ORDER BY rr.start_date DESC, rr.created_at DESC
@@ -263,8 +264,8 @@ class PostgresStorage:
         """Search across all book data fields."""
         # We delegate to the pure search function for now, same as MockStorage
         all_books = self.get_all_books(self.user_id)
-        # MockStorage search also needs reading_records to attach status
-        all_records = self.get_reading_records()
+        # MockStorage search also needs readings to attach status
+        all_records = self.get_readings()
         from book_lamp.services.search import search_books
 
         return search_books(all_books, all_records, query)
@@ -521,7 +522,7 @@ class PostgresStorage:
             res = conn.execute("DELETE FROM books WHERE id = %s", [book_id])
             return res.rowcount > 0
 
-    def add_reading_record(
+    def add_reading(
         self,
         book_id: int,
         status: str,
@@ -529,9 +530,10 @@ class PostgresStorage:
         end_date: Optional[str] = None,
         rating: int = 0,
     ) -> dict[str, Any]:
+        require_end_date(status, end_date)
         # Check if record already exists for this book_status combination
         existing_query = """
-            SELECT id FROM reading_records 
+            SELECT id FROM readings 
             WHERE user_id = %s AND book_id = %s AND status = %s AND start_date = %s
         """
         with self.pool.connection() as conn:
@@ -539,53 +541,54 @@ class PostgresStorage:
             if existing:
                 logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
                 # Return the existing record
-                records = self.get_reading_records(book_id=book_id)
+                records = self.get_readings(book_id=book_id)
                 for r in records:
                     if r["status"] == status and r["start_date"] == start_date:
                         return r
                 return records[0] if records else {}
 
             query = """
-                INSERT INTO reading_records (user_id, book_id, status, start_date, end_date, rating)
+                INSERT INTO readings (user_id, book_id, status, start_date, end_date, rating)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING *
             """
             row_raw = conn.execute(query, [self.user_id, book_id, status, start_date, end_date, rating]).fetchone()
             if not row_raw:
-                raise Exception("Failed to add reading record")
+                raise Exception("Failed to add reading")
             row = cast(Dict[str, Any], row_raw)
 
             logger.info(f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={row['id']}")
             return dict(row)
 
-    def update_reading_record(
+    def update_reading(
         self,
-        record_id: int,
+        reading_id: int,
         status: str,
         start_date: str,
         end_date: Optional[str] = None,
         rating: int = 0,
     ) -> dict[str, Any]:
+        require_end_date(status, end_date)
         query = """
-            UPDATE reading_records
+            UPDATE readings
             SET status = %s, start_date = %s, end_date = %s, rating = %s
             WHERE id = %s AND user_id = %s
             RETURNING *
         """
         with self.pool.connection() as conn:
-            row_raw = conn.execute(query, [status, start_date, end_date, rating, record_id, self.user_id]).fetchone()
+            row_raw = conn.execute(query, [status, start_date, end_date, rating, reading_id, self.user_id]).fetchone()
             if not row_raw:
-                raise Exception(f"Reading record with ID {record_id} not found")
+                raise Exception(f"Reading record with ID {reading_id} not found")
             row = cast(Dict[str, Any], row_raw)
 
-            logger.info(f"READING_RECORD_UPDATED: id={record_id}, status='{status}'")
+            logger.info(f"READING_UPDATED: id={reading_id}, status='{status}'")
             return dict(row)
 
-    def delete_reading_record(self, record_id: int) -> bool:
+    def delete_reading(self, reading_id: int) -> bool:
         with self.pool.connection() as conn:
             res = conn.execute(
-                "DELETE FROM reading_records WHERE id = %s AND user_id = %s",
-                [record_id, self.user_id],
+                "DELETE FROM readings WHERE id = %s AND user_id = %s",
+                [reading_id, self.user_id],
             )
             return res.rowcount > 0
 
@@ -748,14 +751,15 @@ class PostgresStorage:
                         r_status = record_data["status"]
                         r_start = record_data["start_date"]
                         r_end = record_data.get("end_date")
+                        require_end_date(r_status, r_end)
 
                         existing_record = conn.execute(
-                            "SELECT * FROM reading_records WHERE user_id = %s AND book_id = %s",
+                            "SELECT * FROM readings WHERE user_id = %s AND book_id = %s",
                             [self.user_id, book_id],
                         ).fetchall()
 
                         is_duplicate = False
-                        matched_record_id = None
+                        matched_reading_id = None
 
                         for r_raw in existing_record:
                             r = cast(Dict[str, Any], r_raw)
@@ -793,24 +797,24 @@ class PostgresStorage:
                                     is_duplicate = True
                                 else:
                                     # r was already cast above
-                                    matched_record_id = r["id"]
+                                    matched_reading_id = r["id"]
                                 break
 
                         if not is_duplicate:
-                            if matched_record_id:
+                            if matched_reading_id:
                                 conn.execute(
-                                    "UPDATE reading_records SET status = %s, start_date = %s, end_date = %s, rating = %s WHERE id = %s",
+                                    "UPDATE readings SET status = %s, start_date = %s, end_date = %s, rating = %s WHERE id = %s",
                                     [
                                         r_status,
                                         r_start,
                                         r_end,
                                         record_data.get("rating") or 0,
-                                        matched_record_id,
+                                        matched_reading_id,
                                     ],
                                 )
                             else:
                                 conn.execute(
-                                    "INSERT INTO reading_records (user_id, book_id, status, start_date, end_date, rating) VALUES (%s, %s, %s, %s, %s, %s)",
+                                    "INSERT INTO readings (user_id, book_id, status, start_date, end_date, rating) VALUES (%s, %s, %s, %s, %s, %s)",
                                     [
                                         self.user_id,
                                         book_id,
@@ -836,7 +840,7 @@ class PostgresStorage:
                 from datetime import date
 
                 conn.execute(
-                    "INSERT INTO reading_records (user_id, book_id, status, start_date) VALUES (%s, %s, %s, %s)",
+                    "INSERT INTO readings (user_id, book_id, status, start_date) VALUES (%s, %s, %s, %s)",
                     [self.user_id, book_id, "In Progress", date.today().isoformat()],
                 )
 
@@ -865,6 +869,22 @@ class PostgresStorage:
         """
         with self.pool.connection() as conn:
             conn.execute(query, [self.user_id, key, value])
+
+    @classmethod
+    def find_user_id_by_email(cls, email: str) -> Optional[int]:
+        """Return the id of the user with this email, or None when unknown.
+
+        Read-only, and deliberately so: the MCP service reads as one configured
+        reader and refuses to serve anybody else, so an email it has never seen
+        is a refusal rather than a new account.
+        """
+        query = "SELECT id FROM users WHERE email = %s"
+        with get_pool().connection() as conn:
+            row_raw = conn.execute(query, [email]).fetchone()
+        if not row_raw:
+            return None
+        row = cast(Dict[str, Any], row_raw)
+        return int(row["id"])
 
     @classmethod
     def upsert_user(cls, email: str, name: str) -> int:

@@ -78,7 +78,7 @@ def pg_storage(setup_database):
     with psycopg.connect(setup_database) as conn:
         with conn.transaction():
             conn.execute(
-                "TRUNCATE users, books, authors, reading_records, reading_list, settings, recommendations RESTART IDENTITY CASCADE"
+                "TRUNCATE users, books, authors, readings, reading_list, settings, recommendations RESTART IDENTITY CASCADE"
             )
             # Create a default user
             conn.execute("INSERT INTO users (id, email, name) VALUES (1, 'user1@example.com', 'User 1')")
@@ -120,19 +120,21 @@ def test_multi_user_isolation(pg_storage):
 
     # Add book for user 1
     book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
-    pg_storage.add_reading_record(book_id=book["id"], status="Completed", start_date="2024-01-01")
+    pg_storage.add_reading(
+        book_id=book["id"], status="Completed", start_date="2024-01-01", end_date="2024-01-10"
+    )
 
     # Check user 2 sees no records
-    assert len(storage2.get_reading_records()) == 0
+    assert len(storage2.get_readings()) == 0
 
     # Add record for user 2
-    storage2.add_reading_record(book_id=book["id"], status="In Progress", start_date="2024-02-01")
+    storage2.add_reading(book_id=book["id"], status="In Progress", start_date="2024-02-01")
 
-    assert len(pg_storage.get_reading_records()) == 1
-    assert pg_storage.get_reading_records()[0]["status"] == "Completed"
+    assert len(pg_storage.get_readings()) == 1
+    assert pg_storage.get_readings()[0]["status"] == "Completed"
 
-    assert len(storage2.get_reading_records()) == 1
-    assert storage2.get_reading_records()[0]["status"] == "In Progress"
+    assert len(storage2.get_readings()) == 1
+    assert storage2.get_readings()[0]["status"] == "In Progress"
 
 
 def test_bulk_import(pg_storage):
@@ -172,7 +174,7 @@ def test_bulk_import(pg_storage):
     count2 = pg_storage.bulk_import(items)
     assert count2 == 2
     assert len(pg_storage.get_all_books()) == 2
-    assert len(pg_storage.get_reading_records()) == 2
+    assert len(pg_storage.get_readings()) == 2
 
 
 def test_start_reading(pg_storage):
@@ -184,7 +186,7 @@ def test_start_reading(pg_storage):
     pg_storage.start_reading(book["id"])
 
     assert len(pg_storage.get_reading_list()) == 0
-    records = pg_storage.get_reading_records()
+    records = pg_storage.get_readings()
     assert len(records) == 1
     assert records[0]["status"] == "In Progress"
 
@@ -345,3 +347,51 @@ def test_bulk_import_replaces_a_dewey_category(pg_storage):
     updated = pg_storage.get_book_by_id(book["id"])
     assert updated["bisac_category"] == "FICTION / General"
     assert updated["bisac_main_category"] == "FICTION"
+
+
+def test_find_user_id_by_email_resolves_the_reader_and_refuses_strangers(pg_storage):
+    """The MCP service resolves its reader this way, and must not create one.
+
+    An address the database has never seen is a refusal rather than a new
+    account: the server reads as one configured reader, so it cannot be talked
+    into serving somebody else.
+    """
+    assert PostgresStorage.find_user_id_by_email("user1@example.com") == 1
+    assert PostgresStorage.find_user_id_by_email("user2@example.com") == 2
+    assert PostgresStorage.find_user_id_by_email("stranger@example.com") is None
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        assert conn.execute("SELECT count(*) FROM users").fetchone()[0] == 2
+
+
+def test_the_rename_migration_left_the_table_indexes_and_constraint_renamed(pg_storage):
+    """0004 renames the table, its three indexes and its primary-key constraint.
+
+    Asserted against the schema rather than the rows: a migration that ran but
+    left the old index or constraint names behind would still pass every storage
+    test, because Postgres does not care what an index is called.
+    """
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+            ).fetchall()
+        }
+        indexes = {
+            row[0]
+            for row in conn.execute(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'readings'"
+            ).fetchall()
+        }
+        constraints = {
+            row[0]
+            for row in conn.execute(
+                "SELECT conname FROM pg_constraint WHERE conrelid = 'readings'::regclass"
+            ).fetchall()
+        }
+
+    assert "readings" in tables
+    assert "reading_records" not in tables
+    assert {"idx_readings_user_id", "idx_readings_status", "idx_readings_book_id"} <= indexes
+    assert "readings_pkey" in constraints

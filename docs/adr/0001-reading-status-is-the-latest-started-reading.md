@@ -1,16 +1,16 @@
-# 1. A Book's Reading Status comes from its latest-started Reading Record
+# 1. A Book's Reading Status comes from its latest-started Reading
 
 - **Status:** Accepted
 - **Date:** 2026-09-28
 
 ## Context
 
-A Book gathers Reading Records as it is planned, started, abandoned and restarted.
+A Book gathers Readings as it is planned, started, abandoned and restarted.
 The catalogue, the dashboard and the reading-date sort each need to know which
 record currently represents a Book, and therefore that Book's Reading Status.
 
 That rule had grown four separate implementations, and they did not agree. They
-took two different tie-breaks, so for two Reading Records that started on the same
+took two different tie-breaks, so for two Readings that started on the same
 date two of them kept the later-added record and two kept the earlier one.
 
 This is not only untidy. The two storage adapters return records in different
@@ -20,7 +20,7 @@ gives one answer under test and another in production.
 
 ## Decision
 
-The Current Reading Record is the one with the greatest `(start_date, id)`:
+The Current Reading is the one with the greatest `(start_date, id)`:
 
 - the record that started latest wins;
 - when two started on the same date, the one added last wins;
@@ -34,8 +34,8 @@ whose current record is a planned-only entry has none.
 - The rule has one home and every caller crosses the same seam, so the catalogue,
   the dashboard and the sort cannot disagree about a Book.
 - `id` breaks ties rather than `created_at`, because the in-memory adapter gives
-  every Reading Record the same fixed `created_at` and so could never break one.
-- A Reading Record whose `book_id` or `id` cannot be read as a positive integer is
+  every Reading the same fixed `created_at` and so could never break one.
+- A Reading whose `book_id` or `id` cannot be read as a positive integer is
   ignored: it can neither be attributed to a Book nor ordered against its
   siblings. The alternative — keeping it and letting the comparison do something
   arbitrary — hides a data problem instead of surfacing it.

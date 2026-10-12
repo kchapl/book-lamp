@@ -1,6 +1,6 @@
-"""Which Reading Record currently represents a Book.
+"""Which Reading currently represents a Book.
 
-A Book accumulates Reading Records as it is started, abandoned and restarted.
+A Book accumulates Readings as it is started, abandoned and restarted.
 Exactly one record at a time represents the Book. This module owns the rule that
 decides which, so every caller reaches the same answer whatever order the
 storage adapter happened to return its records in.
@@ -25,15 +25,15 @@ def _as_identifier(value: Any) -> Optional[int]:
     return identifier if identifier > 0 else None
 
 
-def _order_key(record: Mapping[str, Any], record_id: int) -> tuple[str, int]:
+def _order_key(record: Mapping[str, Any], reading_id: int) -> tuple[str, int]:
     """Order records by when they started, then by the order they were added."""
-    return (str(record.get("start_date") or ""), record_id)
+    return (str(record.get("start_date") or ""), reading_id)
 
 
-def latest_record_by_book(
+def latest_reading_by_book(
     records: Iterable[Mapping[str, Any]],
 ) -> Dict[int, Dict[str, Any]]:
-    """Map each Book id to the Reading Record that currently represents it.
+    """Map each Book id to the Reading that currently represents it.
 
     The current record is the one that started latest; when two started on the
     same date, the one added last wins. The answer deliberately does not depend
@@ -45,23 +45,23 @@ def latest_record_by_book(
     since they cannot be attributed or ordered.
 
     Returns:
-        A dict keyed by Book id, holding the raw Reading Record dicts.
+        A dict keyed by Book id, holding the raw Reading dicts.
     """
     latest: Dict[int, Dict[str, Any]] = {}
     latest_keys: Dict[int, tuple[str, int]] = {}
 
     for record in records:
         book_id = _as_identifier(record.get("book_id"))
-        record_id = _as_identifier(record.get("id"))
-        if book_id is None or record_id is None:
+        reading_id = _as_identifier(record.get("id"))
+        if book_id is None or reading_id is None:
             logger.debug(
-                "Skipping Reading Record with unusable identifiers: book_id=%r, id=%r",
+                "Skipping Reading with unusable identifiers: book_id=%r, id=%r",
                 record.get("book_id"),
                 record.get("id"),
             )
             continue
 
-        key = _order_key(record, record_id)
+        key = _order_key(record, reading_id)
         incumbent = latest_keys.get(book_id)
         if incumbent is None or key > incumbent:
             latest[book_id] = dict(record)
@@ -76,7 +76,7 @@ def with_reading_status(
 ) -> List[Dict[str, Any]]:
     """Books that have a Reading Status, each carrying ``latest_status``.
 
-    Books with no Reading Record, and books whose current record sits outside
+    Books with no Reading, and books whose current record sits outside
     :data:`READING_STATUSES`, are omitted.
 
     The given books are left untouched: each result is a copy carrying one extra
@@ -86,7 +86,7 @@ def with_reading_status(
     Returns:
         New book dicts.
     """
-    latest = latest_record_by_book(records)
+    latest = latest_reading_by_book(records)
     books_with_status: List[Dict[str, Any]] = []
 
     for book in books:

@@ -1,6 +1,6 @@
 """Search service for book data.
 
-This module provides search functionality across book and reading record fields.
+This module provides search functionality across book and reading fields.
 Supports free text search.
 """
 
@@ -10,14 +10,14 @@ from typing import Any, Dict, List
 
 def calculate_relevance_score(
     book: Dict[str, Any],
-    reading_records: List[Dict[str, Any]],
+    readings: List[Dict[str, Any]],
     query: str,
 ) -> float:
     """Calculate relevance score for a book based on search query.
 
     Args:
         book: Book dictionary with fields to search.
-        reading_records: List of reading records for this book.
+        readings: List of readings for this book.
         query: Search query string.
 
     Returns:
@@ -57,7 +57,7 @@ def calculate_relevance_score(
     # Search book fields
     for field, weight in weights.items():
         if field in ["status", "rating", "dates"]:
-            continue  # These are in reading records
+            continue  # These are in readings
 
         if field == "author":
             # Search both the legacy field and individual authors
@@ -89,8 +89,8 @@ def calculate_relevance_score(
             if str(value).lower() == query.lower():
                 score += weight * 0.5
 
-    # Search reading record fields
-    for record in reading_records:
+    # Search reading fields
+    for record in readings:
         if matches(record.get("status", ""), query):
             score += weights["status"]
         if record.get("rating") and matches(str(record["rating"]), query):
@@ -112,18 +112,18 @@ def search_books(
 
     Args:
         all_books: List of all books.
-        all_records: List of all reading records.
+        all_records: List of all readings.
         query: Search query (free text).
 
     Returns:
-        List of matching books with reading_records attached, sorted by relevance.
+        List of matching books with readings attached, sorted by relevance.
     """
     if not query or not query.strip():
         return []
 
     query = query.strip()
 
-    # Attach reading records to books and calculate scores
+    # Attach readings to books and calculate scores
     results = []
     for book in all_books:
         book_records = [r for r in all_records if r["book_id"] == book["id"]]
@@ -132,7 +132,7 @@ def search_books(
         if score > 0:
             # Create a copy to avoid mutating the original
             book_copy = book.copy()
-            book_copy["reading_records"] = book_records
+            book_copy["readings"] = book_records
             book_copy["_relevance_score"] = score
             results.append(book_copy)
 

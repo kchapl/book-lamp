@@ -19,7 +19,7 @@ from book_lamp.services.recommendations import (
 def _make_storage(books=None, records=None, cached_recs=None):
     storage = MagicMock()
     storage.get_all_books.return_value = books or []
-    storage.get_reading_records.return_value = records or []
+    storage.get_readings.return_value = records or []
     storage.get_recommendations.return_value = cached_recs or []
     return storage
 

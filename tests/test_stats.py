@@ -17,7 +17,7 @@ def test_stats_category_limit(client, authenticated_client):
             publication_year=2020,
             bisac_category=cat,
         )
-        storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
+        storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
 
     # Get stats API data
     resp = authenticated_client.get("/api/dashboard")
@@ -38,7 +38,7 @@ def test_stats_category_limit(client, authenticated_client):
             author="Author",
             bisac_category="FICTION / General",
         )
-        storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
+        storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
 
     resp = authenticated_client.get("/api/dashboard")
     data = resp.get_json()
@@ -75,7 +75,7 @@ def test_api_dashboard_endpoint(authenticated_client):
         physical_format="Hardcover",
         language="English",
     )
-    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-15", rating=4)
 
     # Test API endpoint
     resp = authenticated_client.get("/api/dashboard")
@@ -107,10 +107,10 @@ def test_dashboard_last_record_date_tracks_the_latest_reading(authenticated_clie
     storage = get_storage()
 
     older = storage.add_book(isbn13="9780000000101", title="Older", author="Author")
-    storage.add_reading_record(older["id"], "In Progress", "2023-05-01", None)
+    storage.add_reading(older["id"], "In Progress", "2023-05-01", None)
 
     recent = storage.add_book(isbn13="9780000000102", title="Recent", author="Author")
-    storage.add_reading_record(recent["id"], "Completed", "2024-03-01", "2024-03-10", rating=5)
+    storage.add_reading(recent["id"], "Completed", "2024-03-01", "2024-03-10", rating=5)
 
     resp = authenticated_client.get("/api/dashboard")
     assert resp.status_code == 200

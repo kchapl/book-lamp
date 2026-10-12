@@ -13,21 +13,21 @@ from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.stats_calculator import calculate_collection_stats
 from book_lamp.utils.reading_status import (
     READING_STATUSES,
-    latest_record_by_book,
+    latest_reading_by_book,
     with_reading_status,
 )
 from book_lamp.utils.sorting import sort_by_reading_date
 
 
 def _record(
-    record_id: object,
+    reading_id: object,
     book_id: object,
     start_date: str,
     status: str = "Completed",
 ) -> dict[str, Any]:
-    """Build a Reading Record as the storage adapters hand it over."""
+    """Build a Reading as the storage adapters hand it over."""
     return {
-        "id": record_id,
+        "id": reading_id,
         "book_id": book_id,
         "start_date": start_date,
         "status": status,
@@ -40,12 +40,12 @@ def _book(book_id: object, title: str = "A Book") -> dict[str, Any]:
 
 
 def _picked(records: list[dict[str, Any]]) -> dict[int, int]:
-    """Summarise the fold as Book id -> chosen Reading Record id.
+    """Summarise the fold as Book id -> chosen Reading id.
 
     Only the map's keys and its ordering are normalised to ints; the values stay
     the raw records, so the summary normalises the record id itself.
     """
-    return {book_id: int(record["id"]) for book_id, record in latest_record_by_book(records).items()}
+    return {book_id: int(record["id"]) for book_id, record in latest_reading_by_book(records).items()}
 
 
 FOLD_CASES = [
@@ -102,14 +102,14 @@ FOLD_CASES = [
 
 
 @pytest.mark.parametrize("records, expected", FOLD_CASES)
-def test_latest_record_by_book_picks_the_current_record(
+def test_latest_reading_by_book_picks_the_current_record(
     records: list[dict[str, Any]], expected: dict[int, int]
 ) -> None:
     assert _picked(records) == expected
 
 
 @pytest.mark.parametrize("records, expected", FOLD_CASES)
-def test_latest_record_by_book_ignores_iteration_order(records: list[dict[str, Any]], expected: dict[int, int]) -> None:
+def test_latest_reading_by_book_ignores_iteration_order(records: list[dict[str, Any]], expected: dict[int, int]) -> None:
     """The rule must not depend on the order an adapter returns records in.
 
     One adapter hands back records newest-first and the other in insertion
@@ -122,7 +122,7 @@ def test_latest_record_by_book_ignores_iteration_order(records: list[dict[str, A
 def test_the_fold_keeps_the_whole_record() -> None:
     record = _record(1, 7, "2024-01-01", "Completed")
 
-    assert latest_record_by_book([record])[7]["status"] == "Completed"
+    assert latest_reading_by_book([record])[7]["status"] == "Completed"
 
 
 def test_reading_statuses_are_the_three_readings() -> None:
@@ -175,9 +175,9 @@ def test_with_reading_status_leaves_an_adapters_own_books_untouched() -> None:
     """MockStorage hands out its live list, so attaching in place would write into it."""
     storage = MockStorage()
     book = storage.add_book(isbn13="9780000000001", title="A Book", author="An Author")
-    storage.add_reading_record(book["id"], "Completed", "2024-01-01")
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
 
-    with_reading_status(storage.get_all_books(), storage.get_reading_records())
+    with_reading_status(storage.get_all_books(), storage.get_readings())
 
     assert "latest_status" not in storage.get_all_books()[0]
 

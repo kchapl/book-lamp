@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { formatDate } from '../format';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { formatDate, todayIso } from '../format';
 
 describe('formatDate', () => {
     it('formats an ISO date for display', () => {
@@ -23,5 +23,27 @@ describe('formatDate', () => {
 
     it('passes an unparseable value through rather than inventing a date', () => {
         expect(formatDate('not-a-date')).toBe('not-a-date');
+    });
+});
+
+describe('todayIso', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('names today as the local calendar date', () => {
+        // Built from local parts, so this holds in any timezone the suite runs in.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 9, 12, 9, 30));
+
+        expect(todayIso()).toBe('2026-10-12');
+    });
+
+    it('zero-pads a single-digit month and day', () => {
+        // A date input and the API both want `YYYY-MM-DD`, not `2026-1-5`.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 0, 5, 9, 30));
+
+        expect(todayIso()).toBe('2026-01-05');
     });
 });

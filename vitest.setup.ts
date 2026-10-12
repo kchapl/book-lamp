@@ -57,3 +57,31 @@ function shimElementInternals(): void {
 }
 
 shimElementInternals();
+
+/**
+ * jsdom has no `IntersectionObserver`, and Material Web's dialog creates one
+ * while it initialises to measure where it sits on screen. Without it, any
+ * component that renders a dialog rejects asynchronously on first paint.
+ *
+ * This is a no-op observer: nothing under test depends on the callback firing.
+ */
+function shimIntersectionObserver(): void {
+    if ('IntersectionObserver' in globalThis) return;
+
+    class NoopIntersectionObserver {
+        readonly root = null;
+        readonly rootMargin = '';
+        readonly thresholds: readonly number[] = [];
+
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+        takeRecords(): IntersectionObserverEntry[] {
+            return [];
+        }
+    }
+
+    globalThis.IntersectionObserver = NoopIntersectionObserver as unknown as typeof IntersectionObserver;
+}
+
+shimIntersectionObserver();

@@ -9,6 +9,8 @@ import io
 import json
 from unittest.mock import patch
 
+import pytest
+
 from book_lamp.app import get_storage
 
 # ---------------------------------------------------------------------------
@@ -26,7 +28,7 @@ def _json(resp):
 # ---------------------------------------------------------------------------
 
 
-def test_api_export_csv_includes_books_reading_records_and_reading_list(authenticated_client):
+def test_api_export_csv_includes_books_readings_and_reading_list(authenticated_client):
     """The authenticated CSV export contains catalogue, history, and list data."""
     storage = get_storage()
     book = storage.add_book(
@@ -45,8 +47,8 @@ def test_api_export_csv_includes_books_reading_records_and_reading_list(authenti
         thumbnail_url="https://example.com/thumb.jpg",
         cover_url="https://example.com/cover.jpg",
     )
-    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-10", 5)
-    storage.add_reading_record(book["id"], "In Progress", "2025-02-03")
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10", 5)
+    storage.add_reading(book["id"], "In Progress", "2025-02-03")
     storage.add_to_reading_list(book["id"])
 
     response = authenticated_client.get("/api/export/csv")
@@ -265,7 +267,7 @@ def test_api_search_books_with_results(authenticated_client):
     """GET /api/books/search?q=... returns matching books."""
     storage = get_storage()
     b = storage.add_book(isbn13="555", title="Searchable Title", author="An Author")
-    storage.add_reading_record(b["id"], "Completed", "2024-01-01", "2024-01-15", 4)
+    storage.add_reading(b["id"], "Completed", "2024-01-01", "2024-01-15", 4)
 
     resp = authenticated_client.get("/api/books/search?q=Searchable")
     assert resp.status_code == 200
@@ -311,17 +313,17 @@ def test_api_lookup_isbn_adds_publication_year(mock_lookup, authenticated_client
 
 
 # ---------------------------------------------------------------------------
-# Reading records – create
+# Readings – create
 # ---------------------------------------------------------------------------
 
 
-def test_api_create_reading_record_success(authenticated_client):
-    """POST /api/books/<id>/reading-records creates a record and returns 201."""
+def test_api_create_reading_success(authenticated_client):
+    """POST /api/books/<id>/readings creates a record and returns 201."""
     storage = get_storage()
     book = storage.add_book(isbn13="666", title="Book", author="Author")
 
     resp = authenticated_client.post(
-        f"/api/books/{book['id']}/reading-records",
+        f"/api/books/{book['id']}/readings",
         json={
             "status": "Completed",
             "start_date": "2024-01-01",
@@ -334,31 +336,59 @@ def test_api_create_reading_record_success(authenticated_client):
     assert body["status"] == "Completed"
 
 
-def test_api_create_reading_record_missing_fields(authenticated_client):
-    """POST /api/books/<id>/reading-records without required fields returns 400."""
+def test_api_create_reading_missing_fields(authenticated_client):
+    """POST /api/books/<id>/readings without required fields returns 400."""
     storage = get_storage()
     book = storage.add_book(isbn13="777", title="B", author="A")
 
     resp = authenticated_client.post(
-        f"/api/books/{book['id']}/reading-records",
+        f"/api/books/{book['id']}/readings",
         json={"status": "Completed"},  # missing start_date
     )
     assert resp.status_code == 400
 
 
-# ---------------------------------------------------------------------------
-# Reading records – update
-# ---------------------------------------------------------------------------
-
-
-def test_api_update_reading_record_success(authenticated_client):
-    """POST /api/reading-records/<id>/edit updates and returns success."""
+@pytest.mark.parametrize("status", ["Completed", "Abandoned"])
+def test_api_create_reading_ended_without_an_end_date(authenticated_client, status):
+    """A status that ends a Reading is refused when it carries no end date."""
     storage = get_storage()
-    book = storage.add_book(isbn13="888", title="B", author="A")
-    record = storage.add_reading_record(book["id"], "In Progress", "2024-01-01")
+    book = storage.add_book(isbn13="778", title="B", author="A")
 
     resp = authenticated_client.post(
-        f"/api/reading-records/{record['id']}/edit",
+        f"/api/books/{book['id']}/readings",
+        json={"status": status, "start_date": "2024-01-01"},
+    )
+
+    assert resp.status_code == 400
+    assert "end date" in _json(resp)["error"]
+
+
+def test_api_create_reading_in_progress_needs_no_end_date(authenticated_client):
+    """An open Reading is writable without an end date."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="779", title="B", author="A")
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/readings",
+        json={"status": "In Progress", "start_date": "2024-01-01"},
+    )
+
+    assert resp.status_code == 201
+
+
+# ---------------------------------------------------------------------------
+# Readings – update
+# ---------------------------------------------------------------------------
+
+
+def test_api_update_reading_success(authenticated_client):
+    """POST /api/readings/<id>/edit updates and returns success."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="888", title="B", author="A")
+    record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
+
+    resp = authenticated_client.post(
+        f"/api/readings/{record['id']}/edit",
         json={
             "status": "Completed",
             "start_date": "2024-01-01",
@@ -370,25 +400,40 @@ def test_api_update_reading_record_success(authenticated_client):
     assert _json(resp) == {"success": True}
 
 
+def test_api_update_reading_refuses_completed_without_an_end_date(authenticated_client):
+    """Ending a Reading through the edit route is refused without an end date."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="781", title="B", author="A")
+    record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
+
+    resp = authenticated_client.post(
+        f"/api/readings/{record['id']}/edit",
+        json={"status": "Completed", "start_date": "2024-01-01"},
+    )
+
+    assert resp.status_code == 400
+    assert "end date" in _json(resp)["error"]
+
+
 # ---------------------------------------------------------------------------
-# Reading records – delete
+# Readings – delete
 # ---------------------------------------------------------------------------
 
 
-def test_api_delete_reading_record_success(authenticated_client):
-    """POST /api/reading-records/<id>/delete removes the record."""
+def test_api_delete_reading_success(authenticated_client):
+    """POST /api/readings/<id>/delete removes the record."""
     storage = get_storage()
     book = storage.add_book(isbn13="999", title="B", author="A")
-    record = storage.add_reading_record(book["id"], "In Progress", "2024-01-01")
+    record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
 
-    resp = authenticated_client.post(f"/api/reading-records/{record['id']}/delete")
+    resp = authenticated_client.post(f"/api/readings/{record['id']}/delete")
     assert resp.status_code == 200
     assert _json(resp) == {"success": True}
 
 
-def test_api_delete_reading_record_not_found(authenticated_client):
-    """POST /api/reading-records/<id>/delete for missing record returns 404."""
-    resp = authenticated_client.post("/api/reading-records/99999/delete")
+def test_api_delete_reading_not_found(authenticated_client):
+    """POST /api/readings/<id>/delete for missing record returns 404."""
+    resp = authenticated_client.post("/api/readings/99999/delete")
     assert resp.status_code == 404
 
 

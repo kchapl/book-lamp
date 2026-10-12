@@ -113,7 +113,7 @@ def test_search_route_with_query(authenticated_client):
     # Add a test book
     storage = get_storage()
     book = storage.add_book(isbn13="9780000000000", title="A Test Book", author="A1")
-    storage.add_reading_record(book["id"], "Completed", "2024-01-01", "2024-01-15")
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-15")
 
     response = authenticated_client.get("/api/books/search?q=test")
     assert response.status_code == 200

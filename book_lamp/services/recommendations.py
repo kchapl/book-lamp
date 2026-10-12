@@ -46,9 +46,9 @@ def _is_cache_stale(recommendations: List[Dict[str, Any]]) -> bool:
 
 
 def get_liked_books(storage: Any) -> List[Dict[str, Any]]:
-    """Return books with high ratings from completed reading records (pure)."""
+    """Return books with high ratings from completed readings (pure)."""
     all_books = storage.get_all_books()
-    all_records = storage.get_reading_records()
+    all_records = storage.get_readings()
 
     book_map = {b["id"]: b for b in all_books}
 

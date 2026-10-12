@@ -26,7 +26,7 @@ def test_reading_list_mock_storage():
     assert rl[1]["book_id"] == b1["id"]
     assert rl[1]["position"] == 2
 
-    records = storage.get_reading_records()
+    records = storage.get_readings()
     assert len(records) == 0
 
     storage.remove_from_reading_list(b2["id"])
@@ -35,5 +35,5 @@ def test_reading_list_mock_storage():
     assert rl[0]["book_id"] == b1["id"]
     assert rl[0]["position"] == 1
 
-    records = storage.get_reading_records()
+    records = storage.get_readings()
     assert len(records) == 0

@@ -8,6 +8,7 @@ from book_lamp.routes.books import _background_fetch_missing_data
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.stats_calculator import calculate_collection_stats
 from book_lamp.services.storage_factory import get_storage
+from book_lamp.utils.readings import filter_reading_log, sort_reading_log
 
 stats_bp = Blueprint("stats", __name__)
 
@@ -22,35 +23,19 @@ def api_reading_history():
     all_statuses = sorted(list(set(r.get("status") for r in history if r.get("status"))))
 
     status_filter = request.args.get("status")
-    if status_filter:
-        history = [r for r in history if r.get("status") == status_filter]
 
     min_rating = request.args.get("min_rating")
-    if min_rating and min_rating.isdigit():
-        min_rating_val = int(min_rating)
-        history = [r for r in history if r.get("rating", 0) >= min_rating_val]
-    else:
-        min_rating_val = None
+    min_rating_val = int(min_rating) if min_rating and min_rating.isdigit() else None
 
     year_filter = request.args.get("year")
-    if year_filter and year_filter.isdigit():
-        history = [
-            r
-            for r in history
-            if (r.get("end_date") and r.get("end_date")[:4] == year_filter)
-            or (not r.get("end_date") and r.get("start_date") and r.get("start_date")[:4] == year_filter)
-        ]
+    if not (year_filter and year_filter.isdigit()):
+        year_filter = None
 
     sort_by = request.args.get("sort", "date_desc")
 
-    if sort_by == "date_desc":
-        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "", reverse=True)
-    elif sort_by == "date_asc":
-        history.sort(key=lambda r: r.get("end_date") or r.get("start_date") or "")
-    elif sort_by == "rating_desc":
-        history.sort(key=lambda r: r.get("rating", 0), reverse=True)
-    elif sort_by == "title":
-        history.sort(key=lambda r: (r.get("book_title") or "").lower())
+    # The same narrowing the MCP tools use, so the page and the tools agree.
+    history = filter_reading_log(history, status_filter, min_rating_val, year_filter)
+    history = sort_reading_log(history, sort_by)
 
     return jsonify(
         {
@@ -78,7 +63,7 @@ def api_collection_stats():
     """API endpoint for collection statistics."""
     storage = get_storage()
     books = storage.get_all_books()
-    all_records = storage.get_reading_records()
+    all_records = storage.get_readings()
     settings = storage.get_settings() if hasattr(storage, "get_settings") else None
 
     stats_data = calculate_collection_stats(books, all_records, settings=settings)

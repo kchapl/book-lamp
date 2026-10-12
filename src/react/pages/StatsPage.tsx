@@ -63,11 +63,11 @@ const StatsPage: React.FC = () => {
                     <p className="eyebrow">Reading room</p>
                     <h1>The collection at a glance</h1>
                     <p className="lede">
-                        Every figure below is drawn from your reading records — what has been begun,
+                        Every figure below is drawn from your readings — what has been begun,
                         completed or set aside. Nothing here updates until you add a record.
                     </p>
                 </div>
-                <p className="as-of" title="The date of your most recent reading record">
+                <p className="as-of" title="The date of your most recent reading">
                     <Icon name="clock" size="sm" />
                     Last entry {formatDate(stats.last_record_date, 'no entries yet')}
                 </p>

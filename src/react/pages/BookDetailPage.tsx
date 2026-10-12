@@ -4,13 +4,15 @@ import {
     getBookDetail,
     updateBook,
     deleteBook,
-    createReadingRecord,
+    createReading,
     addToReadingList,
     removeFromReadingList,
 } from '../services/api';
 import { Button, Dialog, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
-import { statusClass } from '../utils/status';
+import { endsReading, statusClass } from '../utils/status';
+import { todayIso } from '../utils/format';
+import { readingPayload } from '../utils/reading';
 import type { Book } from '../types';
 
 const BookDetailPage: React.FC = () => {
@@ -19,7 +21,13 @@ const BookDetailPage: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Book>>({});
     const [showAddRecord, setShowAddRecord] = useState(false);
-    const [newRecord, setNewRecord] = useState({ status: 'Completed', rating: 5 });
+    const [addRecordError, setAddRecordError] = useState<string | null>(null);
+    const [newRecord, setNewRecord] = useState({
+        status: 'Completed',
+        rating: 5,
+        start_date: todayIso(),
+        end_date: todayIso(),
+    });
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const loadBook = async () => {
@@ -52,14 +60,24 @@ const BookDetailPage: React.FC = () => {
         }
     };
 
+    const handleStatusChange = (value: string) => {
+        setNewRecord((current) => ({
+            ...current,
+            status: value,
+            // Ending a Reading defaults it to today; starting one clears the end.
+            end_date: endsReading(value) ? current.end_date || todayIso() : '',
+        }));
+    };
+
     const handleAddRecord = async () => {
         if (!bookId) return;
+        setAddRecordError(null);
         try {
-            await createReadingRecord(Number(bookId), newRecord);
+            await createReading(Number(bookId), readingPayload(newRecord));
             setShowAddRecord(false);
             reload();
         } catch (err) {
-            console.error('Failed to add record:', err);
+            setAddRecordError(err instanceof Error ? err.message : 'Failed to add reading');
         }
     };
 
@@ -86,7 +104,7 @@ const BookDetailPage: React.FC = () => {
     }
 
     const cover = book.cover_url || book.thumbnail_url;
-    const currentStatus = book.latest_status ?? book.reading_records?.[0]?.status;
+    const currentStatus = book.latest_status ?? book.readings?.[0]?.status;
 
     return (
         <div className="book-detail-page page">
@@ -224,27 +242,52 @@ const BookDetailPage: React.FC = () => {
                         </Button>
                     </div>
 
-                    <section className="reading-records section">
+                    <section className="readings section">
                         <div className="row-between">
                             <h2>Reading history</h2>
-                            <Button variant="outlined" icon="plus" onClick={() => setShowAddRecord(true)}>
-                                Add reading record
+                            <Button
+                                variant="outlined"
+                                icon="plus"
+                                onClick={() => {
+                                    setAddRecordError(null);
+                                    setShowAddRecord(true);
+                                }}
+                            >
+                                Add reading
                             </Button>
                         </div>
 
                         {showAddRecord && (
                             <div className="add-record-form">
-                                <h3>Add reading record</h3>
+                                <h3>Add reading</h3>
                                 <Select
                                     id="record-status"
                                     label="Status"
                                     value={newRecord.status}
-                                    onValueChange={(value) => setNewRecord({ ...newRecord, status: value })}
+                                    onValueChange={handleStatusChange}
                                 >
                                     <SelectOption value="Completed">Completed</SelectOption>
                                     <SelectOption value="In Progress">In Progress</SelectOption>
                                     <SelectOption value="Abandoned">Abandoned</SelectOption>
                                 </Select>
+                                <TextField
+                                    id="record-start-date"
+                                    label="Started"
+                                    type="date"
+                                    value={newRecord.start_date}
+                                    onValueChange={(value) => setNewRecord({ ...newRecord, start_date: value })}
+                                />
+                                {endsReading(newRecord.status) && (
+                                    <TextField
+                                        id="record-end-date"
+                                        label="Ended"
+                                        type="date"
+                                        value={newRecord.end_date}
+                                        onValueChange={(value) =>
+                                            setNewRecord({ ...newRecord, end_date: value })
+                                        }
+                                    />
+                                )}
                                 <TextField
                                     id="record-rating"
                                     label="Rating (1–5)"
@@ -256,6 +299,7 @@ const BookDetailPage: React.FC = () => {
                                         setNewRecord({ ...newRecord, rating: parseInt(value) || 0 })
                                     }
                                 />
+                                {addRecordError && <p className="error-message">{addRecordError}</p>}
                                 <div className="form-actions">
                                     <Button onClick={handleAddRecord}>Add</Button>
                                     <Button variant="text" onClick={() => setShowAddRecord(false)}>
@@ -265,9 +309,9 @@ const BookDetailPage: React.FC = () => {
                             </div>
                         )}
 
-                        {book.reading_records && book.reading_records.length > 0 ? (
+                        {book.readings && book.readings.length > 0 ? (
                             <div className="records-list">
-                                {book.reading_records.map((record) => (
+                                {book.readings.map((record) => (
                                     <div key={record.id} className="record-item">
                                         <span className={`status-badge ${statusClass(record.status)}`}>
                                             {record.status}
@@ -287,7 +331,7 @@ const BookDetailPage: React.FC = () => {
                             </div>
                         ) : (
                             <div className="empty-state">
-                                <h2>No reading records yet</h2>
+                                <h2>No readings yet</h2>
                                 <p>Record the first attempt at this book to begin its history.</p>
                             </div>
                         )}

@@ -71,10 +71,10 @@ def _storage_reset(app):
             pass
         elif hasattr(storage, "books"):
             storage.books = []
-            storage.reading_records = []
+            storage.readings = []
             storage.reading_list = []
             storage.next_book_id = 1
-            storage.next_record_id = 1
+            storage.next_reading_id = 1
 
         if hasattr(storage, "set_authorised"):
             storage.set_authorised(True)

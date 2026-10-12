@@ -6,7 +6,7 @@ for organising book collections.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
-from book_lamp.utils.reading_status import latest_record_by_book
+from book_lamp.utils.reading_status import latest_reading_by_book
 
 
 def _normalise_title_for_sort(title: str) -> str:
@@ -196,18 +196,18 @@ def sort_by_date_added(books: List[Dict[str, Any]], reverse: bool = True) -> Lis
 
 def sort_by_reading_date(
     books: List[Dict[str, Any]],
-    reading_records: List[Dict[str, Any]],
+    readings: List[Dict[str, Any]],
     reverse: bool = True,
 ) -> List[Dict[str, Any]]:
     """Sort books by most recent reading date.
 
-    Uses the start_date of the most recent reading record. If never read,
+    Uses the start_date of the most recent reading. If never read,
     falls back to created_at. Defaults to reverse=True to show most recently
     read first.
 
     Args:
         books: List of book dictionaries.
-        reading_records: List of reading record dictionaries.
+        readings: List of reading dictionaries.
         reverse: If True, sort most recent first.
 
     Returns:
@@ -215,7 +215,7 @@ def sort_by_reading_date(
     """
     # The same rule the catalogue and the dashboard use, so sort order cannot
     # disagree with the Reading Status a Book is shown with.
-    records_by_book = latest_record_by_book(reading_records)
+    records_by_book = latest_reading_by_book(readings)
 
     def sort_key(book: Dict[str, Any]) -> str:
         book_id = book.get("id")
@@ -249,7 +249,7 @@ SORT_OPTIONS: Dict[str, Tuple[str, SortFunction]] = {
 def sort_books(
     books: List[Dict[str, Any]],
     sort_by: str = "reading_date",
-    reading_records: Optional[List[Dict[str, Any]]] = None,
+    readings: Optional[List[Dict[str, Any]]] = None,
     reverse: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
     """Sort books using the specified method.
@@ -257,7 +257,7 @@ def sort_books(
     Args:
         books: List of book dictionaries to sort.
         sort_by: Sort method key (one of: reading_date, date_added, author, title, year, category).
-        reading_records: Optional list of reading records (required for reading_date sort).
+        readings: Optional list of readings (required for reading_date sort).
         reverse: Whether to reverse sort order. If None, uses method default.
 
     Returns:
@@ -273,16 +273,16 @@ def sort_books(
         # Use defaults: reverse=True for date-based sorts, False for alphabetical
         reverse = sort_by in ("reading_date", "date_added", "year")
 
-    # Special handling for reading_date which needs reading_records
+    # Special handling for reading_date which needs readings
     if sort_by == "reading_date":
-        if reading_records is None:
-            reading_records = []
+        if readings is None:
+            readings = []
         # Type narrowing: we know this is sort_by_reading_date which takes 3 args
         reading_date_func = cast(
             Callable[[List[Dict[str, Any]], List[Dict[str, Any]], bool], List[Dict[str, Any]]],
             sort_func,
         )
-        return reading_date_func(books, reading_records, reverse)  # type: ignore[call-arg]
+        return reading_date_func(books, readings, reverse)  # type: ignore[call-arg]
 
     # Type narrowing: we know other sort functions take 2 args (books, reverse)
     standard_func = cast(

@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, ReadingRecord, AuthStatus } from '../types';
+import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, Reading, AuthStatus } from '../types';
 
 const API_BASE = '/api';
 const UNAUTHORISED_PATH = '/unauthorised';
@@ -180,23 +180,23 @@ export async function searchBooks(query: string): Promise<{
     return fetchJSON(`${API_BASE}/books/search?${params}`);
 }
 
-// Reading Records API
-export async function createReadingRecord(bookId: number, record: Partial<ReadingRecord>): Promise<ReadingRecord> {
-    return fetchJSON<ReadingRecord>(`${API_BASE}/books/${bookId}/reading-records`, {
+// Readings API
+export async function createReading(bookId: number, record: Partial<Reading>): Promise<Reading> {
+    return fetchJSON<Reading>(`${API_BASE}/books/${bookId}/readings`, {
         method: 'POST',
         body: JSON.stringify(record),
     });
 }
 
-export async function updateReadingRecord(recordId: number, record: Partial<ReadingRecord>): Promise<void> {
-    await fetchJSON(`${API_BASE}/reading-records/${recordId}/edit`, {
+export async function updateReading(recordId: number, record: Partial<Reading>): Promise<void> {
+    await fetchJSON(`${API_BASE}/readings/${recordId}/edit`, {
         method: 'POST',
         body: JSON.stringify(record),
     });
 }
 
-export async function deleteReadingRecord(recordId: number): Promise<void> {
-    await fetchJSON(`${API_BASE}/reading-records/${recordId}/delete`, {
+export async function deleteReading(recordId: number): Promise<void> {
+    await fetchJSON(`${API_BASE}/readings/${recordId}/delete`, {
         method: 'POST',
     });
 }
@@ -233,7 +233,7 @@ export async function addToReadingList(bookId: number): Promise<void> {
 
 // History API
 export async function getHistory(filters?: Partial<HistoryFilters>): Promise<{
-    history: ReadingRecord[];
+    history: Reading[];
     statuses: string[];
     filters: HistoryFilters;
 }> {
