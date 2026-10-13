@@ -120,9 +120,7 @@ def test_multi_user_isolation(pg_storage):
 
     # Add book for user 1
     book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
-    pg_storage.add_reading(
-        book_id=book["id"], status="Completed", start_date="2024-01-01", end_date="2024-01-10"
-    )
+    pg_storage.add_reading(book_id=book["id"], status="Completed", start_date="2024-01-01", end_date="2024-01-10")
 
     # Check user 2 sees no records
     assert len(storage2.get_readings()) == 0
@@ -373,10 +371,7 @@ def test_the_rename_migration_left_the_table_indexes_and_constraint_renamed(pg_s
     """
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         tables = {
-            row[0]
-            for row in conn.execute(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-            ).fetchall()
+            row[0] for row in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'").fetchall()
         }
         indexes = {
             row[0]

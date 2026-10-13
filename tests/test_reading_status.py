@@ -109,7 +109,9 @@ def test_latest_reading_by_book_picks_the_current_record(
 
 
 @pytest.mark.parametrize("records, expected", FOLD_CASES)
-def test_latest_reading_by_book_ignores_iteration_order(records: list[dict[str, Any]], expected: dict[int, int]) -> None:
+def test_latest_reading_by_book_ignores_iteration_order(
+    records: list[dict[str, Any]], expected: dict[int, int]
+) -> None:
     """The rule must not depend on the order an adapter returns records in.
 
     One adapter hands back records newest-first and the other in insertion

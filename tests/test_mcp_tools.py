@@ -257,7 +257,8 @@ def _register(client: TestClient) -> str:
     """Register a client the way an MCP client does, and return its id."""
     response = client.post("/register", json={"client_name": "Gemini", "redirect_uris": [REDIRECT_URI]})
     assert response.status_code < 400, response.text
-    return response.json()["client_id"]
+    client_id: str = response.json()["client_id"]
+    return client_id
 
 
 def _authorize(client: TestClient, client_id: str) -> str:
@@ -294,9 +295,14 @@ def test_consenting_hands_the_reader_to_google(google_app) -> None:
         consent = client.get(consent_url)
         assert consent.status_code == 200
 
+        csrf = re.search(r'name="csrf_token" value="([^"]+)"', consent.text)
+        txn = re.search(r'name="txn_id" value="([^"]+)"', consent.text)
+        # A consent page that omits either field would make the POST below a
+        # silent no-op, so fail here where the reason is visible.
+        assert csrf and txn, consent.text
         form = {
-            "csrf_token": re.search(r'name="csrf_token" value="([^"]+)"', consent.text).group(1),
-            "txn_id": re.search(r'name="txn_id" value="([^"]+)"', consent.text).group(1),
+            "csrf_token": csrf.group(1),
+            "txn_id": txn.group(1),
             "submit": "true",
             "action": "approve",
         }
