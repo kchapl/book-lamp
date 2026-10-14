@@ -878,7 +878,9 @@
 
 .import-books-page,
 .add-book-page,
-.about-page { max-width: 720px; margin: 0 auto; }
+.about-page,
+.privacy-page,
+.terms-page { max-width: 720px; margin: 0 auto; }
 
 .import-form {
     display: flex;
@@ -909,9 +911,13 @@
     font-size: var(--md-sys-typescale-body-medium-size);
 }
 
-.about-page h2 { margin-top: var(--bl-space-6); }
+.about-page h2,
+.privacy-page h2,
+.terms-page h2 { margin-top: var(--bl-space-6); }
 .about-page ul,
-.about-page ol { color: var(--md-sys-color-on-surface-variant); line-height: 1.8; }
+.about-page ol,
+.privacy-page ul,
+.terms-page ul { color: var(--md-sys-color-on-surface-variant); line-height: 1.8; }
 .about-footer { margin-top: var(--bl-space-7); color: var(--md-sys-color-on-surface-variant); }
 
 .unauthorised-page {

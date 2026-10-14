@@ -17,6 +17,8 @@ const AuthorPage = lazy(() => import('./pages/AuthorPage'));
 const PublisherPage = lazy(() => import('./pages/PublisherPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const UnauthorisedPage = lazy(() => import('./pages/UnauthorisedPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 
 const PageFallback = () => (
     <div className="page-loading" role="status" aria-live="polite">Loading…</div>
@@ -147,6 +149,8 @@ function App() {
                         <Route path="/author/:authorSlug" element={<Suspense fallback={<PageFallback />}><AuthorPage /></Suspense>} />
                         <Route path="/publisher/:publisherSlug" element={<Suspense fallback={<PageFallback />}><PublisherPage /></Suspense>} />
                         <Route path="/about" element={<Suspense fallback={<PageFallback />}><AboutPage /></Suspense>} />
+                        <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPage /></Suspense>} />
+                        <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsPage /></Suspense>} />
                         <Route path="/unauthorised" element={<Suspense fallback={<PageFallback />}><UnauthorisedPage /></Suspense>} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
