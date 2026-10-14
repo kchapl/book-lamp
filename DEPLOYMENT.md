@@ -40,13 +40,18 @@ If you want Google login functionality:
 
 **Build Command:**
 ```bash
-npm ci && npm run build && uv sync --no-dev && uv run alembic upgrade head
+npm ci && npm run build && uv sync --no-dev && uv run --no-dev alembic upgrade head
 ```
 
 **Start Command:**
 ```bash
-uv run gunicorn book_lamp.app:app
+uv run --no-dev gunicorn book_lamp.app:app
 ```
+
+Every `uv run` passes `--no-dev`, the start command included. A bare `uv run`
+re-syncs the environment first, and the default `dev` group is part of what it
+syncs: without the flag the service downloads pytest, black, mypy and ruff
+before it serves anything. A sleeping service pays that on every wake.
 
 ### First-Time Setup
 
@@ -73,6 +78,18 @@ After deployment:
 2. Verify all required environment variables are set
 3. Check application logs for connection errors
 
+**Build fails with `version solving failed`:** the service is installing with
+Poetry. Poetry cannot resolve this project: `requires-python` has no upper
+bound, and `jsonschema-path` — which arrives with `fastmcp` in the `mcp` extra —
+caps Python at `<4.0.0`, so Poetry rejects the combination while uv resolves it
+from `uv.lock`. The build and start commands above must be the ones the service
+uses; a command that leaves out `alembic upgrade head` also deploys code ahead
+of the schema, which migration `0004` needs (it renames `reading_records` to
+`readings`).
+
+Set `UV_VERSION` to pin the same uv that wrote `uv.lock`; Render's default may
+be older.
+
 ## MCP Service (Gemini custom app)
 
 A second Render service serves the MCP protocol, so Gemini's custom apps can read
@@ -88,7 +105,7 @@ application's `DATABASE_URL` but nothing else.
 | Setting | Value |
 |---------|-------|
 | Build Command | `uv sync --no-dev --extra mcp` |
-| Start Command | `uv run python -m book_lamp.mcp_server` |
+| Start Command | `uv run --no-dev --extra mcp python -m book_lamp.mcp_server` |
 | Health check path | `/.well-known/oauth-protected-resource/mcp` |
 
 `--extra mcp` is what installs `fastmcp`. The Flask service does not pass it, so
