@@ -224,6 +224,10 @@ def build_server(auth: Optional[Any] = None) -> FastMCP:
 
 def main() -> None:
     """Serve over Streamable HTTP, which is all Gemini's custom apps accept."""
+    # Every setting is read before the port opens, the reader's address included.
+    # Left to the tools, a deploy missing only that one would bind, pass its health
+    # check and refuse every call — a service that looks like a working one.
+    reader_email()
     server = build_server(auth=auth_provider())
     server.run(transport="http", host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
 

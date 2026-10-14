@@ -199,12 +199,8 @@ def test_a_token_with_no_address_is_refused(monkeypatch) -> None:
         mcp_server.verified_reader_email()
 
 
-@pytest.mark.parametrize(
-    "missing",
-    [mcp_server.READER_EMAIL_ENV, mcp_server.CLIENT_ID_ENV, mcp_server.CLIENT_SECRET_ENV, mcp_server.BASE_URL_ENV],
-)
-def test_a_missing_setting_stops_the_server_rather_than_defaulting(monkeypatch, missing: str) -> None:
-    """There is no unauthenticated mode to fall back into, so this cannot be soft."""
+def _all_settings(monkeypatch) -> None:
+    """Every setting the server starts from, with placeholder credentials."""
     for name, value in {
         mcp_server.READER_EMAIL_ENV: READER,
         mcp_server.CLIENT_ID_ENV: "123.apps.googleusercontent.com",
@@ -212,10 +208,53 @@ def test_a_missing_setting_stops_the_server_rather_than_defaulting(monkeypatch, 
         mcp_server.BASE_URL_ENV: BASE_URL,
     }.items():
         monkeypatch.setenv(name, value)
-    monkeypatch.delenv(missing)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [mcp_server.READER_EMAIL_ENV, mcp_server.CLIENT_ID_ENV, mcp_server.CLIENT_SECRET_ENV, mcp_server.BASE_URL_ENV],
+)
+def test_a_missing_setting_stops_the_server_rather_than_defaulting(monkeypatch, missing: str) -> None:
+    """There is no unauthenticated mode to fall back into, so this cannot be soft."""
+    _all_settings(monkeypatch)
+    monkeypatch.delenv(missing, raising=False)
 
     with pytest.raises(RuntimeError, match=missing):
         mcp_server._required(missing)
+
+
+def test_starting_refuses_without_the_reader_email(monkeypatch) -> None:
+    """The address is checked before the port opens, not on the first tool call.
+
+    Read only when a tool ran, a deploy missing it would bind, answer its health
+    check and refuse every call afterwards — a service that looks like a working
+    one, which is the one thing this server must never be (ADR-0004).
+    """
+    _all_settings(monkeypatch)
+    monkeypatch.delenv(mcp_server.READER_EMAIL_ENV, raising=False)
+
+    def served_anyway(*args, **kwargs):
+        raise AssertionError("served a request without a reader to read as")
+
+    monkeypatch.setattr(mcp_server.FastMCP, "run", served_anyway)
+
+    with pytest.raises(RuntimeError, match=mcp_server.READER_EMAIL_ENV):
+        mcp_server.main()
+
+
+def test_starting_serves_once_every_setting_is_present(monkeypatch) -> None:
+    """The guard refuses a missing setting, not a complete one."""
+    _all_settings(monkeypatch)
+    monkeypatch.setenv("PORT", "8123")
+
+    served: dict = {}
+    monkeypatch.setattr(mcp_server.FastMCP, "run", lambda self, **kwargs: served.update(kwargs))
+
+    mcp_server.main()
+
+    # Render hands the port in PORT; hard-coding one would leave the service unable
+    # to answer on the port it is probed on.
+    assert served == {"transport": "http", "host": "0.0.0.0", "port": 8123}
 
 
 # ---------------------------------------------------------------------------
