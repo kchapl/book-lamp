@@ -147,7 +147,12 @@ needs neither a secret nor a redirect URI and this needs both.
 
 In the Gemini web app: **Settings → Connected Apps → Custom apps**, then paste
 `<BOOK_LAMP_MCP_BASE_URL>/mcp`. Sign in with the account named by
-`BOOK_LAMP_USER_EMAIL`.
+`BOOK_LAMP_USER_EMAIL`. Custom apps can only be added from the web app, and only
+by an eligible account (personal Google account, 18+, US, English, Keep Activity
+on).
+
+Step by step, with example questions and the eligibility list:
+`docs/mcp-service.md`.
 
 ### Troubleshooting
 

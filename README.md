@@ -59,6 +59,16 @@ If `GOOGLE_CLIENT_ID` is left at the placeholder, the sign-in button is not
 rendered and `POST /api/auth/google` answers `503` explaining that sign-in is
 unconfigured, rather than a confusing `401`.
 
+## Asking Gemini about your reading
+
+Book Lamp ships a read-only MCP service, so the Gemini apps can answer questions
+about the Reading Log — "what did I finish this year?" — straight from the same
+storage the app reads.
+
+See **[docs/mcp-service.md](docs/mcp-service.md)** for attaching it to Gemini as
+a custom app and the questions it is good for, and `DEPLOYMENT.md` → "MCP
+Service (Gemini custom app)" for deploying it.
+
 ## Testing
 
 Run backend unit tests:
