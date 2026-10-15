@@ -30,9 +30,10 @@ settings, build commands and the Google OAuth client.
    asked to. Sign in to the app with the account you intend to use before you
    point Gemini at the server.
 3. **A Gemini account that can add custom apps.** Per Google's help for custom
-   apps: a **personal** Google account (not work or school), 18 or over, in the
-   **US**, in **English**, with **Keep Activity on**. When that setting is off,
-   custom apps are unavailable and there is nothing to fix on your side.
+   apps (<https://support.google.com/gemini/answer/17209137>): a **personal**
+   Google account (not work or school), 18 or over, in the **US**, in **English**,
+   with **Keep Activity on**. When that setting is off, custom apps are
+   unavailable and there is nothing to fix on your side.
 
 ## Attaching it to Gemini
 
@@ -41,8 +42,9 @@ in both the Gemini web app and the Gemini mobile app.
 
 1. On a computer, go to <https://gemini.google.com>.
 2. At the bottom, **Settings & help** → **Connected Apps**.
-3. Under **Custom apps**, click **Add a custom app** (the field reads "Add a
-   custom app link to get started" before your first one).
+3. Under **Custom apps** — labelled **Custom apps for Spark** on some screens —
+   click **Add a custom app** (the field reads "Add a custom app link to get
+   started" before your first one).
 4. Paste your MCP server URL — `<BOOK_LAMP_MCP_BASE_URL>/mcp`, for example
    `https://book-lamp-mcp.onrender.com/mcp`.
 5. Click **Next** and follow the sign-in prompt, signing in as the account named
@@ -64,6 +66,10 @@ If it names `search_books`, `get_book` and `get_reading_log`, the transport, the
 OAuth handshake and the reader check all worked. Then try a real one:
 
 > What did I finish reading this year?
+
+That path has been walked end to end: Book Lamp's own service is connected as a
+custom app in the **consumer** Gemini app and answers questions in a chat
+(October 2026). Custom apps are not limited to Spark.
 
 ## What the server can answer
 
@@ -150,10 +156,11 @@ data — it changes at most daily, when you log something.
 Lamp, so there is no reader to read as. Sign in to the app once with it.
 
 **Nothing appears under Custom apps.** Check the eligibility list above — a work
-or school account, location, language, or Keep Activity will do it. Google also
-describes custom apps as part of Gemini Spark, and access to them is reported to
-be gated behind it, so the field can be missing even when everything else is
-right and there is nothing to fix on your side.
+or school account, location, language, or Keep Activity will do it. That list is
+the whole of Google's rules and the feature is live in the consumer app, so a
+missing section means one of them is unmet rather than something to wait for. The
+heading also varies: **Custom apps** in Google's help, **Custom apps for Spark**
+on some screens.
 
 **Gemini asks for consent again after every deploy.** Client registrations and
 tokens are held in memory, so a deploy makes Gemini register and consent again.
