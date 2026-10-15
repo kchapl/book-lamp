@@ -7,7 +7,7 @@ import GoalProgress from '../components/GoalProgress';
 import Icon from '../components/Icon';
 import { Button, LinearProgress } from '../ui';
 import { useResource } from '../hooks/useResource';
-import { statusClass } from '../utils/status';
+import { IN_PROGRESS_STATUS, statusAccentClass, statusClass } from '../utils/status';
 import { formatDate } from '../utils/format';
 
 const STATUS_ORDER = ['Completed', 'In Progress', 'Abandoned'] as const;
@@ -21,7 +21,7 @@ const StatsPage: React.FC = () => {
             getStats(),
             // The dashboard's hero is the books currently being read. A failure
             // here must not take down the whole board, so it is handled apart.
-            getBooks({ status: 'In Progress' }).catch(() => ({ books: [] as Book[] })),
+            getBooks({ status: IN_PROGRESS_STATUS }).catch(() => ({ books: [] as Book[] })),
         ]);
         return { stats, currentBooks: inProgress.books || [] };
     };
@@ -92,7 +92,9 @@ const StatsPage: React.FC = () => {
                                         </span>
                                     )}
                                     <div className="lectern-body">
-                                        <span className="status-badge status-in-progress">In Progress</span>
+                                        <span className={`status-badge ${statusClass(IN_PROGRESS_STATUS)}`}>
+                                            {IN_PROGRESS_STATUS}
+                                        </span>
                                         <h3>{book.title}</h3>
                                         <p>{book.author || 'Unknown author'}</p>
                                     </div>
@@ -132,7 +134,7 @@ const StatsPage: React.FC = () => {
                             <Link
                                 key={status}
                                 to={`/books?status=${encodeURIComponent(status)}`}
-                                className={`status-card ${statusClass(status).replace('status-', 'is-')}`}
+                                className={`status-card ${statusAccentClass(status)}`}
                             >
                                 <div className="status-card-top">
                                     <span className="status-card-name">{status}</span>

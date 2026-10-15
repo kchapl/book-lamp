@@ -5,6 +5,7 @@ import { Button, Select, SelectOption } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { formatDate } from '../utils/format';
+import { statusClass } from '../utils/status';
 import type { HistoryFilters } from '../types';
 
 /** The reading log's filters, as they appear in the URL. */
@@ -116,7 +117,7 @@ const HistoryPage: React.FC = () => {
                                 {records.map((record) => (
                                     <div key={record.id} className="history-record">
                                         <div className="record-main">
-                                            <span className={`status-badge status-${record.status.toLowerCase().replace(' ', '-')}`}>
+                                            <span className={`status-badge ${statusClass(record.status)}`}>
                                                 {record.status}
                                             </span>
                                             {record.rating ? (

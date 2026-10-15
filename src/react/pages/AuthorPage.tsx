@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getAuthorPage, addToReadingList } from '../services/api';
 import { Button } from '../ui';
 import { useResource } from '../hooks/useResource';
+import { READING_LIST_CLASS } from '../utils/status';
 import type { AuthorPage } from '../types';
 
 const AuthorPage: React.FC = () => {
@@ -82,7 +83,7 @@ const AuthorPage: React.FC = () => {
                                 )}
                                 <div className="book-info">
                                     <Link to={`/books/${book.id}`} className="book-title">{book.title}</Link>
-                                    <span className="status-badge">On Reading List</span>
+                                    <span className={`status-badge ${READING_LIST_CLASS}`}>On Reading List</span>
                                 </div>
                             </div>
                         ))}
