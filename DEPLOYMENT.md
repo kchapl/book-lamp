@@ -53,6 +53,26 @@ re-syncs the environment first, and the default `dev` group is part of what it
 syncs: without the flag the service downloads pytest, black, mypy and ruff
 before it serves anything. A sleeping service pays that on every wake.
 
+### Schema changes that span two releases
+
+The build command runs `alembic upgrade head`, so a migration lands before the
+instance written for it starts — while the instance it replaces is still serving.
+A release that removes a column the running application still writes therefore
+cannot go out in one step.
+
+`books.author` is one: the application wrote it until migration `0006`, and `0008`
+drops it. Deploy in two steps.
+
+1. This release, with the application that stopped writing the column: `0006`
+   gives `book_authors` the order a Book's authors are listed in, and `0007`
+   repairs the two Books whose stored author strings the splitter had mangled.
+2. The next release: `0008` drops the column.
+
+`0008` refuses to run while any Book's links cannot reproduce its author string,
+and names the Books that fail, so a Book needing attention stops the deploy
+instead of losing its author. See
+`docs/adr/0005-a-books-authors-come-from-the-links.md`.
+
 ### First-Time Setup
 
 After deployment:

@@ -136,7 +136,7 @@ class PostgresStorage:
         """
         effective_user_id = user_id or self.user_id
         query = """
-            SELECT DISTINCT b.*, array_agg(a.name) as author_names
+            SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
             FROM books b
             LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
             LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
@@ -151,12 +151,11 @@ class PostgresStorage:
             for row_raw in rows:
                 book = cast(Dict[str, Any], row_raw)
 
-                # authors field in MockStorage is a comma-separated string
-
+                # One spelling of the display string, from the links in stored
+                # order, so every path that names a Book's authors agrees.
                 authors_list = [a for a in (book.get("author_names") or []) if a is not None]
                 book["authors"] = authors_list
-                # Use first normalized author if available, otherwise fall back to row's author column or empty string
-                book["author"] = authors_list[0] if authors_list else (book.get("author") or "")
+                book["author"] = ", ".join(authors_list)
                 books.append(book)
             return books
 
@@ -185,7 +184,7 @@ class PostgresStorage:
 
     def get_book_by_id(self, book_id: int) -> Optional[dict[str, Any]]:
         query = """
-            SELECT b.*, array_agg(a.name) as author_names
+            SELECT b.*, array_agg(a.name ORDER BY ba.position) as author_names
             FROM books b
             LEFT JOIN book_authors ba ON b.id = ba.book_id
             LEFT JOIN authors a ON ba.author_id = a.id
@@ -199,15 +198,15 @@ class PostgresStorage:
             row = cast(Dict[str, Any], row_raw)
             book = dict(row)
 
-            book["authors"] = row["author_names"] if row["author_names"] != [None] else []
-            book["author"] = book["author_names"][0] if book["author_names"] else ""
+            book["authors"] = [name for name in (row["author_names"] or []) if name is not None]
+            book["author"] = ", ".join(book["authors"])
 
             return book
 
     def get_book_by_isbn(self, isbn13: str) -> Optional[dict[str, Any]]:
         target_isbn = normalize_isbn(isbn13)
         query = """
-            SELECT b.*, array_agg(a.name) as author_names
+            SELECT b.*, array_agg(a.name ORDER BY ba.position) as author_names
             FROM books b
             LEFT JOIN book_authors ba ON b.id = ba.book_id
             LEFT JOIN authors a ON ba.author_id = a.id
@@ -221,13 +220,17 @@ class PostgresStorage:
             row = cast(Dict[str, Any], row_raw)
             book = dict(row)
 
-            book["authors"] = row["author_names"] if row["author_names"] != [None] else []
-            book["author"] = book["author_names"][0] if book["author_names"] else ""
+            book["authors"] = [name for name in (row["author_names"] or []) if name is not None]
+            book["author"] = ", ".join(book["authors"])
             return book
 
     def get_reading_list(self) -> list[dict[str, Any]]:
         query = """
-            SELECT rl.*, b.title, b.author, b.thumbnail_url
+            SELECT rl.*, b.title, b.thumbnail_url,
+                   (SELECT string_agg(a.name, ', ' ORDER BY ba.position)
+                    FROM book_authors ba
+                    JOIN authors a ON a.id = ba.author_id
+                    WHERE ba.book_id = b.id) AS author
             FROM reading_list rl
             JOIN books b ON rl.book_id = b.id
             WHERE rl.user_id = %s
@@ -240,10 +243,14 @@ class PostgresStorage:
     def get_reading_history(self) -> list[dict[str, Any]]:
         """Retrieve all readings joined with book metadata."""
         query = """
-            SELECT rr.*, b.title as book_title, b.author as book_author, b.thumbnail_url as book_thumbnail_url
+            SELECT rr.*, b.title as book_title, b.thumbnail_url as book_thumbnail_url,
+                   array_agg(a.name ORDER BY ba.position) FILTER (WHERE a.name IS NOT NULL) AS book_author_names
             FROM readings rr
             JOIN books b ON rr.book_id = b.id
+            LEFT JOIN book_authors ba ON ba.book_id = b.id
+            LEFT JOIN authors a ON ba.author_id = a.id
             WHERE rr.user_id = %s AND rr.status IN ('In Progress', 'Completed', 'Abandoned')
+            GROUP BY rr.id, b.title, b.thumbnail_url
             ORDER BY rr.start_date DESC, rr.created_at DESC
         """
         with self.pool.connection() as conn:
@@ -252,10 +259,8 @@ class PostgresStorage:
             for row_raw in rows:
                 row = cast(Dict[str, Any], row_raw)
                 enriched = dict(row)
-                # MockStorage expectation: 'book_authors' as a list
-                # We'll need to fetch authors for each book or do a more complex JOIN
-                # For now, let's just split the single author string for compatibility
-                enriched["book_authors"] = split_authors(row["book_author"])
+                enriched["book_authors"] = [name for name in (row["book_author_names"] or []) if name is not None]
+                enriched["book_author"] = ", ".join(enriched["book_authors"])
 
                 history.append(enriched)
             return history
@@ -321,14 +326,13 @@ class PostgresStorage:
                 # First try atomic upsert
                 query = """
                     INSERT INTO books (
-                        isbn13, title, author, publication_year, thumbnail_url,
+                        isbn13, title, publication_year, thumbnail_url,
                         publisher, description, series, bisac_category,
                         bisac_main_category, bisac_sub_category, language,
                         page_count, physical_format, edition, cover_url
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (isbn13) DO UPDATE SET
                         title = EXCLUDED.title,
-                        author = EXCLUDED.author,
                         publication_year = EXCLUDED.publication_year,
                         thumbnail_url = EXCLUDED.thumbnail_url,
                         publisher = EXCLUDED.publisher,
@@ -351,7 +355,6 @@ class PostgresStorage:
                         [
                             target_isbn,
                             title,
-                            author,
                             publication_year,
                             thumbnail_url,
                             publisher,
@@ -387,12 +390,14 @@ class PostgresStorage:
         return self.get_book_by_id(book_id)  # type: ignore
 
     def _update_book_authors(self, conn: psycopg.Connection[Any], book_id: int, author_str: str) -> None:
-        """Helper to sync the authors table and book_authors link."""
+        """Helper to sync the authors table and the ordered book_authors links."""
         author_names = split_authors(author_str)
         # Clear existing links
         conn.execute("DELETE FROM book_authors WHERE book_id = %s", [book_id])
 
-        for name in author_names:
+        # position is what every read orders by, so the order the names were
+        # split in survives the write (see migration 0006).
+        for position, name in enumerate(author_names, start=1):
             # Upsert author
             conn.execute(
                 "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
@@ -402,8 +407,11 @@ class PostgresStorage:
             if author_row:
                 author_id = author_row["id"]
                 conn.execute(
-                    "INSERT INTO book_authors (book_id, author_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                    [book_id, author_id],
+                    """
+                    INSERT INTO book_authors (book_id, author_id, position) VALUES (%s, %s, %s)
+                    ON CONFLICT (book_id, author_id) DO UPDATE SET position = EXCLUDED.position
+                    """,
+                    [book_id, author_id, position],
                 )
 
     def update_book(
@@ -446,7 +454,7 @@ class PostgresStorage:
 
                 query = """
                     UPDATE books SET
-                        isbn13 = %s, title = %s, author = %s, publication_year = %s,
+                        isbn13 = %s, title = %s, publication_year = %s,
                         thumbnail_url = %s, publisher = %s, description = %s, series = %s,
                         bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
                         language = %s, page_count = %s, physical_format = %s, edition = %s, cover_url = %s
@@ -457,7 +465,6 @@ class PostgresStorage:
                     [
                         normalize_isbn(isbn13),
                         title,
-                        author,
                         publication_year,
                         thumbnail_url or existing["thumbnail_url"],
                         publisher or existing["publisher"],
@@ -674,7 +681,7 @@ class PostgresStorage:
                         # Update book (simplified for bulk)
                         query = """
                             UPDATE books SET
-                                title = %s, author = %s, publication_year = %s,
+                                title = %s, publication_year = %s,
                                 publisher = %s, description = %s, series = %s,
                                 bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
                                 language = %s, page_count = %s, physical_format = %s, edition = %s,
@@ -686,7 +693,6 @@ class PostgresStorage:
                             query,
                             [
                                 book_data["title"],
-                                book_data["author"],
                                 book_data["publication_year"],
                                 book_data.get("publisher"),
                                 book_data.get("description"),
@@ -706,14 +712,13 @@ class PostgresStorage:
                     else:
                         query = """
                             INSERT INTO books (
-                                isbn13, title, author, publication_year, thumbnail_url,
+                                isbn13, title, publication_year, thumbnail_url,
                                 publisher, description, series, bisac_category,
                                 bisac_main_category, bisac_sub_category, language,
                                 page_count, physical_format, edition, cover_url
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (isbn13) DO UPDATE SET
                                 title = EXCLUDED.title,
-                                author = EXCLUDED.author,
                                 publication_year = EXCLUDED.publication_year,
                                 thumbnail_url = EXCLUDED.thumbnail_url
                             RETURNING id
@@ -723,7 +728,6 @@ class PostgresStorage:
                             [
                                 isbn13,
                                 book_data["title"],
-                                book_data["author"],
                                 book_data["publication_year"],
                                 book_data.get("thumbnail_url"),
                                 book_data.get("publisher"),

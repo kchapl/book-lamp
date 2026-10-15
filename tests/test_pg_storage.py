@@ -7,6 +7,7 @@ compose.yaml with podman-compose. A host that cannot start containers skips them
 
 import os
 import shutil
+from uuid import uuid4
 
 import psycopg
 import pytest
@@ -14,6 +15,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.utils.authors import split_authors
 
 # The compose command is only the first hurdle: whether the runtime can actually
 # start a container is settled by the `podman_services` fixture.
@@ -390,3 +392,232 @@ def test_the_rename_migration_left_the_table_indexes_and_constraint_renamed(pg_s
     assert "reading_records" not in tables
     assert {"idx_readings_user_id", "idx_readings_status", "idx_readings_book_id"} <= indexes
     assert "readings_pkey" in constraints
+
+
+def test_a_books_authors_keep_the_order_they_were_entered_in(pg_storage):
+    """A Book's authors are its links, in `position` order (ADR-0005).
+
+    William Gibson is created first here, so ordering the links by `author_id` —
+    what the reads did before 0006 — would name this Book the other way round.
+    """
+    pg_storage.add_book(isbn13="9780441013593", title="Neuromancer", author="William Gibson")
+    book = pg_storage.add_book(
+        isbn13="9780575081567",
+        title="The Difference Engine",
+        author="Bruce Sterling; William Gibson",
+    )
+    pg_storage.add_to_reading_list(book["id"])
+
+    expected = ["Bruce Sterling", "William Gibson"]
+    display = "Bruce Sterling, William Gibson"
+
+    for read in (
+        pg_storage.get_book_by_id(book["id"]),
+        pg_storage.get_book_by_isbn("9780575081567"),
+        next(b for b in pg_storage.get_all_books() if b["id"] == book["id"]),
+    ):
+        assert read["authors"] == expected
+        assert read["author"] == display
+
+    assert pg_storage.get_reading_list()[0]["author"] == display
+
+    pg_storage.start_reading(book["id"])
+    history = pg_storage.get_reading_history()[0]
+    assert history["book_authors"] == expected
+    assert history["book_author"] == display
+
+
+def test_both_adapters_present_a_books_authors_the_same_way(pg_storage):
+    """The in-memory adapter and Postgres agree on a Book's authors (ADR-0005)."""
+    from book_lamp.services.mock_storage import MockStorage
+
+    author = "Bruce Sterling; William Gibson"
+    book = pg_storage.add_book(isbn13="9780575081567", title="The Difference Engine", author=author)
+    in_memory = MockStorage().add_book(isbn13="9780575081567", title="The Difference Engine", author=author)
+
+    read = pg_storage.get_book_by_id(book["id"])
+    assert read["authors"] == in_memory["authors"]
+    assert read["author"] == in_memory["author"]
+
+
+def test_0008_left_a_required_position_and_no_author_column(pg_storage):
+    """The schema 0008 writes, asserted rather than the rows it leaves.
+
+    A migration that ran but left the column, the default or the check behind
+    would still pass every storage test, because nothing reads the column any
+    more — so the shape is read off the catalogue here.
+    """
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        book_columns = {
+            row[0]
+            for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'books'"
+            ).fetchall()
+        }
+        position = conn.execute(
+            "SELECT is_nullable, column_default FROM information_schema.columns "
+            "WHERE table_name = 'book_authors' AND column_name = 'position'"
+        ).fetchone()
+        check = conn.execute(
+            "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+            "WHERE conrelid = 'book_authors'::regclass AND conname = 'book_authors_position_check'"
+        ).fetchone()
+
+    assert "author" not in book_columns
+    assert position is not None
+    assert position[0] == "NO"
+    assert position[1] is None  # nothing may write a link without an order
+    assert check is not None
+    assert "position" in check[0] and "> 0" in check[0]
+
+
+@pytest.fixture
+def own_database(setup_database, monkeypatch):
+    """A database of this test's own, so a migration can be stopped part-way.
+
+    `alembic/env.py` prefers `DATABASE_URL` to the config's URL, so the migrations
+    are aimed at this database by aiming that variable at it. The shared pool is
+    opened against the test database first: it keeps the conninfo it was built
+    with, so nothing reconnects here.
+    """
+    from book_lamp.services.pg_storage import get_pool
+
+    get_pool()
+
+    server = setup_database.rsplit("/", 1)[0]
+    name = f"book_lamp_migration_{uuid4().hex[:8]}"
+    with psycopg.connect(f"{server}/postgres", autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{name}"')
+
+    monkeypatch.setenv("DATABASE_URL", f"{server}/{name}")
+    try:
+        yield f"{server}/{name}"
+    finally:
+        with psycopg.connect(f"{server}/postgres", autocommit=True) as conn:
+            conn.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+def _upgrade_database(url, revision):
+    """Run the migrations up to `revision` against the database at `url`."""
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", url)
+    command.upgrade(config, revision)
+
+
+def _write_book_as_the_release_before_0006_did(url, isbn13, title, author):
+    """A Book as that release left it: the string, and links in split order.
+
+    `book_authors` had no `position` then, so its `_update_book_authors` inserted
+    one row per name `split_authors` returned, in that order.
+    """
+    with psycopg.connect(url) as conn:
+        book_id = conn.execute(
+            "INSERT INTO books (isbn13, title, author) VALUES (%s, %s, %s) RETURNING id",
+            [isbn13, title, author],
+        ).fetchone()[0]
+        for name in split_authors(author):
+            author_id = conn.execute(
+                "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO UPDATE "
+                "SET name = EXCLUDED.name RETURNING id",
+                [name],
+            ).fetchone()[0]
+            conn.execute("INSERT INTO book_authors (book_id, author_id) VALUES (%s, %s)", [book_id, author_id])
+    return book_id
+
+
+def _author_names_in_order(url, isbn13):
+    """The names of the authors one Book links to, in `position` order."""
+    with psycopg.connect(url) as conn:
+        return conn.execute(
+            """
+            SELECT array_agg(a.name ORDER BY ba.position)
+            FROM books b
+            JOIN book_authors ba ON ba.book_id = b.id
+            JOIN authors a ON a.id = ba.author_id
+            WHERE b.isbn13 = %s
+            """,
+            [isbn13],
+        ).fetchone()[0]
+
+
+def test_0007_repairs_the_two_strings_the_splitter_mangled(own_database):
+    """The repair reads the string, so what it writes joins back to it exactly."""
+    _upgrade_database(own_database, "0005")
+    _write_book_as_the_release_before_0006_did(
+        own_database, "9781398505292", "A Book", "To Be To Be Confirmed Simon & Schuster"
+    )
+    _write_book_as_the_release_before_0006_did(
+        own_database, "9781785781438", "Another Book", "Sutherland, John, John Crace"
+    )
+    # A Book whose string really is comma-separated authors, which the splitter
+    # read correctly; the repair must leave it alone.
+    _write_book_as_the_release_before_0006_did(
+        own_database, "9780441013593", "Dune", "Frank Herbert, Kevin J. Anderson, Brian Herbert"
+    )
+
+    _upgrade_database(own_database, "head")
+
+    assert _author_names_in_order(own_database, "9781398505292") == ["To Be To Be Confirmed Simon & Schuster"]
+    assert _author_names_in_order(own_database, "9781785781438") == ["Sutherland, John", "John Crace"]
+    assert _author_names_in_order(own_database, "9780441013593") == [
+        "Frank Herbert",
+        "Kevin J. Anderson",
+        "Brian Herbert",
+    ]
+
+    with psycopg.connect(own_database) as conn:
+        # The halves the bad split invented are referenced by nothing now, so
+        # they go: they named no Book and no person (ADR-0005).
+        leftovers = conn.execute(
+            "SELECT name FROM authors WHERE name IN "
+            "('To Be To Be Confirmed Simon', 'Schuster', 'Sutherland', 'John')"
+        ).fetchall()
+    assert leftovers == []
+
+
+def test_0008_numbers_a_link_the_release_before_0006_wrote(own_database):
+    """Such a link carries the default 0, and 0008 leaves no link unordered."""
+    _upgrade_database(own_database, "0007")
+    _write_book_as_the_release_before_0006_did(
+        own_database, "9780441013593", "Dune", "Frank Herbert, Kevin J. Anderson, Brian Herbert"
+    )
+    with psycopg.connect(own_database) as conn:
+        assert conn.execute("SELECT DISTINCT position FROM book_authors").fetchall() == [(0,)]
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        numbered = conn.execute("""
+            SELECT a.name, ba.position
+            FROM book_authors ba
+            JOIN authors a ON a.id = ba.author_id
+            JOIN books b ON b.id = ba.book_id
+            WHERE b.isbn13 = '9780441013593'
+            ORDER BY ba.position
+            """).fetchall()
+    assert numbered == [("Frank Herbert", 1), ("Kevin J. Anderson", 2), ("Brian Herbert", 3)]
+
+
+def test_0008_refuses_a_book_whose_links_cannot_reproduce_its_string(own_database):
+    """A Book needing attention stops the drop instead of losing its author."""
+    _upgrade_database(own_database, "0007")
+    with psycopg.connect(own_database) as conn:
+        book_id = conn.execute(
+            "INSERT INTO books (isbn13, title, author) VALUES ('9780441013593', 'Dune', 'Frank Herbert') RETURNING id"
+        ).fetchone()[0]
+        author_id = conn.execute("INSERT INTO authors (name) VALUES ('Somebody Else') RETURNING id").fetchone()[0]
+        conn.execute(
+            "INSERT INTO book_authors (book_id, author_id, position) VALUES (%s, %s, 1)",
+            [book_id, author_id],
+        )
+
+    with pytest.raises(RuntimeError, match="Refusing to drop books.author"):
+        _upgrade_database(own_database, "head")
+
+    # The refusal is the whole migration, not just the drop: the column is still
+    # there and the revision is not stamped.
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT author FROM books WHERE isbn13 = '9780441013593'").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == "Frank Herbert"
+    assert stamped == "0007"
