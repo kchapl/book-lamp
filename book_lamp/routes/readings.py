@@ -44,8 +44,8 @@ def api_create_reading(book_id: int):
         )
         current_app.logger.info(f"READING_CREATED (API): book_id={book_id}, status='{status}'")
         return jsonify(record), 201
-    except ReadingEndsWithoutADate as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ReadingEndsWithoutADate:
+        return jsonify({"error": "An end date is required when a Reading is completed or abandoned"}), 400
     except Exception:
         current_app.logger.exception(f"api_create_reading: failed for book_id={book_id}")
         return jsonify({"error": "Failed to create reading"}), 500
@@ -85,8 +85,8 @@ def api_update_reading(reading_id: int):
         )
         current_app.logger.info(f"READING_UPDATED (API): reading_id={reading_id}, status='{status}'")
         return jsonify({"success": True})
-    except ReadingEndsWithoutADate as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ReadingEndsWithoutADate:
+        return jsonify({"error": "An end date is required when a Reading is completed or abandoned"}), 400
     except Exception:
         current_app.logger.exception(f"api_update_reading: failed for reading_id={reading_id}")
         return jsonify({"error": "Failed to update reading"}), 500
