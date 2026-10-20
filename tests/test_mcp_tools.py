@@ -349,5 +349,7 @@ def test_consenting_hands_the_reader_to_google(google_app) -> None:
         approved = client.post(consent_url, data=form, follow_redirects=False)
 
     assert approved.status_code == 302, approved.text
-    parsed_url = urlparse(approved.headers["location"])
-    assert parsed_url.hostname == "accounts.google.com" or parsed_url.hostname.endswith(".accounts.google.com")
+    # A missing host cannot match either branch; the empty default keeps both
+    # the comparison and the suffix check total for the type checker.
+    hostname = urlparse(approved.headers["location"]).hostname or ""
+    assert hostname == "accounts.google.com" or hostname.endswith(".accounts.google.com")
