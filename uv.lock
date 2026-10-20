@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -206,6 +206,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "certifi" },
     { name = "click" },
     { name = "flask" },
     { name = "google-auth" },
@@ -257,6 +258,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18" },
     { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.9" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=26.5" },
+    { name = "certifi", specifier = ">=2026.5.20" },
     { name = "click", specifier = ">=8.4" },
     { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=4.1" },
     { name = "flask", specifier = ">=3.1" },
