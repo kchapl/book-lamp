@@ -57,7 +57,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2.25.0
+        uses: enricomi/publish-unit-test-result-action@v2.25.0
         if: always()
         with:
           files: pytest-results.xml
