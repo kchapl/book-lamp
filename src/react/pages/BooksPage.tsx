@@ -49,10 +49,29 @@ const BooksPage: React.FC = () => {
     /** Apply a filter, leaving search mode: the search box is not a filter. */
     const applyFilter = (update: Record<string, string>) => setUrlFilters({ ...update, q: '' });
 
+    // A search replaces the filters; an empty one clears everything. Both the
+    // form's submit and the field's Enter key reach this, so the two cannot
+    // disagree about what a search is.
+    const runSearch = () => {
+        setUrlFilters({ ...NO_FILTERS, q: searchQuery.trim() });
+    };
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        // A search replaces the filters; an empty one clears everything.
-        setUrlFilters({ ...NO_FILTERS, q: searchQuery.trim() });
+        runSearch();
+    };
+
+    /**
+     * Enter in the field has to start the search itself. The real input lives in
+     * the text field's shadow root and is not in the form's own tree, so the
+     * browser's implicit submission never fires — without this the key does
+     * nothing at all. The default is prevented so the search cannot also arrive
+     * as a native submit.
+     */
+    const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        runSearch();
     };
 
     const clearFilters = () => {
@@ -90,6 +109,7 @@ const BooksPage: React.FC = () => {
                         placeholder="Search by title, author or ISBN…"
                         value={searchQuery}
                         onValueChange={setSearchQuery}
+                        onKeyDown={handleSearchKeyDown}
                     />
                     <Button variant="filled" icon="search" type="submit">
                         Search
