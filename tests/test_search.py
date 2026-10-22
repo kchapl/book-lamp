@@ -105,6 +105,71 @@ def test_search_with_series():
     assert results[0]["series"] == "Harry Potter"
 
 
+# --- Tolerance for mistyped words ---
+
+
+def test_search_ignores_case():
+    """A capitalised query is the same query, not a corrected one."""
+    books = [{"id": 1, "title": "Project Hail Mary", "author": "Andy Weir"}]
+    assert [b["title"] for b in search_books(books, [], "HAIL MARY")] == ["Project Hail Mary"]
+    assert calculate_relevance_score(books[0], [], "HAIL MARY") == calculate_relevance_score(books[0], [], "hail mary")
+
+
+def test_search_tolerates_a_typo_in_a_title():
+    """One mistyped word should not hide a Book the other words name."""
+    books = [{"id": 1, "title": "Project Hail Mary", "author": "Andy Weir"}]
+    results = search_books(books, [], "hail mairy")
+    assert [b["title"] for b in results] == ["Project Hail Mary"]
+
+
+def test_search_tolerates_a_transposed_letter_in_an_author_name():
+    """Two swapped characters are one typo, not two."""
+    books = [{"id": 1, "title": "Project Hail Mary", "author": "Andy Weir"}]
+    results = search_books(books, [], "andy wier")
+    assert [b["title"] for b in results] == ["Project Hail Mary"]
+
+
+def test_search_tolerates_a_typo_and_matches_the_rest_of_a_word():
+    """A corrected word still only has to reach the beginning of a word."""
+    books = [{"id": 1, "title": "Project Hail Mary", "author": "Andy Weir"}]
+    results = search_books(books, [], "projet hail mar")
+    assert [b["title"] for b in results] == ["Project Hail Mary"]
+
+
+def test_an_exact_word_outranks_a_corrected_one():
+    """A typo may find a Book, but it must not displace the one spelled right."""
+    books = [{"id": 1, "title": "Mery"}, {"id": 2, "title": "Mary"}]
+    results = search_books(books, [], "mary")
+
+    assert [b["title"] for b in results] == ["Mary", "Mery"]
+    assert calculate_relevance_score(books[1], [], "mary") > calculate_relevance_score(books[0], [], "mary")
+
+
+def test_short_words_are_not_corrected():
+    """Three letters are too little to tell a typo from a different word."""
+    book = {"id": 1, "title": "Dune", "author": "Frank Herbert"}
+    assert calculate_relevance_score(book, [], "dan") == 0.0
+
+
+def test_search_returns_nothing_when_no_word_is_close():
+    """Tolerance is bounded: a query that resembles nothing still finds nothing."""
+    books = [{"id": 1, "title": "Dune", "author": "Frank Herbert"}]
+    assert search_books(books, [], "zzzz") == []
+
+
+def test_every_query_word_has_to_match_somewhere():
+    """One matched word does not carry a query whose other words match nothing."""
+    books = [{"id": 1, "title": "Hail Caesar", "author": "A"}]
+    assert search_books(books, [], "hail mary") == []
+
+
+def test_query_words_may_land_in_different_fields():
+    """The words of a query are matched independently, not as one phrase."""
+    books = [{"id": 1, "title": "Project Hail Mary", "author": "Andy Weir"}]
+    results = search_books(books, [], "hail weir")
+    assert [b["title"] for b in results] == ["Project Hail Mary"]
+
+
 # --- Route Tests ---
 
 
@@ -120,6 +185,22 @@ def test_search_route_with_query(authenticated_client):
     body = response.get_json()
     assert body["search_query"] == "test"
     assert any(b["title"] == "A Test Book" for b in body["books"])
+
+
+def test_search_route_tolerates_a_typo(authenticated_client):
+    """The route returns the Book for a mistyped query, not an empty set.
+
+    The route narrows results to Books that have a Reading Status, so the Book
+    needs a Reading to be reachable this way at all.
+    """
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000003", title="Project Hail Mary", author="Andy Weir")
+    storage.add_reading(book["id"], "Completed", "2026-09-01", "2026-10-11")
+
+    response = authenticated_client.get("/api/books/search?q=hail+mairy")
+
+    assert response.status_code == 200
+    assert [b["title"] for b in response.get_json()["books"]] == ["Project Hail Mary"]
 
 
 def test_search_route_with_empty_query(authenticated_client):

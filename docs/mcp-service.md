@@ -92,9 +92,11 @@ A few behaviours worth knowing, because they shape what you can ask:
   and you get exactly that.
 - **A year means the year a Reading ended** — or, for one still open, the year it
   started.
-- **Search is broad.** It matches title, author, ISBN, series, publisher,
-  category, publication year, and the Reading's own fields (status, rating,
-  dates). It returns identity fields only, though, so use the Reading Log when
+- **Search is broad, and forgives a typo.** It matches title, author, ISBN,
+  series, publisher, category, publication year, and the Reading's own fields
+  (status, rating, dates). Every word in a query has to land somewhere, but a
+  word one or two letters out still finds its Book — a misspelling is not an
+  absence. It returns identity fields only, though, so use the Reading Log when
   you want statuses and ratings back.
 - **A title has to name exactly one Book.** `get_book` with "Dune" refuses when
   several Books match, and hands back the ISBNs to choose from. Naming the author

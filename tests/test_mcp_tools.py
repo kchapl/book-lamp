@@ -83,6 +83,15 @@ def test_search_answers_nothing_for_a_title_the_collection_does_not_have(verifie
     assert _call("search_books", {"query": "The Silmarillion"}).data == []
 
 
+def test_search_tolerates_a_typo_in_a_title(verified) -> None:
+    """The tool's tolerance comes from the shared search, so prove it here too."""
+    _seed()
+
+    found = _call("search_books", {"query": "hail mairy"}).data
+
+    assert [book["title"] for book in found] == ["Project Hail Mary"]
+
+
 def test_get_book_by_isbn_returns_its_readings_newest_first(verified) -> None:
     seed = _seed()
     storage.add_reading(seed["hail_mary"]["id"], "In Progress", "2026-01-05")
