@@ -57,50 +57,103 @@ describe('Layout navigation', () => {
     });
 });
 
-describe('Layout data export', () => {
-    it('offers an authenticated reader a CSV export action', () => {
-        const { container } = render(
+describe('Layout account menu', () => {
+    const renderLayout = (isAuthorized = true) => {
+        const logoutUser = vi.fn();
+        const utils = render(
             <MemoryRouter>
                 <AppContext.Provider
                     value={{
                         theme: 'system',
                         setTheme: vi.fn(),
-                        isAuthorized: true,
+                        isAuthorized,
                         setIsAuthorized: vi.fn(),
                         googleClientId: null,
                         syncStatus: 'ok',
-                        logoutUser: vi.fn(),
+                        logoutUser,
                     }}
                 >
                     <Layout><div>Reading room</div></Layout>
                 </AppContext.Provider>
             </MemoryRouter>
         );
+        return { ...utils, logoutUser };
+    };
 
-        fireEvent.click(container.querySelector('md-text-button[aria-label="Export my data as CSV"]') as HTMLElement);
+    const trigger = (container: HTMLElement) =>
+        container.querySelector('md-text-button[aria-label="Account"]') as HTMLElement | null;
+    const exportItem = (container: HTMLElement) =>
+        container.querySelector('md-text-button[aria-label="Export my data as CSV"]') as HTMLElement | null;
+    const signOutItem = (container: HTMLElement) =>
+        container.querySelector('md-text-button[aria-label="Sign out"]') as HTMLElement | null;
+
+    const openMenu = (container: HTMLElement) => {
+        fireEvent.click(trigger(container) as HTMLElement);
+    };
+
+    it('keeps the export out of the nav until the account menu is open', () => {
+        const { container } = renderLayout();
+
+        expect(exportItem(container)).not.toBeInTheDocument();
+
+        openMenu(container);
+
+        expect(exportItem(container)).toBeInTheDocument();
+    });
+
+    it('downloads the CSV from the account menu', () => {
+        const { container } = renderLayout();
+        openMenu(container);
+
+        fireEvent.click(exportItem(container) as HTMLElement);
 
         expect(locationAssign).toHaveBeenCalledWith('/api/export/csv');
     });
 
-    it('does not offer a private data export to signed-out visitors', () => {
-        const { container } = render(
-            <MemoryRouter>
-                <AppContext.Provider
-                    value={{
-                        theme: 'system',
-                        setTheme: vi.fn(),
-                        isAuthorized: false,
-                        setIsAuthorized: vi.fn(),
-                        googleClientId: null,
-                        syncStatus: 'checking',
-                        logoutUser: vi.fn(),
-                    }}
-                >
-                    <Layout><div>Reading room</div></Layout>
-                </AppContext.Provider>
-            </MemoryRouter>
-        );
+    it('signs out from the account menu', () => {
+        const { container, logoutUser } = renderLayout();
+        openMenu(container);
 
-        expect(container.querySelector('md-text-button[aria-label="Export my data as CSV"]')).not.toBeInTheDocument();
+        fireEvent.click(signOutItem(container) as HTMLElement);
+
+        expect(logoutUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports whether the menu is open on its trigger', () => {
+        const { container } = renderLayout();
+
+        expect(trigger(container)).toHaveAttribute('aria-haspopup', 'menu');
+        expect(trigger(container)).toHaveAttribute('aria-expanded', 'false');
+
+        openMenu(container);
+
+        expect(trigger(container)).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('closes the account menu on Escape', () => {
+        const { container } = renderLayout();
+        openMenu(container);
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+
+        expect(exportItem(container)).not.toBeInTheDocument();
+        expect(trigger(container)).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('closes the account menu when the reader clicks elsewhere', () => {
+        const { container } = renderLayout();
+        openMenu(container);
+
+        fireEvent.mouseDown(document.body);
+
+        expect(exportItem(container)).not.toBeInTheDocument();
+    });
+
+    it('offers signed-out visitors no account menu, export or sign out', () => {
+        const { container } = renderLayout(false);
+
+        expect(trigger(container)).not.toBeInTheDocument();
+        expect(exportItem(container)).not.toBeInTheDocument();
+        expect(signOutItem(container)).not.toBeInTheDocument();
     });
 });

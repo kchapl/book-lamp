@@ -229,12 +229,16 @@ button {
     cursor: help;
 }
 
-.theme-selector {
+.theme-selector,
+.account-selector {
     position: relative;
     display: inline-flex;
 }
 
-.theme-menu {
+/* The theme and account dropdowns are the same piece of furniture: a panel hung
+   under its trigger. The class is shared so the two cannot drift apart. */
+.theme-menu,
+.account-menu {
     position: absolute;
     top: calc(100% + var(--bl-space-2));
     right: 0;

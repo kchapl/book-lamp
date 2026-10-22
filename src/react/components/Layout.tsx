@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppContext } from '../App';
 import Icon, { IconName } from './Icon';
@@ -27,9 +27,11 @@ const THEME_OPTIONS: { value: 'light' | 'dark' | 'system'; label: string; icon: 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { theme, setTheme, syncStatus, isAuthorized, logoutUser } = useContext(AppContext);
     const [showThemeMenu, setShowThemeMenu] = useState(false);
+    const [showAccountMenu, setShowAccountMenu] = useState(false);
     const [jobIndicator, setJobIndicator] = useState<string | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
+    const accountRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -40,10 +42,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }, [location]);
 
     useEffect(() => {
-        // A route change always closes the mobile menu.
+        // A route change always closes the mobile menu and its dropdowns.
         setMobileMenuOpen(false);
         setShowThemeMenu(false);
+        setShowAccountMenu(false);
     }, [location.pathname]);
+
+    useEffect(() => {
+        if (!showAccountMenu) return;
+
+        // A dropdown that ignores Escape or a click elsewhere traps a reader in
+        // it, so both close the account menu from anywhere on the page.
+        const onPointerDown = (event: MouseEvent) => {
+            if (!accountRef.current?.contains(event.target as Node)) {
+                setShowAccountMenu(false);
+            }
+        };
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setShowAccountMenu(false);
+        };
+
+        document.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onPointerDown);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [showAccountMenu]);
 
     const isActive = (path: string) =>
         path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
@@ -65,12 +90,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         Book Lamp
                     </Link>
 
+                    {/* ARIA wants "true"/"false", and React writes a bare
+                        boolean to a custom element as an empty attribute, which
+                        is neither to a screen reader: these three toggles state
+                        their state as strings for that reason. */}
                     <IconButton
                         icon={mobileMenuOpen ? 'close' : 'menu'}
                         className="mobile-menu-toggle"
                         onClick={() => setMobileMenuOpen((open) => !open)}
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
+                        aria-expanded={mobileMenuOpen ? 'true' : 'false'}
                     />
 
                     <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
@@ -104,9 +133,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <div className="theme-selector">
                             <IconButton
                                 icon="contrast"
-                                onClick={() => setShowThemeMenu((open) => !open)}
+                                onClick={() => {
+                                    setShowThemeMenu((open) => !open);
+                                    setShowAccountMenu(false);
+                                }}
                                 aria-label="Change theme"
-                                aria-expanded={showThemeMenu}
+                                aria-expanded={showThemeMenu ? 'true' : 'false'}
                                 aria-haspopup="menu"
                             />
                             {showThemeMenu && (
@@ -132,18 +164,46 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         </div>
 
                         {isAuthorized ? (
-                            <>
+                            <div className="account-selector" ref={accountRef}>
                                 <Button
                                     variant="text"
-                                    onClick={() => window.location.assign('/api/export/csv')}
-                                    aria-label="Export my data as CSV"
+                                    aria-label="Account"
+                                    aria-haspopup="menu"
+                                    aria-expanded={showAccountMenu ? 'true' : 'false'}
+                                    onClick={() => {
+                                        setShowAccountMenu((open) => !open);
+                                        setShowThemeMenu(false);
+                                    }}
                                 >
-                                    <span className="btn-label">Export CSV</span>
+                                    Account
                                 </Button>
-                                <Button variant="text" onClick={logoutUser} aria-label="Sign out">
-                                    <span className="btn-label">Sign out</span>
-                                </Button>
-                            </>
+                                {showAccountMenu && (
+                                    <div className="account-menu" role="menu" aria-label="Account">
+                                        <Button
+                                            variant="text"
+                                            role="menuitem"
+                                            aria-label="Export my data as CSV"
+                                            onClick={() => {
+                                                setShowAccountMenu(false);
+                                                window.location.assign('/api/export/csv');
+                                            }}
+                                        >
+                                            Export CSV
+                                        </Button>
+                                        <Button
+                                            variant="text"
+                                            role="menuitem"
+                                            aria-label="Sign out"
+                                            onClick={() => {
+                                                setShowAccountMenu(false);
+                                                logoutUser();
+                                            }}
+                                        >
+                                            Sign out
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <Button variant="outlined" to="/unauthorised">
                                 Sign in
