@@ -45,12 +45,23 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
+const renderAt = (path: string) =>
+    render(
+        <MemoryRouter initialEntries={[path]}>
+            <AddBookPage />
+        </MemoryRouter>
+    );
+
 /** A Material Web text field host, addressed by the id the page gives it. */
 const field = (id: string) =>
     document.getElementById(id) as (HTMLElement & { value: string }) | null;
 
 /** The Material Web button whose visible label matches. */
 const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
+
+/** The reading-list option, which only exists once the form is open. */
+const checkbox = (container: HTMLElement) =>
+    container.querySelector('md-checkbox') as (HTMLElement & { checked: boolean }) | null;
 
 /** Type into a Material Web field: set the host value, then report the input. */
 function typeInto(id: string, value: string) {
@@ -91,6 +102,24 @@ describe('AddBookPage barcode scanner', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(screen.getByText(/stop scanner/i)).toBeInTheDocument();
         expect(screen.queryByText(/failed to start camera/i)).not.toBeInTheDocument();
+    });
+});
+
+describe('AddBookPage reading-list option', () => {
+    it('starts ticked when the Reading List sent the reader here', () => {
+        const { container } = renderAt('/books/new?add_to_reading_list=1');
+
+        fireEvent.click(button(/enter manually/i));
+
+        expect(checkbox(container)?.checked).toBe(true);
+    });
+
+    it('starts unticked for every other entry point into the form', () => {
+        const { container } = renderAt('/books/new');
+
+        fireEvent.click(button(/enter manually/i));
+
+        expect(checkbox(container)?.checked).toBe(false);
     });
 });
 

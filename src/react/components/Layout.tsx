@@ -11,6 +11,8 @@ interface LayoutProps {
 const NAV_ITEMS: { path: string; label: string; icon: IconName }[] = [
     { path: '/', label: 'Home', icon: 'home' },
     { path: '/books', label: 'My Books', icon: 'books' },
+    // Adding a Book is reachable from every page, not just the collection.
+    { path: '/books/new', label: 'Add Book', icon: 'plus' },
     { path: '/reading-list', label: 'Reading List', icon: 'bookmark' },
     { path: '/history', label: 'History', icon: 'history' },
     { path: '/dashboard', label: 'Dashboard', icon: 'chart' },
@@ -46,6 +48,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const isActive = (path: string) =>
         path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
+    // `/books/new` nests under `/books`, so both entries match that route. Only
+    // the most specific match may claim the page, or two links read as current.
+    const activeNavPath = NAV_ITEMS.filter((item) => isActive(item.path)).sort(
+        (a, b) => b.path.length - a.path.length
+    )[0]?.path;
+
     return (
         <div className="app-container">
             <header className="site-header">
@@ -66,18 +74,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     />
 
                     <ul className={`nav-links ${mobileMenuOpen ? 'nav-open' : ''}`}>
-                        {NAV_ITEMS.map((item) => (
-                            <li key={item.path}>
-                                <Link
-                                    to={item.path}
-                                    className={isActive(item.path) ? 'active' : ''}
-                                    aria-current={isActive(item.path) ? 'page' : undefined}
-                                >
-                                    <Icon name={item.icon} size="sm" />
-                                    {item.label}
-                                </Link>
-                            </li>
-                        ))}
+                        {NAV_ITEMS.map((item) => {
+                            const active = item.path === activeNavPath;
+                            return (
+                                <li key={item.path}>
+                                    <Link
+                                        to={item.path}
+                                        className={active ? 'active' : ''}
+                                        aria-current={active ? 'page' : undefined}
+                                    >
+                                        <Icon name={item.icon} size="sm" />
+                                        {item.label}
+                                    </Link>
+                                </li>
+                            );
+                        })}
                     </ul>
 
                     <div className="nav-actions">

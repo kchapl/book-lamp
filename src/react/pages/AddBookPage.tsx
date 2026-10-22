@@ -17,7 +17,11 @@ const AddBookPage: React.FC = () => {
     const [isbnNotice, setIsbnNotice] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
-    const [addToReadingListChecked, setAddToReadingListChecked] = useState(false);
+    // The Reading List links here with `add_to_reading_list=1`, so the option
+    // starts ticked for a reader who came from the list to queue a Book.
+    const [addToReadingListChecked, setAddToReadingListChecked] = useState(
+        () => searchParams.get('add_to_reading_list') === '1'
+    );
     const [scanning, setScanning] = useState(false);
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
