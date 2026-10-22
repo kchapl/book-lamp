@@ -15,6 +15,7 @@ const ReadingListPage = lazy(() => import('./pages/ReadingListPage'));
 const StatsPage = lazy(() => import('./pages/StatsPage'));
 const AuthorPage = lazy(() => import('./pages/AuthorPage'));
 const PublisherPage = lazy(() => import('./pages/PublisherPage'));
+const SeriesPage = lazy(() => import('./pages/SeriesPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const UnauthorisedPage = lazy(() => import('./pages/UnauthorisedPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
@@ -148,6 +149,7 @@ function App() {
                         <Route path="/stats" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/author/:authorSlug" element={<Suspense fallback={<PageFallback />}><AuthorPage /></Suspense>} />
                         <Route path="/publisher/:publisherSlug" element={<Suspense fallback={<PageFallback />}><PublisherPage /></Suspense>} />
+                        <Route path="/series/:seriesSlug" element={<Suspense fallback={<PageFallback />}><SeriesPage /></Suspense>} />
                         <Route path="/about" element={<Suspense fallback={<PageFallback />}><AboutPage /></Suspense>} />
                         <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><PrivacyPage /></Suspense>} />
                         <Route path="/terms" element={<Suspense fallback={<PageFallback />}><TermsPage /></Suspense>} />

@@ -9,6 +9,7 @@ import { Button, LinearProgress } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { IN_PROGRESS_STATUS, statusAccentClass, statusClass } from '../utils/status';
 import { formatDate } from '../utils/format';
+import { seriesPath } from '../utils/series';
 
 const STATUS_ORDER = ['Completed', 'In Progress', 'Abandoned'] as const;
 
@@ -397,7 +398,9 @@ const StatsPage: React.FC = () => {
                             {stats.top_series.map((series, index) => (
                                 <li key={series.name}>
                                     <span className="rank-index numeric">{index + 1}</span>
-                                    <span className="rank-name">{series.name}</span>
+                                    <Link to={seriesPath(series.name)} className="rank-name">
+                                        {series.name}
+                                    </Link>
                                     <span className="rank-count">{series.count}</span>
                                 </li>
                             ))}

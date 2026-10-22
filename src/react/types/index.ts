@@ -125,6 +125,11 @@ export interface PublisherPage {
     books: Book[];
 }
 
+export interface SeriesPage {
+    series_name: string;
+    books: Book[];
+}
+
 export interface User {
     id: string;
     name: string;

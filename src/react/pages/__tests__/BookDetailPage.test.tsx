@@ -95,6 +95,21 @@ describe('BookDetailPage add reading', () => {
         });
     });
 
+    it("links the Book's series to that series' page", async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'The Final Empire',
+            author: 'Brandon Sanderson',
+            series: 'Mistborn: Era 1',
+            readings: [],
+        });
+
+        renderPage();
+
+        const link = await screen.findByRole('link', { name: 'Mistborn: Era 1' });
+        expect(link).toHaveAttribute('href', '/series/Mistborn%3A%20Era%201');
+    });
+
     it('shows why the API refused a Reading instead of swallowing it', async () => {
         create.mockRejectedValue(new Error('HTTP 400: an end date is required when a Reading is Completed'));
 

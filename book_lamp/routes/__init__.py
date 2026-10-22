@@ -9,6 +9,7 @@ from book_lamp.routes.jobs import jobs_bp
 from book_lamp.routes.reading_list import reading_list_bp
 from book_lamp.routes.readings import readings_bp
 from book_lamp.routes.recommendations import recommendations_bp
+from book_lamp.routes.series import series_bp
 from book_lamp.routes.spa import spa_bp
 from book_lamp.routes.stats import stats_bp
 from book_lamp.routes.testing import testing_bp
@@ -23,6 +24,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(reading_list_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(authors_bp)
+    app.register_blueprint(series_bp)
     app.register_blueprint(jobs_bp)
     app.register_blueprint(recommendations_bp)
 

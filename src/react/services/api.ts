@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, HistoryFilters, BooksFilters, Reading, AuthStatus } from '../types';
+import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus } from '../types';
 
 const API_BASE = '/api';
 const UNAUTHORISED_PATH = '/unauthorised';
@@ -259,6 +259,12 @@ export async function getAuthorPage(authorSlug: string): Promise<AuthorPage> {
 
 export async function getPublisherPage(publisherSlug: string): Promise<PublisherPage> {
     return fetchJSON<PublisherPage>(`${API_BASE}/publisher/${publisherSlug}`);
+}
+
+export async function getSeriesPage(seriesSlug: string): Promise<SeriesPage> {
+    // The segment is a name, not a slug, so it has to be encoded here: a colon
+    // or an ampersand would otherwise end or split the path.
+    return fetchJSON<SeriesPage>(`${API_BASE}/series/${encodeURIComponent(seriesSlug)}`);
 }
 
 // ISBN lookup

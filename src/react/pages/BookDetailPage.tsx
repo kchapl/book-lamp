@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
     getBookDetail,
     updateBook,
@@ -13,6 +13,7 @@ import { useResource } from '../hooks/useResource';
 import { endsReading, statusClass } from '../utils/status';
 import { todayIso } from '../utils/format';
 import { readingPayload } from '../utils/reading';
+import { seriesPath } from '../utils/series';
 import type { Book } from '../types';
 
 const BookDetailPage: React.FC = () => {
@@ -205,7 +206,9 @@ const BookDetailPage: React.FC = () => {
                                 {book.series && (
                                     <div className="placard-row">
                                         <dt>Series</dt>
-                                        <dd>{book.series}</dd>
+                                        <dd>
+                                            <Link to={seriesPath(book.series)}>{book.series}</Link>
+                                        </dd>
                                     </div>
                                 )}
                             </dl>

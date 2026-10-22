@@ -83,6 +83,18 @@ describe('StatsPage reading-status board', () => {
         expect(screen.queryByText(/streak/i)).not.toBeInTheDocument();
     });
 
+    it('links a series in the dashboard panel to its series page', async () => {
+        vi.mocked(getStats).mockResolvedValue({
+            ...mockStats,
+            top_series: [{ name: 'The Expanse', count: 3, books: [] }],
+        } as never);
+
+        renderPage();
+
+        const link = await screen.findByRole('link', { name: 'The Expanse' });
+        expect(link).toHaveAttribute('href', '/series/The%20Expanse');
+    });
+
     it('mounts the books currently in progress on the lectern', async () => {
         vi.mocked(getBooks).mockResolvedValue({
             books: [{ id: 1, title: 'The Dispossessed', author: 'A Lectern Author' }],
