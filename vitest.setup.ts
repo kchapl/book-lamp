@@ -85,3 +85,79 @@ function shimIntersectionObserver(): void {
 }
 
 shimIntersectionObserver();
+
+/**
+ * jsdom ships `HTMLDialogElement` but without the modal surface: `showModal`,
+ * `show` and `close` are all absent. Material Web's dialog calls `showModal()`
+ * while opening, and the rejection that follows is asynchronous, so a dialog
+ * that renders in a test — the Reading delete confirmation — fails the run
+ * through an unhandled rejection rather than at the call site.
+ *
+ * This fills in the three methods with the state they are expected to keep:
+ * `open` tracks whether the dialog is showing, and `close()` reports it through
+ * the `close` event a native dialog fires. The parts a test asserts on are the
+ * light-DOM contents, which need none of the real modal behaviour.
+ */
+function shimDialog(): void {
+    const proto = globalThis.HTMLDialogElement?.prototype as
+        | (HTMLDialogElement & { showModal?: () => void; show?: () => void })
+        | undefined;
+    if (!proto || typeof proto.showModal === 'function') return;
+
+    const setOpen = (dialog: HTMLDialogElement, open: boolean) => {
+        if (open) {
+            dialog.setAttribute('open', '');
+        } else {
+            dialog.removeAttribute('open');
+            dialog.dispatchEvent(new Event('close'));
+        }
+    };
+
+    Object.defineProperties(proto, {
+        showModal: {
+            configurable: true,
+            writable: true,
+            value(this: HTMLDialogElement) {
+                setOpen(this, true);
+            },
+        },
+        show: {
+            configurable: true,
+            writable: true,
+            value(this: HTMLDialogElement) {
+                setOpen(this, true);
+            },
+        },
+        close: {
+            configurable: true,
+            writable: true,
+            value(this: HTMLDialogElement) {
+                setOpen(this, false);
+            },
+        },
+    });
+}
+
+/**
+ * jsdom has no Web Animations API, and Material Web's dialog animates itself
+ * open and closed through `element.animate(...)`. It awaits each animation's
+ * `finished` promise, so a missing method surfaces as an unhandled rejection
+ * rather than a failure at the call site.
+ *
+ * This returns an inert animation whose `finished` promise resolves at once and
+ * whose `cancel()` does nothing: nothing under test depends on the animation.
+ */
+function shimElementAnimate(): void {
+    if (typeof Element.prototype.animate === 'function') return;
+
+    Element.prototype.animate = function animate(): Animation {
+        return {
+            finished: Promise.resolve(),
+            cancel: () => {},
+        } as unknown as Animation;
+    } as Element['animate'];
+}
+
+shimElementAnimate();
+
+shimDialog();

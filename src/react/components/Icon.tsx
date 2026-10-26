@@ -26,7 +26,9 @@ export type IconName =
     | 'star'
     | 'arrow-left'
     | 'close'
-    | 'menu';
+    | 'menu'
+    | 'edit'
+    | 'delete';
 
 const PATHS: Record<IconName, React.ReactNode> = {
     lamp: (
@@ -103,6 +105,18 @@ const PATHS: Record<IconName, React.ReactNode> = {
     'arrow-left': <path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2Z" />,
     close: <path d="m19 6.4L17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4Z" />,
     menu: <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" />,
+    edit: (
+        <>
+            <path d="M4 17.3V20h2.7l7.9-7.9-2.7-2.7L4 17.3Z" />
+            <path d="M16.4 3.6a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4l-1.9 1.9-4-4 1.9-1.9Z" />
+        </>
+    ),
+    delete: (
+        <>
+            <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3.5-8.5h1.5v7H9.5v-7Zm4.5 0h1.5v7H14v-7Z" />
+            <path d="M15.5 4V3h-7v1H5v2h14V4h-3.5Z" />
+        </>
+    ),
 };
 
 interface IconProps {
