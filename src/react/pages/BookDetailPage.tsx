@@ -5,16 +5,99 @@ import {
     updateBook,
     deleteBook,
     createReading,
+    updateReading,
+    deleteReading,
     addToReadingList,
     removeFromReadingList,
 } from '../services/api';
-import { Button, Dialog, Select, SelectOption, TextField } from '../ui';
+import { Button, Dialog, IconButton, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { endsReading, statusClass } from '../utils/status';
 import { todayIso } from '../utils/format';
-import { readingPayload } from '../utils/reading';
+import { draftWithStatus, readingDraft, readingPayload, type ReadingDraft } from '../utils/reading';
 import { seriesPath } from '../utils/series';
-import type { Book } from '../types';
+import type { Book, Reading } from '../types';
+
+interface ReadingFormProps {
+    /** Field ids are suffixed with this, so the add and edit forms coexist. */
+    idPrefix: string;
+    draft: ReadingDraft;
+    onChange: (draft: ReadingDraft) => void;
+    onSubmit: () => void;
+    onCancel: () => void;
+    submitLabel: string;
+    error: string | null;
+    heading: string;
+}
+
+/**
+ * The Reading fields, shared by the add and edit forms.
+ *
+ * Both forms collect the same four values and enforce the same rule — a Reading
+ * that has ended must carry an end date (ADR-0003) — so the fields live in one
+ * place rather than being spelled out twice.
+ */
+const ReadingForm: React.FC<ReadingFormProps> = ({
+    idPrefix,
+    draft,
+    onChange,
+    onSubmit,
+    onCancel,
+    submitLabel,
+    error,
+    heading,
+}) => {
+    const withStatus = (status: string): ReadingDraft =>
+        draftWithStatus(draft, status, todayIso());
+
+    return (
+        <div className="reading-form">
+            <h3>{heading}</h3>
+            <Select
+                id={`${idPrefix}-status`}
+                label="Status"
+                value={draft.status}
+                onValueChange={(value) => onChange(withStatus(value))}
+            >
+                <SelectOption value="Completed">Completed</SelectOption>
+                <SelectOption value="In Progress">In Progress</SelectOption>
+                <SelectOption value="Abandoned">Abandoned</SelectOption>
+            </Select>
+            <TextField
+                id={`${idPrefix}-start-date`}
+                label="Started"
+                type="date"
+                value={draft.start_date}
+                onValueChange={(value) => onChange({ ...draft, start_date: value })}
+            />
+            {endsReading(draft.status) && (
+                <TextField
+                    id={`${idPrefix}-end-date`}
+                    label="Ended"
+                    type="date"
+                    value={draft.end_date}
+                    onValueChange={(value) => onChange({ ...draft, end_date: value })}
+                />
+            )}
+            <TextField
+                id={`${idPrefix}-rating`}
+                label="Rating (1–5)"
+                type="number"
+                min="1"
+                max="5"
+                value={String(draft.rating)}
+                onValueChange={(value) => onChange({ ...draft, rating: parseInt(value) || 0 })}
+            />
+            {error && <p className="error-message">{error}</p>}
+            <div className="form-actions">
+                <Button onClick={onSubmit}>{submitLabel}</Button>
+                <Button variant="text" onClick={onCancel}>
+                    Cancel
+                </Button>
+            </div>
+        </div>
+    );
+};
 
 const BookDetailPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
@@ -23,12 +106,19 @@ const BookDetailPage: React.FC = () => {
     const [editForm, setEditForm] = useState<Partial<Book>>({});
     const [showAddRecord, setShowAddRecord] = useState(false);
     const [addRecordError, setAddRecordError] = useState<string | null>(null);
-    const [newRecord, setNewRecord] = useState({
+    const [newRecord, setNewRecord] = useState<ReadingDraft>({
         status: 'Completed',
         rating: 5,
         start_date: todayIso(),
         end_date: todayIso(),
     });
+    // The Reading being edited, if any. One at a time: a Book's history is a
+    // short list, and two open forms would need two drafts to keep straight.
+    const [editingRecord, setEditingRecord] = useState<Reading | null>(null);
+    const [editRecord, setEditRecord] = useState<ReadingDraft | null>(null);
+    const [editRecordError, setEditRecordError] = useState<string | null>(null);
+    const [recordToDelete, setRecordToDelete] = useState<Reading | null>(null);
+    const [deleteRecordError, setDeleteRecordError] = useState<string | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const loadBook = async () => {
@@ -61,15 +151,6 @@ const BookDetailPage: React.FC = () => {
         }
     };
 
-    const handleStatusChange = (value: string) => {
-        setNewRecord((current) => ({
-            ...current,
-            status: value,
-            // Ending a Reading defaults it to today; starting one clears the end.
-            end_date: endsReading(value) ? current.end_date || todayIso() : '',
-        }));
-    };
-
     const handleAddRecord = async () => {
         if (!bookId) return;
         setAddRecordError(null);
@@ -79,6 +160,38 @@ const BookDetailPage: React.FC = () => {
             reload();
         } catch (err) {
             setAddRecordError(err instanceof Error ? err.message : 'Failed to add reading');
+        }
+    };
+
+    /** Open the edit form on a Reading, pre-filled from it. */
+    const openEditRecord = (record: Reading) => {
+        setEditRecordError(null);
+        setEditRecord(readingDraft(record));
+        setEditingRecord(record);
+    };
+
+    const handleUpdateRecord = async () => {
+        if (!editingRecord || !editRecord) return;
+        setEditRecordError(null);
+        try {
+            await updateReading(editingRecord.id, readingPayload(editRecord));
+            setEditingRecord(null);
+            setEditRecord(null);
+            reload();
+        } catch (err) {
+            setEditRecordError(err instanceof Error ? err.message : 'Failed to update reading');
+        }
+    };
+
+    const handleDeleteRecord = async () => {
+        if (!recordToDelete) return;
+        setDeleteRecordError(null);
+        try {
+            await deleteReading(recordToDelete.id);
+            setRecordToDelete(null);
+            reload();
+        } catch (err) {
+            setDeleteRecordError(err instanceof Error ? err.message : 'Failed to delete reading');
         }
     };
 
@@ -261,74 +374,67 @@ const BookDetailPage: React.FC = () => {
                         </div>
 
                         {showAddRecord && (
-                            <div className="add-record-form">
-                                <h3>Add reading</h3>
-                                <Select
-                                    id="record-status"
-                                    label="Status"
-                                    value={newRecord.status}
-                                    onValueChange={handleStatusChange}
-                                >
-                                    <SelectOption value="Completed">Completed</SelectOption>
-                                    <SelectOption value="In Progress">In Progress</SelectOption>
-                                    <SelectOption value="Abandoned">Abandoned</SelectOption>
-                                </Select>
-                                <TextField
-                                    id="record-start-date"
-                                    label="Started"
-                                    type="date"
-                                    value={newRecord.start_date}
-                                    onValueChange={(value) => setNewRecord({ ...newRecord, start_date: value })}
-                                />
-                                {endsReading(newRecord.status) && (
-                                    <TextField
-                                        id="record-end-date"
-                                        label="Ended"
-                                        type="date"
-                                        value={newRecord.end_date}
-                                        onValueChange={(value) =>
-                                            setNewRecord({ ...newRecord, end_date: value })
-                                        }
-                                    />
-                                )}
-                                <TextField
-                                    id="record-rating"
-                                    label="Rating (1–5)"
-                                    type="number"
-                                    min="1"
-                                    max="5"
-                                    value={String(newRecord.rating)}
-                                    onValueChange={(value) =>
-                                        setNewRecord({ ...newRecord, rating: parseInt(value) || 0 })
-                                    }
-                                />
-                                {addRecordError && <p className="error-message">{addRecordError}</p>}
-                                <div className="form-actions">
-                                    <Button onClick={handleAddRecord}>Add</Button>
-                                    <Button variant="text" onClick={() => setShowAddRecord(false)}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
+                            <ReadingForm
+                                idPrefix="record"
+                                heading="Add reading"
+                                submitLabel="Add"
+                                draft={newRecord}
+                                onChange={setNewRecord}
+                                onSubmit={handleAddRecord}
+                                onCancel={() => setShowAddRecord(false)}
+                                error={addRecordError}
+                            />
                         )}
 
                         {book.readings && book.readings.length > 0 ? (
                             <div className="records-list">
                                 {book.readings.map((record) => (
                                     <div key={record.id} className="record-item">
-                                        <span className={`status-badge ${statusClass(record.status)}`}>
-                                            {record.status}
-                                        </span>
-                                        {record.rating ? (
-                                            <span className="rating-stars" aria-label={`${record.rating} out of 5`}>
-                                                {'★'.repeat(record.rating)}
-                                                {'☆'.repeat(5 - record.rating)}
+                                        <div className="record-main">
+                                            <span className={`status-badge ${statusClass(record.status)}`}>
+                                                {record.status}
                                             </span>
-                                        ) : null}
-                                        <span className="dates">
-                                            {record.start_date} → {record.end_date || 'Present'}
-                                        </span>
+                                            {record.rating ? (
+                                                <span className="rating-stars" aria-label={`${record.rating} out of 5`}>
+                                                    {'★'.repeat(record.rating)}
+                                                    {'☆'.repeat(5 - record.rating)}
+                                                </span>
+                                            ) : null}
+                                            <span className="dates">
+                                                {record.start_date} → {record.end_date || 'Present'}
+                                            </span>
+                                        </div>
+                                        <div className="record-actions">
+                                            <IconButton
+                                                icon="edit"
+                                                aria-label={`Edit reading of ${record.start_date}`}
+                                                onClick={() => openEditRecord(record)}
+                                            />
+                                            <IconButton
+                                                icon="delete"
+                                                aria-label={`Delete reading of ${record.start_date}`}
+                                                onClick={() => {
+                                                    setDeleteRecordError(null);
+                                                    setRecordToDelete(record);
+                                                }}
+                                            />
+                                        </div>
                                         {record.notes && <p className="notes">{record.notes}</p>}
+                                        {editingRecord?.id === record.id && editRecord && (
+                                            <ReadingForm
+                                                idPrefix="edit-record"
+                                                heading="Edit reading"
+                                                submitLabel="Save"
+                                                draft={editRecord}
+                                                onChange={setEditRecord}
+                                                onSubmit={handleUpdateRecord}
+                                                onCancel={() => {
+                                                    setEditingRecord(null);
+                                                    setEditRecord(null);
+                                                }}
+                                                error={editRecordError}
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -360,6 +466,37 @@ const BookDetailPage: React.FC = () => {
                 <p>
                     This removes “{book.title}” and its reading history. This cannot be undone.
                 </p>
+            </Dialog>
+
+            <Dialog
+                open={recordToDelete !== null}
+                onClose={() => {
+                    setRecordToDelete(null);
+                    setDeleteRecordError(null);
+                }}
+                headline="Delete this reading?"
+                actions={
+                    <>
+                        <Button
+                            variant="text"
+                            onClick={() => {
+                                setRecordToDelete(null);
+                                setDeleteRecordError(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button variant="filled" className="btn-danger" onClick={handleDeleteRecord}>
+                            Delete
+                        </Button>
+                    </>
+                }
+            >
+                <p>
+                    This removes the reading that started {recordToDelete?.start_date} from the
+                    history. This cannot be undone.
+                </p>
+                {deleteRecordError && <p className="error-message">{deleteRecordError}</p>}
             </Dialog>
         </div>
     );

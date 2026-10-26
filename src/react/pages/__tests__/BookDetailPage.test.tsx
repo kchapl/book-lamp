@@ -1,5 +1,6 @@
 /**
- * BookDetailPage's "Add reading" form.
+ * BookDetailPage's Reading history: the "Add reading" form, and the per-row
+ * edit and delete controls.
  *
  * The API requires a start date, and a Reading that has ended must also carry an
  * end date (see book_lamp/utils/readings.py). The form used to send neither, so
@@ -7,28 +8,38 @@
  * console.error. These tests therefore assert on both halves: the payload the
  * form sends, and that a rejection actually reaches the reader.
  *
+ * A Book whose Reading was In Progress had no way to record that it had
+ * finished: the history rows were read-only, so the status could not be
+ * corrected from the Book page. The rows now carry edit and delete controls,
+ * wired to the routes the API client already wrapped.
+ *
  * Like AddBookPage, this page drives Material Web controls, so fields are
  * addressed by the id the page gives the host element and buttons by their
- * slotted label.
+ * slotted label. Two dialogs share a "Delete" label, so the reading dialog's
+ * actions are addressed within that dialog.
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import BookDetailPage from '../BookDetailPage';
-import { createReading, getBookDetail } from '../../services/api';
+import { createReading, deleteReading, getBookDetail, updateReading } from '../../services/api';
 
 vi.mock('../../services/api', () => ({
     getBookDetail: vi.fn(),
     updateBook: vi.fn(),
     deleteBook: vi.fn(),
     createReading: vi.fn(),
+    updateReading: vi.fn(),
+    deleteReading: vi.fn(),
     addToReadingList: vi.fn(),
     removeFromReadingList: vi.fn(),
 }));
 
 const detail = vi.mocked(getBookDetail);
 const create = vi.mocked(createReading);
+const update = vi.mocked(updateReading);
+const remove = vi.mocked(deleteReading);
 
 const BUTTON_SELECTOR =
     'md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button';
@@ -47,6 +58,18 @@ const field = (id: string) => document.getElementById(id) as (HTMLElement & { va
 
 /** The Material Web button whose visible label matches. */
 const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
+
+/** A button inside the dialog carrying this headline. */
+const dialogButton = (headline: string, name: RegExp) => {
+    const dialog = screen.getByText(headline).closest('md-dialog') as HTMLElement;
+    return within(dialog).getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
+};
+
+/** A button inside the row's edit form, which the page labels "Edit reading". */
+const editFormButton = (name: RegExp) => {
+    const form = screen.getByText(/edit reading/i).closest('.reading-form') as HTMLElement;
+    return within(form).getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
+};
 
 /** Type into a Material Web field: set the host value, then report the input. */
 function typeInto(id: string, value: string) {
@@ -69,6 +92,32 @@ async function openAddReading() {
     await waitFor(() => expect(screen.getByText(/add reading/i)).toBeInTheDocument());
     fireEvent.click(button(/add reading/i));
     await waitFor(() => expect(field('record-start-date')).toBeInTheDocument());
+}
+
+/** The Book whose Reading is still open, which the issue is about. */
+const openReading = {
+    id: 11,
+    book_id: 1,
+    status: 'In Progress',
+    start_date: '2026-10-01',
+    rating: 0,
+};
+
+/** A Reading that has ended, so its form carries an end-date control. */
+const completedReading = {
+    id: 12,
+    book_id: 1,
+    status: 'Completed',
+    start_date: '2026-10-01',
+    end_date: '2026-10-11',
+    rating: 5,
+};
+
+/** Open the row's edit form and wait for it to be filled in from the Reading. */
+async function openEditReading() {
+    await waitFor(() => expect(screen.getByLabelText(/edit reading of 2026-10-01/i)).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText(/edit reading of 2026-10-01/i));
+    await waitFor(() => expect(field('edit-record-start-date')).toBeInTheDocument());
 }
 
 beforeEach(() => {
@@ -120,5 +169,110 @@ describe('BookDetailPage add reading', () => {
         fireEvent.click(button(/^add$/i));
 
         await waitFor(() => expect(screen.getByText(/end date is required/i)).toBeInTheDocument());
+    });
+});
+
+describe('BookDetailPage edit reading', () => {
+    it('offers an edit control on a Reading in the history', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [openReading] });
+
+        renderPage();
+
+        await waitFor(() =>
+            expect(screen.getByLabelText(/edit reading of 2026-10-01/i)).toBeInTheDocument()
+        );
+    });
+
+    it('pre-fills the form from the Reading it edits', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [openReading] });
+
+        renderPage();
+        await openEditReading();
+
+        expect(field('edit-record-start-date')?.value).toBe('2026-10-01');
+        expect(field('edit-record-rating')?.value).toBe('0');
+        // An open Reading has no end, so the form offers no end-date control.
+        expect(field('edit-record-end-date')).not.toBeInTheDocument();
+    });
+
+    it('sends the edit to the reading route with the dates the form holds', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [completedReading] });
+        update.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditReading();
+
+        typeInto('edit-record-end-date', '2026-10-20');
+        fireEvent.click(editFormButton(/^save$/i));
+
+        await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+        // The status select cannot be driven in jsdom, so the Reading keeps the
+        // status it was seeded with and takes the end date the form was given.
+        expect(update).toHaveBeenCalledWith(12, {
+            status: 'Completed',
+            start_date: '2026-10-01',
+            end_date: '2026-10-20',
+            rating: 5,
+        });
+    });
+
+    it('shows why the API refused the edit instead of swallowing it', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [completedReading] });
+        update.mockRejectedValue(new Error('HTTP 400: an end date is required when a Reading is Completed'));
+
+        renderPage();
+        await openEditReading();
+
+        typeInto('edit-record-end-date', '');
+        fireEvent.click(editFormButton(/^save$/i));
+
+        await waitFor(() => expect(screen.getByText(/end date is required/i)).toBeInTheDocument());
+    });
+
+    it('closes the form when the edit is cancelled', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [openReading] });
+
+        renderPage();
+        await openEditReading();
+
+        fireEvent.click(editFormButton(/^cancel$/i));
+
+        await waitFor(() =>
+            expect(field('edit-record-start-date')).not.toBeInTheDocument()
+        );
+        expect(update).not.toHaveBeenCalled();
+    });
+});
+
+describe('BookDetailPage delete reading', () => {
+    it('deletes the Reading only after the reader confirms', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [openReading] });
+        remove.mockResolvedValue(undefined);
+
+        renderPage();
+        await waitFor(() =>
+            expect(screen.getByLabelText(/delete reading of 2026-10-01/i)).toBeInTheDocument()
+        );
+
+        fireEvent.click(screen.getByLabelText(/delete reading of 2026-10-01/i));
+        expect(remove).not.toHaveBeenCalled();
+
+        fireEvent.click(dialogButton('Delete this reading?', /^delete$/i));
+
+        await waitFor(() => expect(remove).toHaveBeenCalledWith(11));
+    });
+
+    it('leaves the Reading alone when the reader cancels', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', readings: [openReading] });
+
+        renderPage();
+        await waitFor(() =>
+            expect(screen.getByLabelText(/delete reading of 2026-10-01/i)).toBeInTheDocument()
+        );
+
+        fireEvent.click(screen.getByLabelText(/delete reading of 2026-10-01/i));
+        fireEvent.click(dialogButton('Delete this reading?', /^cancel$/i));
+
+        expect(remove).not.toHaveBeenCalled();
     });
 });

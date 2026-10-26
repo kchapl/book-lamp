@@ -232,7 +232,20 @@
     font-size: var(--md-sys-typescale-body-medium-size);
 }
 
-.add-record-form,
+.record-actions {
+    display: flex;
+    gap: var(--bl-space-1);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* The edit form sits under the row it belongs to, across its whole width. */
+.record-item .reading-form {
+    flex-basis: 100%;
+    margin-top: 0;
+}
+
+.reading-form,
 .edit-form {
     margin-top: var(--bl-space-4);
     padding: var(--bl-space-5);
@@ -241,7 +254,7 @@
     border-radius: var(--md-sys-shape-corner-medium);
 }
 
-.add-record-form h3,
+.reading-form h3,
 .edit-form h2 {
     margin-top: 0;
 }
