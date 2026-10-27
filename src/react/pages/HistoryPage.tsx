@@ -6,10 +6,17 @@ import { useResource } from '../hooks/useResource';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { formatDate } from '../utils/format';
 import { statusClass } from '../utils/status';
-import type { HistoryFilters } from '../types';
+import type { HistoryFilters, Reading } from '../types';
 
 /** The reading log's filters, as they appear in the URL. */
 const FILTER_KEYS = ['status', 'min_rating', 'year', 'sort'] as const;
+
+/** One Book's Readings, as the log groups them for display. */
+interface HistoryGroup {
+    bookId: number;
+    title: string;
+    records: Reading[];
+}
 
 const HistoryPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -36,15 +43,24 @@ const HistoryPage: React.FC = () => {
     const statuses = data?.statuses ?? [];
     const hasActiveFilters = values.status || values.min_rating || values.year;
 
-    // Group history by book
-    const groupedHistory = history.reduce((acc, record) => {
-        const bookTitle = record.book_title || 'Unknown Book';
-        if (!acc[bookTitle]) {
-            acc[bookTitle] = [];
+    // Group by the Book itself, not by its title. A plain object keyed by title
+    // enumerates integer-like keys first — which hoists a Book called "1983" to
+    // the top of the log whatever the sort — and folds two Books that share a
+    // title into one group. A Map keyed by the Reading's book_id keeps both the
+    // order the API returned and the Books apart.
+    const groupedHistory = history.reduce((groups, record) => {
+        const group = groups.get(record.book_id);
+        if (group) {
+            group.records.push(record);
+        } else {
+            groups.set(record.book_id, {
+                bookId: record.book_id,
+                title: record.book_title || 'Unknown Book',
+                records: [record],
+            });
         }
-        acc[bookTitle].push(record);
-        return acc;
-    }, {} as Record<string, typeof history>);
+        return groups;
+    }, new Map<number, HistoryGroup>());
 
     return (
         <div className="history-page">
@@ -108,13 +124,13 @@ const HistoryPage: React.FC = () => {
                 </div>
             ) : (
                 <div className="history-list">
-                    {Object.entries(groupedHistory).map(([bookTitle, records]) => (
-                        <div key={bookTitle} className="history-group">
+                    {[...groupedHistory.values()].map((group) => (
+                        <div key={group.bookId} className="history-group">
                             <h2 className="group-title">
-                                <Link to={`/books/${records[0].book_id}`}>{bookTitle}</Link>
+                                <Link to={`/books/${group.bookId}`}>{group.title}</Link>
                             </h2>
                             <div className="records-list">
-                                {records.map((record) => (
+                                {group.records.map((record) => (
                                     <div key={record.id} className="history-record">
                                         <div className="record-main">
                                             <span className={`status-badge ${statusClass(record.status)}`}>
