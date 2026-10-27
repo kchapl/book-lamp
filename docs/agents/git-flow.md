@@ -48,8 +48,8 @@ It also matters for required status checks: issue #331 adds an end-to-end suite
 as one, and a required check can only gate work that arrives through a pull
 request.
 
-## Exceptions
+## Dependabot
 
-Dependabot's own pull requests are squash-merged for it once they are mergeable,
-by `.github/workflows/dependabot-auto-merge.yml`. They still arrive as pull
-requests and still run CI.
+Dependabot's own pull requests are ordinary pull requests: they carry the same
+required checks and land the same way, squash and all. There is no exception to
+the flow for them.
