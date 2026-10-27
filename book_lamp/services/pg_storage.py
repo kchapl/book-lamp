@@ -538,34 +538,24 @@ class PostgresStorage:
         rating: int = 0,
     ) -> dict[str, Any]:
         require_end_date(status, end_date)
-        # Check if record already exists for this book_status combination
-        existing_query = """
-            SELECT id FROM readings 
-            WHERE user_id = %s AND book_id = %s AND status = %s AND start_date = %s
+        # A Reading is one attempt at a Book, so the same status and start date
+        # as an earlier Reading makes a second Reading rather than a duplicate of
+        # it: the row is always inserted. Returning the earlier row instead
+        # discarded what the reader had typed, and CONTEXT.md expects two
+        # Readings to be able to start on the same date.
+        query = """
+            INSERT INTO readings (user_id, book_id, status, start_date, end_date, rating)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING *
         """
         with self.pool.connection() as conn:
-            existing = conn.execute(existing_query, [self.user_id, book_id, status, start_date]).fetchone()
-            if existing:
-                logger.info(f"READING_RECORD_EXISTS: book_id={book_id}, status='{status}'")
-                # Return the existing record
-                records = self.get_readings(book_id=book_id)
-                for r in records:
-                    if r["status"] == status and r["start_date"] == start_date:
-                        return r
-                return records[0] if records else {}
-
-            query = """
-                INSERT INTO readings (user_id, book_id, status, start_date, end_date, rating)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING *
-            """
             row_raw = conn.execute(query, [self.user_id, book_id, status, start_date, end_date, rating]).fetchone()
             if not row_raw:
                 raise Exception("Failed to add reading")
             row = cast(Dict[str, Any], row_raw)
 
-            logger.info(f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={row['id']}")
-            return dict(row)
+        logger.info(f"READING_RECORD_ADDED: book_id={book_id}, status='{status}', id={row['id']}")
+        return dict(row)
 
     def update_reading(
         self,

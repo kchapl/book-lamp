@@ -376,6 +376,29 @@ def test_api_create_reading_in_progress_needs_no_end_date(authenticated_client):
     assert resp.status_code == 201
 
 
+def test_api_create_reading_again_with_the_same_status_and_start_date(authenticated_client):
+    """A second Reading that matches the first is still a second Reading.
+
+    A Reading is one attempt at a Book, so the same status and start date is a
+    re-read rather than a duplicate: the route must store it and answer 201 with
+    its own id, not hand back the record it matched.
+    """
+    storage = get_storage()
+    book = storage.add_book(isbn13="782", title="B", author="A")
+
+    payload = {"status": "In Progress", "start_date": "2024-01-01", "rating": 5}
+    first = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
+    second = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert _json(second)["id"] != _json(first)["id"]
+
+    records = storage.get_readings(book_id=book["id"])
+    assert len(records) == 2
+    assert {record["rating"] for record in records} == {5}
+
+
 # ---------------------------------------------------------------------------
 # Readings – update
 # ---------------------------------------------------------------------------

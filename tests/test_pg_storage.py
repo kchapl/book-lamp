@@ -191,6 +191,23 @@ def test_start_reading(pg_storage):
     assert records[0]["status"] == "In Progress"
 
 
+def test_add_reading_again_with_the_same_status_and_start_date(pg_storage):
+    """A second Reading may match the first and must still be a second Reading.
+
+    A Reading is one attempt at a Book, so the same status and start date is a
+    re-read rather than a duplicate. The adapter used to treat the match as a
+    duplicate and return the earlier row, discarding what had just been entered.
+    """
+    book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
+
+    first = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
+    second = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01", rating=5)
+
+    assert second["id"] != first["id"]
+    assert second["rating"] == 5
+    assert len(pg_storage.get_readings(book_id=book["id"])) == 2
+
+
 def test_settings_round_trip(pg_storage):
     pg_storage.update_setting("theme", "dark")
     pg_storage.update_setting("language", "en-GB")
