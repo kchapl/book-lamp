@@ -42,5 +42,7 @@ jobs:
         run: |
           for pr in $PR_NUMBERS; do
             echo "Enabling auto-merge for PR #$pr"
-            gh pr merge --admin --squash --auto-merge $pr
+            # Auto-merge, not an administrative merge: the required checks on the
+            # branch still decide when this lands.
+            gh pr merge --squash --auto "$pr"
           done
