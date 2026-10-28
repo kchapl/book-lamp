@@ -52,7 +52,7 @@ def test_the_storage_seam_refuses_an_ended_reading_without_a_date() -> None:
     """
     storage = MockStorage()
     storage.set_authorised(True)
-    book = storage.add_book(isbn13="9780000000002", title="A Book", author="An Author")
+    book = storage.add_book(isbn13="9780000000002", title="A Book", authors=["An Author"])
 
     with pytest.raises(ReadingEndsWithoutADate):
         storage.add_reading(book["id"], "Completed", "2026-10-12")

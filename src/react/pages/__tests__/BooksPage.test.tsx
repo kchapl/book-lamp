@@ -1,5 +1,5 @@
 /**
- * The collection's search field and the Enter key.
+ * The books page's search field and the Enter key.
  *
  * The field is a Material Web control whose real input lives in a shadow root,
  * so the browser's implicit form submission never fires from it: pressing Enter

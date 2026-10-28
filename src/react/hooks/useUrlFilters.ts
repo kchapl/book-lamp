@@ -1,7 +1,7 @@
 /**
  * Filters kept in the query string.
  *
- * The collection and the reading log both read several filters out of the URL and
+ * The books page and the reading log both read several filters out of the URL and
  * write one back at a time, and both carried their own copy of that round trip.
  * The URL stays the source of truth; this is only the read/write seam.
  */
@@ -14,7 +14,7 @@ export interface UrlFilters<K extends string> {
     /**
      * Write values, deleting any key set to ''. Keys outside `keys` are allowed
      * on purpose: a page sometimes has to drop a parameter it does not own — the
-     * collection clears its search box when a filter changes.
+     * books page clears its search box when a filter changes.
      */
     set: (updates: Record<string, string>) => void;
     /** Drop every parameter. */

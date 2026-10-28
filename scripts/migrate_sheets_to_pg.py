@@ -15,6 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.utils.authors import parse
 from book_lamp.utils.readings import ENDING_STATUSES
 
 # Load environment variables from .env file
@@ -213,7 +214,8 @@ def migrate_books(storage: PostgresStorage, rows: List[List[str]], dry_run: bool
             storage.upsert_book(
                 isbn13=str(book_data["isbn13"]) if book_data["isbn13"] else "",
                 title=str(book_data["title"]),
-                author=str(book_data["author"]) if book_data["author"] else "",
+                # A sheet cell is text that lists names, so it is read here.
+                authors=parse(str(book_data["author"])) if book_data["author"] else [],
                 publication_year=(cast(int, book_data["publication_year"]) if book_data["publication_year"] else None),
                 thumbnail_url=(cast(str, book_data["thumbnail_url"]) if book_data["thumbnail_url"] else None),
                 publisher=cast(Optional[str], book_data["publisher"]),

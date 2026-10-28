@@ -34,13 +34,13 @@ SCOPE = "openid https://www.googleapis.com/auth/userinfo.email"
 
 def _seed() -> dict[str, dict]:
     """Three Books and three Readings, as the reader would have them."""
-    hail_mary = storage.add_book(isbn13="9780593135204", title="Project Hail Mary", author="Andy Weir")
+    hail_mary = storage.add_book(isbn13="9780593135204", title="Project Hail Mary", authors=["Andy Weir"])
     storage.add_reading(hail_mary["id"], "Completed", "2026-09-01", "2026-10-11", rating=4)
 
-    prince = storage.add_book(isbn13="9780156012195", title="The Little Prince", author="Antoine de Saint-Exupéry")
+    prince = storage.add_book(isbn13="9780156012195", title="The Little Prince", authors=["Antoine de Saint-Exupéry"])
     storage.add_reading(prince["id"], "Abandoned", "2025-02-01", "2025-02-14", rating=2)
 
-    dune = storage.add_book(isbn13="9780441013593", title="Dune", author="Frank Herbert")
+    dune = storage.add_book(isbn13="9780441013593", title="Dune", authors=["Frank Herbert"])
     storage.add_reading(dune["id"], "In Progress", "2026-10-01", rating=0)
 
     return {"hail_mary": hail_mary, "prince": prince, "dune": dune}
@@ -114,7 +114,7 @@ def test_get_book_accepts_a_title_when_exactly_one_book_matches(verified) -> Non
 
 
 def test_get_book_refuses_a_title_that_matches_several_books(verified) -> None:
-    storage.add_book(isbn13="9780000000001", title="Dune Messiah", author="Frank Herbert")
+    storage.add_book(isbn13="9780000000001", title="Dune Messiah", authors=["Frank Herbert"])
     _seed()
 
     with pytest.raises(ToolError) as refusal:

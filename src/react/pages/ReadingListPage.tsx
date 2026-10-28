@@ -161,7 +161,7 @@ const ReadingListPage: React.FC = () => {
             ) : books.length === 0 ? (
                 <div className="empty-state">
                     <h2>Your reading list is empty</h2>
-                    <p>Add books from your collection or when browsing.</p>
+                    <p>Add books from your log or while browsing.</p>
                     <Button variant="filled" icon="plus" to={ADD_BOOK_TO_READING_LIST}>
                         Add a book
                     </Button>

@@ -234,8 +234,8 @@ def calculate_relevance_score(
             continue  # These are in readings
 
         if field == "author":
-            # Search both the legacy display name and the individual authors.
-            author_values = [book.get("author")] + list(book.get("authors") or [])
+            # One score per Author: the display string repeats these names.
+            author_values = list(book.get("authors") or [])
             for author in author_values:
                 if not author:
                     continue

@@ -13,7 +13,7 @@ def test_stats_category_limit(client, authenticated_client):
         book = storage.add_book(
             isbn13=f"9780000000{i:03d}",
             title=f"Book {i}",
-            author="Author",
+            authors=["Author"],
             publication_year=2020,
             bisac_category=cat,
         )
@@ -35,7 +35,7 @@ def test_stats_category_limit(client, authenticated_client):
         book = storage.add_book(
             isbn13=f"978111111111{i}",
             title=f"Fiction Book {i}",
-            author="Author",
+            authors=["Author"],
             bisac_category="FICTION / General",
         )
         storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
@@ -69,7 +69,7 @@ def test_api_dashboard_endpoint(authenticated_client):
     book = storage.add_book(
         isbn13="9781234567890",
         title="Test Book",
-        author="Test Author",
+        authors=["Test Author"],
         bisac_category="FICTION / General",
         page_count=300,
         physical_format="Hardcover",
@@ -106,10 +106,10 @@ def test_dashboard_last_record_date_tracks_the_latest_reading(authenticated_clie
     """The dashboard's as-of date is the most recent reading activity."""
     storage = get_storage()
 
-    older = storage.add_book(isbn13="9780000000101", title="Older", author="Author")
+    older = storage.add_book(isbn13="9780000000101", title="Older", authors=["Author"])
     storage.add_reading(older["id"], "In Progress", "2023-05-01", None)
 
-    recent = storage.add_book(isbn13="9780000000102", title="Recent", author="Author")
+    recent = storage.add_book(isbn13="9780000000102", title="Recent", authors=["Author"])
     storage.add_reading(recent["id"], "Completed", "2024-03-01", "2024-03-10", rating=5)
 
     resp = authenticated_client.get("/api/dashboard")

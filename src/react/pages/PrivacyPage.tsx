@@ -53,7 +53,7 @@ const PrivacyPage: React.FC = () => {
             <h2>When data leaves Book Lamp</h2>
             <p>
                 The AI recommendations feature sends the titles and authors of Books you have
-                rated, together with the titles already in your collection, to the
+                rated, together with the titles already in your log, to the
                 language-model provider configured for this deployment, so that it can
                 suggest what to read next. Nothing else is sent, and the feature is off when
                 no provider is configured. Sign-in, and any assistant you connect, reach

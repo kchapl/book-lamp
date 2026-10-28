@@ -176,7 +176,7 @@ def test_with_reading_status_returns_copies() -> None:
 def test_with_reading_status_leaves_an_adapters_own_books_untouched() -> None:
     """MockStorage hands out its live list, so attaching in place would write into it."""
     storage = MockStorage()
-    book = storage.add_book(isbn13="9780000000001", title="A Book", author="An Author")
+    book = storage.add_book(isbn13="9780000000001", title="A Book", authors=["An Author"])
     storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
 
     with_reading_status(storage.get_all_books(), storage.get_readings())

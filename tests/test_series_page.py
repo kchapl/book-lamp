@@ -15,7 +15,7 @@ def _add(title: str, series: str | None, year: int | None = None, isbn: str = ""
     return get_storage().add_book(
         isbn13=isbn or f"9780000000{abs(hash(title)) % 1000:03d}",
         title=title,
-        author="An Author",
+        authors=["An Author"],
         publication_year=year,
         series=series,
     )

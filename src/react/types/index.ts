@@ -86,7 +86,7 @@ export interface HistoryFilters {
     status: string;
     /**
      * Minimum rating. Named `min_rating` to match the Reading Log's query
-     * parameter: it is a floor, where the collection's `rating` is an exact
+     * parameter: it is a floor, where the log page's `rating` is an exact
      * match, and one name for both would hide that.
      */
     min_rating: number;
@@ -114,10 +114,10 @@ export interface Job {
 }
 
 /**
- * A book the author page found outside the collection.
+ * A book the author page found outside your books.
  *
  * It is Book-shaped because it carries the metadata needed to become one, but
- * it is not a collection row yet, so it has no id.
+ * it is not one of your Books yet, so it has no id.
  */
 export interface ExternalBook extends Omit<Book, 'id'> {
     id?: number | null;

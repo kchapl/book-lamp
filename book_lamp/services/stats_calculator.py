@@ -20,7 +20,7 @@ def calculate_collection_stats(
     all_records: List[Dict[str, Any]],
     settings: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Compute collection statistics from book and reading lists (pure)."""
+    """Compute reading statistics from book and reading lists (pure)."""
     completed_records = [r for r in all_records if r.get("status") == "Completed"]
     completed_book_ids = {r.get("book_id") for r in completed_records}
     completed_books = [b for b in books if b.get("id") in completed_book_ids]
@@ -53,12 +53,7 @@ def calculate_collection_stats(
 
     rating_distribution = [(stars, rating_counts[stars]) for stars in range(5, 0, -1)]
 
-    all_authors = []
-    for b in completed_books:
-        if b.get("authors"):
-            all_authors.extend(b["authors"])
-        elif b.get("author"):
-            all_authors.append(b["author"])
+    all_authors = [name for b in completed_books for name in (b.get("authors") or [])]
 
     total_authors = len(set(all_authors))
     top_authors = sorted(Counter(all_authors).items(), key=lambda x: (-x[1], x[0]))[:5]

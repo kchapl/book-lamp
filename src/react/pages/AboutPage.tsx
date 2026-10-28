@@ -14,7 +14,7 @@ const AboutPage: React.FC = () => {
                 <li>Track your reading history with ratings and notes</li>
                 <li>Organise books into a reading list</li>
                 <li>View statistics about your reading habits</li>
-                <li>Search and filter your collection</li>
+                <li>Search and filter your books</li>
                 <li>Import reading history from Libib</li>
                 <li>Barcode scanning for quick book entry</li>
             </ul>

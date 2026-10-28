@@ -60,7 +60,7 @@ describe('useUrlFilters', () => {
     });
 
     it('can drop a parameter outside its keys, for the page that owns it', async () => {
-        // The collection leaves search mode when a filter changes.
+        // The books page leaves search mode when a filter changes.
         const { result } = useSubject('/books?q=foo');
 
         act(() => result.current.filters.set({ status: 'Completed', q: '' }));

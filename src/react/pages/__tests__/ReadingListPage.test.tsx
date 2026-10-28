@@ -1,7 +1,7 @@
 /**
  * The Reading List's add action.
  *
- * The page had no way to add a Book: its empty state pointed at the collection
+ * The page had no way to add a Book: its empty state pointed at your books
  * in prose only, which is what made the capability read as missing. The action
  * now lands on the Add a Book form with the reading-list option already ticked,
  * so a reader who came from the list queues the Book on submit instead of

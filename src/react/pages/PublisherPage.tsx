@@ -48,7 +48,7 @@ const PublisherPage: React.FC = () => {
             ) : (
                 <div className="empty-state">
                     <h2>Nothing from this publisher</h2>
-                    <p>No books in your collection come from {data.publisher_name}.</p>
+                    <p>No books of yours come from {data.publisher_name}.</p>
                 </div>
             )}
         </div>

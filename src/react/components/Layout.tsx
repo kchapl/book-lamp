@@ -11,7 +11,7 @@ interface LayoutProps {
 const NAV_ITEMS: { path: string; label: string; icon: IconName }[] = [
     { path: '/', label: 'Home', icon: 'home' },
     { path: '/books', label: 'My Books', icon: 'books' },
-    // Adding a Book is reachable from every page, not just the collection.
+    // Adding a Book is reachable from every page, not just the books page.
     { path: '/books/new', label: 'Add Book', icon: 'plus' },
     { path: '/reading-list', label: 'Reading List', icon: 'bookmark' },
     { path: '/history', label: 'History', icon: 'history' },

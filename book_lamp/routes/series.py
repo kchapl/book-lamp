@@ -41,7 +41,7 @@ def _publication_order(book: Dict[str, Any]) -> tuple[bool, int, str]:
 @series_bp.route("/api/series/<path:series_slug>", methods=["GET"])
 @authorisation_required
 def api_series_page(series_slug: str):
-    """Every Book in the collection carrying this series name, in reading order."""
+    """Every Book in the reader's books carrying this series name, in reading order."""
     storage = get_storage()
     wanted = normalise_series_name(series_slug)
 
@@ -71,7 +71,7 @@ def api_series_page(series_slug: str):
             }
         )
 
-    # Spellings can differ in a collection by case alone; naming the page after
+    # Spellings can differ in a reading log by case alone; naming the page after
     # the alphabetically first one keeps the answer the same on every request.
     series_name = sorted({" ".join(str(book["series"]).split()) for book in in_series})[0]
 

@@ -3,7 +3,7 @@
  *
  * The "From Open Library" section is only populated outside test mode, so this
  * test supplies the external results itself. An external result is not a
- * collection row and carries no id: the action has to create the Book from the
+ * Book row and carries no id: the action has to create the Book from the
  * metadata already on screen rather than post a null id.
  *
  * Material Web buttons navigate and click from a listener on the host element,

@@ -43,7 +43,7 @@ def test_isbn_lookup_fail_reports_no_book_data(authenticated_client):
 def test_manual_entry_duplicate_isbn(authenticated_client):
     """Adding an ISBN that already exists returns the existing book unchanged."""
     storage = get_storage()
-    storage.add_book(isbn13="9781234567890", title="First Entry", author="Author One")
+    storage.add_book(isbn13="9781234567890", title="First Entry", authors=["Author One"])
 
     response = authenticated_client.post(
         "/api/books",
@@ -60,7 +60,7 @@ def test_manual_entry_duplicate_isbn(authenticated_client):
 def test_manual_entry_existing_isbn_added_to_reading_list(authenticated_client):
     """Re-adding an existing ISBN also queues the book on the reading list."""
     storage = get_storage()
-    book = storage.add_book(isbn13="9781234567890", title="First Entry", author="Author One")
+    book = storage.add_book(isbn13="9781234567890", title="First Entry", authors=["Author One"])
 
     response = authenticated_client.post(
         "/api/books",

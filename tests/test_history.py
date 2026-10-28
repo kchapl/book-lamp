@@ -13,7 +13,7 @@ def test_get_reading_history_empty(authenticated_client):
 def test_get_reading_history_populated(authenticated_client):
     """Test reading history with records; reading list items are excluded."""
     storage = get_storage()
-    book = storage.add_book(isbn13="1", title="Pride and Prejudice", author="Jane Austen")
+    book = storage.add_book(isbn13="1", title="Pride and Prejudice", authors=["Jane Austen"])
     storage.add_reading(
         book_id=book["id"],
         status="Completed",
@@ -36,8 +36,8 @@ def test_get_reading_history_populated(authenticated_client):
 def test_reading_history_filtering(authenticated_client):
     """Test filtering by status and rating."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="1", title="Book 1", author="A1")
-    b2 = storage.add_book(isbn13="2", title="Book 2", author="A2")
+    b1 = storage.add_book(isbn13="1", title="Book 1", authors=["A1"])
+    b2 = storage.add_book(isbn13="2", title="Book 2", authors=["A2"])
 
     storage.add_reading(b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5)
     storage.add_reading(b2["id"], "In Progress", "2023-02-01")
@@ -56,9 +56,9 @@ def test_reading_history_min_rating_filter(authenticated_client):
     read, so the filter never reached the server.
     """
     storage = get_storage()
-    b1 = storage.add_book(isbn13="1", title="Five Stars", author="A1")
-    b2 = storage.add_book(isbn13="2", title="Three Stars", author="A2")
-    b3 = storage.add_book(isbn13="3", title="Unrated", author="A3")
+    b1 = storage.add_book(isbn13="1", title="Five Stars", authors=["A1"])
+    b2 = storage.add_book(isbn13="2", title="Three Stars", authors=["A2"])
+    b3 = storage.add_book(isbn13="3", title="Unrated", authors=["A3"])
 
     storage.add_reading(b1["id"], "Completed", "2023-01-01", "2023-01-02", rating=5)
     storage.add_reading(b2["id"], "Completed", "2023-01-01", "2023-01-03", rating=3)
@@ -78,8 +78,8 @@ def test_reading_history_min_rating_filter(authenticated_client):
 def test_reading_history_sorting(authenticated_client):
     """Test sorting results."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="1", title="Z Book", author="A1")
-    b2 = storage.add_book(isbn13="2", title="A Book", author="A2")
+    b1 = storage.add_book(isbn13="1", title="Z Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="2", title="A Book", authors=["A2"])
 
     storage.add_reading(b1["id"], "Completed", "2023-01-01", "2023-01-10")
     storage.add_reading(b2["id"], "Completed", "2023-01-01", "2023-01-20")
@@ -96,9 +96,9 @@ def test_stats_top_authors_only_completed(authenticated_client):
     """Stats endpoint should count authors based on completed books only."""
     storage = get_storage()
     # Author1 has two books but only one completed
-    b1 = storage.add_book(isbn13="1", title="A", author="Author1")
-    b2 = storage.add_book(isbn13="2", title="B", author="Author1")
-    b3 = storage.add_book(isbn13="3", title="C", author="Author2")
+    b1 = storage.add_book(isbn13="1", title="A", authors=["Author1"])
+    b2 = storage.add_book(isbn13="2", title="B", authors=["Author1"])
+    b3 = storage.add_book(isbn13="3", title="C", authors=["Author2"])
     storage.add_reading(b1["id"], "Completed", "2023-01-01", "2023-01-10")
     storage.add_reading(b2["id"], "In Progress", "2023-02-01")
     storage.add_reading(b3["id"], "Completed", "2023-03-01", "2023-03-10")
@@ -119,8 +119,8 @@ def test_stats_status_links(authenticated_client):
     """Books status endpoint filtering verification."""
     storage = get_storage()
     # create two books with different statuses
-    b1 = storage.add_book(isbn13="1", title="Book One", author="A1")
-    b2 = storage.add_book(isbn13="2", title="Book Two", author="A2")
+    b1 = storage.add_book(isbn13="1", title="Book One", authors=["A1"])
+    b2 = storage.add_book(isbn13="2", title="Book Two", authors=["A2"])
     storage.add_reading(b1["id"], "Completed", "2023-01-01", "2023-01-05")
     storage.add_reading(b2["id"], "In Progress", "2023-02-01")
 
@@ -135,7 +135,7 @@ def test_stats_status_links(authenticated_client):
 def test_update_reading(authenticated_client):
     """Test updating an existing reading."""
     storage = get_storage()
-    book = storage.add_book(isbn13="1", title="Test Book", author="Author")
+    book = storage.add_book(isbn13="1", title="Test Book", authors=["Author"])
     record = storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
 
     response = authenticated_client.post(
@@ -156,7 +156,7 @@ def test_update_reading(authenticated_client):
 def test_delete_reading(authenticated_client):
     """Test deleting a reading."""
     storage = get_storage()
-    book = storage.add_book(isbn13="1", title="Test Book", author="Author")
+    book = storage.add_book(isbn13="1", title="Test Book", authors=["Author"])
     record = storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
 
     assert len(storage.get_readings()) == 1
@@ -170,14 +170,14 @@ def test_stats_top_authors_sorting(authenticated_client):
     storage = get_storage()
     # Rowling and Bryson both have 2 completed books
     # Rowling is added first to possibly ensure she came first in Counter
-    storage.add_book(isbn13="1", title="R1", author="Rowling")
-    storage.add_book(isbn13="2", title="R2", author="Rowling")
-    storage.add_book(isbn13="3", title="B1", author="Bryson")
-    storage.add_book(isbn13="4", title="B2", author="Bryson")
+    storage.add_book(isbn13="1", title="R1", authors=["Rowling"])
+    storage.add_book(isbn13="2", title="R2", authors=["Rowling"])
+    storage.add_book(isbn13="3", title="B1", authors=["Bryson"])
+    storage.add_book(isbn13="4", title="B2", authors=["Bryson"])
     # Tolkien has 3 completed books
-    storage.add_book(isbn13="5", title="T1", author="Tolkien")
-    storage.add_book(isbn13="6", title="T2", author="Tolkien")
-    storage.add_book(isbn13="7", title="T3", author="Tolkien")
+    storage.add_book(isbn13="5", title="T1", authors=["Tolkien"])
+    storage.add_book(isbn13="6", title="T2", authors=["Tolkien"])
+    storage.add_book(isbn13="7", title="T3", authors=["Tolkien"])
 
     for book in storage.get_all_books():
         storage.add_reading(book["id"], "Completed", "2023-01-01", "2023-01-10")
@@ -199,8 +199,8 @@ def test_stats_top_authors_sorting(authenticated_client):
 def test_reading_history_year_filter(authenticated_client):
     """Test filtering reading history by year."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="1", title="2024 Book", author="A1")
-    b2 = storage.add_book(isbn13="2", title="2023 Book", author="A2")
+    b1 = storage.add_book(isbn13="1", title="2024 Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="2", title="2023 Book", authors=["A2"])
 
     storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
     storage.add_reading(b2["id"], "Completed", "2023-12-01", "2023-12-31", rating=4)

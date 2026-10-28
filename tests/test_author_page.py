@@ -25,7 +25,7 @@ def test_author_page_shows_owned_books(authenticated_client):
     storage.add_book(
         isbn13="9780141439518",
         title="Pride and Prejudice",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1813,
     )
 
@@ -45,7 +45,7 @@ def test_author_page_no_unread_section_in_test_mode(authenticated_client):
     storage.add_book(
         isbn13="9780141439518",
         title="Pride and Prejudice",
-        author="Jane Austen",
+        authors=["Jane Austen"],
     )
 
     resp = authenticated_client.get("/api/author/jane-austen")
@@ -77,7 +77,7 @@ def test_author_page_reading_list_flag(authenticated_client):
     book = storage.add_book(
         isbn13="9780141439518",
         title="Pride and Prejudice",
-        author="Jane Austen",
+        authors=["Jane Austen"],
     )
     storage.add_to_reading_list(book["id"])
 
@@ -98,13 +98,13 @@ def test_author_page_sorts_by_pub_year_asc(authenticated_client):
     storage.add_book(
         isbn13="9780141439518",
         title="Sense and Sensibility",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1811,
     )
     storage.add_book(
         isbn13="9780141439600",
         title="Emma",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1815,
     )
 
@@ -124,13 +124,13 @@ def test_author_page_sorts_by_title_when_year_same(authenticated_client):
     storage.add_book(
         isbn13="9780141439519",
         title="Mansfield Park",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1814,
     )
     storage.add_book(
         isbn13="9780141439510",
         title="Northanger Abbey",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1814,
     )
 
@@ -149,7 +149,7 @@ def test_author_page_no_duplicate_books(authenticated_client):
     storage.add_book(
         isbn13="9780141439518",
         title="Pride and Prejudice",
-        author="Jane Austen",
+        authors=["Jane Austen"],
     )
     # Simulate a second call; the mock storage prevents true duplicates via upsert
     resp = authenticated_client.get("/api/author/jane-austen")
@@ -258,7 +258,7 @@ def test_an_external_result_matching_an_owned_isbn_creates_no_duplicate(authenti
     existing = storage.add_book(
         isbn13="9780141439600",
         title="Emma",
-        author="Jane Austen",
+        authors=["Jane Austen"],
         publication_year=1815,
     )
     # The page loaded before this Book existed, so it still offers the result.

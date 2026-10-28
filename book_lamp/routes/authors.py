@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify
 from book_lamp.middleware.auth import authorisation_required
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.storage_factory import get_storage, is_test_mode
+from book_lamp.utils.authors import matches
 from book_lamp.utils.publishers import normalize_publisher
 
 authors_bp = Blueprint("authors", __name__)
@@ -20,25 +21,15 @@ def api_author_page(author_slug: str):
     rl_items = storage.get_reading_list()
     reading_list_book_ids = {item["book_id"] for item in rl_items}
 
-    def to_slug(name):
-        return name.lower().replace(" ", "-").replace(".", "") if name else ""
-
-    search_slug = author_slug.lower()
-
     author_books = []
     display_author_name = author_slug.replace("-", " ").title()
 
     for book in books:
-        if book.get("authors"):
-            for a in book["authors"]:
-                if to_slug(a) == search_slug:
-                    author_books.append(book)
-                    display_author_name = a
-                    break
-        elif book.get("author"):
-            if to_slug(book["author"]) == search_slug:
+        for name in book.get("authors") or []:
+            if matches(name, author_slug):
                 author_books.append(book)
-                display_author_name = book["author"]
+                display_author_name = name
+                break
 
     for book in author_books:
         book["is_owned"] = True

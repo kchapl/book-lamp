@@ -132,8 +132,17 @@ const BookDetailPage: React.FC = () => {
 
     const handleSaveEdit = async () => {
         if (!bookId) return;
+
+        // The author field holds the display string, which a person cannot
+        // un-join. So while it is untouched, send the names it was built from;
+        // once it is edited, it is new text and the server reads it.
+        const payload: Partial<Book> = { ...editForm };
+        if ((editForm.author || '') !== (book?.author || '')) {
+            delete payload.authors;
+        }
+
         try {
-            await updateBook(Number(bookId), editForm);
+            await updateBook(Number(bookId), payload);
             setIsEditing(false);
             reload();
         } catch (err) {
