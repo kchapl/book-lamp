@@ -243,16 +243,22 @@ def api_create_book():
     title = str(data.get("title", "") or "").strip()
     author = str(data.get("author", "") or "").strip()
 
-    if isbn:
-        existing = storage.get_book_by_isbn(isbn)
-        if existing:
-            try:
-                storage.add_to_reading_list(existing["id"])
-            except Exception as exc:
-                current_app.logger.warning(
-                    f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
-                )
-            return jsonify(existing), 200
+    if not isbn:
+        # A Book is identified by its ISBN: storage keys rows on it and an
+        # insert upserts on that key, so a Book without one would overwrite
+        # whichever ISBN-less Book came before it, keeping its id and readings.
+        # Until storage can tell such Books apart, refuse to create one.
+        return jsonify({"error": "isbn is required"}), 400
+
+    existing = storage.get_book_by_isbn(isbn)
+    if existing:
+        try:
+            storage.add_to_reading_list(existing["id"])
+        except Exception as exc:
+            current_app.logger.warning(
+                f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
+            )
+        return jsonify(existing), 200
 
     if title and author:
         book_data = {
@@ -266,9 +272,6 @@ def api_create_book():
             "bisac_category": data.get("bisac_category"),
         }
     else:
-        if not isbn:
-            return jsonify({"error": "isbn is required"}), 400
-
         from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
         if is_test_mode() and isbn == TEST_ISBN:
