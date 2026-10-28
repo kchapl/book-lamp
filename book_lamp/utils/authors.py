@@ -20,14 +20,7 @@ Two rules keep the list authoritative:
 :func:`sort_key` is how a shelf of Books is ordered by surname.
 """
 
-import re
 from typing import Iterable, List, Tuple
-
-
-def _names(text: str) -> List[str]:
-    """Split text on the separators that mark a list, keeping order."""
-    parts = [part.strip() for part in re.split(r"\s*;\s*", text) if part.strip()]
-    return [part for part in parts if part]
 
 
 def parse(text: str) -> List[str]:
@@ -47,7 +40,7 @@ def parse(text: str) -> List[str]:
     # A semicolon is the unambiguous list separator, so it decides the split
     # outright: it is what "Last, First" entries are joined with.
     if ";" in text:
-        return _names(text)
+        return [name.strip() for name in text.split(";") if name.strip()]
 
     # " and " / " & " join names too, and cannot appear inside one. Commas are
     # left alone for the moment, because "Last, First" uses one.
