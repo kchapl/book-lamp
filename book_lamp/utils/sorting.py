@@ -6,6 +6,7 @@ for organising book collections.
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
+from book_lamp.utils.authors import sort_key as author_sort_key
 from book_lamp.utils.reading_status import latest_reading_by_book
 
 
@@ -31,51 +32,6 @@ def _normalise_title_for_sort(title: str) -> str:
     return title_lower
 
 
-def _parse_author_name(author: str) -> Tuple[str, str]:
-    """Parse author name into last name and first name for sorting.
-
-    Handles various formats:
-    - "Last, First" (standard library format)
-    - "First Last" (common format)
-    - Multiple authors (uses first author)
-
-    Args:
-        author: Author name string.
-
-    Returns:
-        Tuple of (last_name, first_name) for sorting, both lowercased.
-    """
-    if not author:
-        return ("", "")
-
-    # Handle multiple authors - use first author
-    # Split on comma first to handle "Last, First" format
-    if "," in author:
-        # Could be "Last, First" or "Last, First and Other"
-        parts = author.split(",", 1)
-        first_part = parts[0].strip()
-        # Check if there's more after the comma
-        if len(parts) > 1:
-            second_part = parts[1].strip()
-            # Remove "and" or "&" if present (for multiple authors)
-            second_part = second_part.split(" and ")[0].split(" & ")[0].strip()
-            # If second part exists, it's "Last, First" format
-            if second_part:
-                return (first_part.lower(), second_part.lower())
-        # Just "Last," format
-        return (first_part.lower(), "")
-
-    # No comma - assume "First Last" format
-    # Remove "and" or "&" for multiple authors
-    first_author = author.split(" and ")[0].split(" & ")[0].strip()
-    # Split on last space
-    parts = first_author.rsplit(" ", 1)
-    if len(parts) == 2:
-        return (parts[1].lower(), parts[0].lower())
-    # Single word - treat as last name
-    return (first_author.lower(), "")
-
-
 def sort_by_author(books: List[Dict[str, Any]], reverse: bool = False) -> List[Dict[str, Any]]:
     """Sort books alphabetically by author (last name, then first name).
 
@@ -96,7 +52,7 @@ def sort_by_author(books: List[Dict[str, Any]], reverse: bool = False) -> List[D
             author = authors[0]
         else:
             author = book.get("author", "") or ""
-        last_name, first_name = _parse_author_name(author)
+        last_name, first_name = author_sort_key(author)
         title = _normalise_title_for_sort(book.get("title", "") or "")
         return (last_name, first_name, title)
 
@@ -120,7 +76,7 @@ def sort_by_title(books: List[Dict[str, Any]], reverse: bool = False) -> List[Di
     def sort_key(book: Dict[str, Any]) -> Tuple[str, str, str]:
         title = _normalise_title_for_sort(book.get("title", "") or "")
         author = book.get("author", "") or ""
-        last_name, first_name = _parse_author_name(author)
+        last_name, first_name = author_sort_key(author)
         return (title, last_name, first_name)
 
     return sorted(books, key=sort_key, reverse=reverse)

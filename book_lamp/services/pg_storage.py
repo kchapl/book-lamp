@@ -10,7 +10,7 @@ from psycopg import OperationalError
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-from book_lamp.utils.authors import split_authors
+from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import Category, normalize_isbn, resolve_category
 from book_lamp.utils.readings import require_end_date
 
@@ -155,7 +155,7 @@ class PostgresStorage:
                 # order, so every path that names a Book's authors agrees.
                 authors_list = [a for a in (book.get("author_names") or []) if a is not None]
                 book["authors"] = authors_list
-                book["author"] = ", ".join(authors_list)
+                book["author"] = display(authors_list)
                 books.append(book)
             return books
 
@@ -199,7 +199,7 @@ class PostgresStorage:
             book = dict(row)
 
             book["authors"] = [name for name in (row["author_names"] or []) if name is not None]
-            book["author"] = ", ".join(book["authors"])
+            book["author"] = display(book["authors"])
 
             return book
 
@@ -221,7 +221,7 @@ class PostgresStorage:
             book = dict(row)
 
             book["authors"] = [name for name in (row["author_names"] or []) if name is not None]
-            book["author"] = ", ".join(book["authors"])
+            book["author"] = display(book["authors"])
             return book
 
     def get_reading_list(self) -> list[dict[str, Any]]:
@@ -391,7 +391,7 @@ class PostgresStorage:
 
     def _update_book_authors(self, conn: psycopg.Connection[Any], book_id: int, author_str: str) -> None:
         """Helper to sync the authors table and the ordered book_authors links."""
-        author_names = split_authors(author_str)
+        author_names = parse(author_str)
         # Clear existing links
         conn.execute("DELETE FROM book_authors WHERE book_id = %s", [book_id])
 

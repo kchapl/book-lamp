@@ -84,17 +84,17 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        from book_lamp.utils.authors import split_authors
+        from book_lamp.utils.authors import display, parse
         from book_lamp.utils.books import normalize_isbn
 
         # One list and one display string, the string derived from the list, so
         # this adapter and Postgres present a Book's authors the same way.
-        authors = split_authors(author)
+        authors = parse(author)
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
             "title": title,
-            "author": ", ".join(authors),
+            "author": display(authors),
             "authors": authors,
             "publication_year": publication_year,
             "thumbnail_url": thumbnail_url,
@@ -135,11 +135,11 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        from book_lamp.utils.authors import split_authors
+        from book_lamp.utils.authors import display, parse
 
         for book in self.books:
             if book["id"] == book_id:
-                authors = split_authors(author)
+                authors = parse(author)
                 # The triple resolves through the one rule, shared with the
                 # Postgres adapter and the import paths (see ADR-0002).
                 resolved = resolve_category(
@@ -151,7 +151,7 @@ class MockStorage:
                     {
                         "isbn13": isbn13,
                         "title": title,
-                        "author": ", ".join(authors),
+                        "author": display(authors),
                         "authors": authors,
                         "publication_year": publication_year,
                         "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),

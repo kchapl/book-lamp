@@ -15,7 +15,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
-from book_lamp.utils.authors import split_authors
+from book_lamp.utils.authors import parse
 
 # The compose command is only the first hurdle: whether the runtime can actually
 # start a container is settled by the `podman_services` fixture.
@@ -525,14 +525,14 @@ def _write_book_as_the_release_before_0006_did(url, isbn13, title, author):
     """A Book as that release left it: the string, and links in split order.
 
     `book_authors` had no `position` then, so its `_update_book_authors` inserted
-    one row per name `split_authors` returned, in that order.
+    one row per name `parse` returned, in that order.
     """
     with psycopg.connect(url) as conn:
         book_id = conn.execute(
             "INSERT INTO books (isbn13, title, author) VALUES (%s, %s, %s) RETURNING id",
             [isbn13, title, author],
         ).fetchone()[0]
-        for name in split_authors(author):
+        for name in parse(author):
             author_id = conn.execute(
                 "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO UPDATE "
                 "SET name = EXCLUDED.name RETURNING id",

@@ -1,65 +1,115 @@
-"""Utilities for handling author names and multi-author strings."""
+"""Authorship: the names a Book is credited to.
 
-from typing import List
+A Book's Authors are a list, in the order the source credited them. Text enters
+that list in one place, :func:`parse`, and leaves it in one place,
+:func:`display`; nothing ever parses a display string back. That is the point:
+the comma that means "Last, First" in a name never has to be told apart from a
+comma separating two names, because a list never arrives as a comma-joined
+string.
+
+Two rules keep the list authoritative:
+
+- A source that gives a list (Open Library, Google Books, a CSV column) is taken
+  as given. A source that gives one name — iTunes' artist, a person's typed
+  text — contributes one Author per name it actually lists, and
+  :func:`parse` is what reads that text.
+- An Author is identified by name (see ``CONTEXT.md``): two spellings are two
+  Authors, each with its own page.
+
+:func:`slug` and :func:`matches` are how an Author gets a page, and
+:func:`sort_key` is how a shelf of Books is ordered by surname.
+"""
+
+import re
+from typing import Iterable, List, Tuple
 
 
-def split_authors(author_str: str) -> List[str]:
-    """Split a string containing one or more authors into a list.
+def _names(text: str) -> List[str]:
+    """Split text on the separators that mark a list, keeping order."""
+    parts = [part.strip() for part in re.split(r"\s*;\s*", text) if part.strip()]
+    return [part for part in parts if part]
 
-    Handles separators like:
-    - Comma (if not used for "Last, First")
-    - Semicolon (common for multiple "Last, First" entries)
-    - " and "
-    - " & "
 
-    Args:
-        author_str: The string to split.
+def parse(text: str) -> List[str]:
+    """Read text that lists several Authors into the names it lists.
 
-    Returns:
-        List of clean individual author names.
+    Use this only for text that is a list of names: a payload field, a CSV
+    column, or something a person typed. A provider's single value is one
+    Author, so it never comes through here.
+
+    Semicolons separate names unambiguously, as do " and " and " & ". A single
+    comma is read as "Last, First" — the one genuinely ambiguous mark — and two
+    or more commas are read as a list, which is how a bare "A, B, C" is handled.
     """
-    if not author_str:
+    if not text or not text.strip():
         return []
 
-    # If it contains semicolons, assume that's the primary separator
-    # (often used to separate "Last, First" entries)
-    if ";" in author_str:
-        parts = [p.strip() for p in author_str.split(";") if p.strip()]
-        return parts
+    # A semicolon is the unambiguous list separator, so it decides the split
+    # outright: it is what "Last, First" entries are joined with.
+    if ";" in text:
+        return _names(text)
 
-    # Normalise common separators to a temporary unique token
-    # We replace " and " and " & " with something unique
-    # We don't replace commas yet because of "Last, First"
-    s = author_str.replace(" and ", " || ").replace(" & ", " || ")
+    # " and " / " & " join names too, and cannot appear inside one. Commas are
+    # left alone for the moment, because "Last, First" uses one.
+    joined = text.replace(" and ", " || ").replace(" & ", " || ")
 
-    # If there are multiple commas, it might be multiple authors
-    # OR it could be "Last, First" with titles etc.
-    # A common pattern for multiple authors is "Author A, Author B, and Author C"
-    # After our " and " replacement, it becomes "Author A, Author B || Author C"
-
-    # Split by the token first
-    parts = s.split(" || ")
-
-    final_authors = []
-    for part in parts:
+    names: List[str] = []
+    for part in joined.split(" || "):
         part = part.strip()
         if not part:
             continue
-
-        # If a part still contains commas, we need to decide if it's multiple
-        # authors or just "Last, First".
-        # Heuristic: If there's only one comma, assume "Last, First".
-        # If there are multiple, it might be a list.
-        if "," in part:
-            comma_count = part.count(",")
-            if comma_count > 1:
-                # Likely a list of authors
-                sub_parts = [sp.strip() for sp in part.split(",") if sp.strip()]
-                final_authors.extend(sub_parts)
-            else:
-                # Likely "Last, First"
-                final_authors.append(part)
+        if part.count(",") > 1:
+            # More than one comma cannot be a single "Last, First" name, so it
+            # is a bare list separated by commas.
+            names.extend(name.strip() for name in part.split(",") if name.strip())
         else:
-            final_authors.append(part)
+            names.append(part)
+    return names
 
-    return [a for a in final_authors if a]
+
+def display(names: Iterable[str]) -> str:
+    """The one-line form of a Book's Authors: what a reader sees.
+
+    A projection, never an input: the result is not meant to be parsed back,
+    which is why ", " is safe to use for a list of people.
+    """
+    cleaned = [str(name).strip() for name in names if str(name).strip()]
+    return ", ".join(cleaned)
+
+
+def slug(name: str) -> str:
+    """The URL segment that names an Author.
+
+    Frozen: every author link already handed out depends on this shape, so it
+    keeps the spaces-to-hyphens and dropped dots it has always had.
+    """
+    if not name:
+        return ""
+    return name.lower().replace(" ", "-").replace(".", "")
+
+
+def matches(name: str, author_slug: str) -> bool:
+    """Whether ``name`` is the Author the page at ``author_slug`` is about."""
+    if not author_slug:
+        return False
+    return slug(name) == author_slug.strip().lower()
+
+
+def sort_key(name: str) -> Tuple[str, str]:
+    """Order one Author's name by surname, then given name, both lowercased.
+
+    "Last, First" says which part is the surname outright. Otherwise the last
+    word is taken as the surname, which is what "First Last" means.
+    """
+    if not name or not name.strip():
+        return ("", "")
+
+    name = name.strip()
+    if "," in name:
+        surname, _, given = name.partition(",")
+        return (surname.strip().lower(), given.strip().lower())
+
+    parts = name.rsplit(" ", 1)
+    if len(parts) == 2:
+        return (parts[1].lower(), parts[0].lower())
+    return (name.lower(), "")

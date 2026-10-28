@@ -3,10 +3,22 @@
 The domain language for this project. These are the canonical names: use them in
 code, in commits, and in conversation.
 
+Book Lamp is one reader's reading log. It records Readings of Books — what was
+started, finished, abandoned and thought of — not copies the reader owns. The
+museum language (the reading room, exhibits, accession lines) is how that log is
+presented; see `DESIGN.md`. It is not a claim to ownership.
+
 ## Book
 
-A work in the collection, identified by its ISBN. A Book is the thing a Reading is
-about and the thing a Reading List holds.
+A work the reader has recorded a Reading of, is reading, or means to read,
+identified by its ISBN. A Book is the thing a Reading is about and the thing a
+Reading List holds. Logging a Book says nothing about owning a copy of it.
+
+## Author
+
+A person who wrote a Book. A Book has at least one Author, and the order they are
+credited in is the order the source gave them. An Author is identified by name:
+two spellings of a name are two Authors, each with its own page.
 
 ## Reading
 
