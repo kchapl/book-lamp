@@ -371,6 +371,10 @@ def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict
             entry: Dict[str, Any] = {
                 "title": raw_title.strip(),
                 "author": author_str,
+                # The display string joins names with a comma, which storage reads
+                # back as one "Last, First" person; the list is what keeps them
+                # apart when the result is added to the collection.
+                "authors": doc_authors if doc_authors else [author_name],
                 "publication_year": year if year else None,
                 "thumbnail_url": thumbnail_url,
                 "isbn13": isbn13,

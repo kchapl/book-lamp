@@ -113,11 +113,21 @@ export interface Job {
     error?: string;
 }
 
+/**
+ * A book the author page found outside the collection.
+ *
+ * It is Book-shaped because it carries the metadata needed to become one, but
+ * it is not a collection row yet, so it has no id.
+ */
+export interface ExternalBook extends Omit<Book, 'id'> {
+    id?: number | null;
+}
+
 export interface AuthorPage {
     author_name: string;
     read_books: Book[];
     reading_list_books: Book[];
-    unread_books: Book[];
+    unread_books: ExternalBook[];
 }
 
 export interface PublisherPage {
@@ -137,6 +147,17 @@ export interface User {
 }
 
 export type Theme = 'light' | 'dark' | 'system';
+
+/**
+ * What the sync probe found.
+ *
+ * `unauthenticated` is not a storage failure: it means the request carried no
+ * session, so there is nothing to probe.
+ */
+export interface SyncDiagnostics {
+    status: 'ok' | 'error' | 'unauthenticated';
+    storage: 'postgres' | 'unauthenticated';
+}
 
 export interface AuthStatus {
     is_authenticated: boolean;

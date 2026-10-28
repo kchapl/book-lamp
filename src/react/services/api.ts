@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus } from '../types';
+import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus, SyncDiagnostics } from '../types';
 
 const API_BASE = '/api';
 const UNAUTHORISED_PATH = '/unauthorised';
@@ -121,8 +121,8 @@ export async function logout(): Promise<{ ok: boolean }> {
 }
 
 // Sync diagnostics
-export async function getSyncDiagnostics(): Promise<{ status: string; message: string }> {
-    return fetchJSON(`${API_BASE}/sync/diagnostics`);
+export async function getSyncDiagnostics(): Promise<SyncDiagnostics> {
+    return fetchJSON<SyncDiagnostics>(`${API_BASE}/sync/diagnostics`);
 }
 
 // Recommendations
