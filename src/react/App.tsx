@@ -86,6 +86,14 @@ function App() {
         const checkSync = async () => {
             try {
                 const diagnostics = await getSyncDiagnostics();
+                if (diagnostics.status === 'unauthenticated') {
+                    // The session has gone. That is not a storage failure, so
+                    // there is no badge to show: forget the signed-in state,
+                    // which stops this probe and offers the sign-in path again.
+                    setSyncStatus('checking');
+                    setIsAuthorized(false);
+                    return;
+                }
                 setSyncStatus(diagnostics.status === 'ok' ? 'ok' : 'error');
             } catch {
                 setSyncStatus('error');
