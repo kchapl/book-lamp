@@ -12,10 +12,10 @@
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
-import { lookupISBN } from '../../services/api';
+import { createBook, lookupISBN } from '../../services/api';
 
 // The scanner library reaches for the camera; stub it out. It must be a real
 // constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
@@ -34,6 +34,7 @@ vi.mock('../../services/api', () => ({
 }));
 
 const lookup = vi.mocked(lookupISBN);
+const create = vi.mocked(createBook);
 
 const BUTTON_SELECTOR =
     'md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button';
@@ -120,6 +121,48 @@ describe('AddBookPage reading-list option', () => {
         fireEvent.click(button(/enter manually/i));
 
         expect(checkbox(container)?.checked).toBe(false);
+    });
+});
+
+describe('AddBookPage submit', () => {
+    it('sends the ISBN to the create endpoint, which stores and de-duplicates on it', async () => {
+        create.mockResolvedValue({ id: 7, title: 'Emma', author: 'Jane Austen' });
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter manually/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+        typeInto('isbn', '978-0-14-143960-0');
+
+        // A custom element is not a native submit button, so submit the form
+        // itself; the payload is what the endpoint contract depends on. The
+        // handler creates the Book and then navigates, so let it finish inside
+        // act rather than updating the router after the test has moved on.
+        await act(async () => {
+            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledWith({
+            title: 'Emma',
+            author: 'Jane Austen',
+            publisher: undefined,
+            publication_year: undefined,
+            isbn: '9780141439600',
+        });
+    });
+
+    it('refuses to submit without an ISBN, which is what identifies a Book', async () => {
+        const { container } = renderPage();
+        fireEvent.click(button(/enter manually/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+        });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(screen.getByText(/an isbn is required/i)).toBeInTheDocument();
     });
 });
 

@@ -101,10 +101,10 @@ def test_api_export_csv_requires_authentication(client, monkeypatch):
 
 
 def test_api_create_book_manual_entry(authenticated_client):
-    """POST /api/books with title+author creates a book and returns 201."""
+    """POST /api/books with an ISBN plus title and author returns 201."""
     resp = authenticated_client.post(
         "/api/books",
-        json={"title": "My New Book", "author": "Some Author", "isbn": ""},
+        json={"title": "My New Book", "author": "Some Author", "isbn": "9780141439600"},
     )
     assert resp.status_code == 201
     body = _json(resp)
@@ -138,6 +138,24 @@ def test_api_create_book_missing_isbn_and_title(authenticated_client):
     """POST /api/books with neither isbn nor title+author returns 400."""
     resp = authenticated_client.post("/api/books", json={})
     assert resp.status_code == 400
+
+
+def test_api_create_book_without_isbn_is_rejected(authenticated_client):
+    """POST /api/books with a title and author but no ISBN creates nothing.
+
+    A Book is identified by its ISBN: storage upserts on it, so an ISBN-less
+    Book would overwrite the ISBN-less Book created before it.
+    """
+    storage = get_storage()
+
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"title": "No ISBN", "author": "Nobody"},
+    )
+
+    assert resp.status_code == 400
+    assert _json(resp)["error"] == "isbn is required"
+    assert storage.get_all_books() == []
 
 
 def test_api_create_book_deduplication(authenticated_client):
