@@ -158,6 +158,135 @@ def test_author_page_no_duplicate_books(authenticated_client):
     assert read_books[0]["title"] == "Pride and Prejudice"
 
 
+def test_adding_an_external_result_moves_it_to_the_reading_list(authenticated_client, monkeypatch):
+    """The action on an external result creates the Book and queues it.
+
+    The external section is only populated outside test mode, so this test
+    supplies the results itself and then makes the request the page makes.
+    """
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    external = {
+        "title": "Emma",
+        "author": "Jane Austen",
+        "isbn13": "9780141439600",
+        "publication_year": 1815,
+        "thumbnail_url": "https://example.com/emma.jpg",
+        "publisher": "John Murray",
+        "description": None,
+    }
+
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(authors_route, "lookup_books_by_author", lambda _name: [dict(external)])
+
+    before = authenticated_client.get("/api/author/jane-austen").get_json()
+    assert [b["title"] for b in before["unread_books"]] == ["Emma"]
+    # An external result is not a collection row, so it has no id.
+    assert before["unread_books"][0]["id"] is None
+
+    added = authenticated_client.post(
+        "/api/books",
+        json={
+            "title": external["title"],
+            "author": external["author"],
+            "isbn": external["isbn13"],
+            "publication_year": external["publication_year"],
+            "thumbnail_url": external["thumbnail_url"],
+            "publisher": external["publisher"],
+        },
+    )
+    assert added.status_code == 201
+    assert len(get_storage().get_all_books()) == 1
+
+    after = authenticated_client.get("/api/author/jane-austen").get_json()
+    assert [b["title"] for b in after["reading_list_books"]] == ["Emma"]
+    assert after["read_books"] == []
+    assert after["unread_books"] == []
+
+
+def test_adding_a_two_author_result_keeps_both_names(authenticated_client, monkeypatch):
+    """A co-authored result stays a Book by both people, not one combined author.
+
+    The page sends the names themselves: the display string joins them with a
+    comma, which storage reads as a single "Last, First" person, and the reloaded
+    pages would then offer the Book as an external result again.
+    """
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    names = ["Neil Gaiman", "Terry Pratchett"]
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Good Omens",
+                "author": ", ".join(names),
+                "authors": names,
+                "isbn13": "9780060853983",
+            }
+        ],
+    )
+
+    added = authenticated_client.post(
+        "/api/books",
+        json={
+            "title": "Good Omens",
+            "author": ", ".join(names),
+            "authors": names,
+            "isbn": "9780060853983",
+        },
+    )
+
+    assert added.status_code == 201
+    assert get_storage().get_book_by_isbn("9780060853983")["authors"] == names
+
+    for slug in ("neil-gaiman", "terry-pratchett"):
+        page = authenticated_client.get(f"/api/author/{slug}").get_json()
+        assert [b["title"] for b in page["reading_list_books"]] == ["Good Omens"]
+        assert page["unread_books"] == []
+
+
+def test_an_external_result_matching_an_owned_isbn_creates_no_duplicate(authenticated_client, monkeypatch):
+    """A result whose ISBN is already in the collection queues that Book."""
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    existing = storage.add_book(
+        isbn13="9780141439600",
+        title="Emma",
+        author="Jane Austen",
+        publication_year=1815,
+    )
+    # The page loaded before this Book existed, so it still offers the result.
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Emma",
+                "author": "Jane Austen",
+                "isbn13": "9780141439600",
+                "publication_year": 1815,
+            }
+        ],
+    )
+
+    added = authenticated_client.post(
+        "/api/books",
+        json={"title": "Emma", "author": "Jane Austen", "isbn": "9780141439600"},
+    )
+
+    assert added.status_code == 200
+    assert added.get_json()["id"] == existing["id"]
+    assert [b["id"] for b in storage.get_all_books()] == [existing["id"]]
+    assert [item["book_id"] for item in storage.get_reading_list()] == [existing["id"]]
+
+
 @pytest.mark.skipif(
     os.environ.get("TEST_MODE") == "1",
     reason="Test expects unauthorized redirect but TEST_MODE forces authorised state",

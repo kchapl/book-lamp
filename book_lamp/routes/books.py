@@ -242,6 +242,14 @@ def api_create_book():
         isbn = isbn10_to_isbn13(isbn) or isbn
     title = str(data.get("title", "") or "").strip()
     author = str(data.get("author", "") or "").strip()
+    # A caller that knows the individual names sends them as a list. Joining
+    # those with a comma would read back as one "Last, First" person, so keep
+    # the semicolon, which split_authors takes verbatim.
+    author_list = data.get("authors")
+    if isinstance(author_list, list):
+        names = [str(name).strip() for name in author_list if str(name).strip()]
+        if names:
+            author = "; ".join(names)
 
     if isbn:
         existing = storage.get_book_by_isbn(isbn)

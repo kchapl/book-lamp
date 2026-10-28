@@ -152,7 +152,13 @@ export async function getBookDetail(bookId: number): Promise<Book> {
     return fetchJSON<Book>(`${API_BASE}/books/${bookId}`);
 }
 
-export async function createBook(book: Partial<Book>): Promise<Book> {
+/**
+ * The create-a-book payload. The endpoint reads `isbn`, not the Book's
+ * `isbn13`, and uses it to de-duplicate against the collection.
+ */
+export type NewBook = Partial<Book> & { isbn?: string };
+
+export async function createBook(book: NewBook): Promise<Book> {
     return fetchJSON<Book>(`${API_BASE}/books`, {
         method: 'POST',
         body: JSON.stringify(book),
