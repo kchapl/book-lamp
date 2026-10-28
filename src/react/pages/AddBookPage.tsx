@@ -131,7 +131,9 @@ const AddBookPage: React.FC = () => {
                 author: author.trim(),
                 publisher: publisher.trim() || undefined,
                 publication_year: year ? parseInt(year) : undefined,
-                isbn13: isbn.replace(/[-\s]/g, ''),
+                // `isbn` is the field the create endpoint reads and
+                // de-duplicates on; a Book's own field is `isbn13`.
+                isbn: isbn.replace(/[-\s]/g, ''),
             });
 
             if (addToReadingListChecked && book.id) {
