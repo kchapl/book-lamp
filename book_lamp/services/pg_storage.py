@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, cast
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import psycopg
 from psycopg import OperationalError
@@ -260,7 +260,7 @@ class PostgresStorage:
                 row = cast(Dict[str, Any], row_raw)
                 enriched = dict(row)
                 enriched["book_authors"] = [name for name in (row["book_author_names"] or []) if name is not None]
-                enriched["book_author"] = ", ".join(enriched["book_authors"])
+                enriched["book_author"] = display(enriched["book_authors"])
 
                 history.append(enriched)
             return history
@@ -292,7 +292,7 @@ class PostgresStorage:
         self,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -385,13 +385,12 @@ class PostgresStorage:
                     book_id = row_raw["id"]
 
                 # Handle authors
-                self._update_book_authors(conn, book_id, author)
+                self._update_book_authors(conn, book_id, authors)
 
         return self.get_book_by_id(book_id)  # type: ignore
 
-    def _update_book_authors(self, conn: psycopg.Connection[Any], book_id: int, author_str: str) -> None:
+    def _update_book_authors(self, conn: psycopg.Connection[Any], book_id: int, author_names: List[str]) -> None:
         """Helper to sync the authors table and the ordered book_authors links."""
-        author_names = parse(author_str)
         # Clear existing links
         conn.execute("DELETE FROM book_authors WHERE book_id = %s", [book_id])
 
@@ -419,7 +418,7 @@ class PostgresStorage:
         book_id: int,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -481,7 +480,7 @@ class PostgresStorage:
                         book_id,
                     ],
                 )
-                self._update_book_authors(conn, book_id, author)
+                self._update_book_authors(conn, book_id, authors)
 
         return self.get_book_by_id(book_id)  # type: ignore
 
@@ -489,7 +488,7 @@ class PostgresStorage:
         self,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -508,7 +507,7 @@ class PostgresStorage:
         return self.add_book(
             isbn13=isbn13,
             title=title,
-            author=author,
+            authors=authors,
             publication_year=publication_year,
             thumbnail_url=thumbnail_url,
             publisher=publisher,
@@ -738,7 +737,10 @@ class PostgresStorage:
                         row = cast(Dict[str, Any], row_raw)
                         book_id = row["id"]
 
-                    self._update_book_authors(conn, book_id, book_data["author"])
+                    # An imported row is text from a file, so its names are read
+                    # there; a row that already carries the list is taken as given.
+                    imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
+                    self._update_book_authors(conn, book_id, imported_authors)
 
                     if record_data:
                         # Find existing record to avoid duplicates

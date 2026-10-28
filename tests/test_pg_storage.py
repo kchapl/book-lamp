@@ -90,7 +90,7 @@ def pg_storage(setup_database):
 
 
 def test_add_book_and_get_by_isbn(pg_storage):
-    pg_storage.add_book(isbn13="9780141036144", title="Brave New World", author="Aldous Huxley")
+    pg_storage.add_book(isbn13="9780141036144", title="Brave New World", authors=["Aldous Huxley"])
 
     book = pg_storage.get_book_by_isbn("9780141036144")
     assert book is not None
@@ -101,13 +101,13 @@ def test_add_book_and_get_by_isbn(pg_storage):
 
 def test_upsert_book_idempotency(pg_storage):
     # First insert
-    pg_storage.upsert_book(isbn13="9780141036144", title="Brave New World", author="Aldous Huxley")
+    pg_storage.upsert_book(isbn13="9780141036144", title="Brave New World", authors=["Aldous Huxley"])
 
     # Second call (update)
     pg_storage.upsert_book(
         isbn13="9780141036144",
         title="Brave New World (Special Edition)",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
     )
 
     # Directly check the database books table for the upsert result
@@ -121,7 +121,7 @@ def test_multi_user_isolation(pg_storage):
     storage2 = PostgresStorage(user_id=2)
 
     # Add book for user 1
-    book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
+    book = pg_storage.add_book(isbn13="123", title="Book 1", authors=["Author 1"])
     pg_storage.add_reading(book_id=book["id"], status="Completed", start_date="2024-01-01", end_date="2024-01-10")
 
     # Check user 2 sees no records
@@ -178,7 +178,7 @@ def test_bulk_import(pg_storage):
 
 
 def test_start_reading(pg_storage):
-    book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
+    book = pg_storage.add_book(isbn13="123", title="Book 1", authors=["Author 1"])
     pg_storage.add_to_reading_list(book["id"])
 
     assert len(pg_storage.get_reading_list()) == 1
@@ -198,7 +198,7 @@ def test_add_reading_again_with_the_same_status_and_start_date(pg_storage):
     re-read rather than a duplicate. The adapter used to treat the match as a
     duplicate and return the earlier row, discarding what had just been entered.
     """
-    book = pg_storage.add_book(isbn13="123", title="Book 1", author="Author 1")
+    book = pg_storage.add_book(isbn13="123", title="Book 1", authors=["Author 1"])
 
     first = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
     second = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01", rating=5)
@@ -248,7 +248,7 @@ def test_upsert_book_does_not_replace_a_real_category(pg_storage):
     pg_storage.add_book(
         isbn13="9780141036144",
         title="Brave New World",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
         bisac_category="FICTION / General",
         bisac_main_category="FICTION",
         bisac_sub_category="General",
@@ -257,7 +257,7 @@ def test_upsert_book_does_not_replace_a_real_category(pg_storage):
     pg_storage.upsert_book(
         isbn13="9780141036144",
         title="Brave New World",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
         bisac_category="823.914",
         bisac_main_category="823.914",
     )
@@ -276,7 +276,7 @@ def test_bulk_import_does_not_replace_a_real_category(pg_storage):
     book = pg_storage.add_book(
         isbn13="9780141036144",
         title="Brave New World",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
         bisac_category="HISTORY / Europe",
         bisac_main_category="HISTORY",
         bisac_sub_category="Europe",
@@ -310,7 +310,7 @@ def test_bulk_import_keeps_a_category_when_the_row_carries_none(pg_storage):
     book = pg_storage.add_book(
         isbn13="9780141036144",
         title="Brave New World",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
         bisac_category="FICTION / General",
         bisac_main_category="FICTION",
         bisac_sub_category="General",
@@ -340,7 +340,7 @@ def test_bulk_import_replaces_a_dewey_category(pg_storage):
     book = pg_storage.add_book(
         isbn13="9780141036144",
         title="Brave New World",
-        author="Aldous Huxley",
+        authors=["Aldous Huxley"],
         bisac_category="823.914",
     )
 
@@ -417,11 +417,11 @@ def test_a_books_authors_keep_the_order_they_were_entered_in(pg_storage):
     William Gibson is created first here, so ordering the links by `author_id` —
     what the reads did before 0006 — would name this Book the other way round.
     """
-    pg_storage.add_book(isbn13="9780441013593", title="Neuromancer", author="William Gibson")
+    pg_storage.add_book(isbn13="9780441013593", title="Neuromancer", authors=["William Gibson"])
     book = pg_storage.add_book(
         isbn13="9780575081567",
         title="The Difference Engine",
-        author="Bruce Sterling; William Gibson",
+        authors=["Bruce Sterling; William Gibson"],
     )
     pg_storage.add_to_reading_list(book["id"])
 
@@ -448,9 +448,9 @@ def test_both_adapters_present_a_books_authors_the_same_way(pg_storage):
     """The in-memory adapter and Postgres agree on a Book's authors (ADR-0005)."""
     from book_lamp.services.mock_storage import MockStorage
 
-    author = "Bruce Sterling; William Gibson"
-    book = pg_storage.add_book(isbn13="9780575081567", title="The Difference Engine", author=author)
-    in_memory = MockStorage().add_book(isbn13="9780575081567", title="The Difference Engine", author=author)
+    authors = ["Bruce Sterling", "William Gibson"]
+    book = pg_storage.add_book(isbn13="9780575081567", title="The Difference Engine", authors=authors)
+    in_memory = MockStorage().add_book(isbn13="9780575081567", title="The Difference Engine", authors=authors)
 
     read = pg_storage.get_book_by_id(book["id"])
     assert read["authors"] == in_memory["authors"]

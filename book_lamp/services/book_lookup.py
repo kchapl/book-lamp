@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from book_lamp.utils.authors import display
 from book_lamp.utils.books import (
     is_dewey_category,
     isbn10_to_isbn13,
@@ -91,11 +92,9 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Helper to parse a single book's data from Open Library."""
     title = data.get("title")
     authors = data.get("authors") or []
-    author_name = None
+    names: List[str] = []
     if authors and isinstance(authors, list):
-        names = [a.get("name") for a in authors if a and a.get("name")]
-        if names:
-            author_name = ", ".join(names)
+        names = [html.unescape(a["name"]) for a in authors if a and a.get("name")]
 
     publish_date = data.get("publish_date")
     publisher_list = data.get("publishers") or []
@@ -142,7 +141,10 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "title": html.unescape(title) if title else title,
-        "author": html.unescape(author_name) if author_name else author_name,
+        # The provider gives a list, so the list is what travels; the display
+        # string is derived from it for anything that still reads one.
+        "authors": names,
+        "author": display(names),
         "publish_date": publish_date,
         "thumbnail_url": thumbnail_url,
         "cover_url": cover_url,
@@ -234,7 +236,8 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
                 publishers = doc.get("publisher") or []
                 return {
                     "title": doc.get("title"),
-                    "author": ", ".join(authors) if authors else None,
+                    "authors": list(authors),
+                    "author": display(authors) if authors else None,
                     "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
                     "cover_url": f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg",
                     "publish_date": (str(doc.get("first_publish_year")) if doc.get("first_publish_year") else None),
@@ -452,7 +455,8 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
 
     return {
         "title": html.unescape(info.get("title", "")),
-        "author": ", ".join(info.get("authors", [])) if info.get("authors") else None,
+        "authors": [html.unescape(name) for name in info.get("authors", [])],
+        "author": display(info.get("authors", [])) if info.get("authors") else None,
         "publish_date": info.get("publishedDate"),
         "thumbnail_url": thumbnail,
         "cover_url": thumbnail,

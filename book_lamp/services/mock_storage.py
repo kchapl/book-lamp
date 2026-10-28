@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, List, Optional
 
+from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import Category, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import require_end_date
@@ -69,7 +70,7 @@ class MockStorage:
         self,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -84,12 +85,11 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        from book_lamp.utils.authors import display, parse
         from book_lamp.utils.books import normalize_isbn
 
         # One list and one display string, the string derived from the list, so
         # this adapter and Postgres present a Book's authors the same way.
-        authors = parse(author)
+        authors = [str(name).strip() for name in authors if str(name).strip()]
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
@@ -120,7 +120,7 @@ class MockStorage:
         book_id: int,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -135,11 +135,9 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        from book_lamp.utils.authors import display, parse
-
         for book in self.books:
             if book["id"] == book_id:
-                authors = parse(author)
+                authors = [str(name).strip() for name in authors if str(name).strip()]
                 # The triple resolves through the one rule, shared with the
                 # Postgres adapter and the import paths (see ADR-0002).
                 resolved = resolve_category(
@@ -176,7 +174,7 @@ class MockStorage:
         self,
         isbn13: str,
         title: str,
-        author: str,
+        authors: List[str],
         publication_year: Optional[int] = None,
         thumbnail_url: Optional[str] = None,
         publisher: Optional[str] = None,
@@ -197,7 +195,7 @@ class MockStorage:
                 book_id=existing["id"],
                 isbn13=isbn13,
                 title=title,
-                author=author,
+                authors=authors,
                 publication_year=publication_year,
                 thumbnail_url=thumbnail_url,
                 publisher=publisher,
@@ -216,7 +214,7 @@ class MockStorage:
             return self.add_book(
                 isbn13=isbn13,
                 title=title,
-                author=author,
+                authors=authors,
                 publication_year=publication_year,
                 thumbnail_url=thumbnail_url,
                 publisher=publisher,
@@ -343,10 +341,13 @@ class MockStorage:
             book_data = item["book"]
             record_data = item["record"]
 
+            # An imported row is text from a file, so its names are read there;
+            # a row that already carries the list is taken as given.
+            imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
             book = self.upsert_book(
                 isbn13=book_data["isbn13"],
                 title=book_data["title"],
-                author=book_data["author"],
+                authors=imported_authors,
                 publication_year=book_data["publication_year"],
                 publisher=book_data.get("publisher"),
                 description=book_data.get("description"),

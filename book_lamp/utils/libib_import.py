@@ -4,6 +4,7 @@ import io
 import re
 from typing import Any, Dict, List, Optional
 
+from book_lamp.utils.authors import parse
 from book_lamp.utils.books import normalize_isbn
 from book_lamp.utils.readings import ENDING_STATUSES
 
@@ -167,6 +168,9 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                 "book": {
                     "isbn13": isbn,
                     "title": title,
+                    # A CSV cell is text that lists names, so it is read once
+                    # here, at the file edge.
+                    "authors": parse(author),
                     "author": author,
                     "publication_year": year,
                     "publisher": publisher,

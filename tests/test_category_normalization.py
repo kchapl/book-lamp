@@ -73,7 +73,7 @@ def test_category_label_for_book_prefers_major_and_falls_back():
 
 
 def _add_completed_book(storage, isbn, title, bisac_category):
-    book = storage.add_book(isbn13=isbn, title=title, author="Author", bisac_category=bisac_category)
+    book = storage.add_book(isbn13=isbn, title=title, authors=["Author"], bisac_category=bisac_category)
     storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-02", rating=5)
     return book
 

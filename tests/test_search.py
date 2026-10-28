@@ -177,7 +177,7 @@ def test_search_route_with_query(authenticated_client):
     """Test search API with a valid query."""
     # Add a test book
     storage = get_storage()
-    book = storage.add_book(isbn13="9780000000000", title="A Test Book", author="A1")
+    book = storage.add_book(isbn13="9780000000000", title="A Test Book", authors=["A1"])
     storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-15")
 
     response = authenticated_client.get("/api/books/search?q=test")
@@ -194,7 +194,7 @@ def test_search_route_tolerates_a_typo(authenticated_client):
     needs a Reading to be reachable this way at all.
     """
     storage = get_storage()
-    book = storage.add_book(isbn13="9780000000003", title="Project Hail Mary", author="Andy Weir")
+    book = storage.add_book(isbn13="9780000000003", title="Project Hail Mary", authors=["Andy Weir"])
     storage.add_reading(book["id"], "Completed", "2026-09-01", "2026-10-11")
 
     response = authenticated_client.get("/api/books/search?q=hail+mairy")

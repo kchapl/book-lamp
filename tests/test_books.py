@@ -70,7 +70,7 @@ def test_add_book_success(mock_session_factory, authenticated_client):
 
 def test_delete_book_success(authenticated_client):
     storage = get_storage()
-    book = storage.add_book(isbn13="9780306406157", title="Test Book", author="Test Author")
+    book = storage.add_book(isbn13="9780306406157", title="Test Book", authors=["Test Author"])
     book_id = book["id"]
 
     resp = authenticated_client.post(f"/api/books/{book_id}/delete")
@@ -80,7 +80,7 @@ def test_delete_book_success(authenticated_client):
 
 def test_edit_book_success(authenticated_client):
     storage = get_storage()
-    book = storage.add_book(isbn13="9780306406157", title="Original Title", author="Original Author")
+    book = storage.add_book(isbn13="9780306406157", title="Original Title", authors=["Original Author"])
 
     updated_data = {
         "isbn13": "9780306406157",
@@ -107,8 +107,8 @@ def _two_books_out_of_title_order(authenticated_client):
     Status to be listed at all.
     """
     storage = get_storage()
-    apple = storage.add_book(isbn13="301", title="Apple", author="A1")
-    zebra = storage.add_book(isbn13="302", title="Zebra", author="A2")
+    apple = storage.add_book(isbn13="301", title="Apple", authors=["A1"])
+    zebra = storage.add_book(isbn13="302", title="Zebra", authors=["A2"])
     storage.add_reading(apple["id"], "Completed", "2024-01-01", "2024-01-10")
     storage.add_reading(zebra["id"], "Completed", "2024-02-01", "2024-02-10")
 
@@ -147,8 +147,8 @@ def test_books_unknown_sort_falls_back_to_reading_date(authenticated_client):
 def test_books_year_filter(authenticated_client):
     """Test filtering the books API by year completed."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="101", title="2024 Book", author="A1")
-    b2 = storage.add_book(isbn13="102", title="2023 Book", author="A2")
+    b1 = storage.add_book(isbn13="101", title="2024 Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="102", title="2023 Book", authors=["A2"])
 
     # b1 completed in 2024
     storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
@@ -163,7 +163,7 @@ def test_books_year_filter(authenticated_client):
     assert payload["filters"]["year"] == "2024"
 
     # An 'In Progress' book started in 2024 must be excluded
-    b3 = storage.add_book(isbn13="103", title="2024 In Progress", author="A3")
+    b3 = storage.add_book(isbn13="103", title="2024 In Progress", authors=["A3"])
     storage.add_reading(b3["id"], "In Progress", "2024-01-01")
     resp = authenticated_client.get("/api/books?year=2024")
     assert "2024 In Progress" not in _titles(resp.get_json())
@@ -176,8 +176,8 @@ def test_books_year_filter(authenticated_client):
 def test_books_month_filter(authenticated_client):
     """Test filtering the books API by month completed."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="201", title="January Book", author="A1")
-    b2 = storage.add_book(isbn13="202", title="February Book", author="A2")
+    b1 = storage.add_book(isbn13="201", title="January Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="202", title="February Book", authors=["A2"])
 
     # b1 completed in January (any year)
     storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
@@ -190,7 +190,7 @@ def test_books_month_filter(authenticated_client):
     assert _titles(resp.get_json()) == {"January Book"}
 
     # An 'In Progress' book started in January must be excluded
-    b3 = storage.add_book(isbn13="203", title="January In Progress", author="A3")
+    b3 = storage.add_book(isbn13="203", title="January In Progress", authors=["A3"])
     storage.add_reading(b3["id"], "In Progress", "2024-01-05")
     resp = authenticated_client.get("/api/books?month=1")
     assert "January In Progress" not in _titles(resp.get_json())
@@ -204,9 +204,9 @@ def test_books_category_filter(authenticated_client):
     """Test filtering the books API by BISAC category."""
     storage = get_storage()
     # Science category
-    b1 = storage.add_book(isbn13="301", title="Science Book", author="A1", bisac_category="Science")
+    b1 = storage.add_book(isbn13="301", title="Science Book", authors=["A1"], bisac_category="Science")
     # Fiction category
-    b2 = storage.add_book(isbn13="302", title="Literature Book", author="A2", bisac_category="Fiction")
+    b2 = storage.add_book(isbn13="302", title="Literature Book", authors=["A2"], bisac_category="Fiction")
 
     # Give them statuses so they show up in the library
     storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15")
@@ -227,8 +227,8 @@ def test_books_category_filter(authenticated_client):
 def test_books_rating_filter(authenticated_client):
     """Test filtering the books API by rating."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="401", title="5 Star Book", author="A1")
-    b2 = storage.add_book(isbn13="402", title="4 Star Book", author="A2")
+    b1 = storage.add_book(isbn13="401", title="5 Star Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="402", title="4 Star Book", authors=["A2"])
 
     # b1 rated 5
     storage.add_reading(b1["id"], "Completed", "2024-01-01", "2024-01-15", rating=5)
@@ -248,8 +248,8 @@ def test_books_rating_filter(authenticated_client):
 def test_books_status_filter(authenticated_client):
     """Test filtering the books API by status."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="501", title="In Progress Book", author="A1")
-    b2 = storage.add_book(isbn13="502", title="Completed Book", author="A2")
+    b1 = storage.add_book(isbn13="501", title="In Progress Book", authors=["A1"])
+    b2 = storage.add_book(isbn13="502", title="Completed Book", authors=["A2"])
 
     # b1 in progress
     storage.add_reading(b1["id"], "In Progress", "2024-01-01")

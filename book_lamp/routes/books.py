@@ -20,6 +20,7 @@ from book_lamp.utils import (
     parse_publication_year,
     sort_books,
 )
+from book_lamp.utils.authors import parse
 from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
@@ -56,6 +57,37 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
     except Exception:
         logger.exception(f"Background job {job_id} failed")
         raise
+
+
+def _payload_authors(data: dict) -> list[str]:
+    """The Authors a create or edit payload names.
+
+    A list is taken as given. A lone ``author`` field is text that lists names,
+    so the authorship module reads it — once, here at the edge — rather than
+    every path below the seam having to tell names from separators.
+    """
+    given = data.get("authors")
+    if isinstance(given, list):
+        names = [str(name).strip() for name in given if str(name).strip()]
+        if names:
+            return names
+    return parse(str(data.get("author", "") or ""))
+
+
+def _book_data_authors(book_data: dict) -> list[str]:
+    """The Authors a lookup result names.
+
+    A provider that gives a list is taken as given; one that gives a single
+    value — iTunes' artist, say — names one Author, because no list was ever
+    involved.
+    """
+    listed = book_data.get("authors")
+    if isinstance(listed, list):
+        names = [str(name).strip() for name in listed if str(name).strip()]
+        if names:
+            return names
+    single = str(book_data.get("author") or "").strip()
+    return [single] if single else []
 
 
 def _safe_csv_cell(value):
@@ -241,15 +273,7 @@ def api_create_book():
     if len(isbn) == 10:
         isbn = isbn10_to_isbn13(isbn) or isbn
     title = str(data.get("title", "") or "").strip()
-    author = str(data.get("author", "") or "").strip()
-    # A caller that knows the individual names sends them as a list. Joining
-    # those with a comma would read back as one "Last, First" person, so keep
-    # the semicolon, which split_authors takes verbatim.
-    author_list = data.get("authors")
-    if isinstance(author_list, list):
-        names = [str(name).strip() for name in author_list if str(name).strip()]
-        if names:
-            author = "; ".join(names)
+    authors = _payload_authors(data)
 
     if not isbn:
         # A Book is identified by its ISBN: storage keys rows on it and an
@@ -268,10 +292,10 @@ def api_create_book():
             )
         return jsonify(existing), 200
 
-    if title and author:
+    if title and authors:
         book_data = {
             "title": title,
-            "author": author,
+            "authors": authors,
             "publisher": data.get("publisher"),
             "publish_date": data.get("publication_year"),
             "thumbnail_url": data.get("thumbnail_url"),
@@ -279,13 +303,17 @@ def api_create_book():
             "description": data.get("description"),
             "bisac_category": data.get("bisac_category"),
         }
+    elif title:
+        # A Book has at least one Author, and a title alone is not a lookup: the
+        # reader was writing the details themselves and left the name out.
+        return jsonify({"error": "at least one author is required"}), 400
     else:
         from book_lamp.services.book_lookup import lookup_book_by_isbn13
 
         if is_test_mode() and isbn == TEST_ISBN:
             book_data = {
                 "title": "Test Book",
-                "author": "Test Author",
+                "authors": ["Test Author"],
                 "publish_date": "2019-05-02",
                 "thumbnail_url": "http://example.com/thumb.jpg",
             }
@@ -300,9 +328,9 @@ def api_create_book():
             return jsonify({"error": f"No book data found for ISBN {isbn}"}), 404
 
     title = str(book_data.get("title") or "")
-    author = str(book_data.get("author") or "")
+    authors = _book_data_authors(book_data)
 
-    if not title or not author:
+    if not title or not authors:
         return (
             jsonify({"error": "Could not determine title or author for this ISBN"}),
             422,
@@ -316,7 +344,7 @@ def api_create_book():
         created = storage.add_book(
             isbn13=isbn,
             title=title[:300],
-            author=author[:200],
+            authors=[name[:200] for name in authors],
             publication_year=year,
             thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
             publisher=book_data.get("publisher"),
@@ -370,10 +398,10 @@ def api_update_book(book_id: int):
     data = request.get_json(silent=True) or {}
 
     title = str(data.get("title", "") or "").strip()
-    author = str(data.get("author", "") or "").strip()
+    authors = _payload_authors(data)
 
-    if not title or not author:
-        return jsonify({"error": "title and author are required"}), 400
+    if not title or not authors:
+        return jsonify({"error": "title and at least one author are required"}), 400
 
     isbn13 = str(data.get("isbn13", "") or "").strip().replace("-", "")
     if isbn13 and not is_valid_isbn13(isbn13) and not (is_test_mode() and isbn13 == TEST_ISBN):
@@ -392,7 +420,7 @@ def api_update_book(book_id: int):
             book_id=book_id,
             isbn13=isbn13,
             title=title[:300],
-            author=author[:200],
+            authors=[name[:200] for name in authors],
             publication_year=publication_year,
             thumbnail_url=(str(data.get("thumbnail_url", "") or "").strip() or None),
             publisher=(str(data.get("publisher", "") or "").strip() or None),

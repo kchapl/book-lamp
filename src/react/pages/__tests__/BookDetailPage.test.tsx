@@ -23,7 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import BookDetailPage from '../BookDetailPage';
-import { createReading, deleteReading, getBookDetail, updateReading } from '../../services/api';
+import { createReading, deleteReading, getBookDetail, updateBook, updateReading } from '../../services/api';
 
 vi.mock('../../services/api', () => ({
     getBookDetail: vi.fn(),
@@ -37,6 +37,7 @@ vi.mock('../../services/api', () => ({
 }));
 
 const detail = vi.mocked(getBookDetail);
+const save = vi.mocked(updateBook);
 const create = vi.mocked(createReading);
 const update = vi.mocked(updateReading);
 const remove = vi.mocked(deleteReading);
@@ -169,6 +170,61 @@ describe('BookDetailPage add reading', () => {
         fireEvent.click(button(/^add$/i));
 
         await waitFor(() => expect(screen.getByText(/end date is required/i)).toBeInTheDocument());
+    });
+});
+
+describe('BookDetailPage edit book', () => {
+    /** A Book two people wrote: its display string cannot be read back. */
+    const coauthored = {
+        id: 1,
+        title: 'Good Omens',
+        author: 'Neil Gaiman, Terry Pratchett',
+        authors: ['Neil Gaiman', 'Terry Pratchett'],
+        readings: [],
+    };
+
+    async function openEditBook() {
+        await waitFor(() => expect(screen.getByText('Good Omens')).toBeInTheDocument());
+        fireEvent.click(button(/^edit$/i));
+        await waitFor(() => expect(field('edit-title')).toBeInTheDocument());
+    }
+
+    it('sends the names it was built from when the author text is untouched', async () => {
+        detail.mockResolvedValue(coauthored);
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        typeInto('edit-title', 'Good Omens (1990)');
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(save).toHaveBeenCalledWith(
+            1,
+            expect.objectContaining({
+                title: 'Good Omens (1990)',
+                authors: ['Neil Gaiman', 'Terry Pratchett'],
+            })
+        );
+    });
+
+    it('lets the server read the text once the author is edited', async () => {
+        detail.mockResolvedValue(coauthored);
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        typeInto('edit-author', 'Neil Gaiman');
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        const payload = save.mock.calls[0][1] as Record<string, unknown>;
+        expect(payload.author).toBe('Neil Gaiman');
+        // New text that lists names is the server's to read, so the stale list
+        // must not travel with it.
+        expect(payload).not.toHaveProperty('authors');
     });
 });
 

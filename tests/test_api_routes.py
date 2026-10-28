@@ -34,7 +34,7 @@ def test_api_export_csv_includes_books_readings_and_reading_list(authenticated_c
     book = storage.add_book(
         isbn13="9780306406157",
         title="Exported Book",
-        author="Jane Doe, John Smith",
+        authors=["Jane Doe, John Smith"],
         publication_year=2020,
         publisher="Example Press",
         description="A book for export",
@@ -77,7 +77,7 @@ def test_api_export_csv_includes_books_readings_and_reading_list(authenticated_c
 def test_api_export_csv_escapes_spreadsheet_formulas(authenticated_client):
     """Exported user-controlled text cannot execute as a spreadsheet formula."""
     storage = get_storage()
-    storage.add_book(isbn13="9780306406157", title='=HYPERLINK("https://example.com")', author="+SUM(1,1)")
+    storage.add_book(isbn13="9780306406157", title='=HYPERLINK("https://example.com")', authors=["+SUM(1,1)"])
 
     response = authenticated_client.get("/api/export/csv")
     rows = list(csv.DictReader(io.StringIO(response.data.decode("utf-8-sig"))))
@@ -158,10 +158,39 @@ def test_api_create_book_without_isbn_is_rejected(authenticated_client):
     assert storage.get_all_books() == []
 
 
+def test_api_create_book_takes_authors_as_a_list(authenticated_client):
+    """A payload that names the Authors as a list keeps them apart."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={
+            "isbn": "9780060853983",
+            "title": "Good Omens",
+            "authors": ["Neil Gaiman", "Terry Pratchett"],
+        },
+    )
+
+    assert resp.status_code == 201
+    body = _json(resp)
+    assert body["authors"] == ["Neil Gaiman", "Terry Pratchett"]
+    assert body["author"] == "Neil Gaiman, Terry Pratchett"
+
+
+def test_api_create_book_refuses_a_title_with_no_author(authenticated_client):
+    """At least one Author is an invariant, not something the lookup can supply."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"isbn": "9780060853984", "title": "Nobody Wrote This", "authors": []},
+    )
+
+    assert resp.status_code == 400
+    assert _json(resp)["error"] == "at least one author is required"
+    assert get_storage().get_all_books() == []
+
+
 def test_api_create_book_deduplication(authenticated_client):
     """POST /api/books for an existing ISBN returns 200 with existing book."""
     storage = get_storage()
-    storage.add_book(isbn13="9780306406157", title="Existing", author="Author")
+    storage.add_book(isbn13="9780306406157", title="Existing", authors=["Author"])
 
     resp = authenticated_client.post(
         "/api/books",
@@ -180,7 +209,7 @@ def test_api_create_book_deduplication(authenticated_client):
 def test_api_update_book_success(authenticated_client):
     """POST /api/books/<id>/edit updates the book and returns success."""
     storage = get_storage()
-    book = storage.add_book(isbn13="111", title="Old Title", author="Old Author")
+    book = storage.add_book(isbn13="111", title="Old Title", authors=["Old Author"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
@@ -193,6 +222,56 @@ def test_api_update_book_success(authenticated_client):
     assert updated["title"] == "New Title"
 
 
+def test_api_update_book_keeps_the_names_it_is_given(authenticated_client):
+    """An edit that carries the list replaces the Authors with exactly those."""
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="555",
+        title="Good Omens",
+        authors=["Neil Gaiman", "Terry Pratchett"],
+    )
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "title": "Good Omens",
+            "author": "Neil Gaiman, Terry Pratchett",
+            "authors": ["Neil Gaiman", "Terry Pratchett"],
+        },
+    )
+
+    assert resp.status_code == 200
+    assert storage.get_book_by_id(book["id"])["authors"] == ["Neil Gaiman", "Terry Pratchett"]
+
+
+def test_api_update_book_reads_a_new_author_string(authenticated_client):
+    """A typed author field is text that lists names, so it is read once."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="556", title="T", authors=["Old Name"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={"title": "T", "author": "Gaiman; Pratchett"},
+    )
+
+    assert resp.status_code == 200
+    assert storage.get_book_by_id(book["id"])["authors"] == ["Gaiman", "Pratchett"]
+
+
+def test_api_update_book_refuses_a_book_with_no_authors(authenticated_client):
+    """An edit cannot leave a Book with nobody credited."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="557", title="T", authors=["An Author"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={"title": "T", "authors": []},
+    )
+
+    assert resp.status_code == 400
+    assert storage.get_book_by_id(book["id"])["authors"] == ["An Author"]
+
+
 def test_api_update_book_rewrites_the_category_pair(authenticated_client):
     """A new category from the edit form brings its major and sub with it.
 
@@ -203,7 +282,7 @@ def test_api_update_book_rewrites_the_category_pair(authenticated_client):
     book = storage.add_book(
         isbn13="444",
         title="T",
-        author="A",
+        authors=["A"],
         bisac_category="HISTORY / Ancient / General",
         bisac_main_category="HISTORY",
         bisac_sub_category="Ancient / General",
@@ -224,7 +303,7 @@ def test_api_update_book_rewrites_the_category_pair(authenticated_client):
 def test_api_update_book_missing_fields(authenticated_client):
     """POST /api/books/<id>/edit without title+author returns 400."""
     storage = get_storage()
-    book = storage.add_book(isbn13="222", title="T", author="A")
+    book = storage.add_book(isbn13="222", title="T", authors=["A"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
@@ -236,7 +315,7 @@ def test_api_update_book_missing_fields(authenticated_client):
 def test_api_update_book_invalid_isbn(authenticated_client):
     """POST /api/books/<id>/edit with a bad ISBN-13 returns 400."""
     storage = get_storage()
-    book = storage.add_book(isbn13="333", title="T", author="A")
+    book = storage.add_book(isbn13="333", title="T", authors=["A"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
@@ -253,7 +332,7 @@ def test_api_update_book_invalid_isbn(authenticated_client):
 def test_api_delete_book_success(authenticated_client):
     """POST /api/books/<id>/delete removes the book and returns success."""
     storage = get_storage()
-    book = storage.add_book(isbn13="444", title="To Delete", author="A")
+    book = storage.add_book(isbn13="444", title="To Delete", authors=["A"])
     book_id = book["id"]
 
     resp = authenticated_client.post(f"/api/books/{book_id}/delete")
@@ -284,7 +363,7 @@ def test_api_search_books_empty_query(authenticated_client):
 def test_api_search_books_with_results(authenticated_client):
     """GET /api/books/search?q=... returns matching books."""
     storage = get_storage()
-    b = storage.add_book(isbn13="555", title="Searchable Title", author="An Author")
+    b = storage.add_book(isbn13="555", title="Searchable Title", authors=["An Author"])
     storage.add_reading(b["id"], "Completed", "2024-01-01", "2024-01-15", 4)
 
     resp = authenticated_client.get("/api/books/search?q=Searchable")
@@ -338,7 +417,7 @@ def test_api_lookup_isbn_adds_publication_year(mock_lookup, authenticated_client
 def test_api_create_reading_success(authenticated_client):
     """POST /api/books/<id>/readings creates a record and returns 201."""
     storage = get_storage()
-    book = storage.add_book(isbn13="666", title="Book", author="Author")
+    book = storage.add_book(isbn13="666", title="Book", authors=["Author"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/readings",
@@ -357,7 +436,7 @@ def test_api_create_reading_success(authenticated_client):
 def test_api_create_reading_missing_fields(authenticated_client):
     """POST /api/books/<id>/readings without required fields returns 400."""
     storage = get_storage()
-    book = storage.add_book(isbn13="777", title="B", author="A")
+    book = storage.add_book(isbn13="777", title="B", authors=["A"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/readings",
@@ -370,7 +449,7 @@ def test_api_create_reading_missing_fields(authenticated_client):
 def test_api_create_reading_ended_without_an_end_date(authenticated_client, status):
     """A status that ends a Reading is refused when it carries no end date."""
     storage = get_storage()
-    book = storage.add_book(isbn13="778", title="B", author="A")
+    book = storage.add_book(isbn13="778", title="B", authors=["A"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/readings",
@@ -384,7 +463,7 @@ def test_api_create_reading_ended_without_an_end_date(authenticated_client, stat
 def test_api_create_reading_in_progress_needs_no_end_date(authenticated_client):
     """An open Reading is writable without an end date."""
     storage = get_storage()
-    book = storage.add_book(isbn13="779", title="B", author="A")
+    book = storage.add_book(isbn13="779", title="B", authors=["A"])
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/readings",
@@ -402,7 +481,7 @@ def test_api_create_reading_again_with_the_same_status_and_start_date(authentica
     its own id, not hand back the record it matched.
     """
     storage = get_storage()
-    book = storage.add_book(isbn13="782", title="B", author="A")
+    book = storage.add_book(isbn13="782", title="B", authors=["A"])
 
     payload = {"status": "In Progress", "start_date": "2024-01-01", "rating": 5}
     first = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
@@ -425,7 +504,7 @@ def test_api_create_reading_again_with_the_same_status_and_start_date(authentica
 def test_api_update_reading_success(authenticated_client):
     """POST /api/readings/<id>/edit updates and returns success."""
     storage = get_storage()
-    book = storage.add_book(isbn13="888", title="B", author="A")
+    book = storage.add_book(isbn13="888", title="B", authors=["A"])
     record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
 
     resp = authenticated_client.post(
@@ -444,7 +523,7 @@ def test_api_update_reading_success(authenticated_client):
 def test_api_update_reading_refuses_completed_without_an_end_date(authenticated_client):
     """Ending a Reading through the edit route is refused without an end date."""
     storage = get_storage()
-    book = storage.add_book(isbn13="781", title="B", author="A")
+    book = storage.add_book(isbn13="781", title="B", authors=["A"])
     record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
 
     resp = authenticated_client.post(
@@ -464,7 +543,7 @@ def test_api_update_reading_refuses_completed_without_an_end_date(authenticated_
 def test_api_delete_reading_success(authenticated_client):
     """POST /api/readings/<id>/delete removes the record."""
     storage = get_storage()
-    book = storage.add_book(isbn13="999", title="B", author="A")
+    book = storage.add_book(isbn13="999", title="B", authors=["A"])
     record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
 
     resp = authenticated_client.post(f"/api/readings/{record['id']}/delete")
@@ -486,8 +565,8 @@ def test_api_delete_reading_not_found(authenticated_client):
 def test_api_reorder_reading_list(authenticated_client):
     """POST /api/reading-list/reorder accepts a JSON list of book IDs."""
     storage = get_storage()
-    b1 = storage.add_book(isbn13="r1", title="B1", author="A")
-    b2 = storage.add_book(isbn13="r2", title="B2", author="A")
+    b1 = storage.add_book(isbn13="r1", title="B1", authors=["A"])
+    b2 = storage.add_book(isbn13="r2", title="B2", authors=["A"])
     storage.add_to_reading_list(b1["id"])
     storage.add_to_reading_list(b2["id"])
 
@@ -502,7 +581,7 @@ def test_api_reorder_reading_list(authenticated_client):
 def test_api_remove_from_reading_list(authenticated_client):
     """POST /api/reading-list/remove/<id> removes the book and returns success."""
     storage = get_storage()
-    book = storage.add_book(isbn13="rm1", title="B", author="A")
+    book = storage.add_book(isbn13="rm1", title="B", authors=["A"])
     storage.add_to_reading_list(book["id"])
 
     resp = authenticated_client.post(f"/api/reading-list/remove/{book['id']}")
@@ -513,7 +592,7 @@ def test_api_remove_from_reading_list(authenticated_client):
 def test_api_start_reading(authenticated_client):
     """POST /api/books/<id>/start-reading moves a book to the reading log."""
     storage = get_storage()
-    book = storage.add_book(isbn13="sr1", title="B", author="A")
+    book = storage.add_book(isbn13="sr1", title="B", authors=["A"])
     storage.add_to_reading_list(book["id"])
 
     resp = authenticated_client.post(f"/api/books/{book['id']}/start-reading")
@@ -524,7 +603,7 @@ def test_api_start_reading(authenticated_client):
 def test_api_add_to_reading_list(authenticated_client):
     """POST /api/books/<id>/add-to-reading-list adds a book to the reading list."""
     storage = get_storage()
-    book = storage.add_book(isbn13="al1", title="B", author="A")
+    book = storage.add_book(isbn13="al1", title="B", authors=["A"])
 
     resp = authenticated_client.post(f"/api/books/{book['id']}/add-to-reading-list")
     assert resp.status_code == 200

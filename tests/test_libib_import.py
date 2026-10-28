@@ -69,7 +69,7 @@ def test_libib_import_overwrite_existing(authenticated_client):
     storage.add_book(
         isbn13="9780000000001",
         title="Old Title",
-        author="Old Author",
+        authors=["Old Author"],
         thumbnail_url="http://example.com/cover.jpg",
     )
 
