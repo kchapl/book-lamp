@@ -6,7 +6,7 @@ storage, without a form and without an export. It is the same data the app
 shows, read by a model.
 
 The service is read-only. It can answer questions about the Reading Log, one
-Book, or the collection; it cannot change anything. That is deliberate — see
+Book, or the log; it cannot change anything. That is deliberate — see
 `docs/adr/0004-an-mcp-server-reads-as-one-reader.md` for why the read path came
 first and the write path is still deferred.
 
@@ -143,7 +143,7 @@ data — it changes at most daily, when you log something.
   (ADR-0004).
 - **Serve anyone but the configured reader.** Any other address gets a refusal.
 - **Show the Reading List.** The queue and the order you put it in are not
-  exposed. Search can confirm a Book is in the collection, but there is no way to
+  exposed. Search can confirm a Book is in the log, but there is no way to
   list what is on the shelf.
 - **Show the app's recommendations.** They are computed for the Dashboard and are
   not a tool.

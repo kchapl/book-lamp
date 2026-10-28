@@ -74,7 +74,7 @@ describe('StatsPage reading-status board', () => {
         expect(screen.getAllByText('20%')).toHaveLength(2);
     });
 
-    it('states when the collection was last updated instead of implying a live feed', async () => {
+    it('states when the log was last updated instead of implying a live feed', async () => {
         renderPage();
 
         const asOf = await screen.findByTitle(/most recent reading/i);

@@ -12,7 +12,7 @@ import type { SeriesPage as SeriesPageData } from '../types';
  * the reader owns, where they are in it, and — because a Book with no Reading
  * still belongs here — what is left to pick up. The author and publisher pages
  * are its precedent; unlike the author page it makes no external lookup, since
- * the collection is what it can speak for.
+ * the log is what it can speak for.
  */
 const SeriesPage: React.FC = () => {
     const { seriesSlug } = useParams<{ seriesSlug: string }>();

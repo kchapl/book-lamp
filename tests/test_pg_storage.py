@@ -421,7 +421,7 @@ def test_a_books_authors_keep_the_order_they_were_entered_in(pg_storage):
     book = pg_storage.add_book(
         isbn13="9780575081567",
         title="The Difference Engine",
-        authors=["Bruce Sterling; William Gibson"],
+        authors=["Bruce Sterling", "William Gibson"],
     )
     pg_storage.add_to_reading_list(book["id"])
 

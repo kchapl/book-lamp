@@ -31,7 +31,7 @@ const HomePage: React.FC = () => {
                 {isAuthorized ? (
                     <div className="hero-actions">
                         <Button variant="filled" icon="books" to="/books">
-                            Browse the collection
+                            Browse your books
                         </Button>
                         <Button variant="outlined" icon="chart" to="/dashboard">
                             Open the dashboard

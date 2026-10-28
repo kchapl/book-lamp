@@ -376,7 +376,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict
                 "author": author_str,
                 # The display string joins names with a comma, which storage reads
                 # back as one "Last, First" person; the list is what keeps them
-                # apart when the result is added to the collection.
+                # apart when the result is added to the reader's books.
                 "authors": doc_authors if doc_authors else [author_name],
                 "publication_year": year if year else None,
                 "thumbnail_url": thumbnail_url,
@@ -856,7 +856,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                 "thumbnail_url": "thumbnail_url",
                 "cover_url": "cover_url",
                 "title": "title",
-                "author": "author",
+                "authors": "authors",
                 "publisher": "publisher",
                 "description": "description",
                 "bisac_category": "bisac_category",
@@ -875,8 +875,8 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                     if isinstance(val, str):
                         if target == "title" and len(val) > 300:
                             val = val[:300]
-                        if target == "author" and len(val) > 200:
-                            val = val[:200]
+                    if target == "authors":
+                        val = [str(name)[:200] for name in val]
                     book_item[target] = val
                     has_updates = True
                     logger.debug(f"Updated {target} for {title}: {val}")

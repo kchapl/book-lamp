@@ -89,7 +89,7 @@ const BooksPage: React.FC = () => {
         <div className="books-page page">
             <header className="page-header">
                 <div>
-                    <p className="eyebrow label-placard">The collection</p>
+                    <p className="eyebrow label-placard">Your books</p>
                     <h1>My Books</h1>
                     {!loading && (
                         <p className="text-muted">
@@ -181,7 +181,7 @@ const BooksPage: React.FC = () => {
                     <p>
                         {hasActiveFilters || activeQuery
                             ? 'Nothing matches those filters. Try widening the search.'
-                            : 'Add your first book to begin the collection.'}
+                            : 'Add your first book to begin.'}
                     </p>
                     <Button variant="filled" icon="plus" to="/books/new">
                         Add a book

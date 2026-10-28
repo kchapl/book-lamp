@@ -1,7 +1,7 @@
 """Sorting utilities for books following librarian best practices.
 
 This module provides sorting functions that follow library science principles
-for organising book collections.
+for organising books.
 """
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast

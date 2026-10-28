@@ -9,14 +9,14 @@ The two sentences to hold in mind:
 - **Material 3 mechanics** — tonal surfaces, elevation, state layers, a shape
   scale, motion tokens. The app is built from the same parts as a modern
   Material product.
-- **The reading room** — the collection is an exhibition. Every book is an
+- **The reading room** — the log is an exhibition. Every book is an
   exhibit, mounted on a plinth with a wall label beside it, lit by the lamp.
 
 ## 1. The metaphor
 
 | Term | Meaning in the UI |
 | --- | --- |
-| **The Reading Room** | The whole app shell: header, collection, footer. |
+| **The Reading Room** | The whole app shell: header, books, footer. |
 | **Exhibit** | A single Book. Cards, list rows and the detail header are all mounts for an exhibit. |
 | **Plinth** | The raised tonal panel an exhibit sits on (`surface-container-low`, elevation 1, brass hairline). |
 | **Placard** | The wall label: title in serif, author, then small-caps metadata rows. |

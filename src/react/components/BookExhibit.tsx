@@ -17,7 +17,7 @@ interface BookExhibitProps {
 
 /**
  * A Book presented as an exhibit: a framed cover on a plinth, then a placard
- * with the title, author and an accession line. Used by the collection grid,
+ * with the title, author and an accession line. Used by the books grid,
  * the home page and publisher pages so every Book reads the same way.
  */
 const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) => {

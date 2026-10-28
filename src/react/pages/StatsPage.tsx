@@ -62,7 +62,7 @@ const StatsPage: React.FC = () => {
             <header className="dashboard-hero">
                 <div>
                     <p className="eyebrow">Reading room</p>
-                    <h1>The collection at a glance</h1>
+                    <h1>Your reading at a glance</h1>
                     <p className="lede">
                         Every figure below is drawn from your readings — what has been begun,
                         completed or set aside. Nothing here updates until you add a record.

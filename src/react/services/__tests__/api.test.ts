@@ -39,7 +39,7 @@ afterEach(() => {
 });
 
 describe('getBooks', () => {
-    it('sends the sort the collection page picked', async () => {
+    it('sends the sort the books page picked', async () => {
         installFetch();
 
         await getBooks({ sort: 'title' });

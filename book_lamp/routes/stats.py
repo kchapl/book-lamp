@@ -60,7 +60,7 @@ def redirect_api_stats():
 @stats_bp.route("/api/dashboard", methods=["GET"])
 @authorisation_required
 def api_collection_stats():
-    """API endpoint for collection statistics."""
+    """API endpoint for reading statistics."""
     storage = get_storage()
     books = storage.get_all_books()
     all_records = storage.get_readings()

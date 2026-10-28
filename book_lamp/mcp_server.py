@@ -146,7 +146,7 @@ def build_server(auth: Optional[Any] = None) -> FastMCP:
 
     @server.tool
     def search_books(query: str) -> List[Dict[str, Any]]:
-        """Find Books in the collection by title, author, ISBN, series or category.
+        """Find Books in the reading log by title, author, ISBN, series or category.
 
         Use this first when you have a title rather than an ISBN: it returns the
         closest matches and each one's ISBN, which `get_book` takes.

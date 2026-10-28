@@ -20,7 +20,7 @@ from book_lamp.utils import (
     parse_publication_year,
     sort_books,
 )
-from book_lamp.utils.authors import parse
+from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
@@ -136,14 +136,14 @@ def api_export_csv():
     )
     for book in books:
         records = records_by_book.get(book["id"]) or [None]
-        authors = book.get("authors") or [book.get("author", "")]
+        authors = book.get("authors") or []
         for record in records:
             writer.writerow(
                 _safe_csv_cell(value)
                 for value in [
                     book.get("isbn13", ""),
                     book.get("title", ""),
-                    ", ".join(authors),
+                    display(authors),
                     book.get("publication_year", ""),
                     book.get("publisher", ""),
                     book.get("series", ""),
