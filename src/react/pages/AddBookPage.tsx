@@ -123,6 +123,14 @@ const AddBookPage: React.FC = () => {
             return;
         }
 
+        const cleanIsbn = isbn.replace(/[-\s]/g, '');
+        // A Book is identified by its ISBN, and the create endpoint refuses one
+        // without: say so here instead of sending a request that will fail.
+        if (!cleanIsbn) {
+            setIsbnError('An ISBN is required');
+            return;
+        }
+
         setLoading(true);
         
         try {
@@ -133,7 +141,7 @@ const AddBookPage: React.FC = () => {
                 publication_year: year ? parseInt(year) : undefined,
                 // `isbn` is the field the create endpoint reads and
                 // de-duplicates on; a Book's own field is `isbn13`.
-                isbn: isbn.replace(/[-\s]/g, ''),
+                isbn: cleanIsbn,
             });
 
             if (addToReadingListChecked && book.id) {

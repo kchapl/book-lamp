@@ -150,6 +150,20 @@ describe('AddBookPage submit', () => {
             isbn: '9780141439600',
         });
     });
+
+    it('refuses to submit without an ISBN, which is what identifies a Book', async () => {
+        const { container } = renderPage();
+        fireEvent.click(button(/enter manually/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+        });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(screen.getByText(/an isbn is required/i)).toBeInTheDocument();
+    });
 });
 
 describe('AddBookPage ISBN lookup', () => {
