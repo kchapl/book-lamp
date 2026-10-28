@@ -148,6 +148,17 @@ export interface User {
 
 export type Theme = 'light' | 'dark' | 'system';
 
+/**
+ * What the sync probe found.
+ *
+ * `unauthenticated` is not a storage failure: it means the request carried no
+ * session, so there is nothing to probe.
+ */
+export interface SyncDiagnostics {
+    status: 'ok' | 'error' | 'unauthenticated';
+    storage: 'postgres' | 'unauthenticated';
+}
+
 export interface AuthStatus {
     is_authenticated: boolean;
     user?: {
