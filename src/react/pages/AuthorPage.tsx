@@ -38,6 +38,9 @@ const AuthorPage: React.FC = () => {
             await createBook({
                 title: book.title,
                 author: book.author || data?.author_name || '',
+                // The names themselves, not only their display string: that one
+                // joins them with a comma, which storage reads as one person.
+                authors: book.authors,
                 isbn: book.isbn13 || undefined,
                 publication_year: book.publication_year,
                 thumbnail_url: book.thumbnail_url,

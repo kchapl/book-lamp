@@ -205,6 +205,50 @@ def test_adding_an_external_result_moves_it_to_the_reading_list(authenticated_cl
     assert after["unread_books"] == []
 
 
+def test_adding_a_two_author_result_keeps_both_names(authenticated_client, monkeypatch):
+    """A co-authored result stays a Book by both people, not one combined author.
+
+    The page sends the names themselves: the display string joins them with a
+    comma, which storage reads as a single "Last, First" person, and the reloaded
+    pages would then offer the Book as an external result again.
+    """
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    names = ["Neil Gaiman", "Terry Pratchett"]
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Good Omens",
+                "author": ", ".join(names),
+                "authors": names,
+                "isbn13": "9780060853983",
+            }
+        ],
+    )
+
+    added = authenticated_client.post(
+        "/api/books",
+        json={
+            "title": "Good Omens",
+            "author": ", ".join(names),
+            "authors": names,
+            "isbn": "9780060853983",
+        },
+    )
+
+    assert added.status_code == 201
+    assert get_storage().get_book_by_isbn("9780060853983")["authors"] == names
+
+    for slug in ("neil-gaiman", "terry-pratchett"):
+        page = authenticated_client.get(f"/api/author/{slug}").get_json()
+        assert [b["title"] for b in page["reading_list_books"]] == ["Good Omens"]
+        assert page["unread_books"] == []
+
+
 def test_an_external_result_matching_an_owned_isbn_creates_no_duplicate(authenticated_client, monkeypatch):
     """A result whose ISBN is already in the collection queues that Book."""
     import book_lamp.routes.authors as authors_route

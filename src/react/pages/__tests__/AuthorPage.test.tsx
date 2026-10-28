@@ -116,6 +116,38 @@ describe('AuthorPage external results', () => {
         expect(create).not.toHaveBeenCalled();
     });
 
+    it('sends the individual authors of a co-authored result', async () => {
+        const names = ['Neil Gaiman', 'Terry Pratchett'];
+        authorPage.mockResolvedValue(
+            page([
+                {
+                    ...externalBook,
+                    title: 'Good Omens',
+                    author: names.join(', '),
+                    authors: names,
+                    isbn13: '9780060853983',
+                },
+            ])
+        );
+        create.mockResolvedValue({ ...queuedBook, title: 'Good Omens' });
+
+        renderPage();
+        await screen.findByText('From Open Library (1)');
+
+        fireEvent.click(addButton());
+
+        // The names, not just the comma-joined display string: storage reads a
+        // single comma as one "Last, First" person.
+        await waitFor(() =>
+            expect(create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    author: 'Neil Gaiman, Terry Pratchett',
+                    authors: names,
+                })
+            )
+        );
+    });
+
     it('tells the reader when the Book could not be added', async () => {
         authorPage.mockResolvedValue(page([externalBook]));
         create.mockRejectedValue(new Error('HTTP 500'));
