@@ -169,6 +169,11 @@ export interface SyncDiagnostics {
     storage: 'postgres' | 'unauthenticated';
 }
 
+export interface AppInfo {
+    /** Short commit the server is running, or the configured version. */
+    version: string;
+}
+
 export interface AuthStatus {
     is_authenticated: boolean;
     user?: {

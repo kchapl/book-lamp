@@ -2,6 +2,7 @@
 
 from flask import Flask
 
+from book_lamp.routes.app_info import app_info_bp
 from book_lamp.routes.auth import auth_bp
 from book_lamp.routes.authors import authors_bp
 from book_lamp.routes.books import books_bp
@@ -18,6 +19,7 @@ from book_lamp.services.storage_factory import is_test_mode
 
 def register_blueprints(app: Flask) -> None:
     """Register all application blueprints with the Flask app."""
+    app.register_blueprint(app_info_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(books_bp)
     app.register_blueprint(readings_bp)

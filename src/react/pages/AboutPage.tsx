@@ -1,6 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getAppInfo } from '../services/api';
 
 const AboutPage: React.FC = () => {
+    // The commit belongs to the running server, not to the bundle that was
+    // built from it, so the page asks rather than baking it in at build time.
+    const [version, setVersion] = useState<string | null>(null);
+
+    useEffect(() => {
+        getAppInfo()
+            .then((info) => setVersion(info.version))
+            .catch(() => setVersion('unknown'));
+    }, []);
+
     return (
         <div className="about-page">
             <h1>About Book Lamp</h1>
@@ -28,7 +39,7 @@ const AboutPage: React.FC = () => {
             </ol>
 
             <footer className="about-footer">
-                <p>Version: 1.0.0</p>
+                <p>Version: {version ?? '…'}</p>
             </footer>
         </div>
     );
