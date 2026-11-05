@@ -1015,6 +1015,10 @@
     margin-bottom: var(--bl-space-3);
 }
 
+.book-matches {
+    margin: var(--bl-space-4) 0;
+}
+
 .add-book-form > label.checkbox-label {
     flex-direction: row;
     align-items: center;

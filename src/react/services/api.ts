@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus, SyncDiagnostics } from '../types';
+import type { Book, BookMatch, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus, SyncDiagnostics } from '../types';
 
 const API_BASE = '/api';
 const UNAUTHORISED_PATH = '/unauthorised';
@@ -277,6 +277,13 @@ export async function getSeriesPage(seriesSlug: string): Promise<SeriesPage> {
 export async function lookupISBN(isbn: string): Promise<Book | null> {
     const params = new URLSearchParams({ isbn });
     return fetchJSON(`${API_BASE}/books/lookup?${params}`);
+}
+
+// Title and author lookup
+export async function findBooksByTitleAuthor(title: string, author: string): Promise<BookMatch[]> {
+    const params = new URLSearchParams({ title, author });
+    const data = await fetchJSON<{ books: BookMatch[] }>(`${API_BASE}/books/matches?${params}`);
+    return data.books;
 }
 
 // Fetch covers

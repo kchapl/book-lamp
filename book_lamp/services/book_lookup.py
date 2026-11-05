@@ -12,6 +12,7 @@ from book_lamp.utils.books import (
     isbn13_to_isbn10,
     normalise_bisac_category,
     normalize_isbn,
+    parse_publication_year,
 )
 
 logger = logging.getLogger("book_lamp")
@@ -20,6 +21,10 @@ OPEN_LIBRARY_API = "https://openlibrary.org/api/books"
 OPEN_LIBRARY_SEARCH_API = "https://openlibrary.org/search.json"
 GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes"
 ITUNES_API = "https://itunes.apple.com/search"
+
+# How many editions a title-and-author search hands back. A reader who knows
+# only the title and author is choosing between editions, not browsing a shelf.
+TITLE_SEARCH_LIMIT = 5
 
 # Shared session for connection pooling and consistent headers.
 _session: Optional[requests.Session] = None
@@ -405,6 +410,169 @@ def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict
         logger.debug(f"Author books lookup failed for '{author_name}': {e}")
 
     return books
+
+
+def _isbn13_from_candidates(candidates: Optional[List[Any]]) -> Optional[str]:
+    """The ISBN a provider's identifier list names, in ISBN-13 form.
+
+    A provider often lists both the ISBN-10 and the ISBN-13 of the same edition,
+    so the 13-digit form is taken first. A 10-digit-only result is upgraded
+    rather than skipped: the ISBN is what a Book is keyed on, and one form of it
+    is worth as much as the other.
+    """
+    cleaned = [normalize_isbn(str(candidate)) for candidate in candidates or [] if candidate]
+    for isbn in cleaned:
+        if len(isbn) == 13 and isbn.isdigit():
+            return isbn
+    for isbn in cleaned:
+        if len(isbn) == 10:
+            upgraded = isbn10_to_isbn13(isbn)
+            if upgraded:
+                return upgraded
+    return None
+
+
+def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
+    """Order the candidates so the reader's own words come first.
+
+    Providers rank by their own relevance, which knows nothing about the
+    subtitle the reader typed or the author they named. An edition whose title
+    is the title they asked for, credited to the author they named, is the one
+    they most likely mean. Everything else keeps the provider's order, because
+    two exact matches are still told apart by the provider.
+    """
+    asked_title = _clean_title_for_search(title).lower()
+    candidate_title = _clean_title_for_search(str(candidate.get("title") or "")).lower()
+    title_rank = 0 if candidate_title == asked_title else 1
+    names = " ".join(str(name) for name in candidate.get("authors") or []).lower()
+    author_rank = 0 if not author or author.lower() in names else 1
+    return (title_rank, author_rank)
+
+
+def _open_library_title_search(title: str, author: Optional[str]) -> List[Dict[str, Any]]:
+    """Search Open Library for editions of a title, by title and author.
+
+    Unlike the cover lookups, this keeps the candidates separate: a reader who
+    does not have an ISBN is choosing an edition, and each answer needs its own.
+    """
+    session = _get_session()
+    fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
+    params: Dict[str, str] = {"title": title, "limit": "10", "fields": fields}
+    if author:
+        params["author"] = author
+
+    try:
+        response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
+        response.raise_for_status()
+        docs = response.json().get("docs") or []
+    except Exception as e:
+        logger.debug(f"Open Library title search failed for '{title}': {e}")
+        docs = []
+
+    if not docs:
+        # Structured fields are exact, and a title as a reader types it often is
+        # not: it carries a subtitle, a series number, or drops the article. Fall
+        # back to the free-text search, which is what the reader just did.
+        query = f"{title} {author}" if author else title
+        try:
+            response = session.get(
+                OPEN_LIBRARY_SEARCH_API,
+                params={"q": query, "limit": "10", "fields": fields},
+                timeout=10,
+            )
+            docs = response.json().get("docs") or []
+        except Exception as e:
+            logger.debug(f"Open Library title search failed for '{query}': {e}")
+            return []
+
+    results: List[Dict[str, Any]] = []
+    for doc in docs:
+        isbn13 = _isbn13_from_candidates(doc.get("isbn"))
+        if not isbn13:
+            # A Book is keyed on its ISBN: an edition without one cannot be
+            # added, so it is not one of the answers to this question.
+            continue
+        names = [html.unescape(name) for name in doc.get("author_name") or [] if name]
+        publishers = doc.get("publisher") or []
+        cover_id = doc.get("cover_i")
+        results.append(
+            {
+                "title": html.unescape(doc.get("title") or ""),
+                "authors": names,
+                "author": display(names),
+                "isbn13": isbn13,
+                "publication_year": doc.get("first_publish_year"),
+                "publisher": publishers[0] if publishers else None,
+                "thumbnail_url": (f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None),
+                "cover_url": (f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None),
+            }
+        )
+    return results
+
+
+def _google_books_title_search(title: str, author: Optional[str]) -> List[Dict[str, Any]]:
+    """Search Google Books for editions of a title, by title and author.
+
+    Google indexes editions Open Library does not, and its identifiers are
+    explicit, so it fills the gaps the other search leaves.
+    """
+    session = _get_session()
+    query = f'intitle:"{title}"'
+    if author:
+        query += f' inauthor:"{author}"'
+
+    try:
+        response = session.get(GOOGLE_BOOKS_API, params={"q": query, "maxResults": "10"}, timeout=10)
+        items = response.json().get("items") or []
+    except Exception as e:
+        logger.debug(f"Google Books title search failed for '{title}': {e}")
+        return []
+
+    results: List[Dict[str, Any]] = []
+    for item in items:
+        identifiers = (item.get("volumeInfo") or {}).get("industryIdentifiers") or []
+        isbn13 = _isbn13_from_candidates(
+            [identifier.get("identifier") for identifier in identifiers if isinstance(identifier, dict)]
+        )
+        if not isbn13:
+            continue
+        parsed = _parse_google_books_item(item)
+        parsed["isbn13"] = isbn13
+        parsed["publication_year"] = parse_publication_year(parsed.get("publish_date"))
+        results.append(parsed)
+    return results
+
+
+def search_books_by_title_author(
+    title: str,
+    author: str = "",
+    limit: int = TITLE_SEARCH_LIMIT,
+) -> List[Dict[str, Any]]:
+    """Find candidate Books for a title and an author, each with its ISBN.
+
+    A Book is identified by its ISBN, but a reader may know only what is printed
+    on the cover. This is the bridge between the two: the title and author are
+    read as a search, and the editions that answer it come back with the ISBN
+    that lets any of them be added.
+    """
+    cleaned_title = _clean_title_for_search(title)
+    cleaned_author = (author or "").strip()
+    if not cleaned_title:
+        return []
+
+    candidates: List[Dict[str, Any]] = []
+    seen: set = set()
+    for find in (_open_library_title_search, _google_books_title_search):
+        for candidate in find(cleaned_title, cleaned_author or None):
+            isbn = candidate.get("isbn13")
+            if not isbn or isbn in seen:
+                # Two providers describing one edition is one answer, not two.
+                continue
+            seen.add(isbn)
+            candidates.append(candidate)
+
+    candidates.sort(key=lambda candidate: _title_match_rank(candidate, cleaned_title, cleaned_author))
+    return candidates[:limit]
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:

@@ -123,6 +123,16 @@ export interface ExternalBook extends Omit<Book, 'id'> {
     id?: number | null;
 }
 
+/**
+ * A candidate from a title-and-author search.
+ *
+ * It is Book-shaped because it carries what is needed to become one, but its
+ * ISBN is what matters: that is the field the reader is missing.
+ */
+export interface BookMatch extends Partial<Book> {
+    isbn13?: string;
+}
+
 export interface AuthorPage {
     author_name: string;
     read_books: Book[];

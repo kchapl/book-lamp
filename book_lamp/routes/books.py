@@ -498,6 +498,33 @@ def api_lookup_isbn():
         return jsonify({"error": "Lookup failed"}), 502
 
 
+@books_bp.route("/api/books/matches", methods=["GET"])
+@authorisation_required
+def api_book_matches():
+    """Find candidate Books by title and author, each with an ISBN.
+
+    A reader who knows a title and an author but not the ISBN is one lookup away
+    from the field, not missing it: answering with the matching editions lets
+    the Add Book form fill the ISBN in from what they do know.
+    """
+    title = request.args.get("title", "").strip()
+    author = request.args.get("author", "").strip()
+    if not title:
+        return jsonify({"error": "title query parameter is required"}), 400
+
+    from book_lamp.services.book_lookup import search_books_by_title_author
+
+    try:
+        books = search_books_by_title_author(title, author)
+    except Exception as exc:
+        current_app.logger.error(
+            f"api_book_matches: search failed for title='{title}', author='{author}': {exc}"
+        )
+        return jsonify({"error": "Lookup failed"}), 502
+
+    return jsonify({"books": books})
+
+
 @books_bp.route("/api/books/fetch-covers", methods=["POST"])
 @authorisation_required
 @csrf_protect

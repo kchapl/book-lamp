@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
-import { createBook, lookupISBN } from '../../services/api';
+import { createBook, findBooksByTitleAuthor, lookupISBN } from '../../services/api';
 
 // The scanner library reaches for the camera; stub it out. It must be a real
 // constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
@@ -29,11 +29,13 @@ vi.mock('html5-qrcode', () => ({
 
 vi.mock('../../services/api', () => ({
     lookupISBN: vi.fn(),
+    findBooksByTitleAuthor: vi.fn(),
     createBook: vi.fn(),
     addToReadingList: vi.fn(),
 }));
 
 const lookup = vi.mocked(lookupISBN);
+const findMatches = vi.mocked(findBooksByTitleAuthor);
 const create = vi.mocked(createBook);
 
 const BUTTON_SELECTOR =
@@ -110,7 +112,7 @@ describe('AddBookPage reading-list option', () => {
     it('starts ticked when the Reading List sent the reader here', () => {
         const { container } = renderAt('/books/new?add_to_reading_list=1');
 
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
 
         expect(checkbox(container)?.checked).toBe(true);
     });
@@ -118,7 +120,7 @@ describe('AddBookPage reading-list option', () => {
     it('starts unticked for every other entry point into the form', () => {
         const { container } = renderAt('/books/new');
 
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
 
         expect(checkbox(container)?.checked).toBe(false);
     });
@@ -129,7 +131,7 @@ describe('AddBookPage submit', () => {
         create.mockResolvedValue({ id: 7, title: 'Emma', author: 'Jane Austen' });
 
         const { container } = renderPage();
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
         typeInto('title', 'Emma');
         typeInto('author', 'Jane Austen');
         typeInto('isbn', '978-0-14-143960-0');
@@ -151,9 +153,41 @@ describe('AddBookPage submit', () => {
         });
     });
 
-    it('refuses to submit without an ISBN, which is what identifies a Book', async () => {
+    it('finds the ISBN from the title and author when the form has none', async () => {
+        // A reader who knows only the cover must still be able to add the Book:
+        // the title and author are what the ISBN lookup needs.
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', isbn13: '9780141439600' },
+        ]);
+        create.mockResolvedValue({ id: 7, title: 'Emma', author: 'Jane Austen' });
+
         const { container } = renderPage();
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+        });
+
+        expect(findMatches).toHaveBeenCalledWith('Emma', 'Jane Austen');
+        expect(create).toHaveBeenCalledWith({
+            title: 'Emma',
+            author: 'Jane Austen',
+            publisher: undefined,
+            publication_year: undefined,
+            isbn: '9780141439600',
+        });
+    });
+
+    it('offers the matching editions instead of picking one when several share the title', async () => {
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', publisher: 'Penguin', isbn13: '9780141439600' },
+            { title: 'Emma', author: 'Jane Austen', publisher: 'Oxford', isbn13: '9780141439587' },
+        ]);
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
         typeInto('title', 'Emma');
         typeInto('author', 'Jane Austen');
 
@@ -162,7 +196,51 @@ describe('AddBookPage submit', () => {
         });
 
         expect(create).not.toHaveBeenCalled();
-        expect(screen.getByText(/an isbn is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/several books match/i)).toBeInTheDocument();
+        expect(screen.getByText(/9780141439587/)).toBeInTheDocument();
+    });
+
+    it('says so when nothing matches, rather than failing silently', async () => {
+        findMatches.mockResolvedValue([]);
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'A Book That Does Not Exist');
+        typeInto('author', 'Nobody');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+        });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(screen.getByText(/no matching book found/i)).toBeInTheDocument();
+    });
+
+    it('fills the ISBN in from the title and author without submitting', async () => {
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', publication_year: 1815, isbn13: '9780141439600' },
+        ]);
+
+        renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+        fireEvent.click(button(/find isbn from title & author/i));
+
+        await waitFor(() => {
+            expect(field('isbn')?.value).toBe('9780141439600');
+        });
+        expect(field('year')?.value).toBe('1815');
+    });
+
+    it('names the lookup on the submit button when the ISBN is blank', () => {
+        renderPage();
+        fireEvent.click(button(/enter title & author/i));
+
+        expect(button(/find isbn & add book/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/look for a matching edition and use its isbn/i)
+        ).toBeInTheDocument();
     });
 });
 
