@@ -4,6 +4,7 @@ External providers are stubbed throughout: the suite never calls them.
 """
 
 import pytest
+import requests
 
 import book_lamp.services.book_lookup as lookup_module
 
@@ -44,6 +45,41 @@ def test_search_books_raises_when_every_provider_fails(monkeypatch):
     monkeypatch.setattr(lookup_module, "_open_library_title_search", unavailable)
     monkeypatch.setattr(lookup_module, "_google_books_title_search", unavailable)
     monkeypatch.setattr(lookup_module, "lookup_books_by_author", unavailable)
+
+    with pytest.raises(lookup_module.BookSearchUnavailable):
+        lookup_module.search_books("Dune")
+
+
+class _Response:
+    def __init__(self, payload: dict, status: int = 200) -> None:
+        self._payload = payload
+        self.status_code = status
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
+
+    def json(self) -> dict:
+        return self._payload
+
+
+class _Session:
+    def __init__(self, *responses: _Response) -> None:
+        self._responses = list(responses)
+
+    def get(self, *args: object, **kwargs: object) -> _Response:
+        return self._responses.pop(0)
+
+
+def test_search_books_reports_an_outage_when_providers_return_http_errors(monkeypatch):
+    """A 429 or 503 JSON body is a failed provider, not an empty result."""
+    session = _Session(
+        _Response({"docs": []}),
+        _Response({"error": "rate limited"}, status=429),
+        _Response({"error": {"code": 429}}, status=429),
+        _Response({"error": "rate limited"}, status=503),
+    )
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: session)
 
     with pytest.raises(lookup_module.BookSearchUnavailable):
         lookup_module.search_books("Dune")
