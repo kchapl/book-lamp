@@ -12,6 +12,7 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     permissions:
       contents: read
       checks: write
@@ -91,6 +92,7 @@ jobs:
 
   lint-and-format:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     permissions:
       contents: read
 
