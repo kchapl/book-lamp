@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import ReadingListPage from '../ReadingListPage';
-import { getReadingList } from '../../services/api';
+import { getReadingList, removeFromReadingList, startReading } from '../../services/api';
 import type { ReadingListItem } from '../../types';
 
 vi.mock('../../services/api', () => ({
@@ -27,6 +27,8 @@ vi.mock('../../services/api', () => ({
 }));
 
 const list = vi.mocked(getReadingList);
+const remove = vi.mocked(removeFromReadingList);
+const start = vi.mocked(startReading);
 
 const BUTTON_SELECTOR =
     'md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button';
@@ -58,6 +60,48 @@ const queuedBook: ReadingListItem = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+});
+
+describe('ReadingListPage row links', () => {
+    it('links the title and the cover to the Book page', async () => {
+        list.mockResolvedValue({
+            books: [{ ...queuedBook, thumbnail_url: 'https://example.com/piranesi.jpg' }],
+        });
+
+        const { container } = renderPage();
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
+
+        const title = container.querySelector('.item-info h2 a') as HTMLAnchorElement;
+        expect(title).toHaveAttribute('href', '/books/1');
+
+        const cover = container.querySelector('.item-cover-link') as HTMLAnchorElement;
+        expect(cover).toHaveAttribute('href', '/books/1');
+        expect(cover).toHaveAccessibleName('Piranesi');
+        // The image is decorative: the link already carries the Book's name.
+        expect(container.querySelector('.item-cover-link img')).toHaveAttribute('alt', '');
+    });
+
+    it('does not make the placeholder cover a link', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        const { container } = renderPage();
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
+
+        expect(container.querySelector('.item-placeholder')?.closest('a')).toBeNull();
+    });
+
+    it('still starts and removes the Book from the row', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
+
+        fireEvent.click(button(/start reading/i));
+        await waitFor(() => expect(start).toHaveBeenCalledWith(1));
+
+        fireEvent.click(button(/remove/i));
+        await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
+    });
 });
 
 describe('ReadingListPage add action', () => {

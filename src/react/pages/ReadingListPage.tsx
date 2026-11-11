@@ -16,6 +16,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Link } from 'react-router-dom';
 import { getReadingList, reorderReadingList, removeFromReadingList, startReading } from '../services/api';
 import { Button, IconButton } from '../ui';
 import { useResource } from '../hooks/useResource';
@@ -60,12 +61,16 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
                 {...(listeners as object)}
             />
             {book.thumbnail_url ? (
-                <img src={book.thumbnail_url} alt={book.title} className="item-thumbnail" />
+                <Link to={`/books/${book.id}`} className="item-cover-link" aria-label={book.title}>
+                    <img src={book.thumbnail_url} alt="" className="item-thumbnail" />
+                </Link>
             ) : (
                 <div className="item-placeholder">📖</div>
             )}
             <div className="item-info">
-                <h2>{book.title}</h2>
+                <h2>
+                    <Link to={`/books/${book.id}`}>{book.title}</Link>
+                </h2>
                 <p>{book.author}</p>
             </div>
             <div className="item-actions">
