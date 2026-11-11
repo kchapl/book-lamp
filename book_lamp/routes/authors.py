@@ -6,7 +6,7 @@ from book_lamp.middleware.auth import authorisation_required
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.storage_factory import get_storage, is_test_mode
 from book_lamp.utils.authors import matches
-from book_lamp.utils.publishers import normalize_publisher
+from book_lamp.utils.publishers import normalize_publisher, publisher_slug
 
 authors_bp = Blueprint("authors", __name__)
 
@@ -83,25 +83,22 @@ def api_author_page(author_slug: str):
     )
 
 
-@authors_bp.route("/api/publisher/<path:publisher_slug>", methods=["GET"])
+@authors_bp.route("/api/publisher/<path:publisher_slug_path>", methods=["GET"])
 @authorisation_required
-def api_publisher_page(publisher_slug: str):
+def api_publisher_page(publisher_slug_path: str):
     """API endpoint for publisher detail page."""
     storage = get_storage()
     books = storage.get_all_books()
 
     publisher_books = []
-    display_publisher_name = publisher_slug.replace("-", " ").title()
+    display_publisher_name = publisher_slug_path.replace("-", " ").title()
 
-    def to_slug(name):
-        return name.lower().replace(" ", "-") if name else ""
-
-    search_slug = publisher_slug.lower()
+    search_slug = publisher_slug_path.lower()
 
     for book in books:
         if book.get("publisher"):
             norm_pub = normalize_publisher(book["publisher"])
-            if norm_pub and to_slug(norm_pub) == search_slug:
+            if norm_pub and publisher_slug(norm_pub) == search_slug:
                 publisher_books.append(book)
                 display_publisher_name = norm_pub
 

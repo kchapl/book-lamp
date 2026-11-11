@@ -1,4 +1,4 @@
-import type { Book, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus, SyncDiagnostics } from '../types';
+import type { Book, BookMatch, ReadingListItem, Stats, Job, AuthorPage, PublisherPage, SeriesPage, HistoryFilters, BooksFilters, Reading, AuthStatus, SyncDiagnostics, AppInfo } from '../types';
 
 const API_BASE = '/api';
 const UNAUTHORISED_PATH = '/unauthorised';
@@ -118,6 +118,11 @@ export async function logout(): Promise<{ ok: boolean }> {
     return fetchJSON<{ ok: boolean }>(`${API_BASE}/auth/logout`, {
         method: 'POST',
     });
+}
+
+// Deployment info
+export async function getAppInfo(): Promise<AppInfo> {
+    return fetchJSON<AppInfo>(`${API_BASE}/app-info`);
 }
 
 // Sync diagnostics
@@ -277,6 +282,20 @@ export async function getSeriesPage(seriesSlug: string): Promise<SeriesPage> {
 export async function lookupISBN(isbn: string): Promise<Book | null> {
     const params = new URLSearchParams({ isbn });
     return fetchJSON(`${API_BASE}/books/lookup?${params}`);
+}
+
+// Find a Book the reader does not own yet, by title or author.
+export async function discoverBooks(query: string): Promise<BookMatch[]> {
+    const params = new URLSearchParams({ q: query });
+    const data = await fetchJSON<{ books: BookMatch[] }>(`${API_BASE}/books/discover?${params}`);
+    return data.books;
+}
+
+// Title and author lookup
+export async function findBooksByTitleAuthor(title: string, author: string): Promise<BookMatch[]> {
+    const params = new URLSearchParams({ title, author });
+    const data = await fetchJSON<{ books: BookMatch[] }>(`${API_BASE}/books/matches?${params}`);
+    return data.books;
 }
 
 // Fetch covers

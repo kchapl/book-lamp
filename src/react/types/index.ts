@@ -11,6 +11,10 @@ export interface Book {
     description?: string;
     series?: string;
     bisac_category?: string;
+    /** The major category label the collection filters by. */
+    bisac_category_label?: string;
+    /** The URL segment of the publisher's page, normalised by the API. */
+    publisher_slug?: string;
     latest_status?: string;
     is_owned?: boolean;
     in_reading_list?: boolean;
@@ -123,6 +127,16 @@ export interface ExternalBook extends Omit<Book, 'id'> {
     id?: number | null;
 }
 
+/**
+ * A candidate from a title-and-author search.
+ *
+ * It is Book-shaped because it carries what is needed to become one, but its
+ * ISBN is what matters: that is the field the reader is missing.
+ */
+export interface BookMatch extends Partial<Book> {
+    isbn13?: string;
+}
+
 export interface AuthorPage {
     author_name: string;
     read_books: Book[];
@@ -156,7 +170,12 @@ export type Theme = 'light' | 'dark' | 'system';
  */
 export interface SyncDiagnostics {
     status: 'ok' | 'error' | 'unauthenticated';
-    storage: 'postgres' | 'unauthenticated';
+    storage: 'postgres' | 'memory' | 'unauthenticated';
+}
+
+export interface AppInfo {
+    /** Short commit the server is running, or the configured version. */
+    version: string;
 }
 
 export interface AuthStatus {

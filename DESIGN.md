@@ -41,7 +41,7 @@ what makes the UI specific rather than generic.
 | **The Reading Room** | The whole app shell: header, books, footer. |
 | **Exhibit** | A single Book. Cards, list rows and the detail header are all mounts for an exhibit. |
 | **Plinth** | The raised tonal panel an exhibit sits on (`surface-container-low`, elevation 1, brass hairline). |
-| **Placard** | The wall label: title in serif, author, then small-caps metadata rows. |
+| **Placard** | The wall label: title in the display weight, author, then small-caps metadata rows. |
 | **Accession line** | The quiet metadata strip — year, ISBN, publisher — set in tabular figures. |
 | **Condition chip** | Reading Status as a condition tag: Completed / In Progress / Abandoned. |
 | **The lamp** | Brand motif. Lamp green is the primary role; brass is the secondary rule/accent. |
@@ -103,21 +103,25 @@ Status is never ad-hoc colour. Each maps to a role family, and its container:
 
 ## 3. Typography
 
-Two faces, no more. **Newsreader** (serif) is the editorial voice — `display`,
-`headline`, and every Book title. **Inter** (grotesque) is the instrument voice
-— `title`, `body`, `label`: controls, metadata, numbers.
+One face: **Inter** (grotesque), served from this app's own assets, for every
+role — `display`, `headline`, `title`, `body`, `label`, and every Book title.
+The editorial and instrument voices are one instrument.
 
-The MD3 scale is unchanged in size; only the display and headline families are
-reassigned to the serif. Display and headline weights are 500, not 400.
+The MD3 scale is unchanged in size. Display and headline weights are 500.
+Headings are set slightly tighter than the MD3 defaults, and labels use reduced
+tracking rather than the wide placard spacing of the old serif pairing. The
+variable font and its OFL licence live in `book_lamp/static/fonts/`; there is
+no runtime request to a font host, and a metric fallback is declared beside the
+face so the swap cannot shift layout.
 
 | Role | Face | Size / line height | Weight | Tracking |
 | --- | --- | --- | --- | --- |
-| `display-large` | serif | 57 / 62 | 500 | −0.5px |
-| `display-medium` | serif | 45 / 52 | 500 | −0.25px |
-| `display-small` | serif | 36 / 44 | 500 | 0 |
-| `headline-large` | serif | 32 / 40 | 500 | 0 |
-| `headline-medium` | serif | 28 / 36 | 500 | 0 |
-| `headline-small` | serif | 24 / 32 | 500 | 0 |
+| `display-large` | Inter | 57 / 62 | 500 | −0.75px |
+| `display-medium` | Inter | 45 / 52 | 500 | −0.5px |
+| `display-small` | Inter | 36 / 44 | 500 | −0.25px |
+| `headline-large` | Inter | 32 / 40 | 500 | −0.25px |
+| `headline-medium` | Inter | 28 / 36 | 500 | −0.25px |
+| `headline-small` | Inter | 24 / 32 | 500 | −0.1px |
 | `title-large` | Inter | 22 / 28 | 500 | 0 |
 | `title-medium` | Inter | 16 / 24 | 500 | +0.15px |
 | `title-small` | Inter | 14 / 20 | 500 | +0.1px |
@@ -128,8 +132,8 @@ reassigned to the serif. Display and headline weights are 500, not 400.
 | `label-medium` | Inter | 12 / 16 | 500 | +0.5px |
 | `label-small` | Inter | 11 / 16 | 500 | +0.5px |
 
-- Placards are `label-small` in small caps with wide tracking (`0.14em`,
-  `--bl-tracking-placard`) so the metadata reads as a museum label.
+- Placards are `label-small` in small caps with moderate tracking
+  (`--bl-tracking-placard`, 0.08em) so the metadata still reads as a label.
 - Numbers that sit in columns or change in place — counts, dates, page totals —
   use `font-variant-numeric: tabular-nums` so they never jitter.
 
@@ -244,7 +248,7 @@ Breakpoints: **1100px** (grid reflow), **900px** (dashboard grid stacks),
 5. **Hairlines before shadows.** If something is not genuinely floating, it does
    not get a shadow.
 6. **One FAB per screen**, and only where there is a single primary action.
-7. **Two faces, MD3 sizes.** No third typeface, no size invented for a
+7. **One face, MD3 sizes.** No second typeface, no size invented for a
    particular screen.
 8. **No fake liveness.** No streaks, no live counters, no auto-refreshing
    numbers. Freshness is stated with an as-of line ("Last entry MMM D, YYYY").

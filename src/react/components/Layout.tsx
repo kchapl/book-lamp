@@ -231,7 +231,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <main className="main-content">{children}</main>
 
             <footer className="site-footer">
-                <p>Book Lamp &copy; {new Date().getFullYear()}</p>
+                <p>
+                    Book Lamp &copy; {new Date().getFullYear()} ·{' '}
+                    <Link to="/about">About</Link>
+                </p>
             </footer>
         </div>
     );

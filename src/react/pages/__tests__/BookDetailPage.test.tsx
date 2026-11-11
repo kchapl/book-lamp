@@ -173,6 +173,88 @@ describe('BookDetailPage add reading', () => {
     });
 });
 
+describe('BookDetailPage placard links', () => {
+    const linkedBook = {
+        id: 1,
+        title: 'The Left Hand of Darkness',
+        author: 'Ursula K. Le Guin',
+        authors: ['Ursula K. Le Guin'],
+        isbn13: '9780441478125',
+        publication_year: 1969,
+        publisher: 'Harper & Row',
+        publisher_slug: 'harper-&-row',
+        bisac_category: 'Fiction / Science Fiction',
+        bisac_category_label: 'Fiction',
+        series: 'Hainish Cycle',
+        readings: [],
+    };
+
+    it('links the author, publisher and subject to their pages', async () => {
+        detail.mockResolvedValue(linkedBook);
+
+        renderPage();
+
+        expect(await screen.findByRole('link', { name: 'Ursula K. Le Guin' })).toHaveAttribute(
+            'href',
+            '/author/ursula-k-le-guin'
+        );
+        expect(screen.getByRole('link', { name: 'Harper & Row' })).toHaveAttribute(
+            'href',
+            '/publisher/harper-%26-row'
+        );
+        // The link carries the label the collection filters by, not the raw
+        // subject string, so arriving there selects the filter.
+        expect(screen.getByRole('link', { name: 'Fiction' })).toHaveAttribute(
+            'href',
+            '/books?category=Fiction'
+        );
+        expect(screen.getByRole('link', { name: 'Hainish Cycle' })).toHaveAttribute(
+            'href',
+            '/series/Hainish%20Cycle'
+        );
+    });
+
+    it('leaves the year and the ISBN as plain text', async () => {
+        detail.mockResolvedValue(linkedBook);
+
+        renderPage();
+
+        await screen.findByText('The Left Hand of Darkness');
+        expect(screen.queryByRole('link', { name: '1969' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: '9780441478125' })).not.toBeInTheDocument();
+    });
+
+    it('renders no empty links for the values the Book lacks', async () => {
+        detail.mockResolvedValue({ id: 1, title: 'A Book with No Metadata', readings: [] });
+
+        renderPage();
+
+        await screen.findByText('A Book with No Metadata');
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('links each author of a co-authored Book separately', async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'Good Omens',
+            author: 'Neil Gaiman, Terry Pratchett',
+            authors: ['Neil Gaiman', 'Terry Pratchett'],
+            readings: [],
+        });
+
+        renderPage();
+
+        expect(await screen.findByRole('link', { name: 'Neil Gaiman' })).toHaveAttribute(
+            'href',
+            '/author/neil-gaiman'
+        );
+        expect(screen.getByRole('link', { name: 'Terry Pratchett' })).toHaveAttribute(
+            'href',
+            '/author/terry-pratchett'
+        );
+    });
+});
+
 describe('BookDetailPage edit book', () => {
     /** A Book two people wrote: its display string cannot be read back. */
     const coauthored = {

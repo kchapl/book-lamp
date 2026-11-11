@@ -303,6 +303,16 @@
 
 .drag-handle:active { cursor: grabbing; }
 
+.item-cover-link {
+    display: block;
+    flex-shrink: 0;
+    border-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.item-cover-link:hover .item-thumbnail {
+    box-shadow: var(--md-sys-elevation-2);
+}
+
 .item-thumbnail {
     width: 52px;
     height: 78px;
@@ -310,6 +320,7 @@
     border-radius: var(--md-sys-shape-corner-extra-small);
     box-shadow: var(--md-sys-elevation-1);
     flex-shrink: 0;
+    display: block;
 }
 
 .item-placeholder {
@@ -336,6 +347,16 @@
     margin: 0 0 var(--bl-space-1);
 }
 
+.item-info h2 a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.item-info h2 a:hover {
+    color: var(--md-sys-color-primary);
+    text-decoration: underline;
+}
+
 .item-info p {
     margin: 0;
     font-size: var(--md-sys-typescale-body-medium-size);
@@ -345,6 +366,33 @@
     display: flex;
     gap: var(--bl-space-2);
     flex-shrink: 0;
+}
+
+/* =============================================================================
+   ADD A BOOK — find a Book the reader does not have yet
+   ============================================================================= */
+
+.discover-section {
+    margin-bottom: var(--bl-space-7);
+    padding-bottom: var(--bl-space-6);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.discover-section > h2 {
+    font-size: var(--md-sys-typescale-title-large-size);
+    margin-bottom: var(--bl-space-2);
+}
+
+.discover-form {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--bl-space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--bl-space-4);
+}
+
+.discover-form md-outlined-text-field {
+    flex: 1 1 260px;
 }
 
 /* =============================================================================
@@ -1013,6 +1061,10 @@
     flex-direction: column;
     gap: var(--bl-space-2);
     margin-bottom: var(--bl-space-3);
+}
+
+.book-matches {
+    margin: var(--bl-space-4) 0;
 }
 
 .add-book-form > label.checkbox-label {

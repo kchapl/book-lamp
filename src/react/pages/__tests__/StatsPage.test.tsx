@@ -108,6 +108,21 @@ describe('StatsPage reading-status board', () => {
         expect(screen.getByText('A Lectern Author')).toBeInTheDocument();
     });
 
+    it('links an author and a publisher with the same spelling the Book page uses', async () => {
+        renderPage();
+
+        // The old ad-hoc spelling kept the dot in "K." and produced a page the
+        // server could not find.
+        expect(await screen.findByRole('link', { name: 'Ursula K. Le Guin' })).toHaveAttribute(
+            'href',
+            '/author/ursula-k-le-guin'
+        );
+        expect(screen.getByRole('link', { name: 'Penguin' })).toHaveAttribute(
+            'href',
+            '/publisher/penguin'
+        );
+    });
+
     it('shows an empty lectern when nothing is in progress', async () => {
         renderPage();
 

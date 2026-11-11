@@ -23,8 +23,9 @@ def is_test_mode() -> bool:
 def get_storage() -> Union[MockStorage, PostgresStorage]:
     """Get the appropriate storage backend for the current request context."""
     if is_test_mode():
-        # Authorise storage for automated testing
-        _mock_storage_singleton.set_authorised(True)
+        # Authorisation is set explicitly by the harness (/test/connect) and by
+        # the pytest fixture. Forcing it here would make the auth gate — and so
+        # the unauthorised journey — impossible to exercise in a test run.
         return _mock_storage_singleton
 
     user_id = session.get("user_id")

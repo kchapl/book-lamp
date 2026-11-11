@@ -12,10 +12,10 @@
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
-import { createBook, lookupISBN } from '../../services/api';
+import { createBook, discoverBooks, findBooksByTitleAuthor, lookupISBN } from '../../services/api';
 
 // The scanner library reaches for the camera; stub it out. It must be a real
 // constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
@@ -29,12 +29,32 @@ vi.mock('html5-qrcode', () => ({
 
 vi.mock('../../services/api', () => ({
     lookupISBN: vi.fn(),
+    findBooksByTitleAuthor: vi.fn(),
+    discoverBooks: vi.fn(),
     createBook: vi.fn(),
     addToReadingList: vi.fn(),
 }));
 
 const lookup = vi.mocked(lookupISBN);
+const findMatches = vi.mocked(findBooksByTitleAuthor);
+const discover = vi.mocked(discoverBooks);
 const create = vi.mocked(createBook);
+
+/** Reports where the page navigated. */
+const Destination: React.FC = () => {
+    const location = useLocation();
+    return <p>{`destination:${location.pathname}`}</p>;
+};
+
+const renderToBook = () =>
+    render(
+        <MemoryRouter initialEntries={['/books/new']}>
+            <Routes>
+                <Route path="/books/new" element={<AddBookPage />} />
+                <Route path="/books/:bookId" element={<Destination />} />
+            </Routes>
+        </MemoryRouter>
+    );
 
 const BUTTON_SELECTOR =
     'md-filled-button, md-filled-tonal-button, md-outlined-button, md-text-button';
@@ -110,7 +130,7 @@ describe('AddBookPage reading-list option', () => {
     it('starts ticked when the Reading List sent the reader here', () => {
         const { container } = renderAt('/books/new?add_to_reading_list=1');
 
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
 
         expect(checkbox(container)?.checked).toBe(true);
     });
@@ -118,7 +138,7 @@ describe('AddBookPage reading-list option', () => {
     it('starts unticked for every other entry point into the form', () => {
         const { container } = renderAt('/books/new');
 
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
 
         expect(checkbox(container)?.checked).toBe(false);
     });
@@ -129,7 +149,7 @@ describe('AddBookPage submit', () => {
         create.mockResolvedValue({ id: 7, title: 'Emma', author: 'Jane Austen' });
 
         const { container } = renderPage();
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
         typeInto('title', 'Emma');
         typeInto('author', 'Jane Austen');
         typeInto('isbn', '978-0-14-143960-0');
@@ -139,7 +159,7 @@ describe('AddBookPage submit', () => {
         // handler creates the Book and then navigates, so let it finish inside
         // act rather than updating the router after the test has moved on.
         await act(async () => {
-            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
         });
 
         expect(create).toHaveBeenCalledWith({
@@ -151,18 +171,198 @@ describe('AddBookPage submit', () => {
         });
     });
 
-    it('refuses to submit without an ISBN, which is what identifies a Book', async () => {
+    it('finds the ISBN from the title and author when the form has none', async () => {
+        // A reader who knows only the cover must still be able to add the Book:
+        // the title and author are what the ISBN lookup needs.
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', isbn13: '9780141439600' },
+        ]);
+        create.mockResolvedValue({ id: 7, title: 'Emma', author: 'Jane Austen' });
+
         const { container } = renderPage();
-        fireEvent.click(button(/enter manually/i));
+        fireEvent.click(button(/enter title & author/i));
         typeInto('title', 'Emma');
         typeInto('author', 'Jane Austen');
 
         await act(async () => {
-            fireEvent.submit(container.querySelector('form') as HTMLFormElement);
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(findMatches).toHaveBeenCalledWith('Emma', 'Jane Austen');
+        expect(create).toHaveBeenCalledWith({
+            title: 'Emma',
+            author: 'Jane Austen',
+            publisher: undefined,
+            publication_year: undefined,
+            isbn: '9780141439600',
+        });
+    });
+
+    it('offers the matching editions instead of picking one when several share the title', async () => {
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', publisher: 'Penguin', isbn13: '9780141439600' },
+            { title: 'Emma', author: 'Jane Austen', publisher: 'Oxford', isbn13: '9780141439587' },
+        ]);
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
         });
 
         expect(create).not.toHaveBeenCalled();
-        expect(screen.getByText(/an isbn is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/several books match/i)).toBeInTheDocument();
+        expect(screen.getByText(/9780141439587/)).toBeInTheDocument();
+    });
+
+    it('says so when nothing matches, rather than failing silently', async () => {
+        findMatches.mockResolvedValue([]);
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'A Book That Does Not Exist');
+        typeInto('author', 'Nobody');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).not.toHaveBeenCalled();
+        expect(screen.getByText(/no matching book found/i)).toBeInTheDocument();
+    });
+
+    it('fills the ISBN in from the title and author without submitting', async () => {
+        findMatches.mockResolvedValue([
+            { title: 'Emma', author: 'Jane Austen', publication_year: 1815, isbn13: '9780141439600' },
+        ]);
+
+        renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+        fireEvent.click(button(/find isbn from title & author/i));
+
+        await waitFor(() => {
+            expect(field('isbn')?.value).toBe('9780141439600');
+        });
+        expect(field('year')?.value).toBe('1815');
+    });
+
+    it('names the lookup on the submit button when the ISBN is blank', () => {
+        renderPage();
+        fireEvent.click(button(/enter title & author/i));
+
+        expect(button(/find isbn & add book/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/look for a matching edition and use its isbn/i)
+        ).toBeInTheDocument();
+    });
+});
+
+describe('AddBookPage discover search', () => {
+    it('lists candidates by title or author and adds the chosen one', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune Messiah',
+                author: 'Frank Herbert',
+                publication_year: 1969,
+                isbn13: '9780593098233',
+            },
+        ]);
+        create.mockResolvedValue({ id: 7, title: 'Dune' });
+
+        renderToBook();
+        typeInto('discover-query', 'Frank Herbert');
+        fireEvent.click(button(/^search$/i));
+
+        await waitFor(() => expect(screen.getByText('Dune Messiah')).toBeInTheDocument());
+        expect(discover).toHaveBeenCalledWith('Frank Herbert');
+        // A row carries the title, author, year and cover the reader needs to
+        // tell one edition from another.
+        expect(screen.getByText(/Frank Herbert · 1965/)).toBeInTheDocument();
+
+        const row = screen.getByText('Dune').closest('.book-item') as HTMLElement;
+        fireEvent.click(within(row).getByText(/add to reading list/i));
+
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        expect(create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                title: 'Dune',
+                author: 'Frank Herbert',
+                isbn: '9780441172719',
+                publication_year: 1965,
+            })
+        );
+        await waitFor(() =>
+            expect(screen.getByText('destination:/books/7')).toBeInTheDocument()
+        );
+    });
+
+    it('queues the existing Book when the candidate is already owned', async () => {
+        // The create endpoint de-duplicates on ISBN; the page makes the one
+        // request and lands on the Book that already exists.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                isbn13: '9780441172719',
+            },
+        ]);
+        create.mockResolvedValue({ id: 2, title: 'Dune', author: 'Frank Herbert' });
+
+        renderToBook();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        await waitFor(() => expect(screen.getByText('Dune')).toBeInTheDocument());
+        const row = screen.getByText('Dune').closest('.book-item') as HTMLElement;
+        fireEvent.click(within(row).getByText(/add to reading list/i));
+
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        await waitFor(() =>
+            expect(screen.getByText('destination:/books/2')).toBeInTheDocument()
+        );
+    });
+
+    it('says so when nothing matches', async () => {
+        discover.mockResolvedValue([]);
+
+        renderPage();
+        typeInto('discover-query', 'A Book That Does Not Exist');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/no books found/i)).toBeInTheDocument();
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it('says the search failed when the providers are unavailable', async () => {
+        discover.mockRejectedValue(new Error('HTTP 502: Book search is unavailable right now'));
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/could not search for books/i)).toBeInTheDocument();
+        // The ISBN and manual paths are still there to fall back to.
+        expect(button(/lookup isbn/i)).toBeInTheDocument();
+        expect(button(/enter title & author/i)).toBeInTheDocument();
+    });
+
+    it('leaves the ISBN and manual entry paths in place', () => {
+        renderPage();
+
+        expect(button(/lookup isbn/i)).toBeInTheDocument();
+        expect(button(/scan barcode/i)).toBeInTheDocument();
+        expect(button(/enter title & author/i)).toBeInTheDocument();
     });
 });
 

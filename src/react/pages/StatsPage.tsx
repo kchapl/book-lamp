@@ -10,6 +10,7 @@ import { useResource } from '../hooks/useResource';
 import { IN_PROGRESS_STATUS, statusAccentClass, statusClass } from '../utils/status';
 import { formatDate } from '../utils/format';
 import { seriesPath } from '../utils/series';
+import { authorPath, publisherPath } from '../utils/paths';
 
 const STATUS_ORDER = ['Completed', 'In Progress', 'Abandoned'] as const;
 
@@ -313,10 +314,7 @@ const StatsPage: React.FC = () => {
                             {stats.top_authors.map((author, index) => (
                                 <li key={author.name}>
                                     <span className="rank-index numeric">{index + 1}</span>
-                                    <Link
-                                        to={`/author/${author.name.toLowerCase().replace(/ /g, '-')}`}
-                                        className="rank-name"
-                                    >
+                                    <Link to={authorPath(author.name)} className="rank-name">
                                         {author.name}
                                     </Link>
                                     <span className="rank-count">{author.count}</span>
@@ -338,7 +336,7 @@ const StatsPage: React.FC = () => {
                                 <li key={publisher.name}>
                                     <span className="rank-index numeric">{index + 1}</span>
                                     <Link
-                                        to={`/publisher/${publisher.name.toLowerCase().replace(/ /g, '-')}`}
+                                        to={publisherPath(publisher.name)}
                                         className="rank-name"
                                     >
                                         {publisher.name}

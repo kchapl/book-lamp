@@ -22,6 +22,7 @@ from book_lamp.utils import (
 )
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
+from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
@@ -386,6 +387,13 @@ def api_book_detail(book_id: int):
     is_planned = any(item["book_id"] == book_id for item in rl_items)
     book["is_planned"] = is_planned
 
+    # The placard links to pages the collection already has: the author and
+    # publisher routes, and the category filter. The label the filter uses is
+    # derived here, by the same rule, so the link and the filter cannot disagree.
+    book["bisac_category_label"] = category_label_for_book(book)
+    if book.get("publisher"):
+        book["publisher_slug"] = publisher_slug(book["publisher"])
+
     return jsonify(book)
 
 
@@ -496,6 +504,66 @@ def api_lookup_isbn():
     except Exception as exc:
         current_app.logger.error(f"api_lookup_isbn: lookup failed for {isbn}: {exc}")
         return jsonify({"error": "Lookup failed"}), 502
+
+
+@books_bp.route("/api/books/matches", methods=["GET"])
+@authorisation_required
+def api_book_matches():
+    """Find candidate Books by title and author, each with an ISBN.
+
+    A reader who knows a title and an author but not the ISBN is one lookup away
+    from the field, not missing it: answering with the matching editions lets
+    the Add Book form fill the ISBN in from what they do know.
+    """
+    title = request.args.get("title", "").strip()
+    author = request.args.get("author", "").strip()
+    if not title:
+        return jsonify({"error": "title query parameter is required"}), 400
+
+    from book_lamp.services.book_lookup import search_books_by_title_author
+
+    try:
+        books = search_books_by_title_author(title, author)
+    except Exception as exc:
+        current_app.logger.error(f"api_book_matches: search failed for title='{title}', author='{author}': {exc}")
+        return jsonify({"error": "Lookup failed"}), 502
+
+    return jsonify({"books": books})
+
+
+@books_bp.route("/api/books/discover", methods=["GET"])
+@authorisation_required
+def api_discover_books():
+    """Find candidate Books by title or author, excluding Books already logged.
+
+    The answer is what the Add a Book page shows when the reader is looking for
+    something they do not own yet. A candidate already in the collection is not
+    a candidate — the existing Book is the one to queue — so those are dropped
+    by ISBN. The create endpoint de-duplicates again for a result that arrived
+    before another tab added the same Book.
+    """
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "q query parameter is required"}), 400
+
+    storage = get_storage()
+    owned_isbns = {
+        normalize_isbn(str(book.get("isbn13") or "")) for book in storage.get_all_books() if book.get("isbn13")
+    }
+
+    from book_lamp.services.book_lookup import BookSearchUnavailable, search_books
+
+    try:
+        books = search_books(query)
+    except BookSearchUnavailable:
+        current_app.logger.warning(f"api_discover_books: every provider failed for '{query}'")
+        return jsonify({"error": "Book search is unavailable right now"}), 502
+    except Exception:
+        current_app.logger.exception(f"api_discover_books: search failed for '{query}'")
+        return jsonify({"error": "Book search failed"}), 502
+
+    candidates = [b for b in books if normalize_isbn(str(b.get("isbn13") or "")) not in owned_isbns]
+    return jsonify({"books": candidates, "query": query})
 
 
 @books_bp.route("/api/books/fetch-covers", methods=["POST"])

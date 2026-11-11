@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, jsonify, redirect, request, session, u
 
 from book_lamp.middleware.csrf import generate_csrf_token
 from book_lamp.services.pg_storage import PostgresStorage
-from book_lamp.services.storage_factory import is_test_mode
+from book_lamp.services.storage_factory import get_storage, is_test_mode
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -38,7 +38,11 @@ def get_csrf_token():
 def auth_status():
     """Return current session authentication status and configuration."""
     user_id = session.get("user_id")
-    is_authenticated = bool(user_id) or is_test_mode()
+    is_authenticated = bool(user_id)
+    if is_test_mode():
+        # The harness signs the test reader in and out explicitly, which is what
+        # lets the auth-gate journey run without Google.
+        is_authenticated = get_storage().is_authorised()
     google_client_id = (current_app.config.get("GOOGLE_CLIENT_ID") or "").strip()
     if not is_google_sign_in_configured(google_client_id):
         # Never hand a placeholder to Google Identity Services: it renders a

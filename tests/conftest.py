@@ -16,6 +16,9 @@ if PROJECT_ROOT not in sys.path:
 # Flask app (and reads GOOGLE_CLIENT_ID) at import time, before any fixture runs.
 # Set the credentials here so the app is built with a configured client ID.
 os.environ["TEST_MODE"] = "1"
+# The application refuses TEST_MODE outside development or CI. pytest is local
+# development; this is the flag that says so.
+os.environ["FLASK_DEBUG"] = "True"
 os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["GOOGLE_CLIENT_ID"] = "dummy-client-id"
 os.environ["GOOGLE_CLIENT_SECRET"] = "dummy-client-secret"
