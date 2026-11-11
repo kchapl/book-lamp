@@ -4,25 +4,8 @@
    Requires tokens.css first. See docs/design-language.md.
    ============================================================================= */
 
-/* Font metric fallbacks keep first paint close to the real faces so the swap
-   (display=optional) cannot shift layout. */
-@font-face {
-    font-family: 'Inter Fallback';
-    src: local('Arial');
-    size-adjust: 100%;
-    ascent-override: 96.88%;
-    descent-override: 24.12%;
-    line-gap-override: 0%;
-}
-
-@font-face {
-    font-family: 'Newsreader Fallback';
-    src: local('Georgia');
-    size-adjust: 97%;
-    ascent-override: 93%;
-    descent-override: 25%;
-    line-gap-override: 0%;
-}
+/* The face and its metric fallback are declared together in fonts.css, so
+   first paint is close to the real face and the swap cannot shift layout. */
 
 *,
 *::before,
@@ -50,7 +33,7 @@ body {
     min-height: 100vh;
 }
 
-/* Headings default to the museum voice; component styles may override weight. */
+/* Headings default to the display token; component styles may override weight. */
 h1, h2, h3, h4 {
     font-family: var(--bl-font-display);
     font-weight: var(--md-sys-typescale-headline-medium-weight);

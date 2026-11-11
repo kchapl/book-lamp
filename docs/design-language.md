@@ -19,7 +19,7 @@ The two sentences to hold in mind:
 | **The Reading Room** | The whole app shell: header, books, footer. |
 | **Exhibit** | A single Book. Cards, list rows and the detail header are all mounts for an exhibit. |
 | **Plinth** | The raised tonal panel an exhibit sits on (`surface-container-low`, elevation 1, brass hairline). |
-| **Placard** | The wall label: title in serif, author, then small-caps metadata rows. |
+| **Placard** | The wall label: title in the display weight, author, then small-caps metadata rows. |
 | **Accession line** | The quiet metadata strip — year, ISBN, publisher — set in tabular figures. |
 | **Condition chip** | Reading Status rendered as a condition tag: Completed / In Progress / Abandoned. |
 | **The lamp** | Brand motif. Lamp green is the primary role; brass is the secondary rule/accent. |
@@ -42,16 +42,16 @@ never carried by colour alone — every condition chip has a text label.
 
 ## 3. Typography
 
-Two faces, no more.
+One face: **Inter** (grotesque), served from this app's own assets, for every
+role — `display`, `headline`, `title`, `body`, `label`, and every Book title.
+The editorial and instrument voices are one instrument.
 
-- **Newsreader** (serif) — `display`, `headline`, and every Book title. This is
-  the editorial voice: wall labels and exhibit names.
-- **Inter** (grotesque) — `title`, `body`, `label`. This is the instrument voice:
-  controls, metadata, numbers.
-
-The MD3 type scale is unchanged in size; only the display and headline families
-are reassigned to the serif. Labels are frequently set in small caps with wide
-tracking (`label-small` + `--bl-tracking-placard`) to read as placards.
+The MD3 type scale is unchanged in size. Headings are set slightly tighter than
+the MD3 defaults, and labels use reduced tracking (`label-small` +
+`--bl-tracking-placard`) rather than the wide placard spacing of the old serif
+pairing. The variable font and its OFL licence live in
+`book_lamp/static/fonts/`; there is no runtime request to a font host. A metric
+fallback is declared beside the face so the swap cannot shift layout.
 
 Numbers that sit in columns or change in place (counts, dates, page totals) use
 `font-variant-numeric: tabular-nums` so they never jitter.
