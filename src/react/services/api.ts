@@ -284,6 +284,13 @@ export async function lookupISBN(isbn: string): Promise<Book | null> {
     return fetchJSON(`${API_BASE}/books/lookup?${params}`);
 }
 
+// Find a Book the reader does not own yet, by title or author.
+export async function discoverBooks(query: string): Promise<BookMatch[]> {
+    const params = new URLSearchParams({ q: query });
+    const data = await fetchJSON<{ books: BookMatch[] }>(`${API_BASE}/books/discover?${params}`);
+    return data.books;
+}
+
 // Title and author lookup
 export async function findBooksByTitleAuthor(title: string, author: string): Promise<BookMatch[]> {
     const params = new URLSearchParams({ title, author });

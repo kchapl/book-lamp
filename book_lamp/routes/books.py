@@ -525,12 +525,45 @@ def api_book_matches():
     try:
         books = search_books_by_title_author(title, author)
     except Exception as exc:
-        current_app.logger.error(
-            f"api_book_matches: search failed for title='{title}', author='{author}': {exc}"
-        )
+        current_app.logger.error(f"api_book_matches: search failed for title='{title}', author='{author}': {exc}")
         return jsonify({"error": "Lookup failed"}), 502
 
     return jsonify({"books": books})
+
+
+@books_bp.route("/api/books/discover", methods=["GET"])
+@authorisation_required
+def api_discover_books():
+    """Find candidate Books by title or author, excluding Books already logged.
+
+    The answer is what the Add a Book page shows when the reader is looking for
+    something they do not own yet. A candidate already in the collection is not
+    a candidate — the existing Book is the one to queue — so those are dropped
+    by ISBN. The create endpoint de-duplicates again for a result that arrived
+    before another tab added the same Book.
+    """
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"error": "q query parameter is required"}), 400
+
+    storage = get_storage()
+    owned_isbns = {
+        normalize_isbn(str(book.get("isbn13") or "")) for book in storage.get_all_books() if book.get("isbn13")
+    }
+
+    from book_lamp.services.book_lookup import BookSearchUnavailable, search_books
+
+    try:
+        books = search_books(query)
+    except BookSearchUnavailable:
+        current_app.logger.warning(f"api_discover_books: every provider failed for '{query}'")
+        return jsonify({"error": "Book search is unavailable right now"}), 502
+    except Exception:
+        current_app.logger.exception(f"api_discover_books: search failed for '{query}'")
+        return jsonify({"error": "Book search failed"}), 502
+
+    candidates = [b for b in books if normalize_isbn(str(b.get("isbn13") or "")) not in owned_isbns]
+    return jsonify({"books": candidates, "query": query})
 
 
 @books_bp.route("/api/books/fetch-covers", methods=["POST"])

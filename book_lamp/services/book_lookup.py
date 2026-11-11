@@ -26,6 +26,14 @@ ITUNES_API = "https://itunes.apple.com/search"
 # only the title and author is choosing between editions, not browsing a shelf.
 TITLE_SEARCH_LIMIT = 5
 
+
+class BookSearchUnavailable(Exception):
+    """Every provider that could answer a search failed.
+
+    "Nothing matched" and "the search could not run" are different answers to a    reader, so the search raises this rather than returning an empty list.
+    """
+
+
 # Shared session for connection pooling and consistent headers.
 _session: Optional[requests.Session] = None
 
@@ -313,7 +321,7 @@ def lookup_books_batch(isbn13_list: List[str], force_refresh: bool = False) -> D
     return results
 
 
-def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict[str, Any]]:
+def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool = False) -> List[Dict[str, Any]]:
     """Search Open Library for all books by a given author name.
 
     Returns deduplicated results with the latest edition per title, sorted
@@ -408,6 +416,8 @@ def lookup_books_by_author(author_name: str, max_results: int = 50) -> List[Dict
 
     except Exception as e:
         logger.debug(f"Author books lookup failed for '{author_name}': {e}")
+        if strict:
+            raise
 
     return books
 
@@ -449,7 +459,7 @@ def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tup
     return (title_rank, author_rank)
 
 
-def _open_library_title_search(title: str, author: Optional[str]) -> List[Dict[str, Any]]:
+def _open_library_title_search(title: str, author: Optional[str], strict: bool = False) -> List[Dict[str, Any]]:
     """Search Open Library for editions of a title, by title and author.
 
     Unlike the cover lookups, this keeps the candidates separate: a reader who
@@ -467,6 +477,8 @@ def _open_library_title_search(title: str, author: Optional[str]) -> List[Dict[s
         docs = response.json().get("docs") or []
     except Exception as e:
         logger.debug(f"Open Library title search failed for '{title}': {e}")
+        if strict:
+            raise
         docs = []
 
     if not docs:
@@ -483,6 +495,8 @@ def _open_library_title_search(title: str, author: Optional[str]) -> List[Dict[s
             docs = response.json().get("docs") or []
         except Exception as e:
             logger.debug(f"Open Library title search failed for '{query}': {e}")
+            if strict:
+                raise
             return []
 
     results: List[Dict[str, Any]] = []
@@ -510,7 +524,7 @@ def _open_library_title_search(title: str, author: Optional[str]) -> List[Dict[s
     return results
 
 
-def _google_books_title_search(title: str, author: Optional[str]) -> List[Dict[str, Any]]:
+def _google_books_title_search(title: str, author: Optional[str], strict: bool = False) -> List[Dict[str, Any]]:
     """Search Google Books for editions of a title, by title and author.
 
     Google indexes editions Open Library does not, and its identifiers are
@@ -526,6 +540,8 @@ def _google_books_title_search(title: str, author: Optional[str]) -> List[Dict[s
         items = response.json().get("items") or []
     except Exception as e:
         logger.debug(f"Google Books title search failed for '{title}': {e}")
+        if strict:
+            raise
         return []
 
     results: List[Dict[str, Any]] = []
@@ -572,6 +588,55 @@ def search_books_by_title_author(
             candidates.append(candidate)
 
     candidates.sort(key=lambda candidate: _title_match_rank(candidate, cleaned_title, cleaned_author))
+    return candidates[:limit]
+
+
+def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, Any]]:
+    """Find candidate Books from a free-text title or author query.
+
+    A reader who knows only what is printed on a cover gets a list to choose
+    from, each candidate carrying the ISBN that lets it be added. The query is
+    asked of the title searches and of the author search, and the answers are
+    merged on ISBN so one edition described twice is one candidate.
+
+    Raises :class:`BookSearchUnavailable` when every provider failed, so the
+    caller can tell "nothing matched" apart from "the search could not run".
+    """
+    cleaned = (query or "").strip()
+    if not cleaned:
+        return []
+
+    candidates: List[Dict[str, Any]] = []
+    seen: set = set()
+    answered = False
+
+    lookups = (
+        lambda: _open_library_title_search(cleaned, None, strict=True),
+        lambda: _google_books_title_search(cleaned, None, strict=True),
+        lambda: lookup_books_by_author(cleaned, strict=True),
+    )
+
+    for lookup in lookups:
+        try:
+            results = lookup()
+        except Exception as e:
+            logger.debug(f"Book search provider failed for '{cleaned}': {e}")
+            continue
+
+        # A provider that answered with nothing is still an answer: "no
+        # matches" is only claimed when at least one provider was reachable.
+        answered = True
+        for candidate in results:
+            isbn = candidate.get("isbn13")
+            if not isbn or isbn in seen:
+                continue
+            seen.add(isbn)
+            candidates.append(candidate)
+
+    if not answered:
+        raise BookSearchUnavailable(f"Every book search provider failed for '{cleaned}'")
+
+    candidates.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
     return candidates[:limit]
 
 

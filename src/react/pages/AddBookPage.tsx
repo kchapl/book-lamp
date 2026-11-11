@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { lookupISBN, findBooksByTitleAuthor, createBook, addToReadingList } from '../services/api';
+import {
+    lookupISBN,
+    findBooksByTitleAuthor,
+    discoverBooks,
+    createBook,
+    addToReadingList,
+} from '../services/api';
 import { Button, Checkbox, TextField } from '../ui';
 import type { BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
@@ -21,6 +27,15 @@ const AddBookPage: React.FC = () => {
     // reader has to say which edition is theirs, so the choice is shown rather
     // than the first result being taken on their behalf.
     const [matches, setMatches] = useState<BookMatch[]>([]);
+    // Books the free-text search found outside the collection. A reader who
+    // does not have a Book yet needs to find it before they can add it, and
+    // chooses from a list rather than having one guess made for them.
+    const [discoverQuery, setDiscoverQuery] = useState('');
+    const [discoveries, setDiscoveries] = useState<BookMatch[]>([]);
+    const [discovering, setDiscovering] = useState(false);
+    const [discoverError, setDiscoverError] = useState<string | null>(null);
+    const [discoverNotice, setDiscoverNotice] = useState<string | null>(null);
+    const [addingCandidate, setAddingCandidate] = useState<string | null>(null);
     // The Reading List links here with `add_to_reading_list=1`, so the option
     // starts ticked for a reader who came from the list to queue a Book.
     const [addToReadingListChecked, setAddToReadingListChecked] = useState(
@@ -171,6 +186,81 @@ const AddBookPage: React.FC = () => {
         }
     };
 
+    /** Find candidate Books the reader does not already have, by title or author. */
+    const handleDiscover = async () => {
+        const query = discoverQuery.trim();
+        if (!query) {
+            setDiscoverError('Enter a title or an author to search for.');
+            return;
+        }
+
+        setDiscovering(true);
+        setDiscoverError(null);
+        setDiscoverNotice(null);
+        setDiscoveries([]);
+
+        try {
+            const found = await discoverBooks(query);
+            if (found.length === 0) {
+                setDiscoverNotice(
+                    `No books found for “${query}”. Check the spelling, or add one by ISBN below.`
+                );
+            } else {
+                setDiscoveries(found);
+            }
+        } catch (err) {
+            console.error('Book discovery error:', err);
+            // A provider failure is not an empty result: say the search could
+            // not run, and leave the ISBN and manual paths in view.
+            setDiscoverError('Could not search for books right now. Try again, or add one by ISBN below.');
+        } finally {
+            setDiscovering(false);
+        }
+    };
+
+    /** The inner input of a Material field is in its shadow root, so Enter does
+     *  not submit the form itself: the key is handled here. */
+    const handleDiscoverKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        handleDiscover();
+    };
+
+    /**
+     * Add a candidate in one action.
+     *
+     * The create endpoint already de-duplicates by ISBN and puts the Book on
+     * the Reading List, so a candidate whose ISBN is already in the collection
+     * queues the existing Book rather than making a second copy.
+     */
+    const handleChooseCandidate = async (candidate: BookMatch) => {
+        const key = candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
+        setAddingCandidate(key);
+        setDiscoverError(null);
+
+        try {
+            const book = await createBook({
+                title: candidate.title,
+                author: candidate.author,
+                authors: candidate.authors,
+                isbn: candidate.isbn13,
+                publication_year: candidate.publication_year,
+                thumbnail_url: candidate.thumbnail_url,
+                cover_url: candidate.cover_url,
+                publisher: candidate.publisher,
+                description: candidate.description,
+            });
+            if (book.id) {
+                navigate(`/books/${book.id}`);
+            }
+        } catch (err) {
+            console.error('Failed to add discovered book:', err);
+            setDiscoverError(`Could not add “${candidate.title}” to your Reading List. Please try again.`);
+        } finally {
+            setAddingCandidate(null);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -236,6 +326,91 @@ const AddBookPage: React.FC = () => {
     return (
         <div className="add-book-page">
             <h1>Add a Book</h1>
+
+            <div className="discover-section">
+                <h2>Find a book</h2>
+                <p className="section-info">
+                    Search by title or author to find a book you have not logged yet.
+                </p>
+                <form
+                    className="discover-form"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        handleDiscover();
+                    }}
+                >
+                    <TextField
+                        id="discover-query"
+                        label="Title or author"
+                        type="search"
+                        placeholder="e.g. Piranesi, or Susanna Clarke"
+                        value={discoverQuery}
+                        onValueChange={setDiscoverQuery}
+                        onKeyDown={handleDiscoverKeyDown}
+                    />
+                    <Button
+                        variant="filled"
+                        icon="search"
+                        onClick={handleDiscover}
+                        disabled={discovering}
+                    >
+                        {discovering ? 'Searching...' : 'Search'}
+                    </Button>
+                </form>
+
+                {discoverError && (
+                    <p className="error-message" role="alert">
+                        {discoverError}
+                    </p>
+                )}
+                {discoverNotice && (
+                    <p className="lookup-notice" role="status">
+                        {discoverNotice}
+                    </p>
+                )}
+
+                {discoveries.length > 0 && (
+                    <div className="book-list">
+                        {discoveries.map((candidate, index) => {
+                            const key =
+                                candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
+                            const author =
+                                candidate.author || (candidate.authors ?? []).join(', ');
+                            return (
+                                <div key={`${key}-${index}`} className="book-item">
+                                    {candidate.thumbnail_url ? (
+                                        <img src={candidate.thumbnail_url} alt="" />
+                                    ) : (
+                                        <div className="book-placeholder">📖</div>
+                                    )}
+                                    <div className="book-info">
+                                        <div className="book-title">{candidate.title}</div>
+                                        <div className="section-info">
+                                            {[author, candidate.publication_year, candidate.publisher]
+                                                .filter(
+                                                    (value) =>
+                                                        value !== undefined &&
+                                                        value !== null &&
+                                                        value !== ''
+                                                )
+                                                .join(' · ')}
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="filled"
+                                        onClick={() => handleChooseCandidate(candidate)}
+                                        disabled={addingCandidate === key}
+                                    >
+                                        {addingCandidate === key
+                                            ? 'Adding...'
+                                            : 'Add to reading list'}
+                                    </Button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
 
             <div className="isbn-section">
                 <TextField
