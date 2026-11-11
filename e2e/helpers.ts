@@ -6,6 +6,10 @@ import { expect, type Page } from '@playwright/test';
  */
 export async function settle(page: Page): Promise<void> {
     await expect(page.locator('.loading, .page-loading, [aria-busy="true"]')).toHaveCount(0);
+    // The shell paints signed out and swaps to the account control once
+    // /api/auth/status answers. Waiting for that control keeps the capture on
+    // the signed-in side of the race instead of encoding whichever won.
+    await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
     await page.evaluate(async () => {
         await document.fonts.ready;
     });
