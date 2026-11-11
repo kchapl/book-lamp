@@ -48,6 +48,22 @@ jobs:
         run: |
           uv run pytest --ignore=tests/test_pg_storage.py --junit-xml=pytest-results.xml
 
+      - name: Publish Test Results
+        uses: enricomi/publish-unit-test-result-action@v2.25.0
+        if: always()
+        with:
+          files: pytest-results.xml
+          comment_mode: off
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
       - name: Cache Node packages
         uses: actions/cache@v6.1.0
         with:
@@ -64,6 +80,48 @@ jobs:
 
       - name: TypeScript type check
         run: npx tsc --noEmit
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Load cached venv
+        uses: actions/cache@v6.1.0
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Cache Node packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install Node dependencies
+        run: npm ci --prefer-offline --no-audit --fund=false
 
       - name: Cache Playwright browsers
         uses: actions/cache@v6.1.0
@@ -82,13 +140,6 @@ jobs:
       - name: Run end-to-end tests
         timeout-minutes: 1
         run: npm run test:e2e
-
-      - name: Publish Test Results
-        uses: enricomi/publish-unit-test-result-action@v2.25.0
-        if: always()
-        with:
-          files: pytest-results.xml
-          comment_mode: off
 
   lint-and-format:
     runs-on: ubuntu-latest
