@@ -99,8 +99,36 @@ def configure_logging() -> None:
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 
+def _test_mode_is_allowed() -> bool:
+    """Whether TEST_MODE may be raised in this process.
+
+    TEST_MODE bypasses Google sign-in, so it is only legal in development or
+    CI. An explicit production environment wins over both: a production
+    process that inherits the flag by accident fails to start rather than
+    opening the reading room to anyone.
+    """
+    environment = os.environ.get("APP_ENV", "").strip().lower()
+    if environment in {"production", "prod"}:
+        return False
+    if os.environ.get("FLASK_ENV", "").strip().lower() == "production":
+        return False
+
+    truthy = {"1", "true", "yes"}
+    return (
+        os.environ.get("FLASK_DEBUG", "").strip().lower() in truthy
+        or os.environ.get("CI", "").strip().lower() in truthy
+        or environment in {"development", "dev"}
+    )
+
+
 def create_app(test_config: Optional[dict] = None) -> Flask:
     """Flask application factory."""
+    if is_test_mode() and not _test_mode_is_allowed():
+        raise RuntimeError(
+            "TEST_MODE=1 is refused outside development or CI: it bypasses Google "
+            "sign-in. Unset TEST_MODE, or set APP_ENV=development for local work."
+        )
+
     configure_logging()
 
     app = Flask(

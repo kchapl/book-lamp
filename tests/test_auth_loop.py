@@ -10,6 +10,11 @@ pin the backend half of the contract that breaks that cycle.
 
 def test_sync_diagnostics_is_public_for_anonymous(client):
     """Anonymous visitors must not receive 401 from the polled endpoint."""
+    from book_lamp.app import get_storage
+
+    # The fixture signs the harness in; this is the visitor who is not.
+    get_storage().set_authorised(False)
+
     resp = client.get("/api/sync/diagnostics")
     assert resp.status_code == 200
     assert resp.json["status"] == "unauthenticated"

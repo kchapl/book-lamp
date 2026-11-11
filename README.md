@@ -81,3 +81,15 @@ Run frontend unit tests:
 npm test
 ```
 
+Run the end-to-end suite (it drives the built SPA on Flask with `TEST_MODE=1`
+and the in-memory store — no database or Google credentials):
+```bash
+npx playwright install chromium   # once
+npm run build
+npm run test:e2e
+```
+
+Every user-facing change updates the end-to-end suite in the same change. See
+[docs/agents/testing.md](docs/agents/testing.md) for the rules and how to
+regenerate screenshot baselines.
+

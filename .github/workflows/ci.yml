@@ -47,14 +47,40 @@ jobs:
         run: |
           uv run pytest --ignore=tests/test_pg_storage.py --junit-xml=pytest-results.xml
 
+      - name: Cache Node packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install Node dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --fund=false
 
       - name: Run frontend tests
         run: npm run test
 
       - name: TypeScript type check
         run: npx tsc --noEmit
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Build the SPA for the end-to-end suite
+        run: npm run build
+
+      - name: Run end-to-end tests
+        timeout-minutes: 1
+        run: npm run test:e2e
 
       - name: Publish Test Results
         uses: enricomi/publish-unit-test-result-action@v2.25.0

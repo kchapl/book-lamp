@@ -7,7 +7,7 @@ from book_lamp.middleware.csrf import csrf_protect
 from book_lamp.routes.books import _background_fetch_missing_data
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.stats_calculator import calculate_collection_stats
-from book_lamp.services.storage_factory import get_storage
+from book_lamp.services.storage_factory import get_storage, is_test_mode
 from book_lamp.utils.readings import filter_reading_log, sort_reading_log
 
 stats_bp = Blueprint("stats", __name__)
@@ -110,6 +110,14 @@ def sync_diagnostics():
     which the API client turned into a redirect to /unauthorised and from
     there into an endless auth loop. Exposes no user data, only liveness.
     """
+    if is_test_mode():
+        # The harness has no Google session cookie: its sign-in is the storage
+        # flag `/test/connect` sets. Reporting the cookie's absence here would
+        # make the SPA sign itself out immediately after signing in.
+        if not get_storage().is_authorised():
+            return jsonify({"status": "unauthenticated", "storage": "unauthenticated"})
+        return jsonify({"status": "ok", "storage": "memory"})
+
     if not session.get("user_id"):
         return jsonify({"status": "unauthenticated", "storage": "unauthenticated"})
 

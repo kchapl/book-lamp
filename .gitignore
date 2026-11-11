@@ -214,6 +214,11 @@ __marimo__/
 # Node
 node_modules/
 
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+
 # Compiled Frontend Assets
 book_lamp/static/**/*.js
 !book_lamp/static/one_tap.js # Google One Tap authentication handler

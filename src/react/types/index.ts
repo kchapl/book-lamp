@@ -170,7 +170,7 @@ export type Theme = 'light' | 'dark' | 'system';
  */
 export interface SyncDiagnostics {
     status: 'ok' | 'error' | 'unauthenticated';
-    storage: 'postgres' | 'unauthenticated';
+    storage: 'postgres' | 'memory' | 'unauthenticated';
 }
 
 export interface AppInfo {
