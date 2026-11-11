@@ -78,6 +78,32 @@ def test_delete_book_success(authenticated_client):
     assert storage.get_book_by_id(book_id) is None
 
 
+def test_book_detail_carries_the_links_the_placard_needs(authenticated_client):
+    """The detail payload supplies the label the filter uses and the publisher slug.
+
+    The placard links to pages derived from a Book's metadata. The category
+    link has to be the major label the collection filters by, derived here by
+    the same function the filter uses, and the publisher link has to be the
+    normalised slug the publisher page matches on.
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780441478125",
+        title="The Left Hand of Darkness",
+        authors=["Ursula K. Le Guin"],
+        publisher="Harper & Row",
+        bisac_category="Fiction / Science Fiction",
+    )
+
+    resp = authenticated_client.get(f"/api/books/{book['id']}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["bisac_category"] == "Fiction / Science Fiction"
+    assert data["bisac_category_label"] == "Fiction"
+    assert data["publisher_slug"] == "harper-&-row"
+
+
 def test_edit_book_success(authenticated_client):
     storage = get_storage()
     book = storage.add_book(isbn13="9780306406157", title="Original Title", authors=["Original Author"])

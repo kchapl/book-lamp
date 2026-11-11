@@ -16,6 +16,7 @@ import { endsReading, statusClass } from '../utils/status';
 import { todayIso } from '../utils/format';
 import { draftWithStatus, readingDraft, readingPayload, type ReadingDraft } from '../utils/reading';
 import { seriesPath } from '../utils/series';
+import { authorPath, categoryPath, publisherPath } from '../utils/paths';
 import type { Book, Reading } from '../types';
 
 interface ReadingFormProps {
@@ -228,6 +229,10 @@ const BookDetailPage: React.FC = () => {
 
     const cover = book.cover_url || book.thumbnail_url;
     const currentStatus = book.latest_status ?? book.readings?.[0]?.status;
+    // A Book's Authors are a list; the display string is only a fallback for a
+    // payload that predates it. Each name gets its own page.
+    const authors = book.authors?.length ? book.authors : book.author ? [book.author] : [];
+    const subject = book.bisac_category_label || book.bisac_category;
 
     return (
         <div className="book-detail-page page">
@@ -298,13 +303,31 @@ const BookDetailPage: React.FC = () => {
                                 </span>
                             )}
                             <h1>{book.title}</h1>
-                            <p className="author">by {book.author || 'Unknown Author'}</p>
+                            <p className="author">
+                                by{' '}
+                                {authors.length > 0
+                                    ? authors.map((name, index) => (
+                                          <React.Fragment key={`${name}-${index}`}>
+                                              {index > 0 && ', '}
+                                              <Link to={authorPath(name)}>{name}</Link>
+                                          </React.Fragment>
+                                      ))
+                                    : 'Unknown Author'}
+                            </p>
 
                             <dl className="placard">
                                 {book.publisher && (
                                     <div className="placard-row">
                                         <dt>Publisher</dt>
-                                        <dd>{book.publisher}</dd>
+                                        <dd>
+                                            {book.publisher_slug ? (
+                                                <Link to={publisherPath(book.publisher_slug)}>
+                                                    {book.publisher}
+                                                </Link>
+                                            ) : (
+                                                book.publisher
+                                            )}
+                                        </dd>
                                     </div>
                                 )}
                                 {book.publication_year && (
@@ -319,10 +342,18 @@ const BookDetailPage: React.FC = () => {
                                         <dd className="numeric">{book.isbn13}</dd>
                                     </div>
                                 )}
-                                {book.bisac_category && (
+                                {subject && (
                                     <div className="placard-row">
                                         <dt>Subject</dt>
-                                        <dd>{book.bisac_category}</dd>
+                                        <dd>
+                                            {book.bisac_category_label ? (
+                                                <Link to={categoryPath(book.bisac_category_label)}>
+                                                    {book.bisac_category_label}
+                                                </Link>
+                                            ) : (
+                                                subject
+                                            )}
+                                        </dd>
                                     </div>
                                 )}
                                 {book.series && (

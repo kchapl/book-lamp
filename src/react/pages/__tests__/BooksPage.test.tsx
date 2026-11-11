@@ -31,15 +31,17 @@ const Where: React.FC = () => {
     return <p>{`location:${location.pathname}${location.search}`}</p>;
 };
 
-const renderPage = () =>
+const renderAt = (path: string) =>
     render(
-        <MemoryRouter initialEntries={['/books']}>
+        <MemoryRouter initialEntries={[path]}>
             <Where />
             <Routes>
                 <Route path="/books" element={<BooksPage />} />
             </Routes>
         </MemoryRouter>
     );
+
+const renderPage = () => renderAt('/books');
 
 /** The search field's host, addressed by the id the page gives it. */
 const searchField = () =>
@@ -70,6 +72,36 @@ beforeEach(() => {
         categories: [],
     });
     search.mockResolvedValue({ books: [], search_query: '' });
+});
+
+describe('BooksPage category filter', () => {
+    it('arrives with the category filter applied and the control active', async () => {
+        // The select can only show a value it has an option for, so the server
+        // response has to carry the label — as it does once the filter exists.
+        list.mockResolvedValue({
+            books: [],
+            sort: 'reading_date',
+            sort_options: {},
+            filters: {
+                status: '',
+                year: '',
+                month: '',
+                rating: '',
+                category: 'Fiction',
+                sort: 'reading_date',
+            },
+            categories: ['Fiction', 'Science'],
+        });
+
+        renderAt('/books?category=Fiction');
+
+        await waitFor(() =>
+            expect(list).toHaveBeenCalledWith(expect.objectContaining({ category: 'Fiction' }))
+        );
+
+        // The control is visibly active: the page offers to clear the filter.
+        expect(screen.getByText('Clear')).toBeInTheDocument();
+    });
 });
 
 describe('BooksPage search', () => {

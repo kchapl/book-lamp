@@ -22,6 +22,7 @@ from book_lamp.utils import (
 )
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
+from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
@@ -385,6 +386,13 @@ def api_book_detail(book_id: int):
     rl_items = storage.get_reading_list()
     is_planned = any(item["book_id"] == book_id for item in rl_items)
     book["is_planned"] = is_planned
+
+    # The placard links to pages the collection already has: the author and
+    # publisher routes, and the category filter. The label the filter uses is
+    # derived here, by the same rule, so the link and the filter cannot disagree.
+    book["bisac_category_label"] = category_label_for_book(book)
+    if book.get("publisher"):
+        book["publisher_slug"] = publisher_slug(book["publisher"])
 
     return jsonify(book)
 

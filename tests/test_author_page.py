@@ -59,6 +59,26 @@ def test_author_page_no_unread_section_in_test_mode(authenticated_client):
     assert data["reading_list_books"] == []
 
 
+def test_publisher_page_accepts_the_slug_the_book_page_builds(authenticated_client):
+    """The publisher page matches the normalised slug the detail payload carries."""
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    storage.add_book(
+        isbn13="9780441478125",
+        title="The Left Hand of Darkness",
+        authors=["Ursula K. Le Guin"],
+        publisher="Harper & Row",
+    )
+
+    resp = authenticated_client.get("/api/publisher/harper-&-row")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert [b["title"] for b in data["books"]] == ["The Left Hand of Darkness"]
+    assert data["publisher_name"] == "Harper & Row"
+
+
 def test_author_page_empty_state(authenticated_client):
     """Author API returns empty collections when no books are found."""
     resp = authenticated_client.get("/api/author/unknown-author")

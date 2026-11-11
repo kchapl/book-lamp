@@ -11,6 +11,10 @@ export interface Book {
     description?: string;
     series?: string;
     bisac_category?: string;
+    /** The major category label the collection filters by. */
+    bisac_category_label?: string;
+    /** The URL segment of the publisher's page, normalised by the API. */
+    publisher_slug?: string;
     latest_status?: string;
     is_owned?: boolean;
     in_reading_list?: boolean;

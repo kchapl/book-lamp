@@ -2,6 +2,8 @@
 
 import re
 
+from book_lamp.utils.authors import slug
+
 
 def normalize_publisher(name: str) -> str:
     """Normalize publisher names by stripping legal and corporate suffixes."""
@@ -27,3 +29,14 @@ def normalize_publisher(name: str) -> str:
     if not cleaned:
         return name.strip()
     return cleaned
+
+
+def publisher_slug(name: str) -> str:
+    """The URL segment that names a publisher's page.
+
+    A publisher page is derived from the Books that carry the name, after the
+    corporate suffixes are stripped, so the segment follows the same rule the
+    page matches on. Sharing :func:`book_lamp.utils.authors.slug` keeps
+    publishers and authors spelled the same way in a URL.
+    """
+    return slug(normalize_publisher(name))
