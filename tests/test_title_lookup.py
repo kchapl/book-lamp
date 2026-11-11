@@ -15,9 +15,10 @@ def _candidate(title, author, isbn13, **extra):
 
 def test_lookup_by_title_and_author_returns_editions_with_isbns(authenticated_client):
     """The endpoint answers with the editions, so the form can fill an ISBN in."""
-    with patch("book_lamp.services.book_lookup._open_library_title_search") as open_library, patch(
-        "book_lamp.services.book_lookup._google_books_title_search"
-    ) as google:
+    with (
+        patch("book_lamp.services.book_lookup._open_library_title_search") as open_library,
+        patch("book_lamp.services.book_lookup._google_books_title_search") as google,
+    ):
         open_library.return_value = [_candidate("Emma", "Jane Austen", "9780141439600")]
         google.return_value = [
             # The same edition the other provider already gave: one answer, not two.
@@ -42,12 +43,15 @@ def test_a_title_is_required_because_an_author_search_is_a_different_question(au
 
 def test_a_provider_failure_is_reported_so_the_form_can_ask_for_the_isbn(authenticated_client):
     """A failed search must not look like "no such book"."""
-    with patch(
-        "book_lamp.services.book_lookup._open_library_title_search",
-        side_effect=Exception("Open Library is down"),
-    ), patch(
-        "book_lamp.services.book_lookup._google_books_title_search",
-        side_effect=Exception("Google Books is down"),
+    with (
+        patch(
+            "book_lamp.services.book_lookup._open_library_title_search",
+            side_effect=Exception("Open Library is down"),
+        ),
+        patch(
+            "book_lamp.services.book_lookup._google_books_title_search",
+            side_effect=Exception("Google Books is down"),
+        ),
     ):
         response = authenticated_client.get("/api/books/matches?title=Emma&author=Jane%20Austen")
 
@@ -57,8 +61,9 @@ def test_a_provider_failure_is_reported_so_the_form_can_ask_for_the_isbn(authent
 
 def test_the_reader_not_the_provider_decides_which_edition(authenticated_client):
     """Titles the reader asked for are ranked ahead of looser matches."""
-    with patch("book_lamp.services.book_lookup._open_library_title_search") as open_library, patch(
-        "book_lamp.services.book_lookup._google_books_title_search", return_value=[]
+    with (
+        patch("book_lamp.services.book_lookup._open_library_title_search") as open_library,
+        patch("book_lamp.services.book_lookup._google_books_title_search", return_value=[]),
     ):
         open_library.return_value = [
             _candidate("Emma: A Modern Retelling", "Alexander McCall Smith", "9780804172745"),
