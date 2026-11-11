@@ -45,6 +45,8 @@ const AddBookPage: React.FC = () => {
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+    const discoverInFlight = useRef(false);
+    const discoverRequest = useRef(0);
 
     useEffect(() => {
         const initialIsbn = searchParams.get('isbn');
@@ -193,7 +195,13 @@ const AddBookPage: React.FC = () => {
             setDiscoverError('Enter a title or an author to search for.');
             return;
         }
+        // Enter can fire while a search is in flight. A second request would
+        // race the first, and the loser could paint candidates for a query the
+        // reader has already replaced.
+        if (discoverInFlight.current) return;
 
+        const requestId = ++discoverRequest.current;
+        discoverInFlight.current = true;
         setDiscovering(true);
         setDiscoverError(null);
         setDiscoverNotice(null);
@@ -201,6 +209,7 @@ const AddBookPage: React.FC = () => {
 
         try {
             const found = await discoverBooks(query);
+            if (requestId !== discoverRequest.current) return;
             if (found.length === 0) {
                 setDiscoverNotice(
                     `No books found for “${query}”. Check the spelling, or add one by ISBN below.`
@@ -209,12 +218,16 @@ const AddBookPage: React.FC = () => {
                 setDiscoveries(found);
             }
         } catch (err) {
+            if (requestId !== discoverRequest.current) return;
             console.error('Book discovery error:', err);
             // A provider failure is not an empty result: say the search could
             // not run, and leave the ISBN and manual paths in view.
             setDiscoverError('Could not search for books right now. Try again, or add one by ISBN below.');
         } finally {
-            setDiscovering(false);
+            if (requestId === discoverRequest.current) {
+                discoverInFlight.current = false;
+                setDiscovering(false);
+            }
         }
     };
 

@@ -344,6 +344,31 @@ describe('AddBookPage discover search', () => {
         expect(create).not.toHaveBeenCalled();
     });
 
+    it('does not start a second search when Enter is pressed while one is pending', async () => {
+        let finishSearch = () => {};
+        discover.mockReturnValue(
+            new Promise((resolve) => {
+                finishSearch = () => resolve([]);
+            })
+        );
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+        await waitFor(() => expect(discover).toHaveBeenCalledWith('Dune'));
+
+        // The reader edits the field and presses Enter before the first answer
+        // lands. That must not start a request that can overtake it.
+        typeInto('discover-query', 'Foundation');
+        fireEvent.keyDown(field('discover-query') as HTMLElement, { key: 'Enter' });
+
+        expect(discover).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishSearch();
+        });
+    });
+
     it('says the search failed when the providers are unavailable', async () => {
         discover.mockRejectedValue(new Error('HTTP 502: Book search is unavailable right now'));
 
