@@ -16,6 +16,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
 import { createBook, discoverBooks, findBooksByTitleAuthor, lookupISBN } from '../../services/api';
+import type { BookMatch } from '../../types';
 
 // The scanner library reaches for the camera; stub it out. It must be a real
 // constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
@@ -342,6 +343,45 @@ describe('AddBookPage discover search', () => {
 
         expect(await screen.findByText(/no books found/i)).toBeInTheDocument();
         expect(create).not.toHaveBeenCalled();
+    });
+
+    it('lets the newer query win and ignores the answer to the replaced one', async () => {
+        const pending: Record<string, (books: BookMatch[]) => void> = {};
+        discover.mockImplementation(
+            (query: string) =>
+                new Promise<BookMatch[]>((resolve) => {
+                    pending[query] = resolve;
+                })
+        );
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+        await waitFor(() => expect(discover).toHaveBeenCalledWith('Dune'));
+
+        // The reader edits the field and presses Enter before the first answer
+        // lands. The newer search must run rather than be silently dropped.
+        typeInto('discover-query', 'Foundation');
+        fireEvent.keyDown(field('discover-query') as HTMLElement, { key: 'Enter' });
+        await waitFor(() => expect(discover).toHaveBeenCalledWith('Foundation'));
+
+        // The Dune answer is stale; painting it would show Dune results under
+        // the Foundation query that replaced it.
+        await act(async () => {
+            pending['Dune']([
+                { title: 'Dune Messiah', author: 'Frank Herbert', isbn13: '9780593098233' },
+            ]);
+        });
+        expect(screen.queryByText('Dune Messiah')).not.toBeInTheDocument();
+
+        await act(async () => {
+            pending['Foundation']([
+                { title: 'Foundation and Empire', author: 'Isaac Asimov', isbn13: '9780553293371' },
+            ]);
+        });
+        expect(await screen.findByText('Foundation and Empire')).toBeInTheDocument();
+        // The stale answer must not have left the search stuck in progress.
+        expect(screen.queryByText(/searching\.\.\./i)).not.toBeInTheDocument();
     });
 
     it('says the search failed when the providers are unavailable', async () => {
