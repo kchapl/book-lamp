@@ -492,6 +492,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
                 params={"q": query, "limit": "10", "fields": fields},
                 timeout=10,
             )
+            response.raise_for_status()
             docs = response.json().get("docs") or []
         except Exception as e:
             logger.debug(f"Open Library title search failed for '{query}': {e}")
@@ -537,6 +538,7 @@ def _google_books_title_search(title: str, author: Optional[str], strict: bool =
 
     try:
         response = session.get(GOOGLE_BOOKS_API, params={"q": query, "maxResults": "10"}, timeout=10)
+        response.raise_for_status()
         items = response.json().get("items") or []
     except Exception as e:
         logger.debug(f"Google Books title search failed for '{title}': {e}")
