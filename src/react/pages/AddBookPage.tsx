@@ -45,7 +45,6 @@ const AddBookPage: React.FC = () => {
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const discoverInFlight = useRef(false);
     const discoverRequest = useRef(0);
 
     useEffect(() => {
@@ -195,13 +194,11 @@ const AddBookPage: React.FC = () => {
             setDiscoverError('Enter a title or an author to search for.');
             return;
         }
-        // Enter can fire while a search is in flight. A second request would
-        // race the first, and the loser could paint candidates for a query the
-        // reader has already replaced.
-        if (discoverInFlight.current) return;
-
+        // Enter can fire while an earlier search is still in flight. Each
+        // request takes the next id and only the newest id may paint, so the
+        // query the reader asked for last always wins and a stale answer is
+        // dropped rather than shown under the current query.
         const requestId = ++discoverRequest.current;
-        discoverInFlight.current = true;
         setDiscovering(true);
         setDiscoverError(null);
         setDiscoverNotice(null);
@@ -224,8 +221,9 @@ const AddBookPage: React.FC = () => {
             // not run, and leave the ISBN and manual paths in view.
             setDiscoverError('Could not search for books right now. Try again, or add one by ISBN below.');
         } finally {
+            // A stale request must not clear the spinner: the newer search that
+            // replaced it is still running and owns that state.
             if (requestId === discoverRequest.current) {
-                discoverInFlight.current = false;
                 setDiscovering(false);
             }
         }
