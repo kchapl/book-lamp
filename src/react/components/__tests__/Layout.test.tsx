@@ -17,14 +17,14 @@ afterEach(() => {
 });
 
 describe('Layout navigation', () => {
-    const renderLayout = (path = '/') =>
+    const renderLayout = (path = '/', isAuthorized = true) =>
         render(
             <MemoryRouter initialEntries={[path]}>
                 <AppContext.Provider
                     value={{
                         theme: 'system',
                         setTheme: vi.fn(),
-                        isAuthorized: true,
+                        isAuthorized,
                         setIsAuthorized: vi.fn(),
                         googleClientId: null,
                         syncStatus: 'ok',
@@ -54,6 +54,39 @@ describe('Layout navigation', () => {
 
         expect(current).toHaveLength(1);
         expect(current[0]).toHaveAttribute('href', '/books/new');
+    });
+
+    it('offers the About page from the primary navigation', () => {
+        const { container } = renderLayout();
+
+        const about = container.querySelector('nav[aria-label="Primary"] a[href="/about"]');
+
+        expect(about).toBeInTheDocument();
+        expect(about).toHaveTextContent(/about/i);
+    });
+
+    it('marks the About entry current on the About page', () => {
+        const { container } = renderLayout('/about');
+
+        const current = container.querySelectorAll('nav[aria-label="Primary"] a[aria-current="page"]');
+
+        expect(current).toHaveLength(1);
+        expect(current[0]).toHaveAttribute('href', '/about');
+    });
+
+    it('leaves the About entry unmarked on another page', () => {
+        const { container } = renderLayout('/books');
+
+        const current = container.querySelectorAll('nav[aria-label="Primary"] a[aria-current="page"]');
+
+        expect(current).toHaveLength(1);
+        expect(current[0]).toHaveAttribute('href', '/books');
+    });
+
+    it('offers the About page to a signed-out visitor', () => {
+        const { container } = renderLayout('/', false);
+
+        expect(container.querySelector('nav[aria-label="Primary"] a[href="/about"]')).toBeInTheDocument();
     });
 });
 
