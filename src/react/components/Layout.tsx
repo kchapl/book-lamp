@@ -16,6 +16,7 @@ const NAV_ITEMS: { path: string; label: string; icon: IconName }[] = [
     { path: '/reading-list', label: 'Reading List', icon: 'bookmark' },
     { path: '/history', label: 'History', icon: 'history' },
     { path: '/dashboard', label: 'Dashboard', icon: 'chart' },
+    { path: '/about', label: 'About', icon: 'info' },
 ];
 
 const THEME_OPTIONS: { value: 'light' | 'dark' | 'system'; label: string; icon: IconName }[] = [

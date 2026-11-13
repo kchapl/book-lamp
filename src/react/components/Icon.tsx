@@ -28,7 +28,8 @@ export type IconName =
     | 'close'
     | 'menu'
     | 'edit'
-    | 'delete';
+    | 'delete'
+    | 'info';
 
 const PATHS: Record<IconName, React.ReactNode> = {
     lamp: (
@@ -115,6 +116,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
         <>
             <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3.5-8.5h1.5v7H9.5v-7Zm4.5 0h1.5v7H14v-7Z" />
             <path d="M15.5 4V3h-7v1H5v2h14V4h-3.5Z" />
+        </>
+    ),
+    info: (
+        <>
+            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" />
+            <path d="M11 10h2v7h-2v-7Zm0-3.5h2v2h-2v-2Z" />
         </>
     ),
 };
