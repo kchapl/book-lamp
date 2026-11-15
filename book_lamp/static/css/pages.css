@@ -267,6 +267,26 @@
     margin: 0;
 }
 
+/* One field per Author, with the Remove control beside every row but the first:
+   removing a row renumbers nothing the reader can see, so only the visible
+   labels move. */
+.author-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--bl-space-3);
+}
+
+.author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--bl-space-2);
+}
+
+.author-row md-outlined-text-field {
+    flex: 1;
+    min-width: 0;
+}
+
 /* =============================================================================
    READING LIST
    ============================================================================= */

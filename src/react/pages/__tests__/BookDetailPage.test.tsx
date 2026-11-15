@@ -256,7 +256,7 @@ describe('BookDetailPage placard links', () => {
 });
 
 describe('BookDetailPage edit book', () => {
-    /** A Book two people wrote: its display string cannot be read back. */
+    /** A Book two people wrote: its Authors are a list, not a joined string. */
     const coauthored = {
         id: 1,
         title: 'Good Omens',
@@ -266,12 +266,27 @@ describe('BookDetailPage edit book', () => {
     };
 
     async function openEditBook() {
-        await waitFor(() => expect(screen.getByText('Good Omens')).toBeInTheDocument());
+        await waitFor(() => expect(button(/^edit$/i)).toBeInTheDocument());
         fireEvent.click(button(/^edit$/i));
-        await waitFor(() => expect(field('edit-title')).toBeInTheDocument());
+        await waitFor(() => expect(field('edit-author-0')).toBeInTheDocument());
     }
 
-    it('sends the names it was built from when the author text is untouched', async () => {
+    /** The Authors the last save sent, which is what the endpoint stores. */
+    function savedAuthors(): unknown {
+        return (save.mock.calls[0][1] as Record<string, unknown>).authors;
+    }
+
+    it('opens one Author row per author, in the order the Book credits them', async () => {
+        detail.mockResolvedValue(coauthored);
+
+        renderPage();
+        await openEditBook();
+
+        expect(field('edit-author-0')?.value).toBe('Neil Gaiman');
+        expect(field('edit-author-1')?.value).toBe('Terry Pratchett');
+    });
+
+    it('sends the names as a list when an unrelated field is saved', async () => {
         detail.mockResolvedValue(coauthored);
         save.mockResolvedValue(undefined);
 
@@ -284,29 +299,117 @@ describe('BookDetailPage edit book', () => {
         await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
         expect(save).toHaveBeenCalledWith(
             1,
-            expect.objectContaining({
-                title: 'Good Omens (1990)',
-                authors: ['Neil Gaiman', 'Terry Pratchett'],
-            })
+            expect.objectContaining({ title: 'Good Omens (1990)' })
         );
+        expect(savedAuthors()).toEqual(['Neil Gaiman', 'Terry Pratchett']);
+        // The joined display string is output only: never sent as input.
+        expect(save.mock.calls[0][1]).not.toHaveProperty('author');
     });
 
-    it('lets the server read the text once the author is edited', async () => {
+    it('replaces only the author whose row was edited', async () => {
         detail.mockResolvedValue(coauthored);
         save.mockResolvedValue(undefined);
 
         renderPage();
         await openEditBook();
 
-        typeInto('edit-author', 'Neil Gaiman');
+        typeInto('edit-author-1', 'Sir Terry Pratchett');
         fireEvent.click(button(/^save$/i));
 
         await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-        const payload = save.mock.calls[0][1] as Record<string, unknown>;
-        expect(payload.author).toBe('Neil Gaiman');
-        // New text that lists names is the server's to read, so the stale list
-        // must not travel with it.
-        expect(payload).not.toHaveProperty('authors');
+        expect(savedAuthors()).toEqual(['Neil Gaiman', 'Sir Terry Pratchett']);
+    });
+
+    it('adds an author in the row that was added', async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'Good Omens',
+            author: 'Neil Gaiman',
+            authors: ['Neil Gaiman'],
+            readings: [],
+        });
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        fireEvent.click(button(/add author/i));
+        await waitFor(() => expect(field('edit-author-1')).toBeInTheDocument());
+        typeInto('edit-author-1', 'Terry Pratchett');
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(savedAuthors()).toEqual(['Neil Gaiman', 'Terry Pratchett']);
+    });
+
+    it('drops the author whose row was removed, keeping the rest in order', async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'Three Authors',
+            author: 'Ann One, Bob Two, Cat Three',
+            authors: ['Ann One', 'Bob Two', 'Cat Three'],
+            readings: [],
+        });
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        fireEvent.click(screen.getByLabelText(/remove author 2/i));
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(savedAuthors()).toEqual(['Ann One', 'Cat Three']);
+    });
+
+    it('leaves a whitespace-only row out of the list it saves', async () => {
+        detail.mockResolvedValue(coauthored);
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        typeInto('edit-author-1', '   ');
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(savedAuthors()).toEqual(['Neil Gaiman']);
+    });
+
+    it('refuses to save when every author row is empty, and says why', async () => {
+        detail.mockResolvedValue(coauthored);
+
+        renderPage();
+        await openEditBook();
+
+        typeInto('edit-author-0', ' ');
+        typeInto('edit-author-1', '');
+        fireEvent.click(button(/^save$/i));
+
+        expect(await screen.findByText(/an author is required/i)).toBeInTheDocument();
+        expect(save).not.toHaveBeenCalled();
+        // The form stays open so the reader can fill a row in.
+        expect(field('edit-author-0')).toBeInTheDocument();
+    });
+
+    it('opens a Book that carries only the display string with one row', async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'Piranesi',
+            author: 'Susanna Clarke',
+            readings: [],
+        });
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+        await openEditBook();
+
+        expect(field('edit-author-0')?.value).toBe('Susanna Clarke');
+
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(savedAuthors()).toEqual(['Susanna Clarke']);
     });
 });
 
