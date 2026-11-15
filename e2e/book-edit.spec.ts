@@ -1,0 +1,36 @@
+import { expect, test } from '@playwright/test';
+import { fillField } from './helpers';
+import { resetAndSeed } from './seed';
+
+test.beforeEach(async ({ request }) => {
+    await resetAndSeed(request);
+});
+
+test('edits a co-authored Book one Author row at a time', async ({ page, request }) => {
+    // The seed has no Book two people wrote, so one is created through the same
+    // API the app uses. Its Authors travel as a list.
+    const response = await request.post('/api/books', {
+        data: {
+            isbn: '9780306406157',
+            title: 'Good Omens',
+            authors: ['Neil Gaiman', 'Terry Pratchett'],
+        },
+    });
+    expect(response.ok()).toBeTruthy();
+    const book = await response.json();
+
+    await page.goto(`/books/${book.id}`);
+    await expect(page.getByRole('link', { name: 'Neil Gaiman' })).toBeVisible();
+
+    await page.getByText('Edit', { exact: true }).click();
+    // One row per Author, in the order the Book credits them.
+    await expect(page.locator('#edit-author-0 input')).toHaveValue('Neil Gaiman');
+    await expect(page.locator('#edit-author-1 input')).toHaveValue('Terry Pratchett');
+
+    await fillField(page, 'edit-author-1', 'Sir Terry Pratchett');
+    await page.locator('.edit-form').getByText('Save', { exact: true }).click();
+
+    // Only the row that was edited changed, and both names are still Authors.
+    await expect(page.getByRole('link', { name: 'Neil Gaiman' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sir Terry Pratchett' })).toBeVisible();
+});
