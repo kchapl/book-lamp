@@ -308,6 +308,79 @@ describe('AddBookPage discover search', () => {
         );
     });
 
+    it('tells two editions of one work apart instead of listing a duplicate', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'A History of England in 100 Places',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549234',
+            },
+            {
+                title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549241',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'A history of England in 100 places');
+        fireEvent.click(button(/^search$/i));
+
+        // The subtitle gets its own line, so the second row reads as the same
+        // book with a subtitle rather than as the title repeated.
+        expect(await screen.findByText('From Stonehenge to the Gherkin')).toBeInTheDocument();
+        // Each row says which ISBN it would add. That is the only difference a
+        // reader could act on, since author, year and publisher agree.
+        expect(screen.getByText('ISBN 9781848549234')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9781848549241')).toBeInTheDocument();
+    });
+
+    it('numbers rows that would otherwise show exactly the same details', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780593099322',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/Edition 1 of 2/)).toBeInTheDocument();
+        expect(screen.getByText(/Edition 2 of 2/)).toBeInTheDocument();
+    });
+
+    it('does not fold a sequel into the title it starts with', async () => {
+        // Guessing at a subtitle that the provider did not separate would turn
+        // "Dune Messiah" into "Dune: Messiah" and hide a different book.
+        discover.mockResolvedValue([
+            { title: 'Dune', author: 'Frank Herbert', isbn13: '9780441172719' },
+            { title: 'Dune Messiah', author: 'Frank Herbert', isbn13: '9780593098233' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Dune Messiah')).toBeInTheDocument();
+        expect(screen.queryByText('Messiah')).not.toBeInTheDocument();
+    });
+
     it('queues the existing Book when the candidate is already owned', async () => {
         // The create endpoint de-duplicates on ISBN; the page makes the one
         // request and lands on the Book that already exists.
