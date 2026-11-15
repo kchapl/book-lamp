@@ -442,18 +442,95 @@ def _isbn13_from_candidates(candidates: Optional[List[Any]]) -> Optional[str]:
     return None
 
 
+_LEADING_ARTICLE = re.compile(r"^(?:a|an|the)\s+")
+
+
+def _normalise_title_for_match(title: str) -> str:
+    """A title reduced to the words that identify it.
+
+    Case and punctuation are not part of a title's identity — providers
+    punctuate the same title differently, and a reader types it as they
+    remember it — so both are dropped before two titles are compared. The words
+    are kept, because they are what tells one title from another.
+    """
+    text = html.unescape(title or "").lower()
+    text = re.sub(r"[^\w\s]|_", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _without_leading_article(title: str) -> str:
+    """The title without an ``A``/``An``/``The`` in front of it.
+
+    A reader who writes "History of England" and a provider that files it as
+    "The History of England" are naming one title, so the article is not part
+    of what is matched.
+    """
+    return _LEADING_ARTICLE.sub("", title)
+
+
+def _is_title_family(asked: str, candidate: str) -> bool:
+    """Whether two normalised titles name the same work.
+
+    The same title reaches a provider in more than one shape: with a leading
+    article dropped, or with a subtitle appended (after a separator, or glued
+    on with none). Either shape is still the title the reader asked for, so both
+    count as the same family. A title that only starts with the same words and
+    then diverges — "History of Tom Jones" for "History of England" — is not:
+    the word after the shared prefix has to begin the qualification, which the
+    space in ``f"{core} "`` is what checks.
+    """
+    asked_core = _without_leading_article(asked)
+    candidate_core = _without_leading_article(candidate)
+    if not asked_core or not candidate_core:
+        return False
+    if asked_core == candidate_core:
+        return True
+    return candidate_core.startswith(f"{asked_core} ") or asked_core.startswith(
+        f"{candidate_core} "
+    )
+
+
+def _mentions_query(candidate: Dict[str, Any], query: str) -> bool:
+    """Whether a candidate answers the query at all.
+
+    A title search widens recall by asking looser questions, and a loose
+    question answers with unrelated books as well. Returning those to fill the
+    limit would pad the list with titles the reader did not ask for, so they are
+    dropped — unless the query names one of their authors, which is what an
+    author search looks like when it answers with that author's books.
+    """
+    asked = _normalise_title_for_match(query)
+    if not asked:
+        return False
+
+    title = _normalise_title_for_match(str(candidate.get("title") or ""))
+    if title and (title == asked or _is_title_family(asked, title)):
+        return True
+
+    names = [str(name) for name in candidate.get("authors") or [] if name]
+    if candidate.get("author"):
+        names.append(str(candidate["author"]))
+    return any(asked in _normalise_title_for_match(name) for name in names)
+
+
 def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
     """Order the candidates so the reader's own words come first.
 
     Providers rank by their own relevance, which knows nothing about the
     subtitle the reader typed or the author they named. An edition whose title
-    is the title they asked for, credited to the author they named, is the one
-    they most likely mean. Everything else keeps the provider's order, because
-    two exact matches are still told apart by the provider.
+    is exactly the title they asked for is ranked first; an edition whose title
+    differs only by a dropped leading article or an added subtitle is next;
+    anything else comes last. Within a rank the provider's own order is kept,
+    because two exact matches are still told apart by the provider.
     """
-    asked_title = _clean_title_for_search(title).lower()
-    candidate_title = _clean_title_for_search(str(candidate.get("title") or "")).lower()
-    title_rank = 0 if candidate_title == asked_title else 1
+    asked_title = _normalise_title_for_match(title)
+    candidate_title = _normalise_title_for_match(str(candidate.get("title") or ""))
+    if candidate_title and candidate_title == asked_title:
+        title_rank = 0
+    elif _is_title_family(asked_title, candidate_title):
+        title_rank = 1
+    else:
+        title_rank = 2
     names = " ".join(str(name) for name in candidate.get("authors") or []).lower()
     author_rank = 0 if not author or author.lower() in names else 1
     return (title_rank, author_rank)
@@ -467,46 +544,48 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     """
     session = _get_session()
     fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
-    params: Dict[str, str] = {"title": title, "limit": "10", "fields": fields}
+
+    # Two questions, one provider. The structured `title` field is exact, so it
+    # misses an edition whose title drops a leading article or appends a
+    # subtitle; the free-text `q` is loose enough to find those. Asking the
+    # second only when the first came back empty is what used to hide an edition
+    # behind two other records, so both are asked and the answers merged.
+    questions: List[Dict[str, str]] = [{"title": title, "limit": "10", "fields": fields}]
     if author:
-        params["author"] = author
+        questions[0]["author"] = author
+    questions.append(
+        {"q": f"{title} {author}" if author else title, "limit": "10", "fields": fields}
+    )
 
-    try:
-        response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
-        response.raise_for_status()
-        docs = response.json().get("docs") or []
-    except Exception as e:
-        logger.debug(f"Open Library title search failed for '{title}': {e}")
-        if strict:
-            raise
-        docs = []
-
-    if not docs:
-        # Structured fields are exact, and a title as a reader types it often is
-        # not: it carries a subtitle, a series number, or drops the article. Fall
-        # back to the free-text search, which is what the reader just did.
-        query = f"{title} {author}" if author else title
+    docs: List[Dict[str, Any]] = []
+    answered = False
+    failure: Optional[Exception] = None
+    for params in questions:
         try:
-            response = session.get(
-                OPEN_LIBRARY_SEARCH_API,
-                params={"q": query, "limit": "10", "fields": fields},
-                timeout=10,
-            )
+            response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
             response.raise_for_status()
-            docs = response.json().get("docs") or []
+            docs.extend(response.json().get("docs") or [])
+            answered = True
         except Exception as e:
-            logger.debug(f"Open Library title search failed for '{query}': {e}")
-            if strict:
-                raise
-            return []
+            logger.debug(f"Open Library title search failed for '{params}': {e}")
+            failure = e
+
+    if strict and (not answered or (failure is not None and not docs)):
+        # A failed question with nothing to show for the provider is an outage,
+        # not an empty answer, and the caller has to tell those apart. A question
+        # that failed after another one answered with records is survivable: the
+        # provider did answer, and those records are the answer.
+        raise failure or RuntimeError(f"Open Library title search failed for '{title}'")
 
     results: List[Dict[str, Any]] = []
+    seen_isbns: set = set()
     for doc in docs:
         isbn13 = _isbn13_from_candidates(doc.get("isbn"))
-        if not isbn13:
+        if not isbn13 or isbn13 in seen_isbns:
             # A Book is keyed on its ISBN: an edition without one cannot be
-            # added, so it is not one of the answers to this question.
+            # added, and the two questions above can describe one edition twice.
             continue
+        seen_isbns.add(isbn13)
         names = [html.unescape(name) for name in doc.get("author_name") or [] if name]
         publishers = doc.get("publisher") or []
         cover_id = doc.get("cover_i")
@@ -638,8 +717,12 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
     if not answered:
         raise BookSearchUnavailable(f"Every book search provider failed for '{cleaned}'")
 
-    candidates.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
-    return candidates[:limit]
+    # A loose question answers with unrelated books as well. Returning those to
+    # fill the cap would pad the list with titles the reader did not ask for, so
+    # only candidates that answer the query at all are handed back.
+    related = [candidate for candidate in candidates if _mentions_query(candidate, cleaned)]
+    related.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
+    return related[:limit]
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:

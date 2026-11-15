@@ -13,6 +13,42 @@ def _candidate(isbn: str, title: str = "Dune", **extra):
     return {"isbn13": isbn, "title": title, "author": "Frank Herbert", **extra}
 
 
+def _doc(isbn: str, title: str, authors=("Frank Herbert",), year=None):
+    """One document in the shape Open Library's search answers with."""
+    return {
+        "title": title,
+        "author_name": list(authors),
+        "isbn": [isbn],
+        "first_publish_year": year,
+    }
+
+
+class _AnswersBothQuestions:
+    """A stand-in for Open Library that tells its two questions apart.
+
+    The structured title query carries `title`; the free-text one carries `q`.
+    Both are asked for every search now, so a fake session has to answer them
+    separately for the merge to be observable.
+    """
+
+    def __init__(self, by_title=(), by_query=()) -> None:
+        self.by_title = list(by_title)
+        self.by_query = list(by_query)
+        self.asked: list = []
+
+    def get(self, url, params=None, timeout=None):
+        self.asked.append(dict(params or {}))
+        docs = self.by_query if "q" in (params or {}) else self.by_title
+        return _Response({"docs": docs})
+
+
+def _only_open_library(monkeypatch, session: _AnswersBothQuestions) -> None:
+    """Make the other providers answer nothing, so one provider is the subject."""
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: session)
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *a, **k: [])
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", lambda *a, **k: [])
+
+
 def test_search_books_merges_providers_and_dedupes_on_isbn(monkeypatch):
     """One edition described by two providers is one candidate."""
     monkeypatch.setattr(
@@ -100,6 +136,137 @@ def test_search_books_returns_nothing_when_a_provider_answers_empty(monkeypatch)
     )
 
     assert lookup_module.search_books("A Book That Does Not Exist") == []
+
+
+def test_a_title_search_asks_both_of_open_librarys_questions(monkeypatch):
+    """The structured query answering must not suppress the free-text one.
+
+    Two records from the exact-title index used to be enough to keep the looser
+    question from being asked at all, which is how an edition the reader meant
+    stayed hidden behind two they did not.
+    """
+    session = _AnswersBothQuestions(
+        by_title=[_doc("9781848546073", "A History of England in 100 Places")],
+        by_query=[
+            _doc("9781848546073", "A History of England in 100 Places"),
+            _doc("9781848025097", "History of England in 100 Places", ["Philip Wilkinson"]),
+        ],
+    )
+    _only_open_library(monkeypatch, session)
+
+    results = lookup_module.search_books("A history of England in 100 places")
+
+    # The free-text answer is found, and the edition both questions describe is
+    # one candidate, not two.
+    assert [book["isbn13"] for book in results] == ["9781848546073", "9781848025097"]
+    assert any("title" in params for params in session.asked)
+    assert any("q" in params for params in session.asked)
+
+
+def test_editions_that_drop_the_article_or_add_a_subtitle_are_found(monkeypatch):
+    """Recall reaches the variants of a title, not only its exact spelling."""
+    session = _AnswersBothQuestions(
+        by_title=[
+            _doc("9781848546073", "A History of England in 100 Places", ["John Julius Norwich"]),
+            _doc("9781848546066", "A History of England in 100 Places", ["John Julius Norwich"]),
+        ],
+        by_query=[
+            _doc("9781848025097", "History of England in 100 Places", ["Philip Wilkinson"]),
+            _doc(
+                "9781848546123",
+                "A History of England in 100 Places from Stonehenge to the Gherkin",
+                ["John Julius Norwich"],
+            ),
+            # The loose question answers with these too; neither was asked for.
+            _doc("9780140430092", "The History of Tom Jones", ["Henry Fielding"]),
+            _doc("9780141439570", "The Picture of Dorian Gray", ["Oscar Wilde"]),
+        ],
+    )
+    _only_open_library(monkeypatch, session)
+
+    isbns = [book["isbn13"] for book in lookup_module.search_books("A history of England in 100 places")]
+
+    assert isbns == ["9781848546073", "9781848546066", "9781848025097", "9781848546123"]
+    assert "9780140430092" not in isbns
+    assert "9780141439570" not in isbns
+
+
+def test_the_title_the_reader_asked_for_ranks_first(monkeypatch):
+    """An exact title outranks one that only drops the article."""
+    session = _AnswersBothQuestions(
+        by_query=[
+            _doc("9781848025097", "History of England in 100 Places", ["Philip Wilkinson"]),
+            _doc("9781848546073", "A History of England in 100 Places", ["John Julius Norwich"]),
+        ]
+    )
+    _only_open_library(monkeypatch, session)
+
+    results = lookup_module.search_books("A history of England in 100 places")
+
+    assert [book["isbn13"] for book in results] == ["9781848546073", "9781848025097"]
+
+
+def test_an_unrelated_title_ranks_below_a_matching_one():
+    """The cap must not be filled with titles the reader did not ask for."""
+    asked = "A history of England in 100 places"
+
+    matching = lookup_module._title_match_rank(
+        {"title": "History of England in 100 Places"}, asked, ""
+    )
+    unrelated = lookup_module._title_match_rank({"title": "The History of Tom Jones"}, asked, "")
+
+    assert matching < unrelated
+
+
+def test_a_query_naming_an_author_keeps_that_authors_books(monkeypatch):
+    """Filtering unrelated titles must not empty an author search."""
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: _AnswersBothQuestions())
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *a, **k: [])
+    monkeypatch.setattr(
+        lookup_module,
+        "lookup_books_by_author",
+        lambda *a, **k: [_candidate("111", "Dune")],
+    )
+
+    results = lookup_module.search_books("Frank Herbert")
+
+    assert [book["isbn13"] for book in results] == ["111"]
+
+
+def test_a_rate_limited_second_question_keeps_the_answer_to_the_first(monkeypatch):
+    """One failed question does not throw away what the provider did answer."""
+
+    class HalfRateLimited:
+        def get(self, url, params=None, timeout=None):
+            if "q" in (params or {}):
+                return _Response({"error": "rate limited"}, status=429)
+            return _Response({"docs": [_doc("9781848546073", "A History of England in 100 Places")]})
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: HalfRateLimited())
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", unavailable)
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", unavailable)
+
+    results = lookup_module.search_books("A history of England in 100 places")
+
+    assert [book["isbn13"] for book in results] == ["9781848546073"]
+
+
+def test_a_candidate_without_an_isbn_is_not_an_answer(monkeypatch):
+    """A Book is keyed on its ISBN, so an edition without one cannot be added."""
+    session = _AnswersBothQuestions(
+        by_query=[
+            {"title": "A History of England in 100 Places", "author_name": ["Nobody"]},
+            _doc("9781848546073", "A History of England in 100 Places"),
+        ]
+    )
+    _only_open_library(monkeypatch, session)
+
+    results = lookup_module.search_books("A history of England in 100 places")
+
+    assert [book["isbn13"] for book in results] == ["9781848546073"]
 
 
 def test_discover_route_returns_candidates(authenticated_client, monkeypatch):
