@@ -210,9 +210,7 @@ def test_an_unrelated_title_ranks_below_a_matching_one():
     """The cap must not be filled with titles the reader did not ask for."""
     asked = "A history of England in 100 places"
 
-    matching = lookup_module._title_match_rank(
-        {"title": "History of England in 100 Places"}, asked, ""
-    )
+    matching = lookup_module._title_match_rank({"title": "History of England in 100 Places"}, asked, "")
     unrelated = lookup_module._title_match_rank({"title": "The History of Tom Jones"}, asked, "")
 
     assert matching < unrelated

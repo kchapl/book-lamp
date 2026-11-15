@@ -445,15 +445,15 @@ def _isbn13_from_candidates(candidates: Optional[List[Any]]) -> Optional[str]:
 _LEADING_ARTICLE = re.compile(r"^(?:a|an|the)\s+")
 
 
-def _normalise_title_for_match(title: str) -> str:
-    """A title reduced to the words that identify it.
+def _normalise_for_match(text: str) -> str:
+    """A title or a name reduced to the words that identify it.
 
-    Case and punctuation are not part of a title's identity — providers
+    Case and punctuation are not part of what a title or a name says — providers
     punctuate the same title differently, and a reader types it as they
-    remember it — so both are dropped before two titles are compared. The words
-    are kept, because they are what tells one title from another.
+    remember it — so both are dropped before two are compared. The words are
+    kept, because they are what tells one title from another.
     """
-    text = html.unescape(title or "").lower()
+    text = html.unescape(text or "").lower()
     text = re.sub(r"[^\w\s]|_", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -485,9 +485,7 @@ def _is_title_family(asked: str, candidate: str) -> bool:
         return False
     if asked_core == candidate_core:
         return True
-    return candidate_core.startswith(f"{asked_core} ") or asked_core.startswith(
-        f"{candidate_core} "
-    )
+    return candidate_core.startswith(f"{asked_core} ") or asked_core.startswith(f"{candidate_core} ")
 
 
 def _mentions_query(candidate: Dict[str, Any], query: str) -> bool:
@@ -499,18 +497,18 @@ def _mentions_query(candidate: Dict[str, Any], query: str) -> bool:
     dropped — unless the query names one of their authors, which is what an
     author search looks like when it answers with that author's books.
     """
-    asked = _normalise_title_for_match(query)
+    asked = _normalise_for_match(query)
     if not asked:
         return False
 
-    title = _normalise_title_for_match(str(candidate.get("title") or ""))
+    title = _normalise_for_match(str(candidate.get("title") or ""))
     if title and (title == asked or _is_title_family(asked, title)):
         return True
 
     names = [str(name) for name in candidate.get("authors") or [] if name]
     if candidate.get("author"):
         names.append(str(candidate["author"]))
-    return any(asked in _normalise_title_for_match(name) for name in names)
+    return any(asked in _normalise_for_match(name) for name in names)
 
 
 def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
@@ -523,8 +521,8 @@ def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tup
     anything else comes last. Within a rank the provider's own order is kept,
     because two exact matches are still told apart by the provider.
     """
-    asked_title = _normalise_title_for_match(title)
-    candidate_title = _normalise_title_for_match(str(candidate.get("title") or ""))
+    asked_title = _normalise_for_match(title)
+    candidate_title = _normalise_for_match(str(candidate.get("title") or ""))
     if candidate_title and candidate_title == asked_title:
         title_rank = 0
     elif _is_title_family(asked_title, candidate_title):
@@ -553,9 +551,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     questions: List[Dict[str, str]] = [{"title": title, "limit": "10", "fields": fields}]
     if author:
         questions[0]["author"] = author
-    questions.append(
-        {"q": f"{title} {author}" if author else title, "limit": "10", "fields": fields}
-    )
+    questions.append({"q": f"{title} {author}" if author else title, "limit": "10", "fields": fields})
 
     docs: List[Dict[str, Any]] = []
     answered = False
