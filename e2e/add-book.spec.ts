@@ -9,6 +9,12 @@ test.beforeEach(async ({ request }) => {
 test('adds a Book through the ISBN lookup', async ({ page }) => {
     await page.goto('/books/new');
 
+    // The ISBN is the cheapest way to identify a Book, so its block is above the
+    // title-or-author search, whose results need more from the reader.
+    const isbnBlock = await page.locator('.isbn-section').boundingBox();
+    const discoverBlock = await page.locator('.discover-section').boundingBox();
+    expect(isbnBlock!.y).toBeLessThan(discoverBlock!.y);
+
     await fillField(page, 'isbn', '9780000000000');
     await page.getByText('Lookup ISBN', { exact: true }).click();
 

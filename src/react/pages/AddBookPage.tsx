@@ -338,6 +338,36 @@ const AddBookPage: React.FC = () => {
         <div className="add-book-page">
             <h1>Add a Book</h1>
 
+            <div className="isbn-section">
+                <TextField
+                    id="isbn"
+                    label="ISBN (optional)"
+                    placeholder="Enter ISBN (10 or 13 digits)"
+                    value={isbn}
+                    onValueChange={setIsbn}
+                    supportingText="No ISBN? Choose “Enter title & author” to type in what is printed on the cover."
+                />
+                <div className="isbn-actions">
+                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
+                        {loading ? 'Looking up...' : 'Lookup ISBN'}
+                    </Button>
+                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
+                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
+                    </Button>
+                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
+                        Enter title &amp; author
+                    </Button>
+                </div>
+
+                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
+                    <div id="scanner-reader" ref={scannerRef}></div>
+                </div>
+
+                {scannerError && <p className="error-message">{scannerError}</p>}
+                {isbnError && <p className="error-message">{isbnError}</p>}
+                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
+            </div>
+
             <div className="discover-section">
                 <h2>Find a book</h2>
                 <p className="section-info">
@@ -421,36 +451,6 @@ const AddBookPage: React.FC = () => {
                         })}
                     </div>
                 )}
-            </div>
-
-            <div className="isbn-section">
-                <TextField
-                    id="isbn"
-                    label="ISBN (optional)"
-                    placeholder="Enter ISBN (10 or 13 digits)"
-                    value={isbn}
-                    onValueChange={setIsbn}
-                    supportingText="No ISBN? Enter the title and author below and it will be found for you."
-                />
-                <div className="isbn-actions">
-                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
-                        {loading ? 'Looking up...' : 'Lookup ISBN'}
-                    </Button>
-                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
-                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
-                    </Button>
-                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
-                        Enter title &amp; author
-                    </Button>
-                </div>
-
-                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
-                    <div id="scanner-reader" ref={scannerRef}></div>
-                </div>
-
-                {scannerError && <p className="error-message">{scannerError}</p>}
-                {isbnError && <p className="error-message">{isbnError}</p>}
-                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
             </div>
 
             {(showManualEntry || title || author) && (

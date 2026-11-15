@@ -451,3 +451,46 @@ describe('AddBookPage ISBN lookup', () => {
         expect(screen.getByText(/could not look up/i)).toBeInTheDocument();
     });
 });
+
+describe('AddBookPage order', () => {
+    it('puts the ISBN capture above the title-or-author search', () => {
+        // The ISBN is the cheapest way to identify a Book, so it is asked for
+        // first; a title-or-author search needs more from the reader and comes
+        // after it.
+        const { container } = renderPage();
+
+        const isbnSection = container.querySelector('.isbn-section') as HTMLElement;
+        const discoverSection = container.querySelector('.discover-section') as HTMLElement;
+
+        expect(isbnSection).toBeInTheDocument();
+        expect(discoverSection).toBeInTheDocument();
+        expect(
+            isbnSection.compareDocumentPosition(discoverSection) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
+
+    it('points its helper text at the control in its own block', () => {
+        // The copy used to send the reader "below" for title and author, which
+        // now names the discovery search rather than the manual form.
+        renderPage();
+
+        const isbnField = field('isbn') as (HTMLElement & { supportingText?: string }) | null;
+
+        expect(isbnField?.supportingText).toMatch(/enter title & author/i);
+        expect(isbnField?.supportingText).not.toMatch(/below/i);
+    });
+
+    it('keeps the title and author form below both blocks', () => {
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+
+        const form = container.querySelector('.add-book-form') as HTMLElement;
+        const discoverSection = container.querySelector('.discover-section') as HTMLElement;
+
+        expect(
+            form.compareDocumentPosition(discoverSection) &
+                Node.DOCUMENT_POSITION_PRECEDING
+        ).toBeTruthy();
+    });
+});
