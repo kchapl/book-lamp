@@ -67,23 +67,12 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
-const renderAt = (path: string) =>
-    render(
-        <MemoryRouter initialEntries={[path]}>
-            <AddBookPage />
-        </MemoryRouter>
-    );
-
 /** A Material Web text field host, addressed by the id the page gives it. */
 const field = (id: string) =>
     document.getElementById(id) as (HTMLElement & { value: string }) | null;
 
 /** The Material Web button whose visible label matches. */
 const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
-
-/** The reading-list option, which only exists once the form is open. */
-const checkbox = (container: HTMLElement) =>
-    container.querySelector('md-checkbox') as (HTMLElement & { checked: boolean }) | null;
 
 /** Type into a Material Web field: set the host value, then report the input. */
 function typeInto(id: string, value: string) {
@@ -127,21 +116,29 @@ describe('AddBookPage barcode scanner', () => {
     });
 });
 
-describe('AddBookPage reading-list option', () => {
-    it('starts ticked when the Reading List sent the reader here', () => {
-        const { container } = renderAt('/books/new?add_to_reading_list=1');
+describe('AddBookPage layout', () => {
+    it('captures the ISBN above the title-or-author search', () => {
+        const { container } = renderPage();
+        const isbn = container.querySelector('.isbn-section') as HTMLElement;
+        const discover = container.querySelector('.discover-section') as HTMLElement;
 
-        fireEvent.click(button(/enter title & author/i));
-
-        expect(checkbox(container)?.checked).toBe(true);
+        expect(isbn).not.toBeNull();
+        expect(discover).not.toBeNull();
+        // DOCUMENT_POSITION_FOLLOWING means the discovery search renders after
+        // the ISBN block, which is the order a reader reads.
+        expect(
+            isbn.compareDocumentPosition(discover) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
     });
 
-    it('starts unticked for every other entry point into the form', () => {
-        const { container } = renderAt('/books/new');
+    it('points the ISBN helper text at the form, not at the search', () => {
+        renderPage();
 
-        fireEvent.click(button(/enter title & author/i));
+        const host = field('isbn') as (HTMLElement & { supportingText?: string }) | null;
+        const copy = host?.getAttribute('supporting-text') ?? host?.supportingText ?? '';
 
-        expect(checkbox(container)?.checked).toBe(false);
+        expect(copy).toMatch(/title and author form below/i);
+        expect(copy).not.toMatch(/enter the title and author below/i);
     });
 });
 

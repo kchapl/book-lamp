@@ -267,6 +267,25 @@
     margin: 0;
 }
 
+/* Each Author is one row: the field takes the remaining width, its Remove
+   control sits beside it, and the rows stack. */
+.author-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--bl-space-3);
+}
+
+.author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--bl-space-2);
+}
+
+.author-row md-outlined-text-field {
+    flex: 1;
+    min-width: 0;
+}
+
 /* =============================================================================
    READING LIST
    ============================================================================= */

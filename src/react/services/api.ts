@@ -160,6 +160,9 @@ export async function getBookDetail(bookId: number): Promise<Book> {
 /**
  * The create-a-book payload. The endpoint reads `isbn`, not the Book's
  * `isbn13`, and uses it to de-duplicate against the Books already logged.
+ *
+ * Creating a Book also puts it in the reader's reading list: adding it is how
+ * they say they mean to read it, so no caller has to ask.
  */
 export type NewBook = Partial<Book> & { isbn?: string };
 

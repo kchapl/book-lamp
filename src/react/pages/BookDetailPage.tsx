@@ -100,11 +100,24 @@ const ReadingForm: React.FC<ReadingFormProps> = ({
     );
 };
 
+/**
+ * The Author rows the edit form starts with.
+ *
+ * A Book's Authors are a list, so the form gives each name its own row. A
+ * payload that predates the list carries only the display string; that one
+ * name still gets a row, so old data can be edited rather than blocked.
+ */
+function authorRows(book: Book): string[] {
+    const names = book.authors?.length ? book.authors : book.author ? [book.author] : [];
+    return names.length > 0 ? names : [''];
+}
+
 const BookDetailPage: React.FC = () => {
     const { bookId } = useParams<{ bookId: string }>();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Book>>({});
+    const [editError, setEditError] = useState<string | null>(null);
     const [showAddRecord, setShowAddRecord] = useState(false);
     const [addRecordError, setAddRecordError] = useState<string | null>(null);
     const [newRecord, setNewRecord] = useState<ReadingDraft>({
@@ -134,22 +147,47 @@ const BookDetailPage: React.FC = () => {
     const handleSaveEdit = async () => {
         if (!bookId) return;
 
-        // The author field holds the display string, which a person cannot
-        // un-join. So while it is untouched, send the names it was built from;
-        // once it is edited, it is new text and the server reads it.
-        const payload: Partial<Book> = { ...editForm };
-        if ((editForm.author || '') !== (book?.author || '')) {
-            delete payload.authors;
+        // A row the reader left blank is a row they did not fill in, not an
+        // Author with no name, so it is dropped rather than sent.
+        const authors = (editForm.authors ?? [])
+            .map((name) => (name ?? '').trim())
+            .filter((name) => name.length > 0);
+
+        if (authors.length === 0) {
+            setEditError('An author is required.');
+            return;
         }
 
+        // The list is what the endpoint stores; `author` is a display
+        // projection on the way out, never an input, so it is not sent.
+        const payload: Partial<Book> = { ...editForm, authors };
+        delete payload.author;
+
+        setEditError(null);
         try {
             await updateBook(Number(bookId), payload);
             setIsEditing(false);
             reload();
         } catch (err) {
-            console.error('Failed to update book:', err);
+            setEditError(err instanceof Error ? err.message : 'Failed to save changes');
         }
     };
+
+    /** Replace one Author row, leaving the other names where they are. */
+    const setAuthorRow = (index: number, name: string) => {
+        const rows = [...(editForm.authors ?? [])];
+        rows[index] = name;
+        setEditForm({ ...editForm, authors: rows });
+    };
+
+    const addAuthorRow = () =>
+        setEditForm({ ...editForm, authors: [...(editForm.authors ?? []), ''] });
+
+    const removeAuthorRow = (index: number) =>
+        setEditForm({
+            ...editForm,
+            authors: (editForm.authors ?? []).filter((_, position) => position !== index),
+        });
 
     const handleDelete = async () => {
         if (!bookId) return;
@@ -249,12 +287,28 @@ const BookDetailPage: React.FC = () => {
                         value={editForm.title || ''}
                         onValueChange={(value) => setEditForm({ ...editForm, title: value })}
                     />
-                    <TextField
-                        id="edit-author"
-                        label="Author"
-                        value={editForm.author || ''}
-                        onValueChange={(value) => setEditForm({ ...editForm, author: value })}
-                    />
+                    <div className="author-rows">
+                        {(editForm.authors ?? []).map((name, index) => (
+                            <div className="author-row" key={index}>
+                                <TextField
+                                    id={`edit-author-${index}`}
+                                    label={index === 0 ? 'Author' : `Author ${index + 1}`}
+                                    value={name}
+                                    onValueChange={(value) => setAuthorRow(index, value)}
+                                />
+                                {index > 0 && (
+                                    <IconButton
+                                        icon="delete"
+                                        aria-label={`Remove author ${index + 1}`}
+                                        onClick={() => removeAuthorRow(index)}
+                                    />
+                                )}
+                            </div>
+                        ))}
+                        <Button variant="text" icon="plus" onClick={addAuthorRow}>
+                            Add author
+                        </Button>
+                    </div>
                     <TextField
                         id="edit-isbn"
                         label="ISBN"
@@ -279,9 +333,20 @@ const BookDetailPage: React.FC = () => {
                             })
                         }
                     />
+                    {editError && (
+                        <p className="error-message" role="alert">
+                            {editError}
+                        </p>
+                    )}
                     <div className="form-actions">
                         <Button onClick={handleSaveEdit}>Save</Button>
-                        <Button variant="text" onClick={() => setIsEditing(false)}>
+                        <Button
+                            variant="text"
+                            onClick={() => {
+                                setEditError(null);
+                                setIsEditing(false);
+                            }}
+                        >
                             Cancel
                         </Button>
                     </div>
@@ -376,7 +441,8 @@ const BookDetailPage: React.FC = () => {
                         <Button
                             variant="outlined"
                             onClick={() => {
-                                setEditForm(book);
+                                setEditForm({ ...book, authors: authorRows(book) });
+                                setEditError(null);
                                 setIsEditing(true);
                             }}
                         >
