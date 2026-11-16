@@ -11,7 +11,7 @@ import type { BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
 /** One row of the discovery list: the candidate, and what the row shows of it. */
-export interface DiscoveredRow {
+interface DiscoveredRow {
     candidate: BookMatch;
     /** The title, with a subtitle taken off the end when the provider separated it. */
     title: string;
@@ -53,7 +53,7 @@ function splitSubtitle(rawTitle: string): { title: string; subtitle?: string } {
  * rows apart. Numbering is left for records that agree on that as well, where
  * the row itself gives the reader nothing else.
  */
-export function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
+function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
     const rows: DiscoveredRow[] = candidates.map((candidate) => {
         const { title, subtitle } = splitSubtitle(candidate.title || '');
         return {
