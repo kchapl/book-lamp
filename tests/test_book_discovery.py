@@ -73,8 +73,10 @@ class _Session:
 
 def test_search_books_reports_an_outage_when_providers_return_http_errors(monkeypatch):
     """A 429 or 503 JSON body is a failed provider, not an empty result."""
+    # Open Library is asked twice — the exact title field, then free text — and
+    # the provider has only failed when both of its searches did.
     session = _Session(
-        _Response({"docs": []}),
+        _Response({"error": "rate limited"}, status=429),
         _Response({"error": "rate limited"}, status=429),
         _Response({"error": {"code": 429}}, status=429),
         _Response({"error": "rate limited"}, status=503),
@@ -158,3 +160,115 @@ def test_discover_route_requires_a_query(authenticated_client):
     resp = authenticated_client.get("/api/books/discover")
 
     assert resp.status_code == 400
+
+
+def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
+    """A structured lookup with results must not suppress the free-text one.
+
+    Open Library's `title` field is exact: it matches the edition that keeps the
+    leading article and misses the one that drops it. The free-text search finds
+    that edition, so both answers belong to the reader.
+    """
+    structured = {
+        "docs": [
+            {
+                "title": "A History of England in 100 Places: From Stonehenge to the Gherkin",
+                "author_name": ["John Julius Norwich"],
+                "isbn": ["9781848546073"],
+                "first_publish_year": 2011,
+            },
+            {
+                "title": "A History of England in 100 Places",
+                "author_name": ["John Julius Norwich"],
+                "isbn": ["9781848546066"],
+                "first_publish_year": 2011,
+            },
+        ]
+    }
+    free_text = {
+        "docs": [
+            {
+                "title": "History of England in 100 Places",
+                "author_name": ["Philip Wilkinson"],
+                "isbn": ["9781848025097"],
+                "first_publish_year": 2018,
+                "publisher": ["Historic England Publishing"],
+            },
+            {
+                "title": "The History of Tom Jones",
+                "author_name": ["Henry Fielding"],
+                "isbn": ["9780140430097"],
+            },
+        ]
+    }
+
+    class _TwoQueries:
+        def get(self, url, params=None, **kwargs):
+            params = params or {}
+            if "title" in params:
+                return _Response(structured)
+            if "q" in params:
+                return _Response(free_text)
+            return _Response({"docs": []})  # the author search
+
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: _TwoQueries())
+
+    results = lookup_module.search_books("A history of England in 100 places")
+
+    isbns = [candidate["isbn13"] for candidate in results]
+    assert "9781848546066" in isbns
+    assert "9781848546073" in isbns
+    assert "9781848025097" in isbns
+    # A loose search returns near-misses; they are not answers to this question.
+    assert "9780140430097" not in isbns
+    # The exact title first, then the article-dropped and subtitled forms.
+    assert isbns[0] == "9781848546066"
+
+
+@pytest.mark.parametrize(
+    "candidate_title, expected_rank",
+    [
+        ("A history of England in 100 places", 0),
+        ("A HISTORY OF ENGLAND IN 100 PLACES", 0),
+        ("History of England in 100 Places", 1),
+        ("A History of England in 100 Places From Stonehenge To The Gherkin", 1),
+        ("The History of Tom Jones", 2),
+        ("The Picture of Dorian Gray", 2),
+    ],
+)
+def test_title_match_rank_folds_articles_punctuation_and_subtitles(candidate_title, expected_rank):
+    rank = lookup_module._title_match_rank(
+        {"title": candidate_title, "authors": ["Philip Wilkinson"]},
+        "A history of England in 100 places",
+        "",
+    )
+
+    assert rank[0] == expected_rank
+
+
+def test_search_books_keeps_the_providers_that_answer(monkeypatch):
+    """One failing provider leaves the others to answer."""
+
+    def down(*args, **kwargs):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(lookup_module, "_open_library_title_search", down)
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *args, **kwargs: [_candidate("111")])
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", down)
+
+    assert [candidate["isbn13"] for candidate in lookup_module.search_books("Dune")] == ["111"]
+
+
+def test_search_books_keeps_an_author_answer_that_does_not_match_the_title(monkeypatch):
+    """A query naming an author is answered by that author's Books."""
+    monkeypatch.setattr(lookup_module, "_open_library_title_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        lookup_module,
+        "lookup_books_by_author",
+        lambda *args, **kwargs: [_candidate("555", title="The Left Hand of Darkness")],
+    )
+
+    results = lookup_module.search_books("Ursula K. Le Guin")
+
+    assert [candidate["isbn13"] for candidate in results] == ["555"]

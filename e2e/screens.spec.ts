@@ -32,6 +32,14 @@ test('reading list', async ({ page }) => {
     await expectScreenshot(page, 'reading-list.png');
 });
 
+test('add a book', async ({ page }) => {
+    await page.goto('/books/new');
+    // The ISBN capture is the first block, because typing or scanning one is the
+    // cheapest way to identify a Book.
+    await expect(page.locator('.isbn-section')).toBeVisible();
+    await expectScreenshot(page, 'add-book.png');
+});
+
 test('dashboard', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: 'Your reading at a glance' })).toBeVisible();

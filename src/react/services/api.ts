@@ -160,8 +160,12 @@ export async function getBookDetail(bookId: number): Promise<Book> {
 /**
  * The create-a-book payload. The endpoint reads `isbn`, not the Book's
  * `isbn13`, and uses it to de-duplicate against the Books already logged.
+ *
+ * `add_to_reading_list` decides whether creating the Book queues it. The
+ * endpoint queues a Book when the field is absent, so a caller that omits it
+ * gets the behaviour the seed and the other entry points already rely on.
  */
-export type NewBook = Partial<Book> & { isbn?: string };
+export type NewBook = Partial<Book> & { isbn?: string; add_to_reading_list?: boolean };
 
 export async function createBook(book: NewBook): Promise<Book> {
     return fetchJSON<Book>(`${API_BASE}/books`, {

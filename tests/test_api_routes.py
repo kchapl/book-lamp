@@ -201,6 +201,74 @@ def test_api_create_book_deduplication(authenticated_client):
     assert body["title"] == "Existing"
 
 
+def test_api_create_book_leaves_the_reading_list_alone_when_unticked(authenticated_client):
+    """The add form's tickbox decides whether a new Book is queued."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={
+            "title": "Unqueued",
+            "author": "Some Author",
+            "isbn": "9780141439600",
+            "add_to_reading_list": False,
+        },
+    )
+
+    assert resp.status_code == 201
+    assert get_storage().get_reading_list() == []
+
+
+def test_api_create_book_queues_a_ticked_book(authenticated_client):
+    resp = authenticated_client.post(
+        "/api/books",
+        json={
+            "title": "Queued",
+            "author": "Some Author",
+            "isbn": "9780141439600",
+            "add_to_reading_list": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    body = _json(resp)
+    assert [item["book_id"] for item in get_storage().get_reading_list()] == [body["id"]]
+
+
+def test_api_create_book_queues_when_the_payload_says_nothing(authenticated_client):
+    """Every other entry point — the e2e seed included — relies on this default."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"title": "Silent", "author": "Some Author", "isbn": "9780141439600"},
+    )
+
+    assert resp.status_code == 201
+    assert len(get_storage().get_reading_list()) == 1
+
+
+def test_api_create_book_for_an_owned_isbn_queues_only_when_asked(authenticated_client):
+    """Posting an ISBN already logged queues it only if the payload asks."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780306406157", title="Existing", authors=["Author"])
+
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"isbn": "9780306406157", "add_to_reading_list": False},
+    )
+
+    assert resp.status_code == 200
+    assert _json(resp)["id"] == book["id"]
+    assert storage.get_reading_list() == []
+
+
+def test_api_create_book_for_an_owned_isbn_queues_by_default(authenticated_client):
+    storage = get_storage()
+    storage.add_book(isbn13="9780306406157", title="Existing", authors=["Author"])
+
+    resp = authenticated_client.post("/api/books", json={"isbn": "9780306406157"})
+
+    assert resp.status_code == 200
+    assert len(storage.get_reading_list()) == 1
+
+
 # ---------------------------------------------------------------------------
 # Books – update
 # ---------------------------------------------------------------------------

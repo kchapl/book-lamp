@@ -143,6 +143,73 @@ describe('AddBookPage reading-list option', () => {
 
         expect(checkbox(container)?.checked).toBe(false);
     });
+
+    it('sends the tick state, so an unticked Book is not queued', async () => {
+        create.mockResolvedValue({ id: 7, title: 'Emma' });
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+        typeInto('isbn', '9780141439600');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledWith(
+            expect.objectContaining({ add_to_reading_list: false })
+        );
+    });
+
+    it('queues the Book when the reader ticks the box', async () => {
+        create.mockResolvedValue({ id: 7, title: 'Emma' });
+
+        const { container } = renderPage();
+        fireEvent.click(button(/enter title & author/i));
+
+        const box = checkbox(container) as HTMLElement & { checked: boolean };
+        box.checked = true;
+        fireEvent.change(box);
+
+        typeInto('title', 'Emma');
+        typeInto('author', 'Jane Austen');
+        typeInto('isbn', '9780141439600');
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledWith(
+            expect.objectContaining({ add_to_reading_list: true })
+        );
+    });
+});
+
+describe('AddBookPage layout', () => {
+    it('captures the ISBN above the title-or-author search', () => {
+        const { container } = renderPage();
+        const isbn = container.querySelector('.isbn-section') as HTMLElement;
+        const discover = container.querySelector('.discover-section') as HTMLElement;
+
+        expect(isbn).not.toBeNull();
+        expect(discover).not.toBeNull();
+        // DOCUMENT_POSITION_FOLLOWING means the discovery search renders after
+        // the ISBN block, which is the order a reader reads.
+        expect(
+            isbn.compareDocumentPosition(discover) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
+
+    it('points the ISBN helper text at the form, not at the search', () => {
+        renderPage();
+
+        const host = field('isbn') as (HTMLElement & { supportingText?: string }) | null;
+        const copy = host?.getAttribute('supporting-text') ?? host?.supportingText ?? '';
+
+        expect(copy).toMatch(/title and author form below/i);
+        expect(copy).not.toMatch(/enter the title and author below/i);
+    });
 });
 
 describe('AddBookPage submit', () => {
@@ -169,6 +236,7 @@ describe('AddBookPage submit', () => {
             publisher: undefined,
             publication_year: undefined,
             isbn: '9780141439600',
+            add_to_reading_list: false,
         });
     });
 
@@ -196,6 +264,7 @@ describe('AddBookPage submit', () => {
             publisher: undefined,
             publication_year: undefined,
             isbn: '9780141439600',
+            add_to_reading_list: false,
         });
     });
 
@@ -301,6 +370,8 @@ describe('AddBookPage discover search', () => {
                 author: 'Frank Herbert',
                 isbn: '9780441172719',
                 publication_year: 1965,
+                // The row's button says "Add to reading list".
+                add_to_reading_list: true,
             })
         );
         await waitFor(() =>
