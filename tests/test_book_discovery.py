@@ -73,10 +73,8 @@ class _Session:
 
 def test_search_books_reports_an_outage_when_providers_return_http_errors(monkeypatch):
     """A 429 or 503 JSON body is a failed provider, not an empty result."""
-    # Open Library is asked twice — the exact title field, then free text — and
-    # the provider has only failed when both of its searches did.
+    # Open Library's title search, then Google Books, then the author search.
     session = _Session(
-        _Response({"error": "rate limited"}, status=429),
         _Response({"error": "rate limited"}, status=429),
         _Response({"error": {"code": 429}}, status=429),
         _Response({"error": "rate limited"}, status=503),
@@ -162,31 +160,28 @@ def test_discover_route_requires_a_query(authenticated_client):
     assert resp.status_code == 400
 
 
-def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
-    """A structured lookup with results must not suppress the free-text one.
+def test_open_library_title_search_asks_one_free_text_search(monkeypatch):
+    """One Open Library request, wide enough to hold every edition it describes.
 
-    Open Library's `title` field is exact: it matches the edition that keeps the
-    leading article and misses the one that drops it. The free-text search finds
-    that edition, so both answers belong to the reader.
+    The free-text search already finds the edition that drops a leading article
+    or carries a subtitle. Asking the exact title field as well spent a second
+    request on editions the first answer had described, so the page is asked for
+    wider instead.
     """
-    structured = {
+    answer = {
         "docs": [
-            {
-                "title": "A History of England in 100 Places: From Stonehenge to the Gherkin",
-                "author_name": ["John Julius Norwich"],
-                "isbn": ["9781848546073"],
-                "first_publish_year": 2011,
-            },
             {
                 "title": "A History of England in 100 Places",
                 "author_name": ["John Julius Norwich"],
                 "isbn": ["9781848546066"],
                 "first_publish_year": 2011,
             },
-        ]
-    }
-    free_text = {
-        "docs": [
+            {
+                "title": "A History of England in 100 Places: From Stonehenge to the Gherkin",
+                "author_name": ["John Julius Norwich"],
+                "isbn": ["9781848546073"],
+                "first_publish_year": 2011,
+            },
             {
                 "title": "History of England in 100 Places",
                 "author_name": ["Philip Wilkinson"],
@@ -202,16 +197,17 @@ def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
         ]
     }
 
-    class _TwoQueries:
+    calls = []
+
+    class _SingleSearch:
         def get(self, url, params=None, **kwargs):
             params = params or {}
-            if "title" in params:
-                return _Response(structured)
-            if "q" in params:
-                return _Response(free_text)
-            return _Response({"docs": []})  # the author search
+            calls.append((url, params))
+            if url == lookup_module.OPEN_LIBRARY_SEARCH_API and "q" in params:
+                return _Response(answer)
+            return _Response({"docs": []})  # Google Books and the author search
 
-    monkeypatch.setattr(lookup_module, "_get_session", lambda: _TwoQueries())
+    monkeypatch.setattr(lookup_module, "_get_session", lambda: _SingleSearch())
 
     results = lookup_module.search_books("A history of England in 100 places")
 
@@ -223,6 +219,13 @@ def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
     assert "9780140430097" not in isbns
     # The exact title first, then the article-dropped and subtitled forms.
     assert isbns[0] == "9781848546066"
+
+    # Open Library answers with one free-text request: no call scopes the title
+    # field, and the page is wide enough to keep the editions ranked below it.
+    assert all("title" not in params for _, params in calls)
+    title_queries = [params for url, params in calls if url == lookup_module.OPEN_LIBRARY_SEARCH_API and "q" in params]
+    assert len(title_queries) == 1
+    assert title_queries[0]["limit"] == "20"
 
 
 @pytest.mark.parametrize(

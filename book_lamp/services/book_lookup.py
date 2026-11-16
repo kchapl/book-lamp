@@ -563,40 +563,28 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     Unlike the cover lookups, this keeps the candidates separate: a reader who
     does not have an ISBN is choosing an edition, and each answer needs its own.
 
-    Both of Open Library's searches are asked, and their answers are merged. The
-    structured `title` field is exact, so it misses the edition that drops a
-    leading article or carries a subtitle; the free-text search is what finds
-    that edition. Stopping once one of them has answered would let the narrower
-    search suppress the wider one, so a result from either cannot silence the
-    other. That costs a second request per search, which is the price of the
-    recall: the narrower query answering is exactly the case that used to hide
-    the edition the reader wanted.
+    The free-text search answers over the whole record, so it finds the edition
+    that drops a leading article or carries a subtitle — the editions a search of
+    the title field alone ranks below, or misses. That ranking also spends slots
+    on author and subject matches, so the page is asked for wider than a title
+    field would need: the edition the reader means still has to be in it.
     """
     session = _get_session()
     fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
-    structured: Dict[str, str] = {"title": title, "limit": "10", "fields": fields}
-    if author:
-        structured["author"] = author
-    free_text = f"{title} {author}" if author else title
+    query = f"{title} {author}" if author else title
 
-    docs: List[Dict[str, Any]] = []
-    failures = 0
-    last_error: Optional[Exception] = None
-    for params in (structured, {"q": free_text, "limit": "10", "fields": fields}):
-        try:
-            response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
-            response.raise_for_status()
-            docs.extend(response.json().get("docs") or [])
-        except Exception as e:
-            # One query failing leaves the other's answer usable, so the provider
-            # has only failed when neither answered.
-            logger.debug(f"Open Library title search failed for {params}: {e}")
-            failures += 1
-            last_error = e
-
-    if failures == 2:
-        if strict and last_error is not None:
-            raise last_error
+    try:
+        response = session.get(
+            OPEN_LIBRARY_SEARCH_API,
+            params={"q": query, "limit": "20", "fields": fields},
+            timeout=10,
+        )
+        response.raise_for_status()
+        docs: List[Dict[str, Any]] = response.json().get("docs") or []
+    except Exception as e:
+        logger.debug(f"Open Library title search failed for '{query}': {e}")
+        if strict:
+            raise
         return []
 
     results: List[Dict[str, Any]] = []
@@ -605,8 +593,8 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
         isbn13 = _isbn13_from_candidates(doc.get("isbn"))
         if not isbn13 or isbn13 in seen:
             # A Book is keyed on its ISBN: an edition without one cannot be
-            # added, so it is not one of the answers to this question. Two
-            # queries describing one edition is also one answer.
+            # added, so it is not one of the answers to this question. One
+            # edition described twice is also one answer.
             continue
         seen.add(isbn13)
         names = [html.unescape(name) for name in doc.get("author_name") or [] if name]
