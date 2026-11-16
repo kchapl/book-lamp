@@ -568,7 +568,9 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     leading article or carries a subtitle; the free-text search is what finds
     that edition. Stopping once one of them has answered would let the narrower
     search suppress the wider one, so a result from either cannot silence the
-    other.
+    other. That costs a second request per search, which is the price of the
+    recall: the narrower query answering is exactly the case that used to hide
+    the edition the reader wanted.
     """
     session = _get_session()
     fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
