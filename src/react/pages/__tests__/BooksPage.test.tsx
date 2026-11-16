@@ -160,3 +160,15 @@ describe('BooksPage search', () => {
         expect(search).toHaveBeenCalledTimes(1);
     });
 });
+
+
+describe('BooksPage add action', () => {
+    it('offers no add call to action', async () => {
+        renderPage();
+
+        await waitFor(() => expect(list).toHaveBeenCalled());
+
+        expect(screen.queryByText(/add a book/i)).not.toBeInTheDocument();
+        expect(document.querySelector('.fab-slot')).toBeNull();
+    });
+});

@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Layout from '../Layout';
 import { AppContext } from '../../App';
@@ -36,24 +36,22 @@ describe('Layout navigation', () => {
             </MemoryRouter>
         );
 
-    it('offers an Add Book entry point on every page', () => {
+    it('keeps adding a Book out of the primary navigation', () => {
         const { container } = renderLayout();
 
-        const addBook = container.querySelector('nav[aria-label="Primary"] a[href="/books/new"]');
-
-        expect(addBook).toBeInTheDocument();
-        expect(addBook).toHaveTextContent(/add book/i);
+        expect(
+            container.querySelector('nav[aria-label="Primary"] a[href="/books/new"]')
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText(/^add book$/i)).not.toBeInTheDocument();
     });
 
-    it('marks only the most specific nav entry current on the Add Book page', () => {
-        // `/books/new` sits under `/books`; both used to match, so both links
-        // claimed the page.
+    it('marks My Books current on the Add Book page, which has no entry of its own', () => {
         const { container } = renderLayout('/books/new');
 
         const current = container.querySelectorAll('nav[aria-label="Primary"] a[aria-current="page"]');
 
         expect(current).toHaveLength(1);
-        expect(current[0]).toHaveAttribute('href', '/books/new');
+        expect(current[0]).toHaveAttribute('href', '/books');
     });
 });
 

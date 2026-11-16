@@ -15,7 +15,7 @@ test('adds a Book through the ISBN lookup', async ({ page }) => {
     await expect(page.locator('#title input')).toHaveValue('Test Book');
     await expect(page.locator('#author input')).toHaveValue('Test Author');
 
-    // "Add Book" is also a nav link, so the submit action is scoped to the form.
+    // The submit action is scoped to the form.
     await page.locator('.add-book-form').getByText('Add Book', { exact: true }).click();
 
     // The seeded store holds five Books, so the new one is the sixth.
