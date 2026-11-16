@@ -394,20 +394,48 @@ describe('AddBookPage discover search', () => {
         expect(screen.getByText(/Option 2 of 2/)).toBeInTheDocument();
     });
 
-    it('does not fold a sequel into the title it starts with', async () => {
-        // Guessing at a subtitle that the provider did not separate would turn
-        // "Dune Messiah" into "Dune: Messiah" and hide a different book.
+    it('keeps a short prefix attached to what follows it', async () => {
+        // "Re: Zero" is a title, not a subtitle: a prefix of three characters
+        // or fewer is too short to tell the reader which Book this is.
         discover.mockResolvedValue([
-            { title: 'Dune', author: 'Frank Herbert', isbn13: '9780441172719' },
-            { title: 'Dune Messiah', author: 'Frank Herbert', isbn13: '9780593098233' },
+            { title: 'Re: Zero', author: 'Tappei Nagatsuki', isbn13: '9780316395344' },
         ]);
 
         renderPage();
-        typeInto('discover-query', 'Dune');
+        typeInto('discover-query', 'Re Zero');
         fireEvent.click(button(/^search$/i));
 
-        expect(await screen.findByText('Dune Messiah')).toBeInTheDocument();
-        expect(screen.queryByText('Messiah')).not.toBeInTheDocument();
+        expect(await screen.findByText('Re: Zero')).toBeInTheDocument();
+        expect(screen.queryByText('Zero')).not.toBeInTheDocument();
+    });
+
+    it('keeps a colon that belongs to the title', async () => {
+        // "10:04" is a title; its colon is not a subtitle separator.
+        discover.mockResolvedValue([
+            { title: '10:04', author: 'Ben Lerner', isbn13: '9780000000019' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', '10:04');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('10:04')).toBeInTheDocument();
+        expect(screen.queryByText('10')).not.toBeInTheDocument();
+    });
+
+    it('splits a colon that really separates a subtitle', async () => {
+        // The guard only keeps a split whose prefix is too short to name the
+        // Book, so a title long enough to stand on its own still gets one.
+        discover.mockResolvedValue([
+            { title: 'Piranesi: A Novel', author: 'Susanna Clarke', isbn13: '9781635575637' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Piranesi');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Piranesi')).toBeInTheDocument();
+        expect(screen.getByText('A Novel')).toBeInTheDocument();
     });
 
     it('queues the existing Book when the candidate is already owned', async () => {
