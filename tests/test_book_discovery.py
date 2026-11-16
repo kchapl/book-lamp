@@ -307,6 +307,27 @@ def test_search_books_keeps_a_partial_title_query(monkeypatch, query):
     assert [candidate["isbn13"] for candidate in results] == ["9780547773742"]
 
 
+@pytest.mark.parametrize("candidate_title", ["Ender's Game", "Ender’s Game"])
+def test_search_books_folds_an_apostrophe_the_query_leaves_out(monkeypatch, candidate_title):
+    """A reader who types "Enders Game" is asking for "Ender's Game".
+
+    An apostrophe inside a word is punctuation, not a word break: folding one
+    title to "ender s game" and the other to "enders game" would rank the answer
+    as a near-miss and drop it before the route ever sees the ISBN.
+    """
+    monkeypatch.setattr(
+        lookup_module,
+        "_open_library_title_search",
+        lambda *args, **kwargs: [_candidate("9780812550702", title=candidate_title)],
+    )
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", lambda *args, **kwargs: [])
+
+    results = lookup_module.search_books("Enders Game")
+
+    assert [candidate["isbn13"] for candidate in results] == ["9780812550702"]
+
+
 def test_search_books_keeps_the_providers_that_answer(monkeypatch):
     """One failing provider leaves the others to answer."""
 

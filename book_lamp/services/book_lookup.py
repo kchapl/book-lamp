@@ -455,6 +455,10 @@ def _title_key(title: str) -> str:
     of England in 100 places", and both name the same work.
     """
     clean = html.unescape(str(title or "")).casefold()
+    # An apostrophe inside a word is not a word break: "Ender's Game" and
+    # "Enders Game" name the same two words, so folding the first to
+    # "ender s game" would set apart the answer the reader asked for.
+    clean = re.sub(r"(?<=\w)['’‘`](?=\w)", "", clean)
     clean = re.sub(r"[^\w]+", " ", clean)
     return re.sub(r"\s+", " ", clean).strip()
 
