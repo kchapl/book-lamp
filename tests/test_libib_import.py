@@ -227,3 +227,16 @@ def test_an_abandoned_row_with_no_completion_date_still_ends() -> None:
     record = items[0]["record"]
     assert record["status"] == "Abandoned"
     assert record["end_date"] == "2023-01-01"
+
+
+def test_libib_import_drops_a_rating_before_completion():
+    """A rating is a verdict on a finished Reading, so a CSV row that never
+    reached Completed imports without one rather than failing the import."""
+    items = parse_libib_csv(
+        "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating\n"
+        "Open Book,Author O,9785555555555,In Progress,2023-01-01,,4\n"
+        "Abandoned Book,Author A,9786666666666,Abandoned,2023-01-01,2023-02-01,3\n"
+        "Finished Book,Author F,9787777777777,Completed,2023-01-01,2023-02-01,5\n"
+    )
+
+    assert [item["record"]["rating"] for item in items] == [0, 0, 5]

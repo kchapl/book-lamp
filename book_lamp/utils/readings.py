@@ -4,6 +4,9 @@ A Reading has two ends: the date it started and the date it ended. A status that
 says the Reading has stopped — Completed or Abandoned — therefore cannot be
 written without an end date. This module owns that rule, so the API, the
 importers and the MCP tools all reach the same answer.
+
+A rating, by contrast, is a verdict on a finished Reading: only a Completed
+Reading may carry one. That rule lives here too, for the same reason.
 """
 
 from typing import Any, Dict, Iterable, List, Mapping, Optional
@@ -32,6 +35,33 @@ def require_end_date(status: str, end_date: Optional[str]) -> None:
     problem = end_date_problem(status, end_date)
     if problem:
         raise ReadingEndsWithoutADate(problem)
+
+
+#: The only Reading Status that may carry a rating.
+RATED_STATUS = "Completed"
+
+
+class RatingBeforeCompleted(ValueError):
+    """Raised when a Reading that has not been Completed is given a rating."""
+
+
+def rating_problem(status: str, rating: int) -> Optional[str]:
+    """Return why this status may not carry this rating, or ``None``.
+
+    A rating is the reader's verdict on a Reading, so it belongs to one that
+    reached Completed. Abandoned ends a Reading but is not a verdict on it, and
+    an open Reading has nothing to rate yet.
+    """
+    if status != RATED_STATUS and int(rating or 0):
+        return f"a rating is only allowed once a Reading is {RATED_STATUS}"
+    return None
+
+
+def require_rating(status: str, rating: int) -> None:
+    """Raise :class:`RatingBeforeCompleted` when the pair breaks the rule."""
+    problem = rating_problem(status, rating)
+    if problem:
+        raise RatingBeforeCompleted(problem)
 
 
 #: The orders the Reading Log offers, as the page's `sort` parameter names them.
