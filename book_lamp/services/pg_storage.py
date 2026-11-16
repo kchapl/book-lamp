@@ -637,9 +637,10 @@ class PostgresStorage:
                     "DELETE FROM reading_list WHERE user_id = %s AND book_id = %s",
                     [self.user_id, book_id],
                 )
-                # Re-order positions
+                # Re-order the queue. A row outside it holds no position, so
+                # renumbering it here would push the queue's own positions up.
                 rows = conn.execute(
-                    "SELECT book_id FROM reading_list WHERE user_id = %s ORDER BY position ASC",
+                    "SELECT book_id FROM reading_list WHERE user_id = %s AND queued ORDER BY position ASC",
                     [self.user_id],
                 ).fetchall()
                 for i, row_raw in enumerate(rows):

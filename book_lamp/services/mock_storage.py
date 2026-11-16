@@ -345,9 +345,11 @@ class MockStorage:
                 self.reading_list.pop(i)
                 logger.info(f"Successfully removed book {book_id} from reading list (MockStorage)")
                 break
-        # Reassign positions
-        for idx, item in enumerate(self.reading_list):
-            item["position"] = idx + 1
+        # Renumber the queue. A row outside it holds no position, so counting it
+        # here would push the queue's own positions up.
+        queued = sorted((item for item in self.reading_list if item["queued"]), key=lambda item: item["position"])
+        for position, item in enumerate(queued, start=1):
+            item["position"] = position
 
     def update_reading_list_order(self, book_ids: list[int]) -> None:
         item_map = {item["book_id"]: item for item in self.reading_list}

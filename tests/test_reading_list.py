@@ -82,3 +82,21 @@ def test_reordering_the_queue_keeps_an_unqueued_book():
 
     assert [item["book_id"] for item in storage.reading_list] == [queued["id"], unqueued["id"]]
     assert storage.get_reading_list()[0]["position"] == 1
+
+
+def test_removing_a_queued_book_leaves_the_queue_numbered_from_one():
+    """A Book outside the queue holds no position, so it must not take one."""
+    storage = MockStorage()
+    first = storage.add_book("8888888888888", "Book 8", "Author 8")
+    second = storage.add_book("9999999999999", "Book 9", "Author 9")
+    unqueued = storage.add_book("1010101010101", "Book 10", "Author 10")
+
+    storage.add_to_reading_list(first["id"])
+    storage.add_to_reading_list(second["id"])
+    storage.add_to_reading_list(unqueued["id"], queued=False)
+    storage.remove_from_reading_list(first["id"])
+
+    queue = storage.get_reading_list()
+    assert [item["book_id"] for item in queue] == [second["id"]]
+    assert queue[0]["position"] == 1
+    assert [item["position"] for item in storage.reading_list if not item["queued"]] == [0]

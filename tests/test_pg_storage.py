@@ -210,6 +210,26 @@ def test_queueing_an_unqueued_book_comes_after_the_books_already_queued(pg_stora
     assert [item["book_id"] for item in pg_storage.get_reading_list()] == [first["id"], second["id"]]
 
 
+def test_removing_a_queued_book_leaves_the_queue_numbered_from_one(pg_storage):
+    """A Book outside the queue holds no position, so it must not take one.
+
+    The CSV export writes the queue position, so a queue numbered from k+1 would
+    claim the reader has k Books they do not.
+    """
+    first = pg_storage.add_book(isbn13="9990000000004", title="First", authors=["Author"])
+    second = pg_storage.add_book(isbn13="9990000000005", title="Second", authors=["Author"])
+    unqueued = pg_storage.add_book(isbn13="9990000000006", title="Unqueued", authors=["Author"])
+    pg_storage.add_to_reading_list(first["id"])
+    pg_storage.add_to_reading_list(second["id"])
+    pg_storage.add_to_reading_list(unqueued["id"], queued=False)
+
+    pg_storage.remove_from_reading_list(first["id"])
+
+    queue = pg_storage.get_reading_list()
+    assert [item["book_id"] for item in queue] == [second["id"]]
+    assert queue[0]["position"] == 1
+
+
 def test_start_reading(pg_storage):
     book = pg_storage.add_book(isbn13="123", title="Book 1", authors=["Author 1"])
     pg_storage.add_to_reading_list(book["id"])
