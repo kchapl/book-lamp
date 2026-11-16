@@ -201,6 +201,30 @@ def test_api_create_book_deduplication(authenticated_client):
     assert body["title"] == "Existing"
 
 
+def test_api_create_book_queues_the_new_book(authenticated_client):
+    """Creating a Book puts it in the reading list, in the same request."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={"title": "Added", "author": "Some Author", "isbn": "9780141439600"},
+    )
+
+    assert resp.status_code == 201
+    body = _json(resp)
+    assert [item["book_id"] for item in get_storage().get_reading_list()] == [body["id"]]
+
+
+def test_api_create_book_queues_an_isbn_the_reader_already_has(authenticated_client):
+    """Books are shared, so a Book the reader already has is queued too."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780306406157", title="Existing", authors=["Author"])
+
+    resp = authenticated_client.post("/api/books", json={"isbn": "9780306406157"})
+
+    assert resp.status_code == 200
+    assert _json(resp)["id"] == book["id"]
+    assert [item["book_id"] for item in storage.get_reading_list()] == [book["id"]]
+
+
 # ---------------------------------------------------------------------------
 # Books – update
 # ---------------------------------------------------------------------------

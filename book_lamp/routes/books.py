@@ -264,7 +264,13 @@ def api_list_books():
 @csrf_protect
 @authorisation_required
 def api_create_book():
-    """Create a new book from a JSON payload and add it to the reading list."""
+    """Create a new book from a JSON payload and put it in the reading list.
+
+    The catalogue is shared: `books` is one row per ISBN for every reader, so a
+    Reading List row or a Reading is what links a Book to someone. Adding a Book
+    is the reader saying they mean to read it, which is why both paths below — a
+    Book new to the catalogue and one the reader already had — write that row.
+    """
     storage = get_storage()
     data = request.get_json(silent=True) or {}
 
