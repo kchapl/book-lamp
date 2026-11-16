@@ -336,7 +336,10 @@ describe('AddBookPage discover search', () => {
         expect(screen.getByText('ISBN 9781848549241')).toBeInTheDocument();
     });
 
-    it('numbers rows that would otherwise show exactly the same details', async () => {
+    it('does not number rows the ISBN already tells apart', async () => {
+        // Two editions can agree on title, author, year and publisher. The ISBN
+        // is on the identity line for the reader to check a copy against, so it
+        // separates the rows without help.
         discover.mockResolvedValue([
             {
                 title: 'Dune',
@@ -358,8 +361,37 @@ describe('AddBookPage discover search', () => {
         typeInto('discover-query', 'Dune');
         fireEvent.click(button(/^search$/i));
 
-        expect(await screen.findByText(/Edition 1 of 2/)).toBeInTheDocument();
-        expect(screen.getByText(/Edition 2 of 2/)).toBeInTheDocument();
+        expect(await screen.findByText('ISBN 9780441172719')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9780593099322')).toBeInTheDocument();
+        expect(screen.queryByText(/of 2/)).not.toBeInTheDocument();
+    });
+
+    it('numbers records that agree on the ISBN and every detail', async () => {
+        // Nothing in the row separates these records, so list position is all
+        // there is to name — and the label says position, not edition.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/Option 1 of 2/)).toBeInTheDocument();
+        expect(screen.getByText(/Option 2 of 2/)).toBeInTheDocument();
     });
 
     it('does not fold a sequel into the title it starts with', async () => {

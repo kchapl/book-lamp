@@ -49,8 +49,9 @@ function splitSubtitle(rawTitle: string): { title: string; subtitle?: string } {
  * A search answers with editions, and two editions of one work can agree on
  * every field a row shows — title, author, year, publisher — with only the ISBN
  * apart. Saying which ISBN a row would add is what lets a reader check it
- * against the copy in their hand; numbering rows that still agree is what stops
- * the list offering two choices that look identical.
+ * against the copy in their hand, so an ISBN that differs is enough to tell two
+ * rows apart. Numbering is left for records that agree on that as well, where
+ * the row itself gives the reader nothing else.
  */
 export function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
     const rows: DiscoveredRow[] = candidates.map((candidate) => {
@@ -65,8 +66,8 @@ export function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
     });
 
     // Rows that would show the same thing are grouped by exactly what is
-    // visible, so a row is only numbered when the reader has nothing else to
-    // tell it by.
+    // visible, the ISBN included, so a row is only numbered when the reader has
+    // nothing else to tell it by.
     const groups = new Map<string, DiscoveredRow[]>();
     for (const row of rows) {
         const key = [
@@ -75,6 +76,7 @@ export function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
             row.author ?? '',
             row.candidate.publication_year ?? '',
             row.candidate.publisher ?? '',
+            row.isbn ?? '',
         ]
             .join('\u0000')
             .toLowerCase();
@@ -86,7 +88,7 @@ export function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
     for (const group of groups.values()) {
         if (group.length < 2) continue;
         group.forEach((row, index) => {
-            row.copyLabel = `Edition ${index + 1} of ${group.length}`;
+            row.copyLabel = `Option ${index + 1} of ${group.length}`;
         });
     }
 
