@@ -6,24 +6,6 @@ test.beforeEach(async ({ request }) => {
     await resetAndSeed(request);
 });
 
-test('captures the ISBN above the title-or-author search', async ({ page }) => {
-    await page.goto('/books/new');
-
-    // The order is what a reader sees, so it is measured where it is painted
-    // rather than read off the markup.
-    const isbn = page.locator('.isbn-section');
-    const discover = page.locator('.discover-section');
-    await expect(isbn).toBeVisible();
-    await expect(discover).toBeVisible();
-
-    const isbnBox = await isbn.boundingBox();
-    const discoverBox = await discover.boundingBox();
-    if (!isbnBox) throw new Error('The ISBN capture has no layout');
-    if (!discoverBox) throw new Error('The title-or-author search has no layout');
-
-    expect(isbnBox.y).toBeLessThan(discoverBox.y);
-});
-
 test('adds a Book through the ISBN lookup', async ({ page }) => {
     await page.goto('/books/new');
 

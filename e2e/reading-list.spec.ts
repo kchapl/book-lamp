@@ -8,12 +8,8 @@ test.beforeEach(async ({ request }) => {
 /**
  * The box Playwright measures, or a failure that names the element with none.
  *
- * `boundingBox()` answers null for an element that exists but has no layout box
- * yet — a Material Web host the library has not upgraded, on a loaded runner.
- * The visibility assertion is what absorbs that: it retries until the element
- * is laid out, so a null box afterwards is a real bug. The message names the
- * element, because "the rows have no layout" leaves the next run with nowhere
- * to start.
+ * `boundingBox()` answers null before an element is laid out — a Material Web
+ * host the library has not upgraded, say — so visibility is asserted first.
  */
 async function measured(locator: Locator, description: string) {
     await expect(locator, `${description} should be visible before it is measured`).toBeVisible();

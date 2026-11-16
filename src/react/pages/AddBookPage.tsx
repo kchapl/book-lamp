@@ -237,12 +237,8 @@ const AddBookPage: React.FC = () => {
     };
 
     /**
-     * Add a candidate in one action.
-     *
-     * The create endpoint de-duplicates by ISBN, so a candidate whose ISBN is
-     * already in the collection queues the existing Book rather than making a
-     * second copy. The button says "Add to reading list", so the payload asks
-     * for the queueing the button promises.
+     * Add a candidate in one action. The payload asks for the queueing the
+     * button promises; the endpoint de-duplicates on ISBN.
      */
     const handleChooseCandidate = async (candidate: BookMatch) => {
         const key = candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
@@ -320,9 +316,8 @@ const AddBookPage: React.FC = () => {
                 }
             }
 
-            // The tickbox is the whole answer to "queue this?": the endpoint
-            // puts the Book on the Reading List itself, so sending the flag
-            // decides it in the same request that creates the Book.
+            // The endpoint queues the Book itself, so the flag travels with
+            // the create rather than a second request.
             const book = await createBook({
                 ...details,
                 isbn: isbnToUse,

@@ -4,11 +4,6 @@
  * App polls /api/sync/diagnostics on every mount, and that endpoint requires a
  * session. fetchJSON redirects to /unauthorised on any 401, so an unauthenticated
  * visitor reloads /unauthorised forever and never reaches the sign-in button.
- *
- * Every test here waits on something the app does — a navigation, or the page it
- * renders — rather than on a wall-clock budget. A poll asks "has it happened
- * yet?" and answers "no" both when the app is wrong and when the machine is
- * slow; waiting for the event itself cannot make that mistake.
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,13 +13,7 @@ import App from '../App';
 const SYNC_DIAGNOSTICS = '/api/sync/diagnostics';
 const AUTH_STATUS = '/api/auth/status';
 
-/**
- * How long a redirect that never comes is given before the test says so.
- *
- * The wait is not a poll: `nextNavigation` resolves the instant the app assigns
- * `location.href`. This only bounds the failure — without it, a regression that
- * stopped redirecting entirely would surface as vitest's bare "test timed out".
- */
+/** Bounds the failure: without it a missing redirect is a bare test timeout. */
 const REDIRECT_BUDGET_MS = 4000;
 
 let navigations: string[] = [];
@@ -91,9 +80,8 @@ function installLocation(pathname: string) {
 /**
  * Resolve as soon as the app sends the browser somewhere.
  *
- * `expectation` completes the sentence the failure prints: "…, but no
- * navigation happened within 4000 ms (requests: …)", which names what the test
- * was waiting for and what the app asked for instead.
+ * `expectation` completes the failure sentence, so the message names what was
+ * awaited rather than reporting a bare timeout.
  */
 function nextNavigation(expectation: string): Promise<string> {
     const seen = navigations[navigations.length - 1];
@@ -120,9 +108,8 @@ function nextNavigation(expectation: string): Promise<string> {
  * Answer every request. Anything whose URL contains one of `unauthorised`
  * comes back 401, which is what a missing session produces.
  *
- * `authenticated` decides what /api/auth/status says. A visitor who the app
- * believes is signed in is what makes the sync probe run, which is the only way
- * a 401 can arrive while the browser is on /unauthorised.
+ * `authenticated` decides what /api/auth/status says; the sync probe only runs
+ * for a visitor the app believes is signed in.
  */
 function installFetch(unauthorised: string[], { authenticated = false } = {}) {
     vi.stubGlobal(
@@ -176,20 +163,14 @@ afterEach(() => {
 describe('an unauthenticated visitor on /unauthorised', () => {
     it('is not sent back to /unauthorised, and never probes a session endpoint', async () => {
         installLocation('/unauthorised');
-        // The visitor has no session, so the session endpoints they reach answer
-        // 401 — the auth check App mounts with among them. That 401 is what the
-        // guard in fetchJSON exists for: without it, this test's visitor would
-        // be sent back to the page they are already on, forever.
+        // A 401 from the auth check is what the guard in fetchJSON exists for:
+        // without it this visitor would be sent back to the page they are on.
         installFetch([SYNC_DIAGNOSTICS, AUTH_STATUS]);
 
         render(React.createElement(App));
 
-        // The page is behind the router's lazy chunk, so reaching its heading
-        // means App has committed and its mount effects — the auth check and
-        // the probe that must not run — have already been through. Nothing that
-        // is going to be requested after that can surprise the assertions: with
-        // an unauthenticated answer, the only thing that would start a probe is
-        // a switch to signed in, which this response rules out.
+        // The heading is behind the router's lazy chunk, so seeing it means the
+        // mount effects — the auth check among them — have run.
         await screen.findByRole('heading', { name: 'Authentication Required' });
 
         expect(navigations).not.toContain('/unauthorised');
@@ -204,10 +185,8 @@ describe('a 401 that arrives on /unauthorised', () => {
 
         render(React.createElement(App));
 
-        // The sync probe earns the 401. The badge is what the app shows once it
-        // has handled that failure, and fetchJSON either redirected or did not
-        // before the throw that leads here — so the assertion is made after the
-        // decision, not after a guess at how long it takes.
+        // The badge appears after fetchJSON has handled the 401, so this is
+        // asserted after the decision rather than in a race with it.
         await screen.findByRole('img', { name: 'Sync problem' });
 
         expect(navigations).toEqual([]);
