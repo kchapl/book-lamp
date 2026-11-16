@@ -233,7 +233,7 @@ class PostgresStorage:
                     WHERE ba.book_id = b.id) AS author
             FROM reading_list rl
             JOIN books b ON rl.book_id = b.id
-            WHERE rl.user_id = %s
+            WHERE rl.user_id = %s AND rl.queued
             ORDER BY rl.position ASC
         """
         with self.pool.connection() as conn:
@@ -588,29 +588,47 @@ class PostgresStorage:
             )
             return res.rowcount > 0
 
-    def add_to_reading_list(self, book_id: int) -> None:
+    def add_to_reading_list(self, book_id: int, queued: bool = True) -> None:
+        """Link the Book to the reader, queued or not.
+
+        A Reading List row is the reader's only link to a Book besides a Reading,
+        and everything that lists their Books joins through one of the two, so a
+        Book saved without the link belongs to nobody. `queued` is the narrower
+        claim: that the Book is in the queue they mean to read next.
+        """
         with self.pool.connection() as conn:
-            # Check if already in list
-            existing = conn.execute(
-                "SELECT 1 FROM reading_list WHERE user_id = %s AND book_id = %s",
+            existing_raw = conn.execute(
+                "SELECT queued FROM reading_list WHERE user_id = %s AND book_id = %s",
                 [self.user_id, book_id],
             ).fetchone()
-            if existing:
+            existing = cast(Optional[Dict[str, Any]], existing_raw)
+            if existing and (existing["queued"] or not queued):
+                # Already queued, or a Book the reader has and is not asking to
+                # queue: nothing to record. Nothing demotes a queued Book.
                 return
 
-            # Get max position
-            row_raw = conn.execute(
-                "SELECT COALESCE(MAX(position), 0) as max_pos FROM reading_list WHERE user_id = %s",
-                [self.user_id],
-            ).fetchone()
-            row = cast(Dict[str, Any], row_raw)
-            new_pos = (row["max_pos"] if row else 0) + 1
+            new_pos = 0
+            if queued:
+                # Queueing puts the Book at the end of the queue. An unqueued row
+                # sits outside it and so holds no position.
+                row_raw = conn.execute(
+                    "SELECT COALESCE(MAX(position), 0) as max_pos FROM reading_list " "WHERE user_id = %s AND queued",
+                    [self.user_id],
+                ).fetchone()
+                row = cast(Dict[str, Any], row_raw)
+                new_pos = (row["max_pos"] if row else 0) + 1
 
-            conn.execute(
-                "INSERT INTO reading_list (user_id, book_id, position) VALUES (%s, %s, %s)",
-                [self.user_id, book_id, new_pos],
-            )
-            logger.info(f"Successfully added book {book_id} to reading list (Postgres)")
+            if existing:
+                conn.execute(
+                    "UPDATE reading_list SET queued = TRUE, position = %s " "WHERE user_id = %s AND book_id = %s",
+                    [new_pos, self.user_id, book_id],
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO reading_list (user_id, book_id, position, queued) " "VALUES (%s, %s, %s, %s)",
+                    [self.user_id, book_id, new_pos, queued],
+                )
+            logger.info(f"Successfully added book {book_id} to reading list (Postgres, queued={queued})")
 
     def remove_from_reading_list(self, book_id: int) -> None:
         with self.pool.connection() as conn:

@@ -10,9 +10,10 @@ presented; see `DESIGN.md`. It is not a claim to ownership.
 
 ## Book
 
-A work the reader has recorded a Reading of, is reading, or means to read,
-identified by its ISBN. A Book is the thing a Reading is about and the thing a
-Reading List holds. Logging a Book says nothing about owning a copy of it.
+A work the reader has recorded a Reading of, is reading, means to read, or has
+saved for later, identified by its ISBN. A Book is the thing a Reading is about
+and the thing a Reading List holds. Logging a Book says nothing about owning a
+copy of it.
 
 ## Author
 
@@ -29,6 +30,8 @@ Readings over its life: it can be planned, started, abandoned, and started again
 ## Reading List
 
 The queue of Books the reader intends to read next, in the reader's chosen order.
+A Book on the list is also one the reader has: saving a Book without queueing it
+keeps that link, and the Book has no place in the queue until it is queued.
 
 ## Reading Log
 

@@ -299,13 +299,14 @@ def api_create_book():
 
     existing = storage.get_book_by_isbn(isbn)
     if existing:
-        if add_to_reading_list:
-            try:
-                storage.add_to_reading_list(existing["id"])
-            except Exception as exc:
-                current_app.logger.warning(
-                    f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
-                )
+        # Queued or not, the reader has to be linked to the Book: the catalogue
+        # is shared, so this row is what makes it theirs.
+        try:
+            storage.add_to_reading_list(existing["id"], queued=add_to_reading_list)
+        except Exception as exc:
+            current_app.logger.warning(
+                f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
+            )
         return jsonify(existing), 200
 
     if title and authors:
@@ -377,11 +378,12 @@ def api_create_book():
         current_app.logger.error(f"api_create_book: storage.add_book failed: {exc}", exc_info=True)
         return jsonify({"error": "Failed to create book"}), 500
 
-    if add_to_reading_list:
-        try:
-            storage.add_to_reading_list(created["id"])
-        except Exception as exc:
-            current_app.logger.warning(f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}")
+    # Queued or not, the reader has to be linked to the Book: the catalogue is
+    # shared, so this row is what makes it theirs.
+    try:
+        storage.add_to_reading_list(created["id"], queued=add_to_reading_list)
+    except Exception as exc:
+        current_app.logger.warning(f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}")
 
     return jsonify(created), 201
 
