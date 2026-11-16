@@ -488,19 +488,46 @@ def _contains_whole_phrase(longer: str, shorter: str) -> bool:
     return f" {shorter} " in f" {longer} "
 
 
+# Words a title carries as glue rather than meaning. Requiring them in a match
+# would drop an edition that writes "History of England, 100 Places" without the
+# "in", and they discriminate nothing on their own.
+_TITLE_GLUE = frozenset({"a", "an", "the", "of", "in", "on", "and", "to", "from", "for", "at", "by"})
+
+
+def _meaningful_words(key: str) -> set:
+    return {word for word in key.split() if word not in _TITLE_GLUE}
+
+
+def _shares_every_meaningful_word(asked_key: str, candidate_key: str) -> bool:
+    """Whether every word that carries meaning in the query is in the title.
+
+    A reader who types "Earthsea Wizard" means *A Wizard of Earthsea*: the words
+    are there in another order, and a title holding all of them is still an
+    answer. A title holding only some — *The History of Tom Jones* for "A history
+    of England in 100 places" — is not, which is what keeps a loose search from
+    padding its answer with near-misses.
+    """
+    wanted = _meaningful_words(asked_key)
+    if not wanted:
+        return False
+    return wanted <= _meaningful_words(candidate_key)
+
+
 def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
     """Order the candidates so the reader's own words come first.
 
     Providers rank by their own relevance, which knows nothing about the
     subtitle the reader typed, the leading article one edition drops, or the
-    author they named. Four title ranks are what a reader can tell apart:
+    author they named. Five title ranks are what a reader can tell apart:
 
     0. the title they typed, word for word;
     1. the same title once case, punctuation and a leading article are folded,
        or the same title with a subtitle on either side;
     2. the title they typed, embedded in a longer one — "Hail Mary" in
        "Project Hail Mary";
-    3. something else.
+    3. every word that carries meaning in the query, in any order —
+       "Earthsea Wizard" for *A Wizard of Earthsea*;
+    4. something else.
 
     Everything within a rank keeps the provider's order, because two exact
     matches are still told apart by the provider.
@@ -511,7 +538,7 @@ def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tup
     candidate_folded = _without_leading_article(candidate_key)
 
     if not asked:
-        title_rank = 3
+        title_rank = 4
     elif candidate_key == asked:
         title_rank = 0
     elif _same_title_family(asked_folded, candidate_folded):
@@ -520,8 +547,10 @@ def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tup
         asked_folded, candidate_folded
     ):
         title_rank = 2
-    else:
+    elif _shares_every_meaningful_word(asked_folded, candidate_folded):
         title_rank = 3
+    else:
+        title_rank = 4
 
     names = " ".join(str(name) for name in candidate.get("authors") or []).lower()
     author_rank = 0 if not author or author.lower() in names else 1
@@ -721,12 +750,13 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
     # history of England — and those are not answers to this question. They stay
     # only when the author search vouched for them: padding the answer out to the
     # limit with them is what a reader reads as a broken search. A title that
-    # contains the query ("Project Hail Mary" for "Hail Mary") is an answer, and
-    # ranks below the titles that start with it.
+    # contains the query ("Project Hail Mary" for "Hail Mary"), or every word of
+    # it in another order ("Earthsea Wizard"), is an answer, and ranks below the
+    # titles that start with it.
     relevant = [
         candidate
         for candidate in candidates
-        if candidate["isbn13"] in by_author or _title_match_rank(candidate, cleaned, "")[0] <= 2
+        if candidate["isbn13"] in by_author or _title_match_rank(candidate, cleaned, "")[0] <= 3
     ]
     relevant.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
     return relevant[:limit]

@@ -232,8 +232,8 @@ def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
         ("A HISTORY OF ENGLAND IN 100 PLACES", 0),
         ("History of England in 100 Places", 1),
         ("A History of England in 100 Places From Stonehenge To The Gherkin", 1),
-        ("The History of Tom Jones", 3),
-        ("The Picture of Dorian Gray", 3),
+        ("The History of Tom Jones", 4),
+        ("The Picture of Dorian Gray", 4),
     ],
 )
 def test_title_match_rank_folds_articles_punctuation_and_subtitles(candidate_title, expected_rank):
@@ -254,7 +254,9 @@ def test_title_match_rank_folds_articles_punctuation_and_subtitles(candidate_tit
         # The query is the part of the title the reader remembers, and it need
         # not be the part the title starts with.
         ("Project Hail Mary", 2),
+        # The same words, reordered: still the title the reader means.
         ("Mary Hail", 3),
+        ("Dune", 4),
     ],
 )
 def test_title_match_rank_places_a_query_inside_a_longer_title(candidate_title, expected_rank):
@@ -280,6 +282,26 @@ def test_search_books_keeps_a_title_that_contains_the_query(monkeypatch):
     results = lookup_module.search_books("Hail Mary")
 
     assert [candidate["title"] for candidate in results] == ["Project Hail Mary"]
+
+
+@pytest.mark.parametrize("query", ["Earthsea", "Earthsea Wizard", "A Wizard of Earthsea"])
+def test_search_books_keeps_a_partial_title_query(monkeypatch, query):
+    """A reader who remembers part of a title, in any order, finds the Book.
+
+    The discovery box is labelled title-or-author, and a reader who types a word
+    from the middle of a title is asking a question the search must answer.
+    """
+    monkeypatch.setattr(
+        lookup_module,
+        "_open_library_title_search",
+        lambda *args, **kwargs: [_candidate("9780547773742", title="A Wizard of Earthsea")],
+    )
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", lambda *args, **kwargs: [])
+
+    results = lookup_module.search_books(query)
+
+    assert [candidate["isbn13"] for candidate in results] == ["9780547773742"]
 
 
 def test_search_books_keeps_the_providers_that_answer(monkeypatch):
