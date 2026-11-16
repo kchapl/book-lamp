@@ -476,32 +476,52 @@ def _same_title_family(left: str, right: str) -> bool:
     return left == right or left.startswith(right + " ") or right.startswith(left + " ")
 
 
+def _contains_whole_phrase(longer: str, shorter: str) -> bool:
+    """Whether `shorter` sits inside `longer` as whole words, not inside one.
+
+    A reader who types "Hail Mary" is asking for "Project Hail Mary": the query
+    is the part of the title they remember, and it need not be the part the
+    title starts with.
+    """
+    if not shorter or not longer:
+        return False
+    return f" {shorter} " in f" {longer} "
+
+
 def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
     """Order the candidates so the reader's own words come first.
 
     Providers rank by their own relevance, which knows nothing about the
     subtitle the reader typed, the leading article one edition drops, or the
-    author they named. Three title ranks are what a reader can tell apart:
+    author they named. Four title ranks are what a reader can tell apart:
 
     0. the title they typed, word for word;
     1. the same title once case, punctuation and a leading article are folded,
        or the same title with a subtitle on either side;
-    2. something else.
+    2. the title they typed, embedded in a longer one — "Hail Mary" in
+       "Project Hail Mary";
+    3. something else.
 
     Everything within a rank keeps the provider's order, because two exact
     matches are still told apart by the provider.
     """
     asked = _title_key(title)
     candidate_key = _title_key(str(candidate.get("title") or ""))
+    asked_folded = _without_leading_article(asked)
+    candidate_folded = _without_leading_article(candidate_key)
 
     if not asked:
-        title_rank = 2
+        title_rank = 3
     elif candidate_key == asked:
         title_rank = 0
-    elif _same_title_family(_without_leading_article(asked), _without_leading_article(candidate_key)):
+    elif _same_title_family(asked_folded, candidate_folded):
         title_rank = 1
-    else:
+    elif _contains_whole_phrase(candidate_folded, asked_folded) or _contains_whole_phrase(
+        asked_folded, candidate_folded
+    ):
         title_rank = 2
+    else:
+        title_rank = 3
 
     names = " ".join(str(name) for name in candidate.get("authors") or []).lower()
     author_rank = 0 if not author or author.lower() in names else 1
@@ -700,11 +720,13 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
     # A loose title search returns near-misses — *The History of Tom Jones* for a
     # history of England — and those are not answers to this question. They stay
     # only when the author search vouched for them: padding the answer out to the
-    # limit with them is what a reader reads as a broken search.
+    # limit with them is what a reader reads as a broken search. A title that
+    # contains the query ("Project Hail Mary" for "Hail Mary") is an answer, and
+    # ranks below the titles that start with it.
     relevant = [
         candidate
         for candidate in candidates
-        if candidate["isbn13"] in by_author or _title_match_rank(candidate, cleaned, "")[0] <= 1
+        if candidate["isbn13"] in by_author or _title_match_rank(candidate, cleaned, "")[0] <= 2
     ]
     relevant.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
     return relevant[:limit]

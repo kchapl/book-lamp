@@ -232,8 +232,8 @@ def test_open_library_title_search_merges_structured_and_free_text(monkeypatch):
         ("A HISTORY OF ENGLAND IN 100 PLACES", 0),
         ("History of England in 100 Places", 1),
         ("A History of England in 100 Places From Stonehenge To The Gherkin", 1),
-        ("The History of Tom Jones", 2),
-        ("The Picture of Dorian Gray", 2),
+        ("The History of Tom Jones", 3),
+        ("The Picture of Dorian Gray", 3),
     ],
 )
 def test_title_match_rank_folds_articles_punctuation_and_subtitles(candidate_title, expected_rank):
@@ -244,6 +244,42 @@ def test_title_match_rank_folds_articles_punctuation_and_subtitles(candidate_tit
     )
 
     assert rank[0] == expected_rank
+
+
+@pytest.mark.parametrize(
+    "candidate_title, expected_rank",
+    [
+        ("Hail Mary", 0),
+        ("Hail Mary: The Story of Apollo", 1),
+        # The query is the part of the title the reader remembers, and it need
+        # not be the part the title starts with.
+        ("Project Hail Mary", 2),
+        ("Mary Hail", 3),
+    ],
+)
+def test_title_match_rank_places_a_query_inside_a_longer_title(candidate_title, expected_rank):
+    rank = lookup_module._title_match_rank(
+        {"title": candidate_title, "authors": ["Andy Weir"]},
+        "Hail Mary",
+        "",
+    )
+
+    assert rank[0] == expected_rank
+
+
+def test_search_books_keeps_a_title_that_contains_the_query(monkeypatch):
+    """Searching "Hail Mary" must not report nothing because of "Project"."""
+    monkeypatch.setattr(
+        lookup_module,
+        "_open_library_title_search",
+        lambda *args, **kwargs: [_candidate("9780593135204", title="Project Hail Mary")],
+    )
+    monkeypatch.setattr(lookup_module, "_google_books_title_search", lambda *args, **kwargs: [])
+    monkeypatch.setattr(lookup_module, "lookup_books_by_author", lambda *args, **kwargs: [])
+
+    results = lookup_module.search_books("Hail Mary")
+
+    assert [candidate["title"] for candidate in results] == ["Project Hail Mary"]
 
 
 def test_search_books_keeps_the_providers_that_answer(monkeypatch):
