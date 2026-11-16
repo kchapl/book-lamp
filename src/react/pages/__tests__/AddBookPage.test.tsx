@@ -305,6 +305,139 @@ describe('AddBookPage discover search', () => {
         );
     });
 
+    it('tells two editions of one work apart instead of listing a duplicate', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'A History of England in 100 Places',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549234',
+            },
+            {
+                title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549241',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'A history of England in 100 places');
+        fireEvent.click(button(/^search$/i));
+
+        // The subtitle gets its own line, so the second row reads as the same
+        // book with a subtitle rather than as the title repeated.
+        expect(await screen.findByText('From Stonehenge to the Gherkin')).toBeInTheDocument();
+        // Each row says which ISBN it would add. That is the only difference a
+        // reader could act on, since author, year and publisher agree.
+        expect(screen.getByText('ISBN 9781848549234')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9781848549241')).toBeInTheDocument();
+    });
+
+    it('does not number rows the ISBN already tells apart', async () => {
+        // Two editions can agree on title, author, year and publisher. The ISBN
+        // is on the identity line for the reader to check a copy against, so it
+        // separates the rows without help.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780593099322',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('ISBN 9780441172719')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9780593099322')).toBeInTheDocument();
+        expect(screen.queryByText(/of 2/)).not.toBeInTheDocument();
+    });
+
+    it('numbers records that agree on the ISBN and every detail', async () => {
+        // Nothing in the row separates these records, so list position is all
+        // there is to name — and the label says position, not edition.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/Option 1 of 2/)).toBeInTheDocument();
+        expect(screen.getByText(/Option 2 of 2/)).toBeInTheDocument();
+    });
+
+    it('keeps a short prefix attached to what follows it', async () => {
+        // "Re: Zero" is a title, not a subtitle: a prefix of three characters
+        // or fewer is too short to tell the reader which Book this is.
+        discover.mockResolvedValue([
+            { title: 'Re: Zero', author: 'Tappei Nagatsuki', isbn13: '9780316395344' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Re Zero');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Re: Zero')).toBeInTheDocument();
+        expect(screen.queryByText('Zero')).not.toBeInTheDocument();
+    });
+
+    it('keeps a colon that belongs to the title', async () => {
+        // "10:04" is a title; its colon is not a subtitle separator.
+        discover.mockResolvedValue([
+            { title: '10:04', author: 'Ben Lerner', isbn13: '9780000000019' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', '10:04');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('10:04')).toBeInTheDocument();
+        expect(screen.queryByText('10')).not.toBeInTheDocument();
+    });
+
+    it('splits a colon that really separates a subtitle', async () => {
+        // The guard only keeps a split whose prefix is too short to name the
+        // Book, so a title long enough to stand on its own still gets one.
+        discover.mockResolvedValue([
+            { title: 'Piranesi: A Novel', author: 'Susanna Clarke', isbn13: '9781635575637' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Piranesi');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Piranesi')).toBeInTheDocument();
+        expect(screen.getByText('A Novel')).toBeInTheDocument();
+    });
+
     it('queues the existing Book when the candidate is already owned', async () => {
         // The create endpoint de-duplicates on ISBN; the page makes the one
         // request and lands on the Book that already exists.
