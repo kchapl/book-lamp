@@ -298,7 +298,7 @@ class MockStorage:
         book_map = {b["id"]: b for b in self.books}
         for item in sorted(self.reading_list, key=lambda x: x["position"]):
             book = book_map.get(item["book_id"])
-            if book and item["queued"]:
+            if book:
                 enriched = item.copy()
                 enriched["title"] = book.get("title", "")
                 enriched["author"] = book.get("author", "")
@@ -306,38 +306,14 @@ class MockStorage:
                 result.append(enriched)
         return result
 
-    def add_to_reading_list(self, book_id: int, queued: bool = True) -> None:
-        """Link the Book to the reader, queued or not.
-
-        A Reading List row is the reader's only link to a Book besides a Reading,
-        and everything that lists their Books joins through one of the two, so a
-        Book saved without the link belongs to nobody. `queued` is the narrower
-        claim: that the Book is in the queue they mean to read next.
-        """
-        existing = next((item for item in self.reading_list if item["book_id"] == book_id), None)
-        if existing and (existing["queued"] or not queued):
-            # Already queued, or a Book the reader has and is not asking to
-            # queue: nothing to record. Nothing demotes a queued Book.
-            logger.info(f"Book {book_id} is already linked to the reader (MockStorage)")
+    def add_to_reading_list(self, book_id: int) -> None:
+        """Put the Book at the end of the queue; adding it twice changes nothing."""
+        if any(item["book_id"] == book_id for item in self.reading_list):
+            logger.info(f"Book {book_id} is already in the reading list (MockStorage)")
             return
-
-        if existing:
-            existing["queued"] = True
-            existing["position"] = self._next_queued_position()
-        else:
-            self.reading_list.append(
-                {
-                    "book_id": book_id,
-                    "position": self._next_queued_position() if queued else 0,
-                    "queued": queued,
-                    "created_at": "2024-01-01T00:00:00",
-                }
-            )
-        logger.info(f"Successfully added book {book_id} to reading list (MockStorage, queued={queued})")
-
-    def _next_queued_position(self) -> int:
-        """One past the end of the queue; unqueued rows take no position."""
-        return max((item["position"] for item in self.reading_list if item["queued"]), default=0) + 1
+        position = max((item["position"] for item in self.reading_list), default=0) + 1
+        self.reading_list.append({"book_id": book_id, "position": position, "created_at": "2024-01-01T00:00:00"})
+        logger.info(f"Successfully added book {book_id} to reading list (MockStorage)")
 
     def remove_from_reading_list(self, book_id: int) -> None:
         for i, item in enumerate(self.reading_list):
@@ -345,17 +321,12 @@ class MockStorage:
                 self.reading_list.pop(i)
                 logger.info(f"Successfully removed book {book_id} from reading list (MockStorage)")
                 break
-        # Renumber the queue. A row outside it holds no position, so counting it
-        # here would push the queue's own positions up.
-        queued = sorted((item for item in self.reading_list if item["queued"]), key=lambda item: item["position"])
-        for position, item in enumerate(queued, start=1):
+        # Reassign positions so the queue stays numbered from one.
+        for position, item in enumerate(self.reading_list, start=1):
             item["position"] = position
 
     def update_reading_list_order(self, book_ids: list[int]) -> None:
         item_map = {item["book_id"]: item for item in self.reading_list}
-        # Rows outside the queue keep their place in the reader's Books; only the
-        # queue is renumbered.
-        unqueued = [item for item in self.reading_list if not item["queued"]]
         new_list = []
         pos = 1
         for bid in book_ids:
@@ -364,7 +335,7 @@ class MockStorage:
                 item["position"] = pos
                 new_list.append(item)
                 pos += 1
-        self.reading_list = new_list + unqueued
+        self.reading_list = new_list
 
     def bulk_import(self, items: list[dict[str, Any]]) -> int:
         import_count = 0

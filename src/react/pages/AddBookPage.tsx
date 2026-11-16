@@ -6,7 +6,7 @@ import {
     discoverBooks,
     createBook,
 } from '../services/api';
-import { Button, Checkbox, TextField } from '../ui';
+import { Button, TextField } from '../ui';
 import type { BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
@@ -35,11 +35,6 @@ const AddBookPage: React.FC = () => {
     const [discoverError, setDiscoverError] = useState<string | null>(null);
     const [discoverNotice, setDiscoverNotice] = useState<string | null>(null);
     const [addingCandidate, setAddingCandidate] = useState<string | null>(null);
-    // The Reading List links here with `add_to_reading_list=1`, so the option
-    // starts ticked for a reader who came from the list to queue a Book.
-    const [addToReadingListChecked, setAddToReadingListChecked] = useState(
-        () => searchParams.get('add_to_reading_list') === '1'
-    );
     const [scanning, setScanning] = useState(false);
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
@@ -237,8 +232,8 @@ const AddBookPage: React.FC = () => {
     };
 
     /**
-     * Add a candidate in one action. The payload asks for the queueing the
-     * button promises; the endpoint de-duplicates on ISBN.
+     * Add a candidate in one action. The endpoint queues the new Book, which is
+     * what the button promises, and de-duplicates on ISBN.
      */
     const handleChooseCandidate = async (candidate: BookMatch) => {
         const key = candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
@@ -256,7 +251,6 @@ const AddBookPage: React.FC = () => {
                 cover_url: candidate.cover_url,
                 publisher: candidate.publisher,
                 description: candidate.description,
-                add_to_reading_list: true,
             });
             if (book.id) {
                 navigate(`/books/${book.id}`);
@@ -316,13 +310,9 @@ const AddBookPage: React.FC = () => {
                 }
             }
 
-            // The endpoint queues the Book itself, so the flag travels with
-            // the create rather than a second request.
-            const book = await createBook({
-                ...details,
-                isbn: isbnToUse,
-                add_to_reading_list: addToReadingListChecked,
-            });
+            // The endpoint puts the Book in the reading list itself, so the
+            // create is the only request.
+            const book = await createBook({ ...details, isbn: isbnToUse });
 
             navigate(`/books/${book.id}`);
         } catch (err) {
@@ -529,14 +519,6 @@ const AddBookPage: React.FC = () => {
                             {loading ? 'Searching...' : 'Find ISBN from title & author'}
                         </Button>
                     </div>
-
-                    <label className="checkbox-label">
-                        <Checkbox
-                            checked={addToReadingListChecked}
-                            onCheckedChange={setAddToReadingListChecked}
-                        />
-                        Add to reading list
-                    </label>
 
                     <Button type="submit" disabled={loading}>
                         {loading ? 'Adding...' : isbn.trim() ? 'Add Book' : 'Find ISBN & Add Book'}

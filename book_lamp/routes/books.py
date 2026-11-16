@@ -75,19 +75,6 @@ def _payload_authors(data: dict) -> list[str]:
     return parse(str(data.get("author", "") or ""))
 
 
-def _payload_add_to_reading_list(data: dict) -> bool:
-    """Whether a create payload wants its Book queued.
-
-    The add form's tickbox decides it. A caller that says nothing keeps the
-    behaviour every other entry point already relies on — the Book is queued —
-    so a payload only opts out by asking to.
-    """
-    given = data.get("add_to_reading_list", True)
-    if isinstance(given, str):
-        return given.strip().lower() not in ("", "0", "false", "no")
-    return bool(given)
-
-
 def _book_data_authors(book_data: dict) -> list[str]:
     """The Authors a lookup result names.
 
@@ -277,10 +264,9 @@ def api_list_books():
 @csrf_protect
 @authorisation_required
 def api_create_book():
-    """Create a new book from a JSON payload, queuing it unless told not to."""
+    """Create a new book from a JSON payload and put it in the reading list."""
     storage = get_storage()
     data = request.get_json(silent=True) or {}
-    add_to_reading_list = _payload_add_to_reading_list(data)
 
     isbn = normalize_isbn(str(data.get("isbn", "") or ""))
     # Store a canonical ISBN-13: the form accepts ISBN-10s, and keeping the
@@ -299,10 +285,10 @@ def api_create_book():
 
     existing = storage.get_book_by_isbn(isbn)
     if existing:
-        # Queued or not, the reader has to be linked to the Book: the catalogue
-        # is shared, so this row is what makes it theirs.
+        # The catalogue is shared, so the reading-list row is what makes the Book
+        # theirs; adding it is how they say they mean to read it.
         try:
-            storage.add_to_reading_list(existing["id"], queued=add_to_reading_list)
+            storage.add_to_reading_list(existing["id"])
         except Exception as exc:
             current_app.logger.warning(
                 f"api_create_book: reading-list add failed for existing book {existing['id']}: {exc}"
@@ -378,10 +364,10 @@ def api_create_book():
         current_app.logger.error(f"api_create_book: storage.add_book failed: {exc}", exc_info=True)
         return jsonify({"error": "Failed to create book"}), 500
 
-    # Queued or not, the reader has to be linked to the Book: the catalogue is
-    # shared, so this row is what makes it theirs.
+    # The catalogue is shared, so the reading-list row is what makes the Book
+    # theirs; adding it is how they say they mean to read it.
     try:
-        storage.add_to_reading_list(created["id"], queued=add_to_reading_list)
+        storage.add_to_reading_list(created["id"])
     except Exception as exc:
         current_app.logger.warning(f"api_create_book: add_to_reading_list failed for book {created['id']}: {exc}")
 

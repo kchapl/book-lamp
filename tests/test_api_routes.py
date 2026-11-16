@@ -201,30 +201,27 @@ def test_api_create_book_deduplication(authenticated_client):
     assert body["title"] == "Existing"
 
 
-def test_api_create_book_leaves_the_reading_list_alone_when_unticked(authenticated_client):
-    """The add form's tickbox decides whether a new Book is queued."""
+def test_api_create_book_queues_the_new_book(authenticated_client):
+    """Adding a Book is the act of queueing it, so the form asks nothing extra."""
     resp = authenticated_client.post(
         "/api/books",
-        json={
-            "title": "Unqueued",
-            "author": "Some Author",
-            "isbn": "9780141439600",
-            "add_to_reading_list": False,
-        },
+        json={"title": "Added", "author": "Some Author", "isbn": "9780141439600"},
     )
 
     assert resp.status_code == 201
-    assert get_storage().get_reading_list() == []
+    body = _json(resp)
+    assert [item["book_id"] for item in get_storage().get_reading_list()] == [body["id"]]
 
 
-def test_api_create_book_queues_a_ticked_book(authenticated_client):
+def test_api_create_book_queues_even_when_a_payload_asks_it_not_to(authenticated_client):
+    """The removed tickbox's field cannot leave a Book with no link to its reader."""
     resp = authenticated_client.post(
         "/api/books",
         json={
             "title": "Queued",
             "author": "Some Author",
             "isbn": "9780141439600",
-            "add_to_reading_list": True,
+            "add_to_reading_list": False,
         },
     )
 
@@ -242,21 +239,6 @@ def test_api_create_book_queues_when_the_payload_says_nothing(authenticated_clie
 
     assert resp.status_code == 201
     assert len(get_storage().get_reading_list()) == 1
-
-
-def test_api_create_book_for_an_owned_isbn_queues_only_when_asked(authenticated_client):
-    """Posting an ISBN already logged queues it only if the payload asks."""
-    storage = get_storage()
-    book = storage.add_book(isbn13="9780306406157", title="Existing", authors=["Author"])
-
-    resp = authenticated_client.post(
-        "/api/books",
-        json={"isbn": "9780306406157", "add_to_reading_list": False},
-    )
-
-    assert resp.status_code == 200
-    assert _json(resp)["id"] == book["id"]
-    assert storage.get_reading_list() == []
 
 
 def test_api_create_book_for_an_owned_isbn_queues_by_default(authenticated_client):

@@ -67,23 +67,12 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
-const renderAt = (path: string) =>
-    render(
-        <MemoryRouter initialEntries={[path]}>
-            <AddBookPage />
-        </MemoryRouter>
-    );
-
 /** A Material Web text field host, addressed by the id the page gives it. */
 const field = (id: string) =>
     document.getElementById(id) as (HTMLElement & { value: string }) | null;
 
 /** The Material Web button whose visible label matches. */
 const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
-
-/** The reading-list option, which only exists once the form is open. */
-const checkbox = (container: HTMLElement) =>
-    container.querySelector('md-checkbox') as (HTMLElement & { checked: boolean }) | null;
 
 /** Type into a Material Web field: set the host value, then report the input. */
 function typeInto(id: string, value: string) {
@@ -124,65 +113,6 @@ describe('AddBookPage barcode scanner', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
         expect(screen.getByText(/stop scanner/i)).toBeInTheDocument();
         expect(screen.queryByText(/failed to start camera/i)).not.toBeInTheDocument();
-    });
-});
-
-describe('AddBookPage reading-list option', () => {
-    it('starts ticked when the Reading List sent the reader here', () => {
-        const { container } = renderAt('/books/new?add_to_reading_list=1');
-
-        fireEvent.click(button(/enter title & author/i));
-
-        expect(checkbox(container)?.checked).toBe(true);
-    });
-
-    it('starts unticked for every other entry point into the form', () => {
-        const { container } = renderAt('/books/new');
-
-        fireEvent.click(button(/enter title & author/i));
-
-        expect(checkbox(container)?.checked).toBe(false);
-    });
-
-    it('sends the tick state, so an unticked Book is not queued', async () => {
-        create.mockResolvedValue({ id: 7, title: 'Emma' });
-
-        const { container } = renderPage();
-        fireEvent.click(button(/enter title & author/i));
-        typeInto('title', 'Emma');
-        typeInto('author', 'Jane Austen');
-        typeInto('isbn', '9780141439600');
-
-        await act(async () => {
-            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
-        });
-
-        expect(create).toHaveBeenCalledWith(
-            expect.objectContaining({ add_to_reading_list: false })
-        );
-    });
-
-    it('queues the Book when the reader ticks the box', async () => {
-        create.mockResolvedValue({ id: 7, title: 'Emma' });
-
-        const { container } = renderPage();
-        fireEvent.click(button(/enter title & author/i));
-
-        const box = checkbox(container) as HTMLElement & { checked: boolean };
-        box.checked = true;
-        fireEvent.change(box);
-
-        typeInto('title', 'Emma');
-        typeInto('author', 'Jane Austen');
-        typeInto('isbn', '9780141439600');
-
-        await act(async () => {
-            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
-        });
-
-        expect(create).toHaveBeenCalledWith(
-            expect.objectContaining({ add_to_reading_list: true })
-        );
     });
 });
 
@@ -236,7 +166,6 @@ describe('AddBookPage submit', () => {
             publisher: undefined,
             publication_year: undefined,
             isbn: '9780141439600',
-            add_to_reading_list: false,
         });
     });
 
@@ -264,7 +193,6 @@ describe('AddBookPage submit', () => {
             publisher: undefined,
             publication_year: undefined,
             isbn: '9780141439600',
-            add_to_reading_list: false,
         });
     });
 
@@ -370,8 +298,6 @@ describe('AddBookPage discover search', () => {
                 author: 'Frank Herbert',
                 isbn: '9780441172719',
                 publication_year: 1965,
-                // The row's button says "Add to reading list".
-                add_to_reading_list: true,
             })
         );
         await waitFor(() =>

@@ -177,51 +177,12 @@ def test_bulk_import(pg_storage):
     assert len(pg_storage.get_readings()) == 2
 
 
-def test_an_unqueued_book_is_the_readers_without_being_in_the_queue(pg_storage):
-    """Saving a Book with the tickbox clear must not leave it belonging to nobody.
-
-    The catalogue is shared, so a Reading List row or a Reading is the only thing
-    that makes a Book the reader's. The unqueued Book has to appear among their
-    Books (which is also the CSV export and discovery's owned set) without
-    taking a place in the queue.
-    """
-    book = pg_storage.add_book(isbn13="9990000000001", title="Unqueued", authors=["Author"])
-
-    pg_storage.add_to_reading_list(book["id"], queued=False)
-
-    assert [b["isbn13"] for b in pg_storage.get_all_books()] == ["9990000000001"]
-    assert pg_storage.get_reading_list() == []
-
-    # Queueing it later moves it into the queue rather than writing a second row.
-    pg_storage.add_to_reading_list(book["id"])
-
-    assert [item["book_id"] for item in pg_storage.get_reading_list()] == [book["id"]]
-    assert pg_storage.get_reading_list()[0]["position"] == 1
-
-
-def test_queueing_an_unqueued_book_comes_after_the_books_already_queued(pg_storage):
-    first = pg_storage.add_book(isbn13="9990000000002", title="First", authors=["Author"])
-    second = pg_storage.add_book(isbn13="9990000000003", title="Second", authors=["Author"])
-
-    pg_storage.add_to_reading_list(first["id"])
-    pg_storage.add_to_reading_list(second["id"], queued=False)
-    pg_storage.add_to_reading_list(second["id"])
-
-    assert [item["book_id"] for item in pg_storage.get_reading_list()] == [first["id"], second["id"]]
-
-
-def test_removing_a_queued_book_leaves_the_queue_numbered_from_one(pg_storage):
-    """A Book outside the queue holds no position, so it must not take one.
-
-    The CSV export writes the queue position, so a queue numbered from k+1 would
-    claim the reader has k Books they do not.
-    """
+def test_removing_a_book_leaves_the_queue_numbered_from_one(pg_storage):
+    """The CSV export writes the queue position, so it has to start at one."""
     first = pg_storage.add_book(isbn13="9990000000004", title="First", authors=["Author"])
     second = pg_storage.add_book(isbn13="9990000000005", title="Second", authors=["Author"])
-    unqueued = pg_storage.add_book(isbn13="9990000000006", title="Unqueued", authors=["Author"])
     pg_storage.add_to_reading_list(first["id"])
     pg_storage.add_to_reading_list(second["id"])
-    pg_storage.add_to_reading_list(unqueued["id"], queued=False)
 
     pg_storage.remove_from_reading_list(first["id"])
 
