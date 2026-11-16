@@ -267,6 +267,25 @@
     margin: 0;
 }
 
+/* Each Author is one row: the field takes the remaining width, its Remove
+   control sits beside it, and the rows stack. */
+.author-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--bl-space-3);
+}
+
+.author-row {
+    display: flex;
+    align-items: center;
+    gap: var(--bl-space-2);
+}
+
+.author-row md-outlined-text-field {
+    flex: 1;
+    min-width: 0;
+}
+
 /* =============================================================================
    READING LIST
    ============================================================================= */
@@ -511,6 +530,22 @@
 }
 
 .book-item .book-title:hover { color: var(--md-sys-color-primary); }
+
+/* The subtitle, set apart so a second edition reads as the same book with a
+   qualifier rather than as a repeated title. */
+.book-item .book-subtitle {
+    margin-top: 2px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-style: italic;
+}
+
+/* The ISBN a row would add, and which of identical-looking records it is. */
+.book-item .book-identity {
+    margin-top: 2px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-size: var(--md-sys-typescale-body-small-size);
+    font-variant-numeric: tabular-nums;
+}
 
 /* =============================================================================
    DASHBOARD — the reading-status board

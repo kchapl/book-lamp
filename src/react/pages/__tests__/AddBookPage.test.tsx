@@ -67,23 +67,12 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
-const renderAt = (path: string) =>
-    render(
-        <MemoryRouter initialEntries={[path]}>
-            <AddBookPage />
-        </MemoryRouter>
-    );
-
 /** A Material Web text field host, addressed by the id the page gives it. */
 const field = (id: string) =>
     document.getElementById(id) as (HTMLElement & { value: string }) | null;
 
 /** The Material Web button whose visible label matches. */
 const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR) as HTMLElement;
-
-/** The reading-list option, which only exists once the form is open. */
-const checkbox = (container: HTMLElement) =>
-    container.querySelector('md-checkbox') as (HTMLElement & { checked: boolean }) | null;
 
 /** Type into a Material Web field: set the host value, then report the input. */
 function typeInto(id: string, value: string) {
@@ -127,21 +116,29 @@ describe('AddBookPage barcode scanner', () => {
     });
 });
 
-describe('AddBookPage reading-list option', () => {
-    it('starts ticked when the Reading List sent the reader here', () => {
-        const { container } = renderAt('/books/new?add_to_reading_list=1');
+describe('AddBookPage layout', () => {
+    it('captures the ISBN above the title-or-author search', () => {
+        const { container } = renderPage();
+        const isbn = container.querySelector('.isbn-section') as HTMLElement;
+        const discover = container.querySelector('.discover-section') as HTMLElement;
 
-        fireEvent.click(button(/enter title & author/i));
-
-        expect(checkbox(container)?.checked).toBe(true);
+        expect(isbn).not.toBeNull();
+        expect(discover).not.toBeNull();
+        // DOCUMENT_POSITION_FOLLOWING means the discovery search renders after
+        // the ISBN block, which is the order a reader reads.
+        expect(
+            isbn.compareDocumentPosition(discover) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
     });
 
-    it('starts unticked for every other entry point into the form', () => {
-        const { container } = renderAt('/books/new');
+    it('points the ISBN helper text at the form, not at the search', () => {
+        renderPage();
 
-        fireEvent.click(button(/enter title & author/i));
+        const host = field('isbn') as (HTMLElement & { supportingText?: string }) | null;
+        const copy = host?.getAttribute('supporting-text') ?? host?.supportingText ?? '';
 
-        expect(checkbox(container)?.checked).toBe(false);
+        expect(copy).toMatch(/title and author form below/i);
+        expect(copy).not.toMatch(/enter the title and author below/i);
     });
 });
 
@@ -306,6 +303,139 @@ describe('AddBookPage discover search', () => {
         await waitFor(() =>
             expect(screen.getByText('destination:/books/7')).toBeInTheDocument()
         );
+    });
+
+    it('tells two editions of one work apart instead of listing a duplicate', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'A History of England in 100 Places',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549234',
+            },
+            {
+                title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
+                author: 'John Julius Norwich',
+                publication_year: 2011,
+                publisher: 'John Murray',
+                isbn13: '9781848549241',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'A history of England in 100 places');
+        fireEvent.click(button(/^search$/i));
+
+        // The subtitle gets its own line, so the second row reads as the same
+        // book with a subtitle rather than as the title repeated.
+        expect(await screen.findByText('From Stonehenge to the Gherkin')).toBeInTheDocument();
+        // Each row says which ISBN it would add. That is the only difference a
+        // reader could act on, since author, year and publisher agree.
+        expect(screen.getByText('ISBN 9781848549234')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9781848549241')).toBeInTheDocument();
+    });
+
+    it('does not number rows the ISBN already tells apart', async () => {
+        // Two editions can agree on title, author, year and publisher. The ISBN
+        // is on the identity line for the reader to check a copy against, so it
+        // separates the rows without help.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780593099322',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('ISBN 9780441172719')).toBeInTheDocument();
+        expect(screen.getByText('ISBN 9780593099322')).toBeInTheDocument();
+        expect(screen.queryByText(/of 2/)).not.toBeInTheDocument();
+    });
+
+    it('numbers records that agree on the ISBN and every detail', async () => {
+        // Nothing in the row separates these records, so list position is all
+        // there is to name — and the label says position, not edition.
+        discover.mockResolvedValue([
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+            {
+                title: 'Dune',
+                author: 'Frank Herbert',
+                publication_year: 1965,
+                publisher: 'Chilton',
+                isbn13: '9780441172719',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Dune');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText(/Option 1 of 2/)).toBeInTheDocument();
+        expect(screen.getByText(/Option 2 of 2/)).toBeInTheDocument();
+    });
+
+    it('keeps a short prefix attached to what follows it', async () => {
+        // "Re: Zero" is a title, not a subtitle: a prefix of three characters
+        // or fewer is too short to tell the reader which Book this is.
+        discover.mockResolvedValue([
+            { title: 'Re: Zero', author: 'Tappei Nagatsuki', isbn13: '9780316395344' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Re Zero');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Re: Zero')).toBeInTheDocument();
+        expect(screen.queryByText('Zero')).not.toBeInTheDocument();
+    });
+
+    it('keeps a colon that belongs to the title', async () => {
+        // "10:04" is a title; its colon is not a subtitle separator.
+        discover.mockResolvedValue([
+            { title: '10:04', author: 'Ben Lerner', isbn13: '9780000000019' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', '10:04');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('10:04')).toBeInTheDocument();
+        expect(screen.queryByText('10')).not.toBeInTheDocument();
+    });
+
+    it('splits a colon that really separates a subtitle', async () => {
+        // The guard only keeps a split whose prefix is too short to name the
+        // Book, so a title long enough to stand on its own still gets one.
+        discover.mockResolvedValue([
+            { title: 'Piranesi: A Novel', author: 'Susanna Clarke', isbn13: '9781635575637' },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Piranesi');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Piranesi')).toBeInTheDocument();
+        expect(screen.getByText('A Novel')).toBeInTheDocument();
     });
 
     it('queues the existing Book when the candidate is already owned', async () => {

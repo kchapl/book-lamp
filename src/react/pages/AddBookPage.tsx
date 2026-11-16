@@ -5,11 +5,95 @@ import {
     findBooksByTitleAuthor,
     discoverBooks,
     createBook,
-    addToReadingList,
 } from '../services/api';
-import { Button, Checkbox, TextField } from '../ui';
+import { Button, TextField } from '../ui';
 import type { BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
+
+/** One row of the discovery list: the candidate, and what the row shows of it. */
+interface DiscoveredRow {
+    candidate: BookMatch;
+    /** The title, with a subtitle taken off the end when the provider separated it. */
+    title: string;
+    /** The part that tells one edition from another, when it is separable. */
+    subtitle?: string;
+    author?: string;
+    /** The ISBN this row would add, which is what a reader can check a copy against. */
+    isbn?: string;
+    /** Which of several otherwise identical records this row is. */
+    copyLabel?: string;
+}
+
+// "Title: Subtitle" and "Title — Subtitle" are how providers separate a
+// subtitle. A colon with almost nothing before it ("Re: ...") and a bare
+// hyphen ("Spider-Man") belong to the title, so neither is split. A provider
+// that glues a subtitle on with no separator cannot be split safely: cutting
+// there would take "Dune Messiah" for a subtitle of "Dune" and hide a sequel
+// behind its predecessor, so such a title is shown whole.
+const SUBTITLE_SEPARATOR = /\s*:\s*|\s+[\u2013\u2014-]\s+/;
+
+function splitSubtitle(rawTitle: string): { title: string; subtitle?: string } {
+    const title = rawTitle.replace(/\s+/g, ' ').trim();
+    const separator = SUBTITLE_SEPARATOR.exec(title);
+    if (!separator) return { title };
+
+    const main = title.slice(0, separator.index).trim();
+    const subtitle = title.slice(separator.index + separator[0].length).trim();
+    if (main.length <= 3 || !subtitle) return { title };
+    return { title: main, subtitle };
+}
+
+/**
+ * Describe discovery candidates so that no two rows read the same.
+ *
+ * A search answers with editions, and two editions of one work can agree on
+ * every field a row shows — title, author, year, publisher — with only the ISBN
+ * apart. Saying which ISBN a row would add is what lets a reader check it
+ * against the copy in their hand, so an ISBN that differs is enough to tell two
+ * rows apart. Numbering is left for records that agree on that as well, where
+ * the row itself gives the reader nothing else.
+ */
+function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
+    const rows: DiscoveredRow[] = candidates.map((candidate) => {
+        const { title, subtitle } = splitSubtitle(candidate.title || '');
+        return {
+            candidate,
+            title,
+            subtitle,
+            author: candidate.author || (candidate.authors ?? []).join(', ') || undefined,
+            isbn: candidate.isbn13,
+        };
+    });
+
+    // Rows that would show the same thing are grouped by exactly what is
+    // visible, the ISBN included, so a row is only numbered when the reader has
+    // nothing else to tell it by.
+    const groups = new Map<string, DiscoveredRow[]>();
+    for (const row of rows) {
+        const key = [
+            row.title,
+            row.subtitle ?? '',
+            row.author ?? '',
+            row.candidate.publication_year ?? '',
+            row.candidate.publisher ?? '',
+            row.isbn ?? '',
+        ]
+            .join('\u0000')
+            .toLowerCase();
+        const group = groups.get(key) ?? [];
+        group.push(row);
+        groups.set(key, group);
+    }
+
+    for (const group of groups.values()) {
+        if (group.length < 2) continue;
+        group.forEach((row, index) => {
+            row.copyLabel = `Option ${index + 1} of ${group.length}`;
+        });
+    }
+
+    return rows;
+}
 
 const AddBookPage: React.FC = () => {
     const navigate = useNavigate();
@@ -36,11 +120,6 @@ const AddBookPage: React.FC = () => {
     const [discoverError, setDiscoverError] = useState<string | null>(null);
     const [discoverNotice, setDiscoverNotice] = useState<string | null>(null);
     const [addingCandidate, setAddingCandidate] = useState<string | null>(null);
-    // The Reading List links here with `add_to_reading_list=1`, so the option
-    // starts ticked for a reader who came from the list to queue a Book.
-    const [addToReadingListChecked, setAddToReadingListChecked] = useState(
-        () => searchParams.get('add_to_reading_list') === '1'
-    );
     const [scanning, setScanning] = useState(false);
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
@@ -238,11 +317,8 @@ const AddBookPage: React.FC = () => {
     };
 
     /**
-     * Add a candidate in one action.
-     *
-     * The create endpoint already de-duplicates by ISBN and puts the Book on
-     * the Reading List, so a candidate whose ISBN is already in the collection
-     * queues the existing Book rather than making a second copy.
+     * Add a candidate in one action. The endpoint queues the new Book, which is
+     * what the button promises, and de-duplicates on ISBN.
      */
     const handleChooseCandidate = async (candidate: BookMatch) => {
         const key = candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
@@ -319,11 +395,9 @@ const AddBookPage: React.FC = () => {
                 }
             }
 
+            // The endpoint puts the Book in the reading list itself, so the
+            // create is the only request.
             const book = await createBook({ ...details, isbn: isbnToUse });
-
-            if (addToReadingListChecked && book.id) {
-                await addToReadingList(book.id);
-            }
 
             navigate(`/books/${book.id}`);
         } catch (err) {
@@ -337,6 +411,36 @@ const AddBookPage: React.FC = () => {
     return (
         <div className="add-book-page">
             <h1>Add a Book</h1>
+
+            <div className="isbn-section">
+                <TextField
+                    id="isbn"
+                    label="ISBN (optional)"
+                    placeholder="Enter ISBN (10 or 13 digits)"
+                    value={isbn}
+                    onValueChange={setIsbn}
+                    supportingText="No ISBN? The title and author form below can find it for you."
+                />
+                <div className="isbn-actions">
+                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
+                        {loading ? 'Looking up...' : 'Lookup ISBN'}
+                    </Button>
+                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
+                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
+                    </Button>
+                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
+                        Enter title &amp; author
+                    </Button>
+                </div>
+
+                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
+                    <div id="scanner-reader" ref={scannerRef}></div>
+                </div>
+
+                {scannerError && <p className="error-message">{scannerError}</p>}
+                {isbnError && <p className="error-message">{isbnError}</p>}
+                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
+            </div>
 
             <div className="discover-section">
                 <h2>Find a book</h2>
@@ -382,11 +486,26 @@ const AddBookPage: React.FC = () => {
 
                 {discoveries.length > 0 && (
                     <div className="book-list">
-                        {discoveries.map((candidate, index) => {
+                        {describeCandidates(discoveries).map((row, index) => {
+                            const candidate = row.candidate;
                             const key =
                                 candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
-                            const author =
-                                candidate.author || (candidate.authors ?? []).join(', ');
+                            const details = [
+                                row.author,
+                                candidate.publication_year,
+                                candidate.publisher,
+                            ]
+                                .filter(
+                                    (value) =>
+                                        value !== undefined && value !== null && value !== ''
+                                )
+                                .join(' · ');
+                            const identity = [
+                                row.isbn ? `ISBN ${row.isbn}` : undefined,
+                                row.copyLabel,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ');
                             return (
                                 <div key={`${key}-${index}`} className="book-item">
                                     {candidate.thumbnail_url ? (
@@ -395,17 +514,14 @@ const AddBookPage: React.FC = () => {
                                         <div className="book-placeholder">📖</div>
                                     )}
                                     <div className="book-info">
-                                        <div className="book-title">{candidate.title}</div>
-                                        <div className="section-info">
-                                            {[author, candidate.publication_year, candidate.publisher]
-                                                .filter(
-                                                    (value) =>
-                                                        value !== undefined &&
-                                                        value !== null &&
-                                                        value !== ''
-                                                )
-                                                .join(' · ')}
-                                        </div>
+                                        <div className="book-title">{row.title}</div>
+                                        {row.subtitle && (
+                                            <div className="book-subtitle">{row.subtitle}</div>
+                                        )}
+                                        <div className="section-info">{details}</div>
+                                        {identity && (
+                                            <div className="book-identity">{identity}</div>
+                                        )}
                                     </div>
                                     <Button
                                         variant="filled"
@@ -421,36 +537,6 @@ const AddBookPage: React.FC = () => {
                         })}
                     </div>
                 )}
-            </div>
-
-            <div className="isbn-section">
-                <TextField
-                    id="isbn"
-                    label="ISBN (optional)"
-                    placeholder="Enter ISBN (10 or 13 digits)"
-                    value={isbn}
-                    onValueChange={setIsbn}
-                    supportingText="No ISBN? Enter the title and author below and it will be found for you."
-                />
-                <div className="isbn-actions">
-                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
-                        {loading ? 'Looking up...' : 'Lookup ISBN'}
-                    </Button>
-                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
-                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
-                    </Button>
-                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
-                        Enter title &amp; author
-                    </Button>
-                </div>
-
-                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
-                    <div id="scanner-reader" ref={scannerRef}></div>
-                </div>
-
-                {scannerError && <p className="error-message">{scannerError}</p>}
-                {isbnError && <p className="error-message">{isbnError}</p>}
-                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
             </div>
 
             {(showManualEntry || title || author) && (
@@ -530,14 +616,6 @@ const AddBookPage: React.FC = () => {
                             {loading ? 'Searching...' : 'Find ISBN from title & author'}
                         </Button>
                     </div>
-
-                    <label className="checkbox-label">
-                        <Checkbox
-                            checked={addToReadingListChecked}
-                            onCheckedChange={setAddToReadingListChecked}
-                        />
-                        Add to reading list
-                    </label>
 
                     <Button type="submit" disabled={loading}>
                         {loading ? 'Adding...' : isbn.trim() ? 'Add Book' : 'Find ISBN & Add Book'}
