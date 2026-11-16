@@ -589,13 +589,8 @@ class PostgresStorage:
             return res.rowcount > 0
 
     def add_to_reading_list(self, book_id: int) -> None:
-        """Put the Book at the end of the reader's queue.
-
-        Adding a Book is how the reader says they mean to read it, so the row is
-        written with the create rather than asked for separately. Adding the same
-        Book twice changes nothing.
-        """
         with self.pool.connection() as conn:
+            # Check if already in list
             existing = conn.execute(
                 "SELECT 1 FROM reading_list WHERE user_id = %s AND book_id = %s",
                 [self.user_id, book_id],
@@ -603,6 +598,7 @@ class PostgresStorage:
             if existing:
                 return
 
+            # Get max position
             row_raw = conn.execute(
                 "SELECT COALESCE(MAX(position), 0) as max_pos FROM reading_list WHERE user_id = %s",
                 [self.user_id],
@@ -623,7 +619,7 @@ class PostgresStorage:
                     "DELETE FROM reading_list WHERE user_id = %s AND book_id = %s",
                     [self.user_id, book_id],
                 )
-                # Re-order positions after the deletion.
+                # Re-order positions
                 rows = conn.execute(
                     "SELECT book_id FROM reading_list WHERE user_id = %s ORDER BY position ASC",
                     [self.user_id],

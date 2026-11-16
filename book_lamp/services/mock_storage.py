@@ -293,7 +293,6 @@ class MockStorage:
         return False
 
     def get_reading_list(self) -> list[dict[str, Any]]:
-        """The queue: Books the reader means to read next."""
         result = []
         book_map = {b["id"]: b for b in self.books}
         for item in sorted(self.reading_list, key=lambda x: x["position"]):
@@ -307,12 +306,11 @@ class MockStorage:
         return result
 
     def add_to_reading_list(self, book_id: int) -> None:
-        """Put the Book at the end of the queue; adding it twice changes nothing."""
         if any(item["book_id"] == book_id for item in self.reading_list):
             logger.info(f"Book {book_id} is already in the reading list (MockStorage)")
             return
-        position = max((item["position"] for item in self.reading_list), default=0) + 1
-        self.reading_list.append({"book_id": book_id, "position": position, "created_at": "2024-01-01T00:00:00"})
+        pos = max((item["position"] for item in self.reading_list), default=0) + 1
+        self.reading_list.append({"book_id": book_id, "position": pos, "created_at": "2024-01-01T00:00:00"})
         logger.info(f"Successfully added book {book_id} to reading list (MockStorage)")
 
     def remove_from_reading_list(self, book_id: int) -> None:
@@ -321,9 +319,9 @@ class MockStorage:
                 self.reading_list.pop(i)
                 logger.info(f"Successfully removed book {book_id} from reading list (MockStorage)")
                 break
-        # Reassign positions so the queue stays numbered from one.
-        for position, item in enumerate(self.reading_list, start=1):
-            item["position"] = position
+        # Reassign positions
+        for idx, item in enumerate(self.reading_list):
+            item["position"] = idx + 1
 
     def update_reading_list_order(self, book_ids: list[int]) -> None:
         item_map = {item["book_id"]: item for item in self.reading_list}
