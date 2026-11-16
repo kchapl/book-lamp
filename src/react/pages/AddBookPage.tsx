@@ -105,6 +105,9 @@ const AddBookPage: React.FC = () => {
     const [year, setYear] = useState('');
     const [isbnError, setIsbnError] = useState<string | null>(null);
     const [isbnNotice, setIsbnNotice] = useState<string | null>(null);
+    // The cover an ISBN lookup or a matched edition brought back. It is kept
+    // apart from the typed fields so a partial result still contributes one.
+    const [cover, setCover] = useState<{ thumbnail_url?: string; cover_url?: string }>({});
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
     // The editions a title-and-author search found. More than one means the
@@ -192,17 +195,26 @@ const AddBookPage: React.FC = () => {
         
         try {
             const book = await lookupISBN(cleanIsbn);
-            // A partial result (e.g. only an ISBN and a cover) is not usable: it
-            // carries no title or author, so the form below would stay hidden and
-            // the page would appear unchanged. Treat that as "not found" and fall
-            // back to manual entry so the user always gets somewhere to type.
+            if (book) {
+                // A cover is worth keeping even when the providers know no title
+                // or author for the edition: the Book would otherwise be stored
+                // without the image that was available before anything was typed.
+                setCover({
+                    thumbnail_url: book.thumbnail_url ?? undefined,
+                    cover_url: book.cover_url ?? undefined,
+                });
+            }
             if (book && (book.title || book.author)) {
                 setTitle(book.title || '');
                 setAuthor(book.author || '');
                 setPublisher(book.publisher || '');
                 setYear(book.publication_year ? String(book.publication_year) : '');
             } else {
-                setIsbnNotice('No details found for that ISBN. Fill them in below.');
+                setIsbnNotice(
+                    book?.thumbnail_url || book?.cover_url
+                        ? 'Found a cover for that ISBN. Fill in the title and author below.'
+                        : 'No details found for that ISBN. Fill them in below.'
+                );
                 setShowManualEntry(true);
             }
         } catch (err) {
@@ -226,6 +238,10 @@ const AddBookPage: React.FC = () => {
         if (matchedAuthor) setAuthor(matchedAuthor);
         if (match.publisher) setPublisher(match.publisher);
         if (match.publication_year) setYear(String(match.publication_year));
+        setCover({
+            thumbnail_url: match.thumbnail_url ?? undefined,
+            cover_url: match.cover_url ?? undefined,
+        });
         setMatches([]);
         setIsbnError(null);
         setIsbnNotice(`Matched “${match.title}” — the ISBN has been filled in.`);
@@ -366,6 +382,8 @@ const AddBookPage: React.FC = () => {
                 author: author.trim(),
                 publisher: publisher.trim() || undefined,
                 publication_year: year ? parseInt(year, 10) || undefined : undefined,
+                thumbnail_url: cover.thumbnail_url,
+                cover_url: cover.cover_url,
             };
 
             if (!isbnToUse) {
@@ -382,6 +400,8 @@ const AddBookPage: React.FC = () => {
                         author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
+                        thumbnail_url: match.thumbnail_url ?? cover.thumbnail_url,
+                        cover_url: match.cover_url ?? cover.cover_url,
                     };
                 } else if (found.length > 1) {
                     setMatches(found);
@@ -418,7 +438,12 @@ const AddBookPage: React.FC = () => {
                     label="ISBN (optional)"
                     placeholder="Enter ISBN (10 or 13 digits)"
                     value={isbn}
-                    onValueChange={setIsbn}
+                    onValueChange={(value) => {
+                        setIsbn(value);
+                        // A different ISBN has a different cover; the next
+                        // lookup fills this one in.
+                        setCover({});
+                    }}
                     supportingText="No ISBN? The title and author form below can find it for you."
                 />
                 <div className="isbn-actions">

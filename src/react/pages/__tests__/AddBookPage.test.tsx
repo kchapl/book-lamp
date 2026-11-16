@@ -581,3 +581,71 @@ describe('AddBookPage ISBN lookup', () => {
         expect(screen.getByText(/could not look up/i)).toBeInTheDocument();
     });
 });
+
+
+describe('AddBookPage covers', () => {
+    it('keeps the cover an ISBN lookup found without a title or author', async () => {
+        lookup.mockResolvedValue({
+            isbn13: '9781529339604',
+            thumbnail_url: 'https://covers.example/9781529339604-M.jpg',
+            cover_url: 'https://covers.example/9781529339604-L.jpg',
+        } as never);
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        await doLookup('9781529339604');
+
+        // The lookup knows the cover but not the title, so the reader types it.
+        await waitFor(() => expect(field('title')).toBeInTheDocument());
+        typeInto('title', 'A History of England in 100 Places');
+        typeInto('author', 'Philip Wilkinson');
+
+        // A custom element is not a native submit button, so submit the form
+        // itself, as the other add-form tests do.
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledTimes(1);
+        expect(create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isbn: '9781529339604',
+                thumbnail_url: 'https://covers.example/9781529339604-M.jpg',
+                cover_url: 'https://covers.example/9781529339604-L.jpg',
+            })
+        );
+    });
+
+    it('carries the cover of the edition the title and author matched', async () => {
+        findMatches.mockResolvedValue([
+            {
+                isbn13: '9781635575637',
+                title: 'Piranesi',
+                author: 'Susanna Clarke',
+                thumbnail_url: 'https://covers.example/piranesi.jpg',
+                cover_url: 'https://covers.example/piranesi-L.jpg',
+            },
+        ]);
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'Piranesi');
+        typeInto('author', 'Susanna Clarke');
+        fireEvent.click(button(/find isbn from title & author/i));
+        await waitFor(() => expect(field('isbn')?.value).toBe('9781635575637'));
+
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledTimes(1);
+        expect(create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isbn: '9781635575637',
+                thumbnail_url: 'https://covers.example/piranesi.jpg',
+                cover_url: 'https://covers.example/piranesi-L.jpg',
+            })
+        );
+    });
+});
