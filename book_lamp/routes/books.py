@@ -264,7 +264,13 @@ def api_list_books():
 @csrf_protect
 @authorisation_required
 def api_create_book():
-    """Create a new book from a JSON payload and put it in the reading list."""
+    """Create a new book from a JSON payload and put it in the reading list.
+
+    The catalogue is shared: `books` is one row per ISBN for every reader, so a
+    Reading List row or a Reading is what links a Book to someone. Adding a Book
+    is the reader saying they mean to read it, which is why both paths below — a
+    Book new to the catalogue and one the reader already had — write that row.
+    """
     storage = get_storage()
     data = request.get_json(silent=True) or {}
 
@@ -285,8 +291,6 @@ def api_create_book():
 
     existing = storage.get_book_by_isbn(isbn)
     if existing:
-        # The catalogue is shared, so the reading-list row is what makes the Book
-        # theirs; adding it is how they say they mean to read it.
         try:
             storage.add_to_reading_list(existing["id"])
         except Exception as exc:
@@ -364,8 +368,6 @@ def api_create_book():
         current_app.logger.error(f"api_create_book: storage.add_book failed: {exc}", exc_info=True)
         return jsonify({"error": "Failed to create book"}), 500
 
-    # The catalogue is shared, so the reading-list row is what makes the Book
-    # theirs; adding it is how they say they mean to read it.
     try:
         storage.add_to_reading_list(created["id"])
     except Exception as exc:
