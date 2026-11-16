@@ -158,6 +158,12 @@ const BookDetailPage: React.FC = () => {
             return;
         }
 
+        // A Book is identified by its ISBN, so an edit may not leave it blank.
+        if (!(editForm.isbn13 ?? '').trim()) {
+            setEditError('An ISBN is required.');
+            return;
+        }
+
         // The list is what the endpoint stores; `author` is a display
         // projection on the way out, never an input, so it is not sent.
         const payload: Partial<Book> = { ...editForm, authors };
@@ -312,6 +318,7 @@ const BookDetailPage: React.FC = () => {
                     <TextField
                         id="edit-isbn"
                         label="ISBN"
+                        required
                         value={editForm.isbn13 || ''}
                         onValueChange={(value) => setEditForm({ ...editForm, isbn13: value })}
                     />
