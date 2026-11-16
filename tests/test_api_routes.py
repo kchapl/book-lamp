@@ -225,6 +225,11 @@ def test_api_create_book_queues_an_isbn_the_reader_already_has(authenticated_cli
     assert [item["book_id"] for item in storage.get_reading_list()] == [book["id"]]
 
 
+# ---------------------------------------------------------------------------
+# Books – update
+# ---------------------------------------------------------------------------
+
+
 def test_api_update_book_success(authenticated_client):
     """POST /api/books/<id>/edit updates the book and returns success."""
     storage = get_storage()
