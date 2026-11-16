@@ -3,9 +3,8 @@
  *
  * The page had no way to add a Book: its empty state pointed at your books
  * in prose only, which is what made the capability read as missing. The action
- * now lands on the Add a Book form with the reading-list option already ticked,
- * so a reader who came from the list queues the Book on submit instead of
- * having to notice the checkbox.
+ * now lands on the Add a Book form, which puts the new Book at the end of the
+ * queue.
  *
  * Material Web buttons navigate from a click listener on the host element, and
  * the host carries no implicit ARIA role, so they are found by their slotted
@@ -117,7 +116,7 @@ describe('ReadingListPage add action', () => {
 
         await waitFor(() =>
             expect(
-                screen.getByText('destination:/books/new?add_to_reading_list=1')
+                screen.getByText('destination:/books/new')
             ).toBeInTheDocument()
         );
     });
@@ -132,7 +131,7 @@ describe('ReadingListPage add action', () => {
 
         await waitFor(() =>
             expect(
-                screen.getByText('destination:/books/new?add_to_reading_list=1')
+                screen.getByText('destination:/books/new')
             ).toBeInTheDocument()
         );
     });

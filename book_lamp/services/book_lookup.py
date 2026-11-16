@@ -442,18 +442,120 @@ def _isbn13_from_candidates(candidates: Optional[List[Any]]) -> Optional[str]:
     return None
 
 
+# A leading article is the article a title can carry or drop without naming a
+# different work: "A History of England" and "History of England" are one book.
+_LEADING_ARTICLE = re.compile(r"^(?:a|an|the)\s+", re.IGNORECASE)
+
+
+def _title_key(title: str) -> str:
+    """Fold a title to the words two editions of one work agree on.
+
+    Case, punctuation and HTML entities are noise in a comparison: a provider
+    writes "History of England in 100 Places" where the reader typed "A history
+    of England in 100 places", and both name the same work.
+    """
+    clean = html.unescape(str(title or "")).casefold()
+    # An apostrophe inside a word is not a word break: "Ender's Game" and
+    # "Enders Game" name the same two words, so folding the first to
+    # "ender s game" would set apart the answer the reader asked for.
+    clean = re.sub(r"(?<=\w)['’‘`](?=\w)", "", clean)
+    clean = re.sub(r"[^\w]+", " ", clean)
+    return re.sub(r"\s+", " ", clean).strip()
+
+
+def _without_leading_article(key: str) -> str:
+    return _LEADING_ARTICLE.sub("", key).strip()
+
+
+def _same_title_family(left: str, right: str) -> bool:
+    """Whether two folded titles are the same work's title, one embellished.
+
+    An edition may append a subtitle without punctuation ("… in 100 Places From
+    Stonehenge To The Gherkin"), and a reader may type the subtitle the edition
+    leaves off. Either way the shorter title is a prefix of the longer, so one
+    starting with the other and a word boundary is the same family.
+    """
+    if not left or not right:
+        return False
+    return left == right or left.startswith(right + " ") or right.startswith(left + " ")
+
+
+def _contains_whole_phrase(longer: str, shorter: str) -> bool:
+    """Whether `shorter` sits inside `longer` as whole words, not inside one.
+
+    A reader who types "Hail Mary" is asking for "Project Hail Mary": the query
+    is the part of the title they remember, and it need not be the part the
+    title starts with.
+    """
+    if not shorter or not longer:
+        return False
+    return f" {shorter} " in f" {longer} "
+
+
+# Words a title carries as glue rather than meaning. Requiring them in a match
+# would drop an edition that writes "History of England, 100 Places" without the
+# "in", and they discriminate nothing on their own.
+_TITLE_GLUE = frozenset({"a", "an", "the", "of", "in", "on", "and", "to", "from", "for", "at", "by"})
+
+
+def _meaningful_words(key: str) -> set:
+    return {word for word in key.split() if word not in _TITLE_GLUE}
+
+
+def _shares_every_meaningful_word(asked_key: str, candidate_key: str) -> bool:
+    """Whether every word that carries meaning in the query is in the title.
+
+    A reader who types "Earthsea Wizard" means *A Wizard of Earthsea*: the words
+    are there in another order, and a title holding all of them is still an
+    answer. A title holding only some — *The History of Tom Jones* for "A history
+    of England in 100 places" — is not, which is what keeps a loose search from
+    padding its answer with near-misses.
+    """
+    wanted = _meaningful_words(asked_key)
+    if not wanted:
+        return False
+    return wanted <= _meaningful_words(candidate_key)
+
+
 def _title_match_rank(candidate: Dict[str, Any], title: str, author: str) -> tuple:
     """Order the candidates so the reader's own words come first.
 
     Providers rank by their own relevance, which knows nothing about the
-    subtitle the reader typed or the author they named. An edition whose title
-    is the title they asked for, credited to the author they named, is the one
-    they most likely mean. Everything else keeps the provider's order, because
-    two exact matches are still told apart by the provider.
+    subtitle the reader typed, the leading article one edition drops, or the
+    author they named. Five title ranks are what a reader can tell apart:
+
+    0. the title they typed, word for word;
+    1. the same title once case, punctuation and a leading article are folded,
+       or the same title with a subtitle on either side;
+    2. the title they typed, embedded in a longer one — "Hail Mary" in
+       "Project Hail Mary";
+    3. every word that carries meaning in the query, in any order —
+       "Earthsea Wizard" for *A Wizard of Earthsea*;
+    4. something else.
+
+    Everything within a rank keeps the provider's order, because two exact
+    matches are still told apart by the provider.
     """
-    asked_title = _clean_title_for_search(title).lower()
-    candidate_title = _clean_title_for_search(str(candidate.get("title") or "")).lower()
-    title_rank = 0 if candidate_title == asked_title else 1
+    asked = _title_key(title)
+    candidate_key = _title_key(str(candidate.get("title") or ""))
+    asked_folded = _without_leading_article(asked)
+    candidate_folded = _without_leading_article(candidate_key)
+
+    if not asked:
+        title_rank = 4
+    elif candidate_key == asked:
+        title_rank = 0
+    elif _same_title_family(asked_folded, candidate_folded):
+        title_rank = 1
+    elif _contains_whole_phrase(candidate_folded, asked_folded) or _contains_whole_phrase(
+        asked_folded, candidate_folded
+    ):
+        title_rank = 2
+    elif _shares_every_meaningful_word(asked_folded, candidate_folded):
+        title_rank = 3
+    else:
+        title_rank = 4
+
     names = " ".join(str(name) for name in candidate.get("authors") or []).lower()
     author_rank = 0 if not author or author.lower() in names else 1
     return (title_rank, author_rank)
@@ -464,49 +566,41 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
 
     Unlike the cover lookups, this keeps the candidates separate: a reader who
     does not have an ISBN is choosing an edition, and each answer needs its own.
+
+    The free-text search answers over the whole record, so it finds the edition
+    that drops a leading article or carries a subtitle — the editions a search of
+    the title field alone ranks below, or misses. That ranking also spends slots
+    on author and subject matches, so the page is asked for wider than a title
+    field would need: the edition the reader means still has to be in it.
     """
     session = _get_session()
     fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
-    params: Dict[str, str] = {"title": title, "limit": "10", "fields": fields}
-    if author:
-        params["author"] = author
+    query = f"{title} {author}" if author else title
 
     try:
-        response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
+        response = session.get(
+            OPEN_LIBRARY_SEARCH_API,
+            params={"q": query, "limit": "20", "fields": fields},
+            timeout=10,
+        )
         response.raise_for_status()
-        docs = response.json().get("docs") or []
+        docs: List[Dict[str, Any]] = response.json().get("docs") or []
     except Exception as e:
-        logger.debug(f"Open Library title search failed for '{title}': {e}")
+        logger.debug(f"Open Library title search failed for '{query}': {e}")
         if strict:
             raise
-        docs = []
-
-    if not docs:
-        # Structured fields are exact, and a title as a reader types it often is
-        # not: it carries a subtitle, a series number, or drops the article. Fall
-        # back to the free-text search, which is what the reader just did.
-        query = f"{title} {author}" if author else title
-        try:
-            response = session.get(
-                OPEN_LIBRARY_SEARCH_API,
-                params={"q": query, "limit": "10", "fields": fields},
-                timeout=10,
-            )
-            response.raise_for_status()
-            docs = response.json().get("docs") or []
-        except Exception as e:
-            logger.debug(f"Open Library title search failed for '{query}': {e}")
-            if strict:
-                raise
-            return []
+        return []
 
     results: List[Dict[str, Any]] = []
+    seen: set = set()
     for doc in docs:
         isbn13 = _isbn13_from_candidates(doc.get("isbn"))
-        if not isbn13:
+        if not isbn13 or isbn13 in seen:
             # A Book is keyed on its ISBN: an edition without one cannot be
-            # added, so it is not one of the answers to this question.
+            # added, so it is not one of the answers to this question. One
+            # edition described twice is also one answer.
             continue
+        seen.add(isbn13)
         names = [html.unescape(name) for name in doc.get("author_name") or [] if name]
         publishers = doc.get("publisher") or []
         cover_id = doc.get("cover_i")
@@ -611,14 +705,18 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
     candidates: List[Dict[str, Any]] = []
     seen: set = set()
     answered = False
+    # ISBNs the author search vouched for. A query that names an author is
+    # answered by that author's books, which need not repeat the query in their
+    # titles — "Ursula K. Le Guin" is the title of nothing she wrote.
+    by_author: set = set()
 
-    lookups = (
-        lambda: _open_library_title_search(cleaned, None, strict=True),
-        lambda: _google_books_title_search(cleaned, None, strict=True),
-        lambda: lookup_books_by_author(cleaned, strict=True),
+    providers = (
+        (lambda: _open_library_title_search(cleaned, None, strict=True), True),
+        (lambda: _google_books_title_search(cleaned, None, strict=True), True),
+        (lambda: lookup_books_by_author(cleaned, strict=True), False),
     )
 
-    for lookup in lookups:
+    for lookup, matches_by_title in providers:
         try:
             results = lookup()
         except Exception as e:
@@ -630,7 +728,11 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
         answered = True
         for candidate in results:
             isbn = candidate.get("isbn13")
-            if not isbn or isbn in seen:
+            if not isbn:
+                continue
+            if not matches_by_title:
+                by_author.add(isbn)
+            if isbn in seen:
                 continue
             seen.add(isbn)
             candidates.append(candidate)
@@ -638,8 +740,20 @@ def search_books(query: str, limit: int = TITLE_SEARCH_LIMIT) -> List[Dict[str, 
     if not answered:
         raise BookSearchUnavailable(f"Every book search provider failed for '{cleaned}'")
 
-    candidates.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
-    return candidates[:limit]
+    # A loose title search returns near-misses — *The History of Tom Jones* for a
+    # history of England — and those are not answers to this question. They stay
+    # only when the author search vouched for them: padding the answer out to the
+    # limit with them is what a reader reads as a broken search. A title that
+    # contains the query ("Project Hail Mary" for "Hail Mary"), or every word of
+    # it in another order ("Earthsea Wizard"), is an answer, and ranks below the
+    # titles that start with it.
+    relevant = [
+        candidate
+        for candidate in candidates
+        if candidate["isbn13"] in by_author or _title_match_rank(candidate, cleaned, "")[0] <= 3
+    ]
+    relevant.sort(key=lambda candidate: _title_match_rank(candidate, cleaned, ""))
+    return relevant[:limit]
 
 
 def _lookup_google_books(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:

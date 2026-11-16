@@ -5,9 +5,8 @@ import {
     findBooksByTitleAuthor,
     discoverBooks,
     createBook,
-    addToReadingList,
 } from '../services/api';
-import { Button, Checkbox, TextField } from '../ui';
+import { Button, TextField } from '../ui';
 import type { BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
@@ -36,11 +35,6 @@ const AddBookPage: React.FC = () => {
     const [discoverError, setDiscoverError] = useState<string | null>(null);
     const [discoverNotice, setDiscoverNotice] = useState<string | null>(null);
     const [addingCandidate, setAddingCandidate] = useState<string | null>(null);
-    // The Reading List links here with `add_to_reading_list=1`, so the option
-    // starts ticked for a reader who came from the list to queue a Book.
-    const [addToReadingListChecked, setAddToReadingListChecked] = useState(
-        () => searchParams.get('add_to_reading_list') === '1'
-    );
     const [scanning, setScanning] = useState(false);
     const [scannerError, setScannerError] = useState<string | null>(null);
     const scannerRef = useRef<HTMLDivElement>(null);
@@ -238,11 +232,8 @@ const AddBookPage: React.FC = () => {
     };
 
     /**
-     * Add a candidate in one action.
-     *
-     * The create endpoint already de-duplicates by ISBN and puts the Book on
-     * the Reading List, so a candidate whose ISBN is already in the collection
-     * queues the existing Book rather than making a second copy.
+     * Add a candidate in one action. The endpoint queues the new Book, which is
+     * what the button promises, and de-duplicates on ISBN.
      */
     const handleChooseCandidate = async (candidate: BookMatch) => {
         const key = candidate.isbn13 || `${candidate.title}-${candidate.publication_year}`;
@@ -319,11 +310,9 @@ const AddBookPage: React.FC = () => {
                 }
             }
 
+            // The endpoint puts the Book in the reading list itself, so the
+            // create is the only request.
             const book = await createBook({ ...details, isbn: isbnToUse });
-
-            if (addToReadingListChecked && book.id) {
-                await addToReadingList(book.id);
-            }
 
             navigate(`/books/${book.id}`);
         } catch (err) {
@@ -337,6 +326,36 @@ const AddBookPage: React.FC = () => {
     return (
         <div className="add-book-page">
             <h1>Add a Book</h1>
+
+            <div className="isbn-section">
+                <TextField
+                    id="isbn"
+                    label="ISBN (optional)"
+                    placeholder="Enter ISBN (10 or 13 digits)"
+                    value={isbn}
+                    onValueChange={setIsbn}
+                    supportingText="No ISBN? The title and author form below can find it for you."
+                />
+                <div className="isbn-actions">
+                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
+                        {loading ? 'Looking up...' : 'Lookup ISBN'}
+                    </Button>
+                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
+                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
+                    </Button>
+                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
+                        Enter title &amp; author
+                    </Button>
+                </div>
+
+                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
+                    <div id="scanner-reader" ref={scannerRef}></div>
+                </div>
+
+                {scannerError && <p className="error-message">{scannerError}</p>}
+                {isbnError && <p className="error-message">{isbnError}</p>}
+                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
+            </div>
 
             <div className="discover-section">
                 <h2>Find a book</h2>
@@ -423,36 +442,6 @@ const AddBookPage: React.FC = () => {
                 )}
             </div>
 
-            <div className="isbn-section">
-                <TextField
-                    id="isbn"
-                    label="ISBN (optional)"
-                    placeholder="Enter ISBN (10 or 13 digits)"
-                    value={isbn}
-                    onValueChange={setIsbn}
-                    supportingText="No ISBN? Enter the title and author below and it will be found for you."
-                />
-                <div className="isbn-actions">
-                    <Button variant="filled" onClick={() => handleLookup(isbn)} disabled={loading}>
-                        {loading ? 'Looking up...' : 'Lookup ISBN'}
-                    </Button>
-                    <Button variant="tonal" onClick={scanning ? stopScanner : startScanner}>
-                        {scanning ? 'Stop Scanner' : '📷 Scan Barcode'}
-                    </Button>
-                    <Button variant="text" onClick={() => setShowManualEntry(true)}>
-                        Enter title &amp; author
-                    </Button>
-                </div>
-
-                <div className="scanner-container" style={{ display: scanning ? 'block' : 'none' }}>
-                    <div id="scanner-reader" ref={scannerRef}></div>
-                </div>
-
-                {scannerError && <p className="error-message">{scannerError}</p>}
-                {isbnError && <p className="error-message">{isbnError}</p>}
-                {isbnNotice && <p className="lookup-notice">{isbnNotice}</p>}
-            </div>
-
             {(showManualEntry || title || author) && (
                 <form onSubmit={handleSubmit} className="add-book-form">
                     <p className="section-info">
@@ -530,14 +519,6 @@ const AddBookPage: React.FC = () => {
                             {loading ? 'Searching...' : 'Find ISBN from title & author'}
                         </Button>
                     </div>
-
-                    <label className="checkbox-label">
-                        <Checkbox
-                            checked={addToReadingListChecked}
-                            onCheckedChange={setAddToReadingListChecked}
-                        />
-                        Add to reading list
-                    </label>
 
                     <Button type="submit" disabled={loading}>
                         {loading ? 'Adding...' : isbn.trim() ? 'Add Book' : 'Find ISBN & Add Book'}

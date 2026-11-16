@@ -23,11 +23,10 @@ import { useResource } from '../hooks/useResource';
 import type { ReadingListItem } from '../types';
 
 /**
- * The Reading List's add action lands on the Add a Book form with the
- * reading-list option already ticked: a reader who came from the list means to
- * queue the Book, not just record it.
+ * The Reading List's add action lands on the Add a Book form, which puts the new
+ * Book at the end of the queue.
  */
-const ADD_BOOK_TO_READING_LIST = '/books/new?add_to_reading_list=1';
+const ADD_BOOK = '/books/new';
 
 interface SortableItemProps {
     book: ReadingListItem;
@@ -155,7 +154,7 @@ const ReadingListPage: React.FC = () => {
                     <p className="subtitle">Drag to reorder the queue.</p>
                 </div>
                 {!loading && books.length > 0 && (
-                    <Button variant="filled" icon="plus" to={ADD_BOOK_TO_READING_LIST}>
+                    <Button variant="filled" icon="plus" to={ADD_BOOK}>
                         Add a book
                     </Button>
                 )}
@@ -167,7 +166,7 @@ const ReadingListPage: React.FC = () => {
                 <div className="empty-state">
                     <h2>Your reading list is empty</h2>
                     <p>Add books from your log or while browsing.</p>
-                    <Button variant="filled" icon="plus" to={ADD_BOOK_TO_READING_LIST}>
+                    <Button variant="filled" icon="plus" to={ADD_BOOK}>
                         Add a book
                     </Button>
                     <Button variant="text" to="/books">
