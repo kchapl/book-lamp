@@ -418,7 +418,11 @@ def api_update_book(book_id: int):
         return jsonify({"error": "title and at least one author are required"}), 400
 
     isbn13 = str(data.get("isbn13", "") or "").strip().replace("-", "")
-    if isbn13 and not is_valid_isbn13(isbn13) and not (is_test_mode() and isbn13 == TEST_ISBN):
+    if not isbn13:
+        # A Book is identified by its ISBN: clearing it would leave a row keyed
+        # on the empty string, which reads as a second copy of the real Book.
+        return jsonify({"error": "isbn is required"}), 400
+    if not is_valid_isbn13(isbn13) and not (is_test_mode() and isbn13 == TEST_ISBN):
         return jsonify({"error": "Invalid ISBN-13"}), 400
 
     publication_year = None

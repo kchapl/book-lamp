@@ -29,7 +29,7 @@ def calculate_collection_stats(
     total_records = len(all_records)
 
     valid_ratings = []
-    for r in all_records:
+    for r in completed_records:
         rating_val = r.get("rating")
         try:
             if rating_val and int(rating_val) > 0:

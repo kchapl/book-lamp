@@ -5,7 +5,7 @@ import { Button, Select, SelectOption } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { formatDate } from '../utils/format';
-import { statusClass } from '../utils/status';
+import { RATED_STATUS, statusClass } from '../utils/status';
 import type { HistoryFilters, Reading } from '../types';
 
 /** The reading log's filters, as they appear in the URL. */
@@ -136,7 +136,7 @@ const HistoryPage: React.FC = () => {
                                             <span className={`status-badge ${statusClass(record.status)}`}>
                                                 {record.status}
                                             </span>
-                                            {record.rating ? (
+                                            {record.status === RATED_STATUS && record.rating ? (
                                                 <span className="rating">{'★'.repeat(record.rating)}{'☆'.repeat(5 - record.rating)}</span>
                                             ) : null}
                                             <span className="dates">
