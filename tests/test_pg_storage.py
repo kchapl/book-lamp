@@ -728,7 +728,13 @@ def test_0008_refuses_a_book_whose_links_cannot_reproduce_its_string(own_databas
 
 @pytest.mark.parametrize(
     ("real_cover", "kept_cover"),
-    [(None, "http://example.com/duplicate.jpg"), ("http://example.com/real.jpg", "http://example.com/real.jpg")],
+    [
+        (None, "http://example.com/duplicate.jpg"),
+        # Imports record a missing cover as an empty string, so it must not block
+        # the only image from being copied.
+        ("", "http://example.com/duplicate.jpg"),
+        ("http://example.com/real.jpg", "http://example.com/real.jpg"),
+    ],
 )
 def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, real_cover, kept_cover):
     """#358's two records become one, and the cover one of them holds survives.

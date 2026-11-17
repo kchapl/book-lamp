@@ -125,13 +125,15 @@ def upgrade() -> None:
             )
 
     for row in empty:
-        # Only fills a gap: a cover the real Book already has wins. The row is the
-        # id matched above and held by its lock, so the ISBN cannot move it away.
+        # Only fills a gap: a cover the real Book already has wins. An empty
+        # string is how an import records a missing cover, so it is no cover to
+        # keep either. The row is the id matched above and held by its lock, so
+        # the ISBN cannot move it away.
         bind.execute(
             text("""
                 UPDATE books
-                SET thumbnail_url = COALESCE(thumbnail_url, :thumbnail_url),
-                    cover_url = COALESCE(cover_url, :cover_url)
+                SET thumbnail_url = COALESCE(NULLIF(thumbnail_url, ''), NULLIF(:thumbnail_url, '')),
+                    cover_url = COALESCE(NULLIF(cover_url, ''), NULLIF(:cover_url, ''))
                 WHERE id = :id
                 """),
             {"thumbnail_url": row["thumbnail_url"], "cover_url": row["cover_url"], "id": real["id"]},
