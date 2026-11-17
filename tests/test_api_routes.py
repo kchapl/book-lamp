@@ -349,11 +349,6 @@ def test_api_update_book_invalid_isbn(authenticated_client):
     assert resp.status_code == 400
 
 
-# ---------------------------------------------------------------------------
-# Books – delete
-# ---------------------------------------------------------------------------
-
-
 def test_api_update_book_refuses_an_edit_without_an_isbn(authenticated_client):
     """An edit cannot clear a Book's ISBN: a Book is identified by it."""
     storage = get_storage()
@@ -367,6 +362,11 @@ def test_api_update_book_refuses_an_edit_without_an_isbn(authenticated_client):
     assert resp.status_code == 400
     assert _json(resp)["error"] == "isbn is required"
     assert storage.get_book_by_id(book["id"])["title"] == "T"
+
+
+# ---------------------------------------------------------------------------
+# Books – delete
+# ---------------------------------------------------------------------------
 
 
 def test_api_delete_book_success(authenticated_client):
