@@ -7,6 +7,8 @@ compose.yaml with podman-compose. A host that cannot start containers skips them
 
 import os
 import shutil
+import threading
+import time
 from uuid import uuid4
 
 import psycopg
@@ -571,6 +573,49 @@ def _author_names_in_order(url, isbn13):
         ).fetchone()[0]
 
 
+def _write_book(url, isbn13, title, authors, thumbnail_url=None):
+    """A Book with its author links in the order given, as the schema holds it."""
+    with psycopg.connect(url) as conn:
+        book_id = conn.execute(
+            "INSERT INTO books (isbn13, title, thumbnail_url) VALUES (%s, %s, %s) RETURNING id",
+            [isbn13, title, thumbnail_url],
+        ).fetchone()[0]
+        for position, name in enumerate(authors, start=1):
+            author_id = conn.execute(
+                "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO UPDATE "
+                "SET name = EXCLUDED.name RETURNING id",
+                [name],
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO book_authors (book_id, author_id, position) VALUES (%s, %s, %s)",
+                [book_id, author_id, position],
+            )
+    return book_id
+
+
+def _wait_for_lock_wait(url):
+    """Block until a backend in `url`'s database is waiting for a lock.
+
+    The migration under test is the only writer there while these tests run, so
+    an ungranted lock is the migration waiting on a row the test holds. Waiting
+    for it to be seen, rather than sleeping, is what proves the lock is taken.
+    """
+    database = url.rsplit("/", 1)[-1]
+    deadline = time.monotonic() + 30
+    with psycopg.connect(url) as watcher:
+        while time.monotonic() < deadline:
+            waiting = watcher.execute(
+                "SELECT count(*) FROM pg_locks l "
+                "JOIN pg_stat_activity a ON a.pid = l.pid "
+                "WHERE NOT l.granted AND a.datname = %s",
+                [database],
+            ).fetchone()[0]
+            if waiting:
+                return
+            time.sleep(0.05)
+    pytest.fail("the migration never waited on the Book's lock")
+
+
 def test_0007_repairs_the_two_strings_the_splitter_mangled(own_database):
     """The repair reads the string, so what it writes joins back to it exactly."""
     _upgrade_database(own_database, "0005")
@@ -679,3 +724,241 @@ def test_0008_refuses_a_book_whose_links_cannot_reproduce_its_string(own_databas
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert held == "Frank Herbert"
     assert stamped == "0007"
+
+
+@pytest.mark.parametrize(
+    ("real_cover", "kept_cover"),
+    [
+        (None, "http://example.com/duplicate.jpg"),
+        # Imports record a missing cover as an empty string, so it must not block
+        # the only image from being copied.
+        ("", "http://example.com/duplicate.jpg"),
+        ("http://example.com/real.jpg", "http://example.com/real.jpg"),
+    ],
+)
+def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, real_cover, kept_cover):
+    """#358's two records become one, and the cover one of them holds survives.
+
+    The duplicate is the only record with an image, so deleting it must not take
+    the image with it; when both hold one, the real Book's wins.
+    """
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"], thumbnail_url=real_cover)
+    _write_book(
+        own_database,
+        "",
+        "The Spy in the Archive",
+        ["Gordon Carera"],
+        thumbnail_url="http://example.com/duplicate.jpg",
+    )
+    _write_book(own_database, "9780441013593", "Dune", ["Frank Herbert"])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, title, thumbnail_url FROM books ORDER BY id").fetchall()
+        links = conn.execute("SELECT count(*) FROM book_authors").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert books == [
+        ("9780008644833", "The Spy in the Archive", kept_cover),
+        ("9780441013593", "Dune", None),
+    ]
+    assert links == 2
+    assert stamped == "0010"
+
+
+@pytest.mark.parametrize("history", ["reading", "reading_list"])
+def test_0010_refuses_an_empty_keyed_duplicate_that_carries_history(own_database, history):
+    """History makes the row a Book to keep, not a duplicate to discard."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        if history == "reading":
+            conn.execute(
+                "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+                [user_id, duplicate_id],
+            )
+        else:
+            conn.execute(
+                "INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)",
+                [user_id, duplicate_id],
+            )
+
+    with pytest.raises(RuntimeError, match="Refusing to delete ISBN-less Book"):
+        _upgrade_database(own_database, "head")
+
+    # The refusal is the whole migration: the row is still there and the
+    # revision is not stamped.
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == 1
+    assert stamped == "0009"
+
+
+@pytest.mark.parametrize(
+    ("title", "authors", "reason"),
+    [
+        ("A Different Book", ["Gordon Carera"], "its title differs"),
+        ("The Spy in the Archive", ["Somebody Else"], "its authors differ"),
+    ],
+)
+def test_0010_refuses_an_empty_keyed_book_that_is_not_the_duplicate(own_database, title, authors, reason):
+    """An ISBN-less Book this repair does not recognise is a person's call."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    _write_book(own_database, "", title, authors)
+
+    with pytest.raises(RuntimeError, match=reason):
+        _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT title FROM books WHERE btrim(isbn13) = ''").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == [(title,)]
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_the_real_book_is_missing(own_database):
+    """With no ISBN-ed record there is nothing to confirm the duplicate against."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+
+    with pytest.raises(RuntimeError, match="is not in the catalogue"):
+        _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT count(*) FROM books").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == 1
+    assert stamped == "0009"
+
+
+def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
+    """The repair may already have happened by hand; it must then do nothing."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, title FROM books").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [("9780008644833", "The Spy in the Archive")]
+    assert stamped == "0010"
+
+
+def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
+    """A deployment serves requests while migrations run (DEPLOYMENT.md).
+
+    The Reading is inserted but its transaction stays open while the migration
+    starts, so a migration that counted first would see zero and then cascade
+    the Reading away with the duplicate. Because the candidate is locked before
+    the count, the migration waits; once the Reading commits, the count sees it
+    and the repair refuses. The commit happens only once the migration is seen
+    waiting on that lock; without the lock nothing waits, so the Reading commits
+    before the count and the assertions below fail.
+    """
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+
+    reader = psycopg.connect(own_database)
+    failure = []
+    try:
+        user_id = reader.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        reader.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+            [user_id, duplicate_id],
+        )
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # The migration cannot get past the Book this transaction holds, so wait
+        # for its ungranted lock before committing. The wait is observed rather
+        # than timed, so the test proves the lock is taken before the count.
+        _wait_for_lock_wait(own_database)
+        reader.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        reader.close()
+
+    assert failure, "the migration deleted the duplicate instead of refusing"
+    assert "Refusing to delete ISBN-less Book" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT count(*) FROM readings").fetchone()[0]
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == 1
+    assert duplicate == 1
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):
+    """An edit can move the survivor after the duplicate was matched to it.
+
+    Deployments still serve edits while migrations run, and an edit may change a
+    Book's ISBN. If that commit lands between the survivor being matched and the
+    cover being copied, an ISBN-keyed copy would find nothing to update while the
+    duplicate, holding the only image, was still deleted. The survivor is locked
+    for the whole copy, so the match and the write see the same row: here the
+    ISBN moves and the repair refuses instead of losing the image.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    _write_book(
+        own_database,
+        "",
+        "The Spy in the Archive",
+        ["Gordon Carera"],
+        thumbnail_url="http://example.com/duplicate.jpg",
+    )
+
+    editor = psycopg.connect(own_database)
+    failure = []
+    try:
+        # Like the update endpoint: keyed by id, so the row keeps its identity
+        # while its ISBN changes. Uncommitted, so the migration must wait.
+        editor.execute("UPDATE books SET isbn13 = '9780441013593' WHERE id = %s", [real_id])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the migration is blocked on the row this edit holds, then
+        # let the edit commit so the migration sees the Book under its new ISBN.
+        _wait_for_lock_wait(own_database)
+        editor.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        editor.close()
+
+    assert failure, "the migration copied nothing and deleted the duplicate anyway"
+    assert "is not in the catalogue" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, thumbnail_url FROM books ORDER BY id").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [
+        ("9780441013593", None),
+        ("", "http://example.com/duplicate.jpg"),
+    ]
+    assert stamped == "0009"

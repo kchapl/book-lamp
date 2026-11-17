@@ -237,7 +237,7 @@ def test_api_update_book_success(authenticated_client):
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
-        json={"title": "New Title", "author": "New Author"},
+        json={"title": "New Title", "author": "New Author", "isbn13": "9780306406157"},
     )
     assert resp.status_code == 200
     assert _json(resp) == {"success": True}
@@ -259,6 +259,7 @@ def test_api_update_book_keeps_the_names_it_is_given(authenticated_client):
         f"/api/books/{book['id']}/edit",
         json={
             "title": "Good Omens",
+            "isbn13": "9780306406157",
             "author": "Neil Gaiman, Terry Pratchett",
             "authors": ["Neil Gaiman", "Terry Pratchett"],
         },
@@ -275,7 +276,7 @@ def test_api_update_book_reads_a_new_author_string(authenticated_client):
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
-        json={"title": "T", "author": "Gaiman; Pratchett"},
+        json={"title": "T", "author": "Gaiman; Pratchett", "isbn13": "9780306406157"},
     )
 
     assert resp.status_code == 200
@@ -289,7 +290,7 @@ def test_api_update_book_refuses_a_book_with_no_authors(authenticated_client):
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
-        json={"title": "T", "authors": []},
+        json={"title": "T", "authors": [], "isbn13": "9780306406157"},
     )
 
     assert resp.status_code == 400
@@ -314,7 +315,7 @@ def test_api_update_book_rewrites_the_category_pair(authenticated_client):
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
-        json={"title": "T", "author": "A", "bisac_category": "FICTION / Literary"},
+        json={"title": "T", "author": "A", "isbn13": "9780306406157", "bisac_category": "FICTION / Literary"},
     )
     assert resp.status_code == 200
 
@@ -331,7 +332,7 @@ def test_api_update_book_missing_fields(authenticated_client):
 
     resp = authenticated_client.post(
         f"/api/books/{book['id']}/edit",
-        json={"title": ""},
+        json={"title": "", "isbn13": "9780306406157"},
     )
     assert resp.status_code == 400
 
@@ -346,6 +347,21 @@ def test_api_update_book_invalid_isbn(authenticated_client):
         json={"title": "T", "author": "A", "isbn13": "000"},
     )
     assert resp.status_code == 400
+
+
+def test_api_update_book_refuses_an_edit_without_an_isbn(authenticated_client):
+    """An edit cannot clear a Book's ISBN: a Book is identified by it."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780306406157", title="T", authors=["A"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={"title": "New Title", "author": "A"},
+    )
+
+    assert resp.status_code == 400
+    assert _json(resp)["error"] == "isbn is required"
+    assert storage.get_book_by_id(book["id"])["title"] == "T"
 
 
 # ---------------------------------------------------------------------------
