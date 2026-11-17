@@ -110,9 +110,9 @@ const AddBookPage: React.FC = () => {
     const [isbnNotice, setIsbnNotice] = useState<string | null>(null);
     // The cover an ISBN lookup or a matched edition brought back, and the ISBN
     // it belongs to. It is kept apart from the typed fields so a partial result
-    // still contributes one, but it is only shown or sent for that ISBN: a
-    // lookup can answer after the reader has moved on, and a scan replaces the
-    // ISBN without passing the field that clears the previous image.
+    // still contributes one, and it is only sent for that ISBN: a lookup can
+    // answer after the reader has moved on, and a scan replaces the ISBN
+    // without clearing the previous image.
     const [cover, setCover] = useState<{
         isbn: string;
         thumbnail_url?: string;
@@ -201,6 +201,9 @@ const AddBookPage: React.FC = () => {
         if (!isbnToLookup.trim()) return;
         
         const cleanIsbn = normalizeIsbn(isbnToLookup);
+        // An answer is only about the ISBN it was asked for: the reader may have
+        // moved on while it was in flight.
+        const superseded = () => normalizeIsbn(isbnRef.current) !== cleanIsbn;
         if (cleanIsbn.length !== 10 && cleanIsbn.length !== 13) {
             setIsbnError('Please enter a valid 10 or 13 digit ISBN');
             return;
@@ -212,9 +215,7 @@ const AddBookPage: React.FC = () => {
         
         try {
             const book = await lookupISBN(cleanIsbn);
-            // The reader may have typed a different ISBN while this was in
-            // flight; the answer belongs to the ISBN it was asked about.
-            if (normalizeIsbn(isbnRef.current) !== cleanIsbn) return;
+            if (superseded()) return;
             if (book) {
                 // A cover is worth keeping even when the providers know no title
                 // or author for the edition: the Book would otherwise be stored
@@ -240,6 +241,9 @@ const AddBookPage: React.FC = () => {
             }
         } catch (err) {
             console.error('Lookup error:', err);
+            // A failure for a replaced ISBN is not a failure of the one now in
+            // the field, so it must not report it or open manual entry for it.
+            if (superseded()) return;
             setIsbnNotice('Could not look up that ISBN. Fill the details in below.');
             setShowManualEntry(true);
         } finally {
@@ -467,12 +471,7 @@ const AddBookPage: React.FC = () => {
                     label="ISBN (optional)"
                     placeholder="Enter ISBN (10 or 13 digits)"
                     value={isbn}
-                    onValueChange={(value) => {
-                        changeIsbn(value);
-                        // A different ISBN has a different cover; the next
-                        // lookup fills this one in.
-                        setCover(null);
-                    }}
+                    onValueChange={changeIsbn}
                     supportingText="No ISBN? The title and author form below can find it for you."
                 />
                 <div className="isbn-actions">

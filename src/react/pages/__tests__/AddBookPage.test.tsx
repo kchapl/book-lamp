@@ -599,6 +599,32 @@ describe('AddBookPage ISBN lookup', () => {
         });
         expect(screen.getByText(/could not look up/i)).toBeInTheDocument();
     });
+
+    it('ignores a failure that answers for the ISBN the reader replaced', async () => {
+        let failLookup: ((error: Error) => void) | undefined;
+        lookup.mockImplementation(
+            () =>
+                new Promise<Book | null>((_resolve, reject) => {
+                    failLookup = reject;
+                })
+        );
+
+        const { container } = renderPage();
+        await doLookup('9781529339604');
+        await waitFor(() => expect(lookup).toHaveBeenCalledWith('9781529339604'));
+
+        // The reader corrects the ISBN before the first lookup fails; that
+        // failure is not about the ISBN now in the field.
+        typeInto('isbn', '9780306406157');
+        await act(async () => {
+            failLookup?.(new Error('HTTP 502: Lookup failed'));
+        });
+
+        expect(screen.queryByText(/could not look up/i)).not.toBeInTheDocument();
+        // Nor does it open manual entry for a Book the reader has not asked to
+        // fill in by hand.
+        expect(container.querySelector('.add-book-form')).toBeNull();
+    });
 });
 
 
