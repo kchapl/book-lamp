@@ -7,6 +7,8 @@ compose.yaml with podman-compose. A host that cannot start containers skips them
 
 import os
 import shutil
+import threading
+import time
 from uuid import uuid4
 
 import psycopg
@@ -818,3 +820,56 @@ def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert books == [("9780008644833", "The Spy in the Archive")]
     assert stamped == "0010"
+
+
+def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
+    """A deployment serves requests while migrations run (DEPLOYMENT.md).
+
+    The Reading is inserted but its transaction stays open while the migration
+    starts, so a migration that counted first would see zero and then cascade
+    the Reading away with the duplicate. Because the candidate is locked before
+    the count, the migration waits; once the Reading commits, the count sees it
+    and the repair refuses. With the lock the migration cannot finish before the
+    commit, and without it the assertions below are what fail.
+    """
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+
+    reader = psycopg.connect(own_database)
+    failure = []
+    try:
+        user_id = reader.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        reader.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+            [user_id, duplicate_id],
+        )
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # By now the migration has reached its candidate and waits on the lock
+        # this transaction holds. Commit the Reading so its count sees it.
+        time.sleep(1)
+        reader.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        reader.close()
+
+    assert failure, "the migration deleted the duplicate instead of refusing"
+    assert "Refusing to delete ISBN-less Book" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT count(*) FROM readings").fetchone()[0]
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == 1
+    assert duplicate == 1
+    assert stamped == "0009"

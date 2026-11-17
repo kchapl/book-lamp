@@ -19,6 +19,13 @@ named, because a row this repair does not recognise needs a person to say which
 ISBN it should carry (0007 shows that form). With no empty-keyed Book the repair
 has already happened and this is a no-op.
 
+The candidate row is locked before its dependents are counted, and the lock is
+held through the delete. A deployment runs this while the previous instance is
+still serving requests (DEPLOYMENT.md), so a reader can save a Reading between
+the check and the delete; that insert takes FOR KEY SHARE on its Book and waits
+for this migration's FOR UPDATE, so its history is either counted and refused or
+not written at all, never cascade-deleted unseen.
+
 Revision ID: 0010
 Revises: 0009
 Create Date: 2026-11-17
@@ -63,9 +70,14 @@ def _describe(row: RowMapping) -> str:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    empty = bind.execute(text(_EMPTY_KEYED_BOOKS)).mappings().all()
-    if not empty:
+    # Lock the candidate before counting what depends on it. A Reading or
+    # Reading List insert takes FOR KEY SHARE on its Book and conflicts with this
+    # FOR UPDATE, so the counts below cannot go stale: the write either lands
+    # before the lock (and is seen) or waits until the migration has finished.
+    locked = bind.execute(text("SELECT id FROM books WHERE btrim(isbn13) = '' FOR UPDATE")).fetchall()
+    if not locked:
         return
+    empty = bind.execute(text(_EMPTY_KEYED_BOOKS)).mappings().all()
 
     real = (
         bind.execute(
