@@ -30,14 +30,12 @@ RATED_STATUS = "Completed"
 
 
 def upgrade() -> None:
-    op.execute(
-        f"""
+    op.execute(f"""
         UPDATE readings
         SET rating = 0
         WHERE status <> '{RATED_STATUS}'
           AND COALESCE(rating, 0) <> 0
-        """
-    )
+        """)
 
 
 def downgrade() -> None:

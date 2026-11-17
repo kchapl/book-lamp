@@ -638,9 +638,7 @@ def test_0009_zeroes_a_rating_on_a_reading_that_never_completed(own_database):
     """
     _upgrade_database(own_database, "0008")
     with psycopg.connect(own_database) as conn:
-        user_id = conn.execute(
-            "INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id"
-        ).fetchone()[0]
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
         book_id = conn.execute(
             "INSERT INTO books (isbn13, title) VALUES ('9780441013593', 'Dune') RETURNING id"
         ).fetchone()[0]
