@@ -48,8 +48,10 @@ export function draftWithStatus(draft: ReadingDraft, status: string, today: stri
 /**
  * The draft an edit form starts from, taken from an existing Reading.
  *
- * The inverse of :func:`readingPayload`, so a Reading round-trips through the
- * form unchanged when the reader only means to change its status.
+ * The inverse of :func:`readingPayload` for a Reading that follows the rating
+ * rule, so it round-trips through the form unchanged when the reader only means
+ * to change its status. An open Reading that carries a rating keeps it in the
+ * draft; :func:`readingPayload` drops it when the draft is saved.
  */
 export function readingDraft(reading: Reading): ReadingDraft {
     return {

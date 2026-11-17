@@ -98,7 +98,7 @@ describe('draftWithStatus', () => {
 });
 
 describe('readingDraft', () => {
-    it('is the inverse of readingPayload for an open Reading', () => {
+    it('drops a rating an open Reading should not carry when saved', () => {
         const reading = {
             id: 7,
             book_id: 1,
