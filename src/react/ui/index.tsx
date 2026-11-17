@@ -456,10 +456,7 @@ export interface FabProps extends MdBaseProps {
     size?: 'small' | 'medium' | 'large';
 }
 
-/**
- * A screen-level primary action (DESIGN.md). It remains part of the shared kit
- * with the other design-language controls, whether or not a page needs it now.
- */
+/** A screen-level primary action (DESIGN.md). */
 export const Fab: React.FC<FabProps> = ({ icon, label, to, onClick, size, className, ...rest }) => {
     const navigate = useNavigate();
     const ref = useMdListener<HTMLElement>('click', (element, event) => {
