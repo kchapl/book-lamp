@@ -71,11 +71,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const isActive = (path: string) =>
         path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
-    // `/books/new` nests under `/books`, so both entries match that route. Only
-    // the most specific match may claim the page, or two links read as current.
-    const activeNavPath = NAV_ITEMS.filter((item) => isActive(item.path)).sort(
-        (a, b) => b.path.length - a.path.length
-    )[0]?.path;
+    // `/` matches only itself and no two entries share a prefix, so the first
+    // entry that matches is the one to mark current.
+    const activeNavPath = NAV_ITEMS.find((item) => isActive(item.path))?.path;
 
     return (
         <div className="app-container">
