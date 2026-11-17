@@ -12,7 +12,7 @@ import {
 } from '../services/api';
 import { Button, Dialog, IconButton, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
-import { endsReading, statusClass } from '../utils/status';
+import { endsReading, RATED_STATUS, statusClass } from '../utils/status';
 import { todayIso } from '../utils/format';
 import { draftWithStatus, readingDraft, readingPayload, type ReadingDraft } from '../utils/reading';
 import { seriesPath } from '../utils/series';
@@ -80,15 +80,19 @@ const ReadingForm: React.FC<ReadingFormProps> = ({
                     onValueChange={(value) => onChange({ ...draft, end_date: value })}
                 />
             )}
-            <TextField
-                id={`${idPrefix}-rating`}
-                label="Rating (1–5)"
-                type="number"
-                min="1"
-                max="5"
-                value={String(draft.rating)}
-                onValueChange={(value) => onChange({ ...draft, rating: parseInt(value) || 0 })}
-            />
+            {/* A rating is a verdict on a Reading that reached Completed, so
+                the other statuses offer no way to record one. */}
+            {draft.status === RATED_STATUS && (
+                <TextField
+                    id={`${idPrefix}-rating`}
+                    label="Rating (1–5)"
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={String(draft.rating)}
+                    onValueChange={(value) => onChange({ ...draft, rating: parseInt(value) || 0 })}
+                />
+            )}
             {error && <p className="error-message">{error}</p>}
             <div className="form-actions">
                 <Button onClick={onSubmit}>{submitLabel}</Button>
@@ -507,7 +511,7 @@ const BookDetailPage: React.FC = () => {
                                             <span className={`status-badge ${statusClass(record.status)}`}>
                                                 {record.status}
                                             </span>
-                                            {record.rating ? (
+                                            {record.status === RATED_STATUS && record.rating ? (
                                                 <span className="rating-stars" aria-label={`${record.rating} out of 5`}>
                                                     {'★'.repeat(record.rating)}
                                                     {'☆'.repeat(5 - record.rating)}

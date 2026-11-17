@@ -32,8 +32,23 @@ describe('readingPayload', () => {
             status: 'In Progress',
             start_date: '2026-10-01',
             end_date: undefined,
-            rating: 5,
+            // A rating only travels with a Completed Reading, so an open one
+            // submits none.
+            rating: 0,
         });
+    });
+
+    it('sends no rating for a Reading that has not completed', () => {
+        // Abandoned ends a Reading but is not a verdict on it, so the score the
+        // draft still holds is not submitted.
+        expect(
+            readingPayload({
+                status: 'Abandoned',
+                start_date: '2026-10-01',
+                end_date: '2026-10-05',
+                rating: 4,
+            }).rating
+        ).toBe(0);
     });
 
     it('keeps the end date for an Abandoned Reading, which has ended too', () => {
@@ -68,6 +83,13 @@ describe('draftWithStatus', () => {
         expect(draftWithStatus(ended, 'Abandoned', '2026-10-26').end_date).toBe('2026-10-11');
     });
 
+    it('clears the rating when the status leaves Completed', () => {
+        const rated = { ...open, status: 'Completed', rating: 5 };
+
+        expect(draftWithStatus(rated, 'In Progress', '2026-10-26').rating).toBe(0);
+        expect(draftWithStatus(rated, 'Abandoned', '2026-10-26').rating).toBe(0);
+    });
+
     it('clears the end date when a Reading is open again', () => {
         const ended = { ...open, status: 'Completed', end_date: '2026-10-11' };
 
@@ -76,7 +98,7 @@ describe('draftWithStatus', () => {
 });
 
 describe('readingDraft', () => {
-    it('is the inverse of readingPayload for an open Reading', () => {
+    it('drops a rating an open Reading should not carry when saved', () => {
         const reading = {
             id: 7,
             book_id: 1,
@@ -89,7 +111,7 @@ describe('readingDraft', () => {
             status: 'In Progress',
             start_date: '2026-10-01',
             end_date: undefined,
-            rating: 3,
+            rating: 0,
         });
     });
 

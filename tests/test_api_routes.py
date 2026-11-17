@@ -523,7 +523,7 @@ def test_api_create_reading_again_with_the_same_status_and_start_date(authentica
     storage = get_storage()
     book = storage.add_book(isbn13="782", title="B", authors=["A"])
 
-    payload = {"status": "In Progress", "start_date": "2024-01-01", "rating": 5}
+    payload = {"status": "In Progress", "start_date": "2024-01-01"}
     first = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
     second = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
 
@@ -533,7 +533,7 @@ def test_api_create_reading_again_with_the_same_status_and_start_date(authentica
 
     records = storage.get_readings(book_id=book["id"])
     assert len(records) == 2
-    assert {record["rating"] for record in records} == {5}
+    assert {record["rating"] for record in records} == {0}
 
 
 # ---------------------------------------------------------------------------
@@ -578,6 +578,41 @@ def test_api_update_reading_refuses_completed_without_an_end_date(authenticated_
 # ---------------------------------------------------------------------------
 # Readings – delete
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", ["In Progress", "Abandoned"])
+def test_api_create_reading_refuses_a_rating_before_completed(authenticated_client, status):
+    """A rating is a verdict on a finished Reading, so an open one and an
+    abandoned one cannot carry it."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="783", title="B", authors=["A"])
+    payload = {"status": status, "start_date": "2024-01-01", "rating": 5}
+    if status == "Abandoned":
+        payload["end_date"] = "2024-01-10"
+
+    resp = authenticated_client.post(f"/api/books/{book['id']}/readings", json=payload)
+
+    assert resp.status_code == 400
+    assert "rating" in _json(resp)["error"]
+    assert storage.get_readings(book_id=book["id"]) == []
+
+
+def test_api_update_reading_refuses_a_rating_before_completed(authenticated_client):
+    """An edit cannot give an open Reading a score."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="784", title="B", authors=["A"])
+    record = storage.add_reading(book["id"], "In Progress", "2024-01-01")
+
+    resp = authenticated_client.post(
+        f"/api/readings/{record['id']}/edit",
+        json={"status": "Abandoned", "start_date": "2024-01-01", "end_date": "2024-01-10", "rating": 4},
+    )
+
+    assert resp.status_code == 400
+    assert "rating" in _json(resp)["error"]
+    stored = storage.get_readings(book_id=book["id"])[0]
+    assert stored["status"] == "In Progress"
+    assert stored["rating"] == 0
 
 
 def test_api_delete_reading_success(authenticated_client):
