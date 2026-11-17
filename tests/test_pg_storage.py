@@ -593,6 +593,29 @@ def _write_book(url, isbn13, title, authors, thumbnail_url=None):
     return book_id
 
 
+def _wait_for_lock_wait(url):
+    """Block until a backend in `url`'s database is waiting for a lock.
+
+    The migration under test is the only writer there while these tests run, so
+    an ungranted lock is the migration waiting on a row the test holds. Waiting
+    for it to be seen, rather than sleeping, is what proves the lock is taken.
+    """
+    database = url.rsplit("/", 1)[-1]
+    deadline = time.monotonic() + 30
+    with psycopg.connect(url) as watcher:
+        while time.monotonic() < deadline:
+            waiting = watcher.execute(
+                "SELECT count(*) FROM pg_locks l "
+                "JOIN pg_stat_activity a ON a.pid = l.pid "
+                "WHERE NOT l.granted AND a.datname = %s",
+                [database],
+            ).fetchone()[0]
+            if waiting:
+                return
+            time.sleep(0.05)
+    pytest.fail("the migration never waited on the Book's lock")
+
+
 def test_0007_repairs_the_two_strings_the_splitter_mangled(own_database):
     """The repair reads the string, so what it writes joins back to it exactly."""
     _upgrade_database(own_database, "0005")
@@ -858,21 +881,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         # The migration cannot get past the Book this transaction holds, so wait
         # for its ungranted lock before committing. The wait is observed rather
         # than timed, so the test proves the lock is taken before the count.
-        database = own_database.rsplit("/", 1)[-1]
-        deadline = time.monotonic() + 30
-        with psycopg.connect(own_database) as watcher:
-            while time.monotonic() < deadline:
-                waiting = watcher.execute(
-                    "SELECT count(*) FROM pg_locks l "
-                    "JOIN pg_stat_activity a ON a.pid = l.pid "
-                    "WHERE NOT l.granted AND a.datname = %s",
-                    [database],
-                ).fetchone()[0]
-                if waiting:
-                    break
-                time.sleep(0.05)
-            else:
-                pytest.fail("the migration never waited on the Book's lock")
+        _wait_for_lock_wait(own_database)
         reader.commit()
         worker.join(timeout=30)
         assert not worker.is_alive(), "the migration did not finish"
@@ -929,21 +938,7 @@ def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own
 
         # Wait until the migration is blocked on the row this edit holds, then
         # let the edit commit so the migration sees the Book under its new ISBN.
-        database = own_database.rsplit("/", 1)[-1]
-        deadline = time.monotonic() + 30
-        with psycopg.connect(own_database) as watcher:
-            while time.monotonic() < deadline:
-                waiting = watcher.execute(
-                    "SELECT count(*) FROM pg_locks l "
-                    "JOIN pg_stat_activity a ON a.pid = l.pid "
-                    "WHERE NOT l.granted AND a.datname = %s",
-                    [database],
-                ).fetchone()[0]
-                if waiting:
-                    break
-                time.sleep(0.05)
-            else:
-                pytest.fail("the migration never waited on the Book's lock")
+        _wait_for_lock_wait(own_database)
         editor.commit()
         worker.join(timeout=30)
         assert not worker.is_alive(), "the migration did not finish"
