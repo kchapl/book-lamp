@@ -16,7 +16,7 @@ from googleapiclient.errors import HttpError
 
 from book_lamp.services.pg_storage import PostgresStorage
 from book_lamp.utils.authors import parse
-from book_lamp.utils.readings import ENDING_STATUSES
+from book_lamp.utils.readings import ENDING_STATUSES, RATED_STATUS
 
 # Load environment variables from .env file
 load_dotenv()
@@ -288,6 +288,13 @@ def migrate_readings(storage: PostgresStorage, rows: List[List[str]], dry_run: b
         # fallback the Libib importer applies, rather than aborting the migration.
         if record_data["status"] in ENDING_STATUSES and not record_data["end_date"]:
             record_data["end_date"] = record_data["start_date"] or date.today().isoformat()
+
+        # A rating is a verdict on a finished Reading, so the storage seam refuses
+        # one on a row that never reached Completed. A Sheets row may still carry
+        # such a cell, so it is dropped here as the Libib importer drops it,
+        # rather than aborting the migration midway through a tab.
+        if record_data["status"] != RATED_STATUS:
+            record_data["rating"] = 0
 
         if dry_run:
             print(f"DRY RUN: Would add reading: {record_data['status']}")

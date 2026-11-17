@@ -8,7 +8,7 @@
  * the form starts in.
  */
 import type { Reading } from '../types';
-import { endsReading } from './status';
+import { endsReading, RATED_STATUS } from './status';
 
 export interface ReadingDraft {
     status: string;
@@ -22,7 +22,9 @@ export function readingPayload(draft: ReadingDraft): Partial<Reading> {
         status: draft.status,
         start_date: draft.start_date,
         end_date: endsReading(draft.status) ? draft.end_date : undefined,
-        rating: draft.rating,
+        // A rating is a verdict on a finished Reading, so only a Completed
+        // one submits the score the form holds.
+        rating: draft.status === RATED_STATUS ? draft.rating : 0,
     };
 }
 
@@ -39,14 +41,17 @@ export function draftWithStatus(draft: ReadingDraft, status: string, today: stri
         ...draft,
         status,
         end_date: endsReading(status) ? draft.end_date || today : '',
+        rating: status === RATED_STATUS ? draft.rating : 0,
     };
 }
 
 /**
  * The draft an edit form starts from, taken from an existing Reading.
  *
- * The inverse of :func:`readingPayload`, so a Reading round-trips through the
- * form unchanged when the reader only means to change its status.
+ * The inverse of :func:`readingPayload` for a Reading that follows the rating
+ * rule, so it round-trips through the form unchanged when the reader only means
+ * to change its status. An open Reading that carries a rating keeps it in the
+ * draft; :func:`readingPayload` drops it when the draft is saved.
  */
 export function readingDraft(reading: Reading): ReadingDraft {
     return {

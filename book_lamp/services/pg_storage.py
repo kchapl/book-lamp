@@ -12,7 +12,7 @@ from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import Category, normalize_isbn, resolve_category
-from book_lamp.utils.readings import require_end_date
+from book_lamp.utils.readings import require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
 
@@ -537,6 +537,7 @@ class PostgresStorage:
         rating: int = 0,
     ) -> dict[str, Any]:
         require_end_date(status, end_date)
+        require_rating(status, rating)
         # A Reading is one attempt at a Book, so the same status and start date
         # as an earlier Reading makes a second Reading rather than a duplicate of
         # it: the row is always inserted. Returning the earlier row instead
@@ -565,6 +566,7 @@ class PostgresStorage:
         rating: int = 0,
     ) -> dict[str, Any]:
         require_end_date(status, end_date)
+        require_rating(status, rating)
         query = """
             UPDATE readings
             SET status = %s, start_date = %s, end_date = %s, rating = %s
@@ -748,6 +750,7 @@ class PostgresStorage:
                         r_start = record_data["start_date"]
                         r_end = record_data.get("end_date")
                         require_end_date(r_status, r_end)
+                        require_rating(r_status, record_data.get("rating") or 0)
 
                         existing_record = conn.execute(
                             "SELECT * FROM readings WHERE user_id = %s AND book_id = %s",

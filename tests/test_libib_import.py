@@ -227,3 +227,50 @@ def test_an_abandoned_row_with_no_completion_date_still_ends() -> None:
     record = items[0]["record"]
     assert record["status"] == "Abandoned"
     assert record["end_date"] == "2023-01-01"
+
+
+def test_libib_import_drops_a_rating_before_completion():
+    """A rating is a verdict on a finished Reading, so a CSV row that never
+    reached Completed imports without one rather than failing the import."""
+    items = parse_libib_csv(
+        "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating\n"
+        "Open Book,Author O,9785555555555,In Progress,2023-01-01,,4\n"
+        "Abandoned Book,Author A,9786666666666,Abandoned,2023-01-01,2023-02-01,3\n"
+        "Finished Book,Author F,9787777777777,Completed,2023-01-01,2023-02-01,5\n"
+    )
+
+    assert [item["record"]["rating"] for item in items] == [0, 0, 5]
+
+
+def test_libib_import_drops_the_rating_when_a_finished_reading_reopens(authenticated_client):
+    """A Completed Reading rated 5 matched by an open row must not keep the 5.
+
+    The open row carries no rating, so the merge has nothing to fall back to on
+    a Reading that is no longer finished.
+    """
+    storage = get_storage()
+    finished = (
+        "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating\n"
+        "Reread Book,Author R,9788888888888,Completed,2023-01-01,2023-01-10,5\n"
+    )
+    reopened = (
+        "Title,Author,ISBN,Reading Status,Date Added,Date Completed,Rating\n"
+        "Reread Book,Author R,9788888888888,In Progress,2023-01-01,,\n"
+    )
+
+    for csv_content in (finished, reopened):
+        data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "libib.csv")}
+        resp = authenticated_client.post(
+            "/books/import",
+            data=data,
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+        _wait_for_latest_job()
+        assert resp.status_code == 200
+
+    book = storage.get_book_by_isbn("9788888888888")
+    records = storage.get_readings(book_id=book["id"])
+    assert len(records) == 1
+    assert records[0]["status"] == "In Progress"
+    assert records[0]["rating"] == 0

@@ -148,6 +148,7 @@ describe('BookDetailPage add reading', () => {
     it("links the Book's series to that series' page", async () => {
         detail.mockResolvedValue({
             id: 1,
+            isbn13: '9780306406157',
             title: 'The Final Empire',
             author: 'Brandon Sanderson',
             series: 'Mistborn: Era 1',
@@ -176,6 +177,7 @@ describe('BookDetailPage add reading', () => {
 describe('BookDetailPage placard links', () => {
     const linkedBook = {
         id: 1,
+        isbn13: '9780306406157',
         title: 'The Left Hand of Darkness',
         author: 'Ursula K. Le Guin',
         authors: ['Ursula K. Le Guin'],
@@ -236,6 +238,7 @@ describe('BookDetailPage placard links', () => {
     it('links each author of a co-authored Book separately', async () => {
         detail.mockResolvedValue({
             id: 1,
+            isbn13: '9780306406157',
             title: 'Good Omens',
             author: 'Neil Gaiman, Terry Pratchett',
             authors: ['Neil Gaiman', 'Terry Pratchett'],
@@ -259,6 +262,7 @@ describe('BookDetailPage edit book', () => {
     /** A Book two people wrote: its Authors are a list, not a joined string. */
     const coauthored = {
         id: 1,
+        isbn13: '9780306406157',
         title: 'Good Omens',
         author: 'Neil Gaiman, Terry Pratchett',
         authors: ['Neil Gaiman', 'Terry Pratchett'],
@@ -323,6 +327,7 @@ describe('BookDetailPage edit book', () => {
     it('adds an author in the row that was added', async () => {
         detail.mockResolvedValue({
             id: 1,
+            isbn13: '9780306406157',
             title: 'Good Omens',
             author: 'Neil Gaiman',
             authors: ['Neil Gaiman'],
@@ -345,6 +350,7 @@ describe('BookDetailPage edit book', () => {
     it('drops the author whose row was removed, keeping the rest in order', async () => {
         detail.mockResolvedValue({
             id: 1,
+            isbn13: '9780306406157',
             title: 'Three Authors',
             author: 'Ann One, Bob Two, Cat Three',
             authors: ['Ann One', 'Bob Two', 'Cat Three'],
@@ -392,9 +398,29 @@ describe('BookDetailPage edit book', () => {
         expect(field('edit-author-0')).toBeInTheDocument();
     });
 
+    it('refuses to save a Book whose ISBN has been cleared, and says why', async () => {
+        detail.mockResolvedValue({
+            id: 1,
+            title: 'Piranesi',
+            authors: ['Susanna Clarke'],
+            isbn13: '9781635575637',
+            readings: [],
+        });
+
+        renderPage();
+        await openEditBook();
+
+        typeInto('edit-isbn', '');
+        fireEvent.click(button(/^save$/i));
+
+        expect(await screen.findByText(/an isbn is required/i)).toBeInTheDocument();
+        expect(save).not.toHaveBeenCalled();
+    });
+
     it('opens a Book that carries only the display string with one row', async () => {
         detail.mockResolvedValue({
             id: 1,
+            isbn13: '9780306406157',
             title: 'Piranesi',
             author: 'Susanna Clarke',
             readings: [],
@@ -431,9 +457,10 @@ describe('BookDetailPage edit reading', () => {
         await openEditReading();
 
         expect(field('edit-record-start-date')?.value).toBe('2026-10-01');
-        expect(field('edit-record-rating')?.value).toBe('0');
         // An open Reading has no end, so the form offers no end-date control.
         expect(field('edit-record-end-date')).not.toBeInTheDocument();
+        // Only a Completed Reading can be rated, so there is no rating control.
+        expect(field('edit-record-rating')).not.toBeInTheDocument();
     });
 
     it('sends the edit to the reading route with the dates the form holds', async () => {
