@@ -829,8 +829,9 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
     starts, so a migration that counted first would see zero and then cascade
     the Reading away with the duplicate. Because the candidate is locked before
     the count, the migration waits; once the Reading commits, the count sees it
-    and the repair refuses. With the lock the migration cannot finish before the
-    commit, and without it the assertions below are what fail.
+    and the repair refuses. The commit happens only once the migration is seen
+    waiting on that lock; without the lock nothing waits, so the Reading commits
+    before the count and the assertions below fail.
     """
     _upgrade_database(own_database, "0009")
     _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
@@ -854,9 +855,24 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         worker = threading.Thread(target=migrate)
         worker.start()
 
-        # By now the migration has reached its candidate and waits on the lock
-        # this transaction holds. Commit the Reading so its count sees it.
-        time.sleep(1)
+        # The migration cannot get past the Book this transaction holds, so wait
+        # for its ungranted lock before committing. The wait is observed rather
+        # than timed, so the test proves the lock is taken before the count.
+        database = own_database.rsplit("/", 1)[-1]
+        deadline = time.monotonic() + 30
+        with psycopg.connect(own_database) as watcher:
+            while time.monotonic() < deadline:
+                waiting = watcher.execute(
+                    "SELECT count(*) FROM pg_locks l "
+                    "JOIN pg_stat_activity a ON a.pid = l.pid "
+                    "WHERE NOT l.granted AND a.datname = %s",
+                    [database],
+                ).fetchone()[0]
+                if waiting:
+                    break
+                time.sleep(0.05)
+            else:
+                pytest.fail("the migration never waited on the Book's lock")
         reader.commit()
         worker.join(timeout=30)
         assert not worker.is_alive(), "the migration did not finish"
@@ -872,4 +888,76 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == 1
     assert duplicate == 1
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):
+    """An edit can move the survivor after the duplicate was matched to it.
+
+    Deployments still serve edits while migrations run, and an edit may change a
+    Book's ISBN. If that commit lands between the survivor being matched and the
+    cover being copied, an ISBN-keyed copy would find nothing to update while the
+    duplicate, holding the only image, was still deleted. The survivor is locked
+    for the whole copy, so the match and the write see the same row: here the
+    ISBN moves and the repair refuses instead of losing the image.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    _write_book(
+        own_database,
+        "",
+        "The Spy in the Archive",
+        ["Gordon Carera"],
+        thumbnail_url="http://example.com/duplicate.jpg",
+    )
+
+    editor = psycopg.connect(own_database)
+    failure = []
+    try:
+        # Like the update endpoint: keyed by id, so the row keeps its identity
+        # while its ISBN changes. Uncommitted, so the migration must wait.
+        editor.execute("UPDATE books SET isbn13 = '9780441013593' WHERE id = %s", [real_id])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the migration is blocked on the row this edit holds, then
+        # let the edit commit so the migration sees the Book under its new ISBN.
+        database = own_database.rsplit("/", 1)[-1]
+        deadline = time.monotonic() + 30
+        with psycopg.connect(own_database) as watcher:
+            while time.monotonic() < deadline:
+                waiting = watcher.execute(
+                    "SELECT count(*) FROM pg_locks l "
+                    "JOIN pg_stat_activity a ON a.pid = l.pid "
+                    "WHERE NOT l.granted AND a.datname = %s",
+                    [database],
+                ).fetchone()[0]
+                if waiting:
+                    break
+                time.sleep(0.05)
+            else:
+                pytest.fail("the migration never waited on the Book's lock")
+        editor.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        editor.close()
+
+    assert failure, "the migration copied nothing and deleted the duplicate anyway"
+    assert "is not in the catalogue" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, thumbnail_url FROM books ORDER BY id").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [
+        ("9780441013593", None),
+        ("", "http://example.com/duplicate.jpg"),
+    ]
     assert stamped == "0009"

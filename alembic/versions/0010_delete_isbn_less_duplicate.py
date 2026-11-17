@@ -26,6 +26,13 @@ the check and the delete; that insert takes FOR KEY SHARE on its Book and waits
 for this migration's FOR UPDATE, so its history is either counted and refused or
 not written at all, never cascade-deleted unseen.
 
+The surviving Book is locked the same way, and the cover is copied to it by id.
+An edit may change a Book's ISBN while the deployment still serves requests, so
+matching the survivor by ISBN alone could find it, then have an edit commit
+before the copy: the copy would match nothing while the duplicate, holding the
+only image, was still deleted. With the lock held through the delete, the row
+that was matched is the row that receives the cover.
+
 Revision ID: 0010
 Revises: 0009
 Create Date: 2026-11-17
@@ -79,9 +86,14 @@ def upgrade() -> None:
         return
     empty = bind.execute(text(_EMPTY_KEYED_BOOKS)).mappings().all()
 
+    # Lock the survivor too, and copy to it by id below: an edit can change its
+    # ISBN, so a match by ISBN alone could be undone before the copy lands.
     real = (
         bind.execute(
-            text(f"SELECT btrim(b.title) AS title, {_AUTHORS} AS authors FROM books b WHERE b.isbn13 = :isbn"),
+            text(
+                f"SELECT b.id, btrim(b.title) AS title, {_AUTHORS} AS authors "
+                "FROM books b WHERE b.isbn13 = :isbn FOR UPDATE"
+            ),
             {"isbn": REAL_ISBN},
         )
         .mappings()
@@ -113,15 +125,16 @@ def upgrade() -> None:
             )
 
     for row in empty:
-        # Only fills a gap: a cover the real Book already has wins.
+        # Only fills a gap: a cover the real Book already has wins. The row is the
+        # id matched above and held by its lock, so the ISBN cannot move it away.
         bind.execute(
             text("""
                 UPDATE books
                 SET thumbnail_url = COALESCE(thumbnail_url, :thumbnail_url),
                     cover_url = COALESCE(cover_url, :cover_url)
-                WHERE isbn13 = :isbn
+                WHERE id = :id
                 """),
-            {"thumbnail_url": row["thumbnail_url"], "cover_url": row["cover_url"], "isbn": REAL_ISBN},
+            {"thumbnail_url": row["thumbnail_url"], "cover_url": row["cover_url"], "id": real["id"]},
         )
         # The row's author links go with it (ON DELETE CASCADE). The guard above
         # is what makes the delete safe: it carries no history to lose.
