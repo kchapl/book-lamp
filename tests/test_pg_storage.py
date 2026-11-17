@@ -571,6 +571,26 @@ def _author_names_in_order(url, isbn13):
         ).fetchone()[0]
 
 
+def _write_book(url, isbn13, title, authors, thumbnail_url=None):
+    """A Book with its author links in the order given, as the schema holds it."""
+    with psycopg.connect(url) as conn:
+        book_id = conn.execute(
+            "INSERT INTO books (isbn13, title, thumbnail_url) VALUES (%s, %s, %s) RETURNING id",
+            [isbn13, title, thumbnail_url],
+        ).fetchone()[0]
+        for position, name in enumerate(authors, start=1):
+            author_id = conn.execute(
+                "INSERT INTO authors (name) VALUES (%s) ON CONFLICT (name) DO UPDATE "
+                "SET name = EXCLUDED.name RETURNING id",
+                [name],
+            ).fetchone()[0]
+            conn.execute(
+                "INSERT INTO book_authors (book_id, author_id, position) VALUES (%s, %s, %s)",
+                [book_id, author_id, position],
+            )
+    return book_id
+
+
 def test_0007_repairs_the_two_strings_the_splitter_mangled(own_database):
     """The repair reads the string, so what it writes joins back to it exactly."""
     _upgrade_database(own_database, "0005")
@@ -679,3 +699,122 @@ def test_0008_refuses_a_book_whose_links_cannot_reproduce_its_string(own_databas
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert held == "Frank Herbert"
     assert stamped == "0007"
+
+
+@pytest.mark.parametrize(
+    ("real_cover", "kept_cover"),
+    [(None, "http://example.com/duplicate.jpg"), ("http://example.com/real.jpg", "http://example.com/real.jpg")],
+)
+def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, real_cover, kept_cover):
+    """#358's two records become one, and the cover one of them holds survives.
+
+    The duplicate is the only record with an image, so deleting it must not take
+    the image with it; when both hold one, the real Book's wins.
+    """
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"], thumbnail_url=real_cover)
+    _write_book(
+        own_database,
+        "",
+        "The Spy in the Archive",
+        ["Gordon Carera"],
+        thumbnail_url="http://example.com/duplicate.jpg",
+    )
+    _write_book(own_database, "9780441013593", "Dune", ["Frank Herbert"])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, title, thumbnail_url FROM books ORDER BY id").fetchall()
+        links = conn.execute("SELECT count(*) FROM book_authors").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert books == [
+        ("9780008644833", "The Spy in the Archive", kept_cover),
+        ("9780441013593", "Dune", None),
+    ]
+    assert links == 2
+    assert stamped == "0010"
+
+
+@pytest.mark.parametrize("history", ["reading", "reading_list"])
+def test_0010_refuses_an_empty_keyed_duplicate_that_carries_history(own_database, history):
+    """History makes the row a Book to keep, not a duplicate to discard."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        if history == "reading":
+            conn.execute(
+                "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+                [user_id, duplicate_id],
+            )
+        else:
+            conn.execute(
+                "INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)",
+                [user_id, duplicate_id],
+            )
+
+    with pytest.raises(RuntimeError, match="Refusing to delete ISBN-less Book"):
+        _upgrade_database(own_database, "head")
+
+    # The refusal is the whole migration: the row is still there and the
+    # revision is not stamped.
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == 1
+    assert stamped == "0009"
+
+
+@pytest.mark.parametrize(
+    ("title", "authors", "reason"),
+    [
+        ("A Different Book", ["Gordon Carera"], "its title differs"),
+        ("The Spy in the Archive", ["Somebody Else"], "its authors differ"),
+    ],
+)
+def test_0010_refuses_an_empty_keyed_book_that_is_not_the_duplicate(own_database, title, authors, reason):
+    """An ISBN-less Book this repair does not recognise is a person's call."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    _write_book(own_database, "", title, authors)
+
+    with pytest.raises(RuntimeError, match=reason):
+        _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT title FROM books WHERE btrim(isbn13) = ''").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == [(title,)]
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_the_real_book_is_missing(own_database):
+    """With no ISBN-ed record there is nothing to confirm the duplicate against."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+
+    with pytest.raises(RuntimeError, match="is not in the catalogue"):
+        _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        held = conn.execute("SELECT count(*) FROM books").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert held == 1
+    assert stamped == "0009"
+
+
+def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
+    """The repair may already have happened by hand; it must then do nothing."""
+    _upgrade_database(own_database, "0009")
+    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT isbn13, title FROM books").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [("9780008644833", "The Spy in the Archive")]
+    assert stamped == "0010"
