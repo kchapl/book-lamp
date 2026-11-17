@@ -161,7 +161,6 @@ describe('BooksPage search', () => {
     });
 });
 
-
 describe('BooksPage add action', () => {
     it('offers no add call to action on an empty shelf', async () => {
         renderPage();
@@ -175,9 +174,8 @@ describe('BooksPage add action', () => {
     });
 
     it('offers no add call to action beside the books', async () => {
-        // The removed FAB only rendered when there were books, so an empty
-        // shelf could never have shown it. This is the case that proves the
-        // action is gone rather than merely hidden by an empty list.
+        // A shelf with books is the case where a page-level add action would
+        // appear if there were one.
         list.mockResolvedValue({
             books: [{ id: 1, title: 'Dune', author: 'Frank Herbert' }],
             sort: 'reading_date',
