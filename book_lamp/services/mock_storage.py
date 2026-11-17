@@ -5,7 +5,7 @@ from typing import Any, List, Optional
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import Category, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
-from book_lamp.utils.readings import require_end_date
+from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +239,7 @@ class MockStorage:
         rating: int = 0,
     ) -> dict[str, Any]:
         require_end_date(status, end_date)
+        require_rating(status, rating)
         record = {
             "id": self.next_reading_id,
             "book_id": book_id,
@@ -262,6 +263,7 @@ class MockStorage:
         rating: int = 0,
     ) -> dict[str, Any]:
         require_end_date(status, end_date)
+        require_rating(status, rating)
         for record in self.readings:
             if record["id"] == reading_id:
                 old_status = record.get("status")
@@ -371,6 +373,7 @@ class MockStorage:
                 r_start = record_data["start_date"]
                 r_end = record_data.get("end_date")
                 require_end_date(r_status, r_end)
+                require_rating(r_status, record_data.get("rating") or 0)
 
                 for r in self.readings:
                     if r["book_id"] == book["id"]:
@@ -408,7 +411,11 @@ class MockStorage:
                             "status": r_status,
                             "start_date": r_start,
                             "end_date": r_end,
-                            "rating": record_data.get("rating") or matched_record.get("rating", 0),
+                            "rating": (
+                                (record_data.get("rating") or matched_record.get("rating", 0))
+                                if r_status == RATED_STATUS
+                                else 0
+                            ),
                         }
                     )
                     logger.info(

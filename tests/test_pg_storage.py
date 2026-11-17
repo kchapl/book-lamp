@@ -215,10 +215,10 @@ def test_add_reading_again_with_the_same_status_and_start_date(pg_storage):
     book = pg_storage.add_book(isbn13="123", title="Book 1", authors=["Author 1"])
 
     first = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
-    second = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01", rating=5)
+    second = pg_storage.add_reading(book_id=book["id"], status="In Progress", start_date="2024-01-01")
 
     assert second["id"] != first["id"]
-    assert second["rating"] == 5
+    assert second["rating"] == 0
     assert len(pg_storage.get_readings(book_id=book["id"])) == 2
 
 
@@ -627,6 +627,33 @@ def test_0008_numbers_a_link_the_release_before_0006_wrote(own_database):
             ORDER BY ba.position
             """).fetchall()
     assert numbered == [("Frank Herbert", 1), ("Kevin J. Anderson", 2), ("Brian Herbert", 3)]
+
+
+def test_0009_zeroes_a_rating_on_a_reading_that_never_completed(own_database):
+    """Rows written before the rule still carry a score; the repair zeroes it.
+
+    Completed keeps its rating, because that is the reading's verdict. The other
+    statuses do not, so the min-rating filter and the rating order cannot select
+    a Reading whose score the pages refuse to show.
+    """
+    _upgrade_database(own_database, "0008")
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        book_id = conn.execute(
+            "INSERT INTO books (isbn13, title) VALUES ('9780441013593', 'Dune') RETURNING id"
+        ).fetchone()[0]
+        for status, rating in (("Completed", 5), ("Abandoned", 3), ("In Progress", 4)):
+            conn.execute(
+                "INSERT INTO readings (user_id, book_id, status, rating) VALUES (%s, %s, %s, %s)",
+                [user_id, book_id, status, rating],
+            )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        ratings = dict(conn.execute("SELECT status, rating FROM readings").fetchall())
+
+    assert ratings == {"Completed": 5, "Abandoned": 0, "In Progress": 0}
 
 
 def test_0008_refuses_a_book_whose_links_cannot_reproduce_its_string(own_database):

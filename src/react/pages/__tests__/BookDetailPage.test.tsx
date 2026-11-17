@@ -431,9 +431,10 @@ describe('BookDetailPage edit reading', () => {
         await openEditReading();
 
         expect(field('edit-record-start-date')?.value).toBe('2026-10-01');
-        expect(field('edit-record-rating')?.value).toBe('0');
         // An open Reading has no end, so the form offers no end-date control.
         expect(field('edit-record-end-date')).not.toBeInTheDocument();
+        // Only a Completed Reading can be rated, so there is no rating control.
+        expect(field('edit-record-rating')).not.toBeInTheDocument();
     });
 
     it('sends the edit to the reading route with the dates the form holds', async () => {

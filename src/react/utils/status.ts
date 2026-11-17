@@ -66,6 +66,9 @@ export function statusAccentClass(status?: string): StatusAccentClass {
  */
 export const ENDING_STATUSES = ['Completed', 'Abandoned'] as const;
 
+/** The only Reading Status that may carry a rating. */
+export const RATED_STATUS = 'Completed';
+
 /** Whether a Reading carrying this status has ended. */
 export function endsReading(status: string): boolean {
     return (ENDING_STATUSES as readonly string[]).includes(status);

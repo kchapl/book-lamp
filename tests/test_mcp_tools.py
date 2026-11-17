@@ -38,7 +38,8 @@ def _seed() -> dict[str, dict]:
     storage.add_reading(hail_mary["id"], "Completed", "2026-09-01", "2026-10-11", rating=4)
 
     prince = storage.add_book(isbn13="9780156012195", title="The Little Prince", authors=["Antoine de Saint-Exupéry"])
-    storage.add_reading(prince["id"], "Abandoned", "2025-02-01", "2025-02-14", rating=2)
+    # A rating belongs to a Completed Reading, so the abandoned one has none.
+    storage.add_reading(prince["id"], "Abandoned", "2025-02-01", "2025-02-14")
 
     dune = storage.add_book(isbn13="9780441013593", title="Dune", authors=["Frank Herbert"])
     storage.add_reading(dune["id"], "In Progress", "2026-10-01", rating=0)

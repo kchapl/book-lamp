@@ -1,6 +1,7 @@
 """Tests for stats/dashboard endpoints."""
 
 from book_lamp.app import get_storage
+from book_lamp.services.stats_calculator import calculate_collection_stats
 
 
 def test_stats_category_limit(client, authenticated_client):
@@ -124,3 +125,22 @@ def test_api_stats_redirect(authenticated_client):
     assert resp.status_code == 301
     # Location should be /api/dashboard
     assert "dashboard" in resp.location
+
+
+def test_dashboard_ignores_a_rating_on_a_reading_that_has_not_completed():
+    """A rating belongs to a finished Reading, so it must not move the average."""
+    books = [{"id": 1, "title": "A Book", "authors": ["An Author"]}]
+    records = [
+        {
+            "book_id": 1,
+            "status": "In Progress",
+            "start_date": "2026-10-01",
+            "end_date": None,
+            "rating": 5,
+        }
+    ]
+
+    stats = calculate_collection_stats(books, records)
+
+    assert stats["avg_rating"] == 0.0
+    assert dict(stats["rating_distribution"])[5] == 0

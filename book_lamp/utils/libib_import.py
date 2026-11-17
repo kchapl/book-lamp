@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from book_lamp.utils.authors import parse
 from book_lamp.utils.books import normalize_isbn
-from book_lamp.utils.readings import ENDING_STATUSES
+from book_lamp.utils.readings import ENDING_STATUSES, RATED_STATUS
 
 
 def normalize_date(date_str: str) -> str:
@@ -162,6 +162,12 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         # may leave an ending status open (see book_lamp.utils.readings).
         if status in ENDING_STATUSES and not end_date:
             end_date = start_date
+
+        # A rating is a verdict on a finished Reading, so a cell on a row that
+        # did not reach Completed has nothing to attach to and is not imported
+        # (see book_lamp.utils.readings).
+        if status != RATED_STATUS:
+            rating = 0
 
         results.append(
             {
