@@ -16,14 +16,23 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import AddBookPage from '../../pages/AddBookPage';
 import { createBook, discoverBooks, findBooksByTitleAuthor, lookupISBN } from '../../services/api';
-import type { BookMatch } from '../../types';
+import type { Book, BookMatch } from '../../types';
 
 // The scanner library reaches for the camera; stub it out. It must be a real
 // constructor: AddBookPage does `new Html5Qrcode(...)`, and an arrow-function
-// mock throws there, which the page swallows into its error state.
+// mock throws there, which the page swallows into its error state. The decode
+// callback is kept so a test can deliver a scan.
+const scanner = vi.hoisted(() => ({
+    decode: null as ((text: string) => void) | null,
+}));
+
 vi.mock('html5-qrcode', () => ({
     Html5Qrcode: class {
-        start = vi.fn().mockResolvedValue(undefined);
+        start = vi.fn(
+            async (_camera: unknown, _config: unknown, onDecoded: (text: string) => void) => {
+                scanner.decode = onDecoded;
+            }
+        );
         stop = vi.fn().mockResolvedValue(undefined);
     },
 }));
@@ -85,6 +94,16 @@ function typeInto(id: string, value: string) {
 async function doLookup(isbn: string) {
     typeInto('isbn', isbn);
     fireEvent.click(button(/lookup isbn/i));
+}
+
+/** Start the scanner and deliver one barcode, as the camera would. */
+async function scan(isbn: string) {
+    fireEvent.click(button(/scan barcode/i));
+    await waitFor(() => expect(scanner.decode).not.toBeNull());
+    await act(async () => {
+        scanner.decode?.(isbn);
+    });
+    scanner.decode = null;
 }
 
 beforeEach(() => {
@@ -614,6 +633,89 @@ describe('AddBookPage covers', () => {
                 cover_url: 'https://covers.example/9781529339604-L.jpg',
             })
         );
+    });
+
+    it('does not send a cover whose lookup answered for the replaced ISBN', async () => {
+        let answerLookup: ((book: Book | null) => void) | undefined;
+        lookup.mockImplementation(
+            () =>
+                new Promise<Book | null>((resolve) => {
+                    answerLookup = resolve;
+                })
+        );
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        await doLookup('9781529339604');
+        await waitFor(() => expect(lookup).toHaveBeenCalledWith('9781529339604'));
+
+        // The reader corrects the ISBN while the first lookup is still out; its
+        // answer, image included, belongs to the ISBN it was asked about.
+        typeInto('isbn', '9780306406157');
+        await act(async () => {
+            answerLookup?.({
+                isbn13: '9781529339604',
+                thumbnail_url: 'https://covers.example/old-M.jpg',
+                cover_url: 'https://covers.example/old-L.jpg',
+            } as never);
+        });
+
+        // The lookups answer for their own ISBN, so this one leaves the form
+        // closed; the reader opens it to type the details for the new ISBN.
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'A Book');
+        typeInto('author', 'Somebody');
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledTimes(1);
+        const sent = create.mock.calls[0][0] as {
+            isbn?: string;
+            thumbnail_url?: string;
+            cover_url?: string;
+        };
+        expect(sent.isbn).toBe('9780306406157');
+        expect(sent.thumbnail_url).toBeUndefined();
+        expect(sent.cover_url).toBeUndefined();
+    });
+
+    it('does not send the previous cover after scanning a different ISBN', async () => {
+        lookup.mockImplementation(async (value) =>
+            value === '9781529339604'
+                ? ({
+                      isbn13: '9781529339604',
+                      thumbnail_url: 'https://covers.example/old-M.jpg',
+                      cover_url: 'https://covers.example/old-L.jpg',
+                  } as never)
+                : null
+        );
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        await doLookup('9781529339604');
+        await waitFor(() => expect(screen.getByText(/found a cover/i)).toBeInTheDocument());
+
+        // A scan writes the ISBN without the field handler that clears the old
+        // cover, and its own lookup finds nothing: the old image must not be
+        // sent under the scanned ISBN.
+        await scan('9780306406157');
+
+        typeInto('title', 'A Book');
+        typeInto('author', 'Somebody');
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+
+        expect(create).toHaveBeenCalledTimes(1);
+        const sent = create.mock.calls[0][0] as {
+            isbn?: string;
+            thumbnail_url?: string;
+            cover_url?: string;
+        };
+        expect(sent.isbn).toBe('9780306406157');
+        expect(sent.thumbnail_url).toBeUndefined();
+        expect(sent.cover_url).toBeUndefined();
     });
 
     it('carries the cover of the edition the title and author matched', async () => {

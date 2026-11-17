@@ -43,6 +43,9 @@ function splitSubtitle(rawTitle: string): { title: string; subtitle?: string } {
     return { title: main, subtitle };
 }
 
+/** An ISBN as the metadata providers and the store use it: digits only. */
+const normalizeIsbn = (value: string) => value.replace(/[-\s]/g, '');
+
 /**
  * Describe discovery candidates so that no two rows read the same.
  *
@@ -105,9 +108,16 @@ const AddBookPage: React.FC = () => {
     const [year, setYear] = useState('');
     const [isbnError, setIsbnError] = useState<string | null>(null);
     const [isbnNotice, setIsbnNotice] = useState<string | null>(null);
-    // The cover an ISBN lookup or a matched edition brought back. It is kept
-    // apart from the typed fields so a partial result still contributes one.
-    const [cover, setCover] = useState<{ thumbnail_url?: string; cover_url?: string }>({});
+    // The cover an ISBN lookup or a matched edition brought back, and the ISBN
+    // it belongs to. It is kept apart from the typed fields so a partial result
+    // still contributes one, but it is only shown or sent for that ISBN: a
+    // lookup can answer after the reader has moved on, and a scan replaces the
+    // ISBN without passing the field that clears the previous image.
+    const [cover, setCover] = useState<{
+        isbn: string;
+        thumbnail_url?: string;
+        cover_url?: string;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
     // The editions a title-and-author search found. More than one means the
@@ -128,11 +138,18 @@ const AddBookPage: React.FC = () => {
     const scannerRef = useRef<HTMLDivElement>(null);
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
     const discoverRequest = useRef(0);
+    const isbnRef = useRef(isbn);
+
+    /** Set the ISBN, keeping the latest one for lookups that answer in flight. */
+    const changeIsbn = (value: string) => {
+        isbnRef.current = value;
+        setIsbn(value);
+    };
 
     useEffect(() => {
         const initialIsbn = searchParams.get('isbn');
         if (initialIsbn) {
-            setIsbn(initialIsbn);
+            changeIsbn(initialIsbn);
             handleLookup(initialIsbn);
         }
     }, [searchParams]);
@@ -155,7 +172,7 @@ const AddBookPage: React.FC = () => {
                     qrbox: { width: 250, height: 150 }
                 },
                 (decodedText) => {
-                    setIsbn(decodedText);
+                    changeIsbn(decodedText);
                     handleLookup(decodedText);
                     stopScanner();
                 },
@@ -183,7 +200,7 @@ const AddBookPage: React.FC = () => {
     const handleLookup = async (isbnToLookup: string) => {
         if (!isbnToLookup.trim()) return;
         
-        const cleanIsbn = isbnToLookup.replace(/[-\s]/g, '');
+        const cleanIsbn = normalizeIsbn(isbnToLookup);
         if (cleanIsbn.length !== 10 && cleanIsbn.length !== 13) {
             setIsbnError('Please enter a valid 10 or 13 digit ISBN');
             return;
@@ -195,11 +212,15 @@ const AddBookPage: React.FC = () => {
         
         try {
             const book = await lookupISBN(cleanIsbn);
+            // The reader may have typed a different ISBN while this was in
+            // flight; the answer belongs to the ISBN it was asked about.
+            if (normalizeIsbn(isbnRef.current) !== cleanIsbn) return;
             if (book) {
                 // A cover is worth keeping even when the providers know no title
                 // or author for the edition: the Book would otherwise be stored
                 // without the image that was available before anything was typed.
                 setCover({
+                    isbn: cleanIsbn,
                     thumbnail_url: book.thumbnail_url ?? undefined,
                     cover_url: book.cover_url ?? undefined,
                 });
@@ -232,16 +253,21 @@ const AddBookPage: React.FC = () => {
 
     /** Fill the form from a matched edition, ISBN included. */
     const applyMatch = (match: BookMatch) => {
-        if (match.isbn13) setIsbn(match.isbn13);
+        if (match.isbn13) {
+            changeIsbn(match.isbn13);
+            // The image belongs to the edition just chosen, not to an ISBN the
+            // reader had typed before the match.
+            setCover({
+                isbn: normalizeIsbn(match.isbn13),
+                thumbnail_url: match.thumbnail_url ?? undefined,
+                cover_url: match.cover_url ?? undefined,
+            });
+        }
         if (match.title) setTitle(match.title);
         const matchedAuthor = match.author || (match.authors ?? []).join(', ');
         if (matchedAuthor) setAuthor(matchedAuthor);
         if (match.publisher) setPublisher(match.publisher);
         if (match.publication_year) setYear(String(match.publication_year));
-        setCover({
-            thumbnail_url: match.thumbnail_url ?? undefined,
-            cover_url: match.cover_url ?? undefined,
-        });
         setMatches([]);
         setIsbnError(null);
         setIsbnNotice(`Matched “${match.title}” — the ISBN has been filled in.`);
@@ -376,14 +402,17 @@ const AddBookPage: React.FC = () => {
         setIsbnError(null);
 
         try {
-            let isbnToUse = isbn.replace(/[-\s]/g, '');
+            let isbnToUse = normalizeIsbn(isbn);
+            // Only a cover looked up for this ISBN may be sent: one left behind
+            // by an earlier ISBN is another edition's image.
+            const usableCover = cover && normalizeIsbn(cover.isbn) === isbnToUse ? cover : null;
             let details = {
                 title: title.trim(),
                 author: author.trim(),
                 publisher: publisher.trim() || undefined,
                 publication_year: year ? parseInt(year, 10) || undefined : undefined,
-                thumbnail_url: cover.thumbnail_url,
-                cover_url: cover.cover_url,
+                thumbnail_url: usableCover?.thumbnail_url,
+                cover_url: usableCover?.cover_url,
             };
 
             if (!isbnToUse) {
@@ -400,8 +429,8 @@ const AddBookPage: React.FC = () => {
                         author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
-                        thumbnail_url: match.thumbnail_url ?? cover.thumbnail_url,
-                        cover_url: match.cover_url ?? cover.cover_url,
+                        thumbnail_url: match.thumbnail_url ?? usableCover?.thumbnail_url,
+                        cover_url: match.cover_url ?? usableCover?.cover_url,
                     };
                 } else if (found.length > 1) {
                     setMatches(found);
@@ -439,10 +468,10 @@ const AddBookPage: React.FC = () => {
                     placeholder="Enter ISBN (10 or 13 digits)"
                     value={isbn}
                     onValueChange={(value) => {
-                        setIsbn(value);
+                        changeIsbn(value);
                         // A different ISBN has a different cover; the next
                         // lookup fills this one in.
-                        setCover({});
+                        setCover(null);
                     }}
                     supportingText="No ISBN? The title and author form below can find it for you."
                 />
