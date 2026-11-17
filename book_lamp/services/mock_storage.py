@@ -5,7 +5,7 @@ from typing import Any, List, Optional
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import Category, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
-from book_lamp.utils.readings import require_end_date, require_rating
+from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
 
@@ -411,7 +411,11 @@ class MockStorage:
                             "status": r_status,
                             "start_date": r_start,
                             "end_date": r_end,
-                            "rating": record_data.get("rating") or matched_record.get("rating", 0),
+                            "rating": (
+                                (record_data.get("rating") or matched_record.get("rating", 0))
+                                if r_status == RATED_STATUS
+                                else 0
+                            ),
                         }
                     )
                     logger.info(
