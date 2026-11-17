@@ -160,3 +160,42 @@ describe('BooksPage search', () => {
         expect(search).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('BooksPage add action', () => {
+    it('offers no add call to action on an empty shelf', async () => {
+        renderPage();
+
+        // The empty state, not just the request, is what shows the load has
+        // finished; before it the page is still a skeleton.
+        await screen.findByText('No books found');
+
+        expect(screen.queryByText(/add a book/i)).not.toBeInTheDocument();
+        expect(document.querySelector('.fab-slot')).toBeNull();
+    });
+
+    it('offers no add call to action beside the books', async () => {
+        // A shelf with books is the case where a page-level add action would
+        // appear if there were one.
+        list.mockResolvedValue({
+            books: [{ id: 1, title: 'Dune', author: 'Frank Herbert' }],
+            sort: 'reading_date',
+            sort_options: {},
+            filters: {
+                status: '',
+                year: '',
+                month: '',
+                rating: '',
+                category: '',
+                sort: 'reading_date',
+            },
+            categories: [],
+        });
+
+        renderPage();
+
+        await screen.findByText('Dune');
+
+        expect(screen.queryByText(/add a book/i)).not.toBeInTheDocument();
+        expect(document.querySelector('.fab-slot')).toBeNull();
+    });
+});

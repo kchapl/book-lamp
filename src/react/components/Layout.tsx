@@ -11,8 +11,6 @@ interface LayoutProps {
 const NAV_ITEMS: { path: string; label: string; icon: IconName }[] = [
     { path: '/', label: 'Home', icon: 'home' },
     { path: '/books', label: 'My Books', icon: 'books' },
-    // Adding a Book is reachable from every page, not just the books page.
-    { path: '/books/new', label: 'Add Book', icon: 'plus' },
     { path: '/reading-list', label: 'Reading List', icon: 'bookmark' },
     { path: '/history', label: 'History', icon: 'history' },
     { path: '/dashboard', label: 'Dashboard', icon: 'chart' },
@@ -73,11 +71,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const isActive = (path: string) =>
         path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
-    // `/books/new` nests under `/books`, so both entries match that route. Only
-    // the most specific match may claim the page, or two links read as current.
-    const activeNavPath = NAV_ITEMS.filter((item) => isActive(item.path)).sort(
-        (a, b) => b.path.length - a.path.length
-    )[0]?.path;
+    // `/` matches only itself and no two entries share a prefix, so the first
+    // entry that matches is the one to mark current.
+    const activeNavPath = NAV_ITEMS.find((item) => isActive(item.path))?.path;
 
     return (
         <div className="app-container">

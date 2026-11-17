@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { getBooks, searchBooks } from '../services/api';
 import BookExhibit from '../components/BookExhibit';
 import Icon from '../components/Icon';
-import { Button, Fab, Select, SelectOption, TextField } from '../ui';
+import { Button, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import type { Book, BooksFilters } from '../types';
@@ -181,11 +181,8 @@ const BooksPage: React.FC = () => {
                     <p>
                         {hasActiveFilters || activeQuery
                             ? 'Nothing matches those filters. Try widening the search.'
-                            : 'Add your first book to begin.'}
+                            : 'Books you start reading will appear here.'}
                     </p>
-                    <Button variant="filled" icon="plus" to="/books/new">
-                        Add a book
-                    </Button>
                 </div>
             ) : (
                 <div className="exhibit-grid">
@@ -196,12 +193,6 @@ const BooksPage: React.FC = () => {
             )}
 
             {error && <p className="error-message">{error}</p>}
-
-            {!loading && books.length > 0 && (
-                <div className="fab-slot">
-                    <Fab icon="plus" label="Add book" to="/books/new" />
-                </div>
-            )}
         </div>
     );
 };
