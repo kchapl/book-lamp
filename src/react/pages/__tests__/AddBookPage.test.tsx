@@ -722,9 +722,9 @@ describe('AddBookPage covers', () => {
         await doLookup('9781529339604');
         await waitFor(() => expect(screen.getByText(/found a cover/i)).toBeInTheDocument());
 
-        // A scan writes the ISBN without the field handler that clears the old
-        // cover, and its own lookup finds nothing: the old image must not be
-        // sent under the scanned ISBN.
+        // A scan replaces the ISBN while the old cover stays tied to the one it
+        // was looked up for, and the scan's own lookup finds nothing: the old
+        // image must not be sent under the scanned ISBN.
         await scan('9780306406157');
 
         typeInto('title', 'A Book');

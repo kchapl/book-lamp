@@ -433,8 +433,8 @@ const AddBookPage: React.FC = () => {
                         author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
-                        thumbnail_url: match.thumbnail_url ?? usableCover?.thumbnail_url,
-                        cover_url: match.cover_url ?? usableCover?.cover_url,
+                        thumbnail_url: match.thumbnail_url ?? undefined,
+                        cover_url: match.cover_url ?? undefined,
                     };
                 } else if (found.length > 1) {
                     setMatches(found);
