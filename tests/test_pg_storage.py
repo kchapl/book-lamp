@@ -1388,6 +1388,14 @@ def test_the_missing_covers_run_reads_and_writes_only_covers(pg_storage):
     still_missing = {book["id"] for book in pg_storage.get_books_missing_covers()}
     assert still_missing == {blank["id"]}
 
+    # A cover added while the run was looking is not replaced.
+    assert not pg_storage.set_book_cover(
+        missing["id"],
+        "9780000000102",
+        thumbnail_url="https://example.com/later.jpg",
+    )
+    assert pg_storage.get_book_by_id(missing["id"])["thumbnail_url"] == "https://example.com/new-M.jpg"
+
     # A cover the lookup found for an ISBN the row no longer has is not written:
     # the reader corrected the edition while the run was looking.
     assert not pg_storage.set_book_cover(

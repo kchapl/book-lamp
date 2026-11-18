@@ -627,7 +627,7 @@ def api_discover_books():
 @books_bp.route("/api/books/fetch-covers", methods=["POST"])
 @authorisation_required
 @csrf_protect
-def api_fetch_missing_data():
+def api_fill_missing_covers():
     """Queue a job that fills in covers for the Books that have none.
 
     An empty or absent ``book_ids`` means the whole collection. Books that

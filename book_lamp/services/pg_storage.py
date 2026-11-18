@@ -101,6 +101,20 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+# A Book is in a reader's collection when they have a Reading or a Reading List
+# entry for it. Every read of the collection scopes rows this way, so the joins
+# and the scope live in one place rather than in each query that needs them.
+_COLLECTION_SCOPE = """
+    SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
+    FROM books b
+    LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
+    LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
+    LEFT JOIN book_authors ba ON b.id = ba.book_id
+    LEFT JOIN authors a ON ba.author_id = a.id
+    WHERE (rr.id IS NOT NULL OR rl.book_id IS NOT NULL)
+"""
+
+
 class PostgresStorage:
     def __init__(self, user_id: int) -> None:
         self.user_id = user_id
@@ -138,6 +152,28 @@ class PostgresStorage:
             books.append(book)
         return books
 
+    def _collection_books(
+        self,
+        conditions: Optional[list[str]] = None,
+        params: Optional[list[Any]] = None,
+        user_id: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        """The reader's collection, with Authors, narrowed by extra conditions.
+
+        `conditions` are ANDed onto the shared scope, and each takes one
+        placeholder in `params`, in order. `user_id` overrides the instance's
+        reader, for the callers that read someone else's collection.
+        """
+        query = _COLLECTION_SCOPE
+        for condition in conditions or []:
+            query += f" AND {condition}"
+        query += " GROUP BY b.id"
+
+        scope_user_id = user_id or self.user_id
+        with self.pool.connection() as conn:
+            rows = conn.execute(query, [scope_user_id, scope_user_id, *(params or [])]).fetchall()
+        return self._books_with_author_names(rows)
+
     @with_retry
     def get_all_books(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return all books known to the system for a given user.
@@ -145,20 +181,7 @@ class PostgresStorage:
         In multi-user model, returns only books the user has interacted with via readings.
         If user_id is provided, uses that; otherwise uses the instance user_id.
         """
-        effective_user_id = user_id or self.user_id
-        query = """
-            SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
-            FROM books b
-            LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
-            LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
-            LEFT JOIN book_authors ba ON b.id = ba.book_id
-            LEFT JOIN authors a ON ba.author_id = a.id
-            WHERE rr.id IS NOT NULL OR rl.book_id IS NOT NULL
-            GROUP BY b.id
-        """
-        with self.pool.connection() as conn:
-            rows = conn.execute(query, [effective_user_id, effective_user_id]).fetchall()
-            return self._books_with_author_names(rows)
+        return self._collection_books(user_id=user_id)
 
     @with_retry
     def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
@@ -167,25 +190,12 @@ class PostgresStorage:
         A cover counts as missing when both cover fields are NULL or blank — the
         same rule the missing-covers run applies before it writes one.
         """
-        query = """
-            SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
-            FROM books b
-            LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
-            LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
-            LEFT JOIN book_authors ba ON b.id = ba.book_id
-            LEFT JOIN authors a ON ba.author_id = a.id
-            WHERE (rr.id IS NOT NULL OR rl.book_id IS NOT NULL)
-              AND COALESCE(NULLIF(TRIM(b.thumbnail_url), ''), NULLIF(TRIM(b.cover_url), '')) IS NULL
-        """
-        params: list[Any] = [self.user_id, self.user_id]
+        conditions = ["COALESCE(NULLIF(TRIM(b.thumbnail_url), ''), NULLIF(TRIM(b.cover_url), '')) IS NULL"]
+        params: list[Any] = []
         if book_ids:
-            query += " AND b.id = ANY(%s)"
+            conditions.append("b.id = ANY(%s)")
             params.append(list(book_ids))
-        query += " GROUP BY b.id"
-
-        with self.pool.connection() as conn:
-            rows = conn.execute(query, params).fetchall()
-            return self._books_with_author_names(rows)
+        return self._collection_books(conditions, params)
 
     @with_retry
     def set_book_cover(
@@ -201,6 +211,10 @@ class PostgresStorage:
         the reader can correct that ISBN while it runs. Requiring it to still
         match makes such a write land on nothing, rather than attach the old
         edition's cover to a Book that is now a different edition.
+
+        The row must still be missing a cover for the same reason: the reader
+        can add one while the run is looking, and a Book that has a cover is
+        never touched by this run.
         """
         with self.pool.connection() as conn:
             row = conn.execute(
@@ -208,7 +222,12 @@ class PostgresStorage:
                 UPDATE books SET
                     thumbnail_url = COALESCE(%s, thumbnail_url),
                     cover_url = COALESCE(%s, cover_url)
-                WHERE id = %s AND isbn13 = %s
+                WHERE id = %s
+                  AND isbn13 = %s
+                  AND COALESCE(
+                      NULLIF(TRIM(thumbnail_url), ''),
+                      NULLIF(TRIM(cover_url), '')
+                  ) IS NULL
                 RETURNING id
                 """,
                 [thumbnail_url, cover_url, book_id, isbn13],

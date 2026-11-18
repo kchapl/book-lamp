@@ -168,6 +168,30 @@ def test_run_leaves_a_book_whose_isbn_changed_mid_run(authenticated_client):
     assert corrected["cover_url"] is None
 
 
+def test_run_leaves_a_cover_added_mid_run(authenticated_client):
+    """A cover the reader added while the run was looking is kept."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000071", title="Late cover", authors=["A"])
+
+    def add_a_cover(isbn, **kwargs):
+        storage.get_book_by_id(book["id"])["thumbnail_url"] = "https://example.com/reader.jpg"
+        return _provider_answer(isbn)
+
+    with patch(
+        "book_lamp.services.book_lookup.lookup_book_by_isbn13",
+        side_effect=add_a_cover,
+    ):
+        response = authenticated_client.post("/api/books/fetch-covers", json={})
+        assert response.status_code == 200
+        job = _finished(response.get_json()["job_id"])
+
+    assert job.status.value == "completed"
+    assert "filled 0" in job.result
+    kept = storage.get_book_by_id(book["id"])
+    assert kept["thumbnail_url"] == "https://example.com/reader.jpg"
+    assert kept["cover_url"] is None
+
+
 def test_run_reports_when_nothing_is_missing(authenticated_client):
     storage = get_storage()
     storage.add_book(

@@ -73,6 +73,14 @@ class MockStorage:
         book = self.get_book_by_id(book_id)
         if book is None or book.get("isbn13") != isbn13:
             return False
+
+        def has_cover(value: Any) -> bool:
+            return value is not None and not (isinstance(value, str) and not value.strip())
+
+        # A cover the reader added while the run was looking is kept: the run
+        # only ever fills a gap it saw at the start.
+        if has_cover(book.get("thumbnail_url")) or has_cover(book.get("cover_url")):
+            return False
         if thumbnail_url:
             book["thumbnail_url"] = thumbnail_url
         if cover_url:
