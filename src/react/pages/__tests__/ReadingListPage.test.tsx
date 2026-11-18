@@ -16,6 +16,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import ReadingListPage from '../ReadingListPage';
 import { getReadingList, removeFromReadingList, startReading } from '../../services/api';
+import {
+    CollectionRevisionProvider,
+    useRefreshCollection,
+} from '../../hooks/useCollectionRevision';
 import type { ReadingListItem } from '../../types';
 
 vi.mock('../../services/api', () => ({
@@ -100,6 +104,34 @@ describe('ReadingListPage row links', () => {
 
         fireEvent.click(button(/remove/i));
         await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
+    });
+});
+
+describe('ReadingListPage background refresh', () => {
+    const RefreshButton: React.FC = () => {
+        const refreshCollection = useRefreshCollection();
+        return <button onClick={refreshCollection}>Refresh collection</button>;
+    };
+
+    it('refetches the queue when a background run changes the collection', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        render(
+            <MemoryRouter initialEntries={['/reading-list']}>
+                <CollectionRevisionProvider>
+                    <Routes>
+                        <Route path="/reading-list" element={<ReadingListPage />} />
+                    </Routes>
+                    <RefreshButton />
+                </CollectionRevisionProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByText('Refresh collection'));
+
+        await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
     });
 });
 

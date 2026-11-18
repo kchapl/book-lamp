@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { getReadingList, reorderReadingList, removeFromReadingList, startReading } from '../services/api';
 import { Button, IconButton } from '../ui';
 import { useResource } from '../hooks/useResource';
+import { useCollectionRevision } from '../hooks/useCollectionRevision';
 import type { ReadingListItem } from '../types';
 
 /**
@@ -84,8 +85,11 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
 
 const ReadingListPage: React.FC = () => {
     const loadReadingList = async () => (await getReadingList()).books || [];
+    const collectionRevision = useCollectionRevision();
 
-    const { data, loading, error, reload } = useResource(loadReadingList, [], {
+    // The queue shows covers, so a covers run that finishes while it is open
+    // refetches it as well; otherwise the saved results would stay invisible.
+    const { data, loading, error, reload } = useResource(loadReadingList, [collectionRevision], {
         errorMessage: 'Failed to load reading list',
     });
 

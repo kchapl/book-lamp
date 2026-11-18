@@ -12,6 +12,7 @@ import {
 } from '../services/api';
 import { Button, Dialog, IconButton, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
+import { useCollectionRevision } from '../hooks/useCollectionRevision';
 import { endsReading, RATED_STATUS, statusClass } from '../utils/status';
 import { todayIso } from '../utils/format';
 import { draftWithStatus, readingDraft, readingPayload, type ReadingDraft } from '../utils/reading';
@@ -144,9 +145,14 @@ const BookDetailPage: React.FC = () => {
         return getBookDetail(Number(bookId));
     };
 
-    const { data: book, loading, error, reload } = useResource(loadBook, [bookId], {
-        errorMessage: 'Failed to load book',
-    });
+    // The page shows the Book's cover, so a covers run that finishes while it is
+    // open refetches it rather than leaving the placeholder in place.
+    const collectionRevision = useCollectionRevision();
+    const { data: book, loading, error, reload } = useResource(
+        loadBook,
+        [bookId, collectionRevision],
+        { errorMessage: 'Failed to load book' }
+    );
 
     const handleSaveEdit = async () => {
         if (!bookId) return;

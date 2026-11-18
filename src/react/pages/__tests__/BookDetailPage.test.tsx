@@ -24,6 +24,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import BookDetailPage from '../BookDetailPage';
 import { createReading, deleteReading, getBookDetail, updateBook, updateReading } from '../../services/api';
+import {
+    CollectionRevisionProvider,
+    useRefreshCollection,
+} from '../../hooks/useCollectionRevision';
 
 vi.mock('../../services/api', () => ({
     getBookDetail: vi.fn(),
@@ -125,6 +129,32 @@ beforeEach(() => {
     vi.clearAllMocks();
     detail.mockResolvedValue({ id: 1, title: 'Project Hail Mary', author: 'Andy Weir', readings: [] });
     create.mockResolvedValue({ id: 1, book_id: 1, status: 'Completed' });
+});
+
+describe('BookDetailPage background refresh', () => {
+    const RefreshButton: React.FC = () => {
+        const refreshCollection = useRefreshCollection();
+        return <button onClick={refreshCollection}>Refresh collection</button>;
+    };
+
+    it('refetches the Book when a background run changes the collection', async () => {
+        render(
+            <MemoryRouter initialEntries={['/books/1']}>
+                <CollectionRevisionProvider>
+                    <Routes>
+                        <Route path="/books/:bookId" element={<BookDetailPage />} />
+                    </Routes>
+                    <RefreshButton />
+                </CollectionRevisionProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => expect(detail).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByText('Refresh collection'));
+
+        await waitFor(() => expect(detail).toHaveBeenCalledTimes(2));
+    });
 });
 
 describe('BookDetailPage add reading', () => {
