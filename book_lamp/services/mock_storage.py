@@ -43,19 +43,30 @@ class MockStorage:
     def get_all_books(self) -> list[dict[str, Any]]:
         return self.books
 
-    def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
-        """Books with no cover, optionally narrowed to the given ids."""
+    def get_books_missing_covers(
+        self,
+        book_ids: Optional[list[int]] = None,
+        placeholder_hosts: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
+        """Books with no cover, optionally narrowed to the given ids.
+
+        A cover hosted where placeholders are served is included too: storage
+        cannot read bytes, so the run fingerprints it and decides.
+        """
         wanted = set(book_ids or [])
 
         def no_cover(value: Any) -> bool:
             return value is None or (isinstance(value, str) and not value.strip())
 
+        def on_placeholder_host(book: dict[str, Any]) -> bool:
+            covers = [book.get("thumbnail_url"), book.get("cover_url")]
+            return any(isinstance(url, str) and host in url for url in covers for host in (placeholder_hosts or []))
+
         return [
             book
             for book in self.books
             if (not wanted or book["id"] in wanted)
-            and no_cover(book.get("thumbnail_url"))
-            and no_cover(book.get("cover_url"))
+            and ((no_cover(book.get("thumbnail_url")) and no_cover(book.get("cover_url"))) or on_placeholder_host(book))
         ]
 
     def set_book_cover(
@@ -64,11 +75,14 @@ class MockStorage:
         isbn13: str,
         thumbnail_url: Optional[str] = None,
         cover_url: Optional[str] = None,
+        replace_urls: Optional[list[str]] = None,
     ) -> bool:
         """Write a Book's cover fields while it still has the ISBN it had.
 
         A corrected ISBN means the cover the lookup found belongs to a different
         edition, so the write is refused rather than attached to the wrong Book.
+        A stored cover may be replaced only when it is one of ``replace_urls``,
+        the placeholder URLs the run fingerprinted.
         """
         book = self.get_book_by_id(book_id)
         if book is None or book.get("isbn13") != isbn13:
@@ -78,9 +92,13 @@ class MockStorage:
             return value is not None and not (isinstance(value, str) and not value.strip())
 
         # A cover the reader added while the run was looking is kept: the run
-        # only ever fills a gap it saw at the start.
+        # only ever fills a gap it saw at the start, or replaces a placeholder
+        # it has just fingerprinted.
+        replaceable = {url for url in (replace_urls or []) if url}
         if has_cover(book.get("thumbnail_url")) or has_cover(book.get("cover_url")):
-            return False
+            held = {url for url in (book.get("thumbnail_url"), book.get("cover_url")) if isinstance(url, str)}
+            if not held & replaceable:
+                return False
         if thumbnail_url:
             book["thumbnail_url"] = thumbnail_url
         if cover_url:

@@ -9,6 +9,7 @@ from flask import Blueprint, Response, current_app, jsonify, request, session
 
 from book_lamp.middleware.auth import authorisation_required
 from book_lamp.middleware.csrf import csrf_protect
+from book_lamp.services.cover_placeholders import CoverFingerprints, PLACEHOLDER_HOSTS
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
@@ -60,11 +61,17 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         raise
 
 
+def _blank_cover(value: object) -> bool:
+    """Whether a stored cover value counts as no cover at all."""
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
 def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: int):
     """Background task: fill in covers for the Books that have none.
 
-    Only a Book's cover fields are written, and only for Books that had no
-    cover when the run started; a Book that already has one is never considered.
+    A Book is considered when it has no cover, or when its stored cover is a
+    registered placeholder. Only a Book's cover fields are written, and a real
+    cover — added before the run or while it looks — is never replaced.
     """
     from book_lamp.services.book_lookup import look_up_missing_covers
 
@@ -75,8 +82,29 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
         else:
             storage = PostgresStorage(user_id=user_id)
 
-        books = storage.get_books_missing_covers(book_ids or None)
-        total = len(books)
+        fingerprints = CoverFingerprints()
+        books = storage.get_books_missing_covers(
+            book_ids or None,
+            placeholder_hosts=list(PLACEHOLDER_HOSTS),
+        )
+
+        # A Book whose cover sits on a host that serves placeholders is only a
+        # candidate when the bytes really are one; a real cover there is not
+        # missing, and the registry host alone does not make it so.
+        candidates: list[tuple[dict, set[str]]] = []
+        for book in books:
+            stored = [
+                book.get(field).strip()
+                for field in ("thumbnail_url", "cover_url")
+                if isinstance(book.get(field), str) and book.get(field).strip()
+            ]
+            placeholders = {url for url in stored if fingerprints.is_placeholder(url)}
+            if placeholders:
+                candidates.append((book, placeholders))
+            elif not stored:
+                candidates.append((book, set()))
+
+        total = len(candidates)
         if total == 0:
             logger.info(f"Background job {job_id}: no books are missing a cover")
             return "No books are missing a cover."
@@ -88,19 +116,47 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
 
         # The ISBN each lookup answers for is the one the row had when the run
         # started, so it is read once, before any provider is asked.
-        isbn_by_id = {book["id"]: str(book.get("isbn13") or "") for book in books}
+        isbn_by_id = {book["id"]: str(book.get("isbn13") or "") for book, _ in candidates}
 
-        covers = look_up_missing_covers(books, on_progress=report_progress)
+        covers = look_up_missing_covers(
+            [book for book, _ in candidates],
+            on_progress=report_progress,
+            fingerprints=fingerprints,
+        )
         filled = 0
-        for book in books:
+        replaced = 0
+        for book, placeholder_urls in candidates:
             cover = covers.get(book["id"])
             if not cover:
                 continue
+            # Only a field that was empty or a fingerprinted placeholder may be
+            # written: a real cover of the reader's is left exactly as it is.
+            payload = {
+                field: url
+                for field, url in cover.items()
+                if field in ("thumbnail_url", "cover_url")
+                and (_blank_cover(book.get(field)) or str(book.get(field)).strip() in placeholder_urls)
+            }
+            if not payload:
+                continue
             # Requiring that ISBN to still match keeps a Book the reader
             # corrected mid-run from getting the old edition's cover.
-            if storage.set_book_cover(book["id"], isbn_by_id[book["id"]], **cover):
-                filled += 1
-        result_msg = f"Checked {total} book(s) without a cover: " f"filled {filled}, {total - filled} still missing."
+            if storage.set_book_cover(
+                book["id"],
+                isbn_by_id[book["id"]],
+                replace_urls=sorted(placeholder_urls),
+                **payload,
+            ):
+                if placeholder_urls:
+                    replaced += 1
+                else:
+                    filled += 1
+        still_missing = total - filled - replaced
+        result_msg = (
+            f"Checked {total} book(s) without a cover: "
+            f"filled {filled}, replaced {replaced} placeholders, "
+            f"{still_missing} still missing."
+        )
         logger.info(f"Background job {job_id}: completed - {result_msg}")
         return result_msg
     except Exception:

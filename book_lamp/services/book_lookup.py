@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
+from book_lamp.services.cover_placeholders import CoverFingerprints
 from book_lamp.utils.authors import display
 from book_lamp.utils.books import (
     is_dewey_category,
@@ -946,25 +947,37 @@ def _lookup_amazon_cover(isbn13: str) -> Optional[str]:
     return None
 
 
-def _lookup_penguin_cover(isbn13: str) -> Optional[str]:
+def _lookup_penguin_cover(
+    isbn13: str,
+    fingerprints: Optional[CoverFingerprints] = None,
+) -> Optional[str]:
     """Helper to lookup cover via Penguin Random House image system.
 
     Works for most Penguin, Vintage, and Random House editions.
-    Returns: URL string or None.
+
+    The service answers 200 with the same "Cover Coming Soon" card for every
+    edition it has no art for, so the bytes settle whether there is a cover. A
+    placeholder is no answer at all: this returns None and the chain keeps
+    looking at the next provider.
     """
     session = _get_session()
     url = f"https://images.penguinrandomhouse.com/cover/{isbn13}"
+    fingerprints = fingerprints or CoverFingerprints()
 
     try:
         logger.debug(f"Checking Penguin Random House for {isbn13}: {url}")
         # Need to allow redirects as it might redirect to a specific size
-        response = session.head(url, timeout=5, allow_redirects=True)
-        # Check if it's actually an image and not a 404/placeholder
-        if response.status_code == 200 and "image" in response.headers.get("Content-Type", "").lower():
-            # Basic sanity check on size if available
-            size = int(response.headers.get("Content-Length", 0))
-            if size > 1000 or size == 0:  # Allow 0 if server doesn't provide length
-                return url
+        response = session.get(url, timeout=5, allow_redirects=True)
+        content_type = response.headers.get("Content-Type", "").lower()
+        if response.status_code != 200 or "image" not in content_type:
+            return None
+        if len(response.content) <= 1000:
+            # Too small to be a cover; the same guard the other lookups use.
+            return None
+        if fingerprints.is_placeholder_bytes(url, response.content):
+            logger.debug(f"Penguin Random House served a placeholder for {isbn13}")
+            return None
+        return url
     except Exception as e:
         logger.debug(f"Penguin lookup failed for {isbn13}: {e}")
 
@@ -987,6 +1000,7 @@ def lookup_book_by_isbn13(
     title: Optional[str] = None,
     author: Optional[str] = None,
     force_refresh: bool = False,
+    fingerprints: Optional[CoverFingerprints] = None,
 ) -> Optional[Dict[str, Optional[Any]]]:
     """Deep lookup for book details with progressive fallbacks."""
     clean_isbn = normalize_isbn(isbn13)
@@ -1020,7 +1034,7 @@ def lookup_book_by_isbn13(
         best["cover_url"] = ol_direct.replace("-M.jpg", "-L.jpg")
         return best
 
-    prh_cover = _lookup_penguin_cover(clean_isbn)
+    prh_cover = _lookup_penguin_cover(clean_isbn, fingerprints)
     if prh_cover:
         best["thumbnail_url"] = prh_cover
         best["cover_url"] = prh_cover
@@ -1272,6 +1286,7 @@ def look_up_missing_covers(
     books: List[Dict[str, Any]],
     max_workers: int = 5,
     on_progress: Optional[Callable[[int, int], None]] = None,
+    fingerprints: Optional[CoverFingerprints] = None,
 ) -> Dict[int, Dict[str, str]]:
     """Find covers for Books that have none.
 
@@ -1287,6 +1302,11 @@ def look_up_missing_covers(
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     found: Dict[int, Dict[str, str]] = {}
+    # One instance per run: a stored cover and a provider answer pointing at
+    # the same URL cost one download, and nothing is remembered afterwards. The
+    # run passes its own, so the stored covers it fingerprinted are the same
+    # verdicts these lookups use.
+    fingerprints = fingerprints or CoverFingerprints()
 
     def cover_for(book: Dict[str, Any]) -> Optional[Dict[str, str]]:
         from book_lamp.utils.books import normalize_isbn
@@ -1298,13 +1318,16 @@ def look_up_missing_covers(
             isbn,
             title=book.get("title"),
             author=book.get("author"),
+            fingerprints=fingerprints,
         )
         if not info:
             return None
         cover: Dict[str, str] = {}
         for field in ("thumbnail_url", "cover_url"):
             url = _usable_cover_url(info.get(field))
-            if url:
+            # A provider that answers with a placeholder anyway has found no
+            # cover: the Book stays missing and a later run tries it again.
+            if url and not fingerprints.is_placeholder(url):
                 cover[field] = url
         return cover or None
 

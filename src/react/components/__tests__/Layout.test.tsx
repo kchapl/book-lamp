@@ -127,7 +127,7 @@ describe('Layout account menu', () => {
             id: 'cover-job',
             status: 'completed',
             progress: 100,
-            result: 'Checked 2 book(s) without a cover: filled 1, 1 still missing.',
+            result: 'Checked 2 book(s) without a cover: filled 1, replaced 0 placeholders, 1 still missing.',
         });
 
         const { container } = renderLayout();
@@ -138,7 +138,7 @@ describe('Layout account menu', () => {
         expect(fetchCovers).toHaveBeenCalledWith([]);
         expect(
             await screen.findByText(
-                'Checked 2 book(s) without a cover: filled 1, 1 still missing.'
+                'Checked 2 book(s) without a cover: filled 1, replaced 0 placeholders, 1 still missing.'
             )
         ).toBeInTheDocument();
     });
@@ -149,7 +149,7 @@ describe('Layout account menu', () => {
             id: 'cover-job',
             status: 'completed',
             progress: 100,
-            result: 'Checked 1 book(s) without a cover: filled 1, 0 still missing.',
+            result: 'Checked 1 book(s) without a cover: filled 1, replaced 0 placeholders, 0 still missing.',
         });
 
         const { container } = renderLayout();
