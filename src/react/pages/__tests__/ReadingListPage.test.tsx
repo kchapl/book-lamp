@@ -94,7 +94,11 @@ describe('ReadingListPage row links', () => {
     });
 
     it('still starts and removes the Book from the row', async () => {
-        list.mockResolvedValue({ books: [queuedBook] });
+        // Each load answers with a fresh list: the page keeps its optimistic
+        // view until the arriving data changes, and one shared array could
+        // leave the row hidden after the refetch, making the wait below fail
+        // for a reason the test did not intend to exercise.
+        list.mockImplementation(async () => ({ books: [{ ...queuedBook }] }));
 
         renderPage();
         await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
