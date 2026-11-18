@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Book } from '../types';
 import { statusClass } from '../utils/status';
+import { splitSubtitle } from '../utils/title';
 
 interface BookExhibitProps {
     book: Book;
@@ -23,6 +24,7 @@ interface BookExhibitProps {
 const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) => {
     const cover = book.cover_url || book.thumbnail_url;
     const Title = titleAs;
+    const { title, subtitle } = splitSubtitle(book.title);
 
     return (
         <Link to={to ?? `/books/${book.id}`} className="exhibit">
@@ -36,7 +38,8 @@ const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) =
                 )}
             </div>
             <div className="exhibit-placard">
-                <Title className="exhibit-title">{book.title}</Title>
+                <Title className="exhibit-title">{title}</Title>
+                {subtitle && <p className="exhibit-subtitle">{subtitle}</p>}
                 <p className="exhibit-author">{book.author || 'Unknown author'}</p>
                 <div className="exhibit-meta">
                     {book.latest_status && (
