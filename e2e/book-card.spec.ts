@@ -1,0 +1,31 @@
+import { expect, test } from '@playwright/test';
+import { resetAndSeed } from './seed';
+
+test.beforeEach(async ({ request }) => {
+    await resetAndSeed(request);
+});
+
+test('a Book card shows a separable subtitle under its title', async ({ page, request }) => {
+    const created = await request.post('/api/books', {
+        data: {
+            isbn: '9780306406157',
+            title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
+            author: 'David Long',
+        },
+    });
+    expect(created.ok()).toBeTruthy();
+    const book = await created.json();
+
+    // A Book reaches My Books by having a Reading Status; the subtitle does not
+    // change that, so the card is asserted where the collection shows it.
+    const reading = await request.post(`/api/books/${book.id}/readings`, {
+        data: { status: 'In Progress', start_date: '2024-06-01' },
+    });
+    expect(reading.ok()).toBeTruthy();
+
+    await page.goto('/books');
+
+    const card = page.locator('.exhibit').filter({ hasText: 'From Stonehenge to the Gherkin' });
+    await expect(card.getByRole('heading', { name: 'A History of England in 100 Places' })).toBeVisible();
+    await expect(card).toContainText('From Stonehenge to the Gherkin');
+});

@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import { Button, TextField } from '../ui';
 import type { BookMatch } from '../types';
+import { splitSubtitle } from '../utils/title';
 import type { Html5Qrcode } from 'html5-qrcode';
 
 /** One row of the discovery list: the candidate, and what the row shows of it. */
@@ -22,25 +23,6 @@ interface DiscoveredRow {
     isbn?: string;
     /** Which of several otherwise identical records this row is. */
     copyLabel?: string;
-}
-
-// "Title: Subtitle" and "Title — Subtitle" are how providers separate a
-// subtitle. A colon with almost nothing before it ("Re: ...") and a bare
-// hyphen ("Spider-Man") belong to the title, so neither is split. A provider
-// that glues a subtitle on with no separator cannot be split safely: cutting
-// there would take "Dune Messiah" for a subtitle of "Dune" and hide a sequel
-// behind its predecessor, so such a title is shown whole.
-const SUBTITLE_SEPARATOR = /\s*:\s*|\s+[\u2013\u2014-]\s+/;
-
-function splitSubtitle(rawTitle: string): { title: string; subtitle?: string } {
-    const title = rawTitle.replace(/\s+/g, ' ').trim();
-    const separator = SUBTITLE_SEPARATOR.exec(title);
-    if (!separator) return { title };
-
-    const main = title.slice(0, separator.index).trim();
-    const subtitle = title.slice(separator.index + separator[0].length).trim();
-    if (main.length <= 3 || !subtitle) return { title };
-    return { title: main, subtitle };
 }
 
 /** An ISBN as the metadata providers and the store use it: digits only. */
