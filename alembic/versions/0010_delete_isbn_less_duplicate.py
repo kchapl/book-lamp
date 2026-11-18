@@ -33,6 +33,15 @@ this migration's FOR UPDATE, so a Reading saved before the lock is moved with
 the rest, and one that starts mid-migration waits and then finds its Book gone
 rather than being cascade-deleted unseen.
 
+The Reading List moves before those Book locks are taken, and no queue row is
+touched after them. `start_reading()` deletes its queue row and then inserts its
+Reading, which takes FOR KEY SHARE on the Book: queue row first, Book second. A
+migration that held a Book lock and then waited on a queue row would close that
+order into a deadlock that aborts the reader's request, so the queue is moved
+first and both sides take the queue row before the Book. A queue row a reader
+adds after the move is deleted with the Book by ON DELETE CASCADE instead of
+moving, which is where an entry for a Book that no longer exists would end.
+
 The surviving Book is locked the same way, and the cover is copied to it by id.
 An edit may change a Book's ISBN while the deployment still serves requests, so
 matching the survivor by ISBN alone could find it, then have an edit commit
@@ -58,6 +67,15 @@ depends_on = None
 #: The ISBN the real Book holds; #358 names it.
 REAL_ISBN = "9780008644833"
 
+#: Raised when an ISBN moves between the Reading List transfer and the Book
+#: locks; the rows the queue moved to could then no longer be the rows this
+#: repair deletes.
+_CATALOGUE_CHANGED = (
+    "Refusing to repair the ISBN-less Book(s): the catalogue changed while the Reading List "
+    "moved, so a reader's entry may now sit on a Book this repair keeps or deletes. Run this "
+    "migration again once the catalogue is quiet."
+)
+
 #: A Book's authors in `book_authors.position` order, so two Books' links can be
 #: compared as one string. The unit separator cannot appear in a name.
 _AUTHORS = """
@@ -80,24 +98,38 @@ def _describe(row: RowMapping) -> str:
     return f"#{row['id']} {row['title']!r} by {authors!r}"
 
 
-def _move_history(bind: Connection, row: RowMapping, real_id: int) -> None:
-    """Carry the duplicate's Readings and Reading List rows to the survivor."""
-    duplicate_id = row["id"]
+def _move_queue(bind: Connection, real_id: int, duplicate_ids: list[int]) -> None:
+    """Carry the duplicates' Reading List rows to the survivor.
 
-    # The queue is keyed by (user_id, book_id), so a reader who already queued
-    # the real Book keeps that entry and the position it already has.
-    bind.execute(
-        text("""
-            INSERT INTO reading_list (user_id, book_id, position)
-            SELECT user_id, :real, position FROM reading_list WHERE book_id = :duplicate
-            ON CONFLICT (user_id, book_id) DO NOTHING
-            """),
-        {"real": real_id, "duplicate": duplicate_id},
-    )
-    bind.execute(
-        text("DELETE FROM reading_list WHERE book_id = :duplicate"),
-        {"duplicate": duplicate_id},
-    )
+    Runs before any Book is locked, and nothing here may run after those locks
+    are taken: `start_reading()` takes the queue row and then the Book, so a
+    migration waiting on a queue row under a Book lock would deadlock with it.
+
+    The queue is keyed by (user_id, book_id), so a reader who already queued the
+    real Book keeps that entry and the position it already has.
+    """
+    for duplicate_id in duplicate_ids:
+        # Move what the delete returned rather than what a read saw before it:
+        # a request already deleting its own entry (start_reading) is resolved
+        # by waiting for its row, and the entry it removed must not be
+        # resurrected on the survivor from a snapshot that predates the commit.
+        bind.execute(
+            text("""
+                WITH removed AS (
+                    DELETE FROM reading_list WHERE book_id = :duplicate
+                    RETURNING user_id, position
+                )
+                INSERT INTO reading_list (user_id, book_id, position)
+                SELECT user_id, :real, position FROM removed
+                ON CONFLICT (user_id, book_id) DO NOTHING
+                """),
+            {"real": real_id, "duplicate": duplicate_id},
+        )
+
+
+def _move_readings(bind: Connection, row: RowMapping, real_id: int) -> None:
+    """Carry the duplicate's Readings to the survivor, under its Book lock."""
+    duplicate_id = row["id"]
 
     # A reader with no Reading of the real Book keeps this one, moved across.
     bind.execute(
@@ -151,13 +183,27 @@ def _move_history(bind: Connection, row: RowMapping, real_id: int) -> None:
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # Lock the candidate before reading what depends on it. A Reading or Reading
-    # List insert takes FOR KEY SHARE on its Book and conflicts with this FOR
-    # UPDATE, so the history read below cannot go stale: the write either lands
-    # before the lock (and is moved) or waits until the migration has finished.
-    locked = bind.execute(text("SELECT id FROM books WHERE btrim(isbn13) = '' FOR UPDATE")).fetchall()
-    if not locked:
+    # The queue moves before any Book is locked (see _move_queue), so the
+    # candidates are read without one here and the Book locks are taken below.
+    candidates = bind.execute(text("SELECT id FROM books WHERE btrim(isbn13) = ''")).fetchall()
+    if not candidates:
         return
+    duplicate_ids = [row[0] for row in candidates]
+
+    survivor = bind.execute(text("SELECT id FROM books WHERE isbn13 = :isbn"), {"isbn": REAL_ISBN}).first()
+    survivor_id = survivor[0] if survivor else None
+    if survivor_id is not None:
+        _move_queue(bind, survivor_id, duplicate_ids)
+
+    # Lock the candidates before reading what depends on them. A Reading insert
+    # takes FOR KEY SHARE on its Book and conflicts with this FOR UPDATE, so the
+    # history read below cannot go stale: the write either lands before the lock
+    # (and is moved) or waits until the migration has finished. Read the same
+    # rows again under the lock: if an ISBN moved while the queue moved, the
+    # entries may have gone to a Book this repair keeps or deletes.
+    locked = bind.execute(text("SELECT id FROM books WHERE btrim(isbn13) = '' FOR UPDATE")).fetchall()
+    if {row[0] for row in locked} != set(duplicate_ids):
+        raise RuntimeError(_CATALOGUE_CHANGED)
     empty = bind.execute(text(_EMPTY_KEYED_BOOKS)).mappings().all()
 
     # Lock the survivor too, and copy to it by id below: an edit can change its
@@ -180,6 +226,8 @@ def upgrade() -> None:
             "catalogue, so there is no record to confirm they duplicate. Give each the ISBN it "
             "should carry in this migration (0007 shows the form)."
         )
+    if real["id"] != survivor_id:
+        raise RuntimeError(_CATALOGUE_CHANGED)
 
     for row in empty:
         reasons = []
@@ -195,7 +243,7 @@ def upgrade() -> None:
             )
 
     for row in empty:
-        _move_history(bind, row, real["id"])
+        _move_readings(bind, row, real["id"])
         # Only fills a gap: a cover the real Book already has wins. An empty
         # string is how an import records a missing cover, so it is no cover to
         # keep either. The row is the id matched above and held by its lock, so

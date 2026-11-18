@@ -801,6 +801,65 @@ def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
     assert stamped == "0010"
 
 
+def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
+    """`start_reading()` takes the queue row and then the Book; so must this.
+
+    The reader deletes its Reading List entry and stays open, exactly as
+    `start_reading()` does before it inserts the Reading. A migration that took
+    the Book lock first would then wait on that queue row while the reader's
+    insert waits on the Book: a deadlock, which Postgres resolves by aborting
+    one of the two. Moving the queue before the Book locks leaves the reader
+    free to finish, and the Reading it saves moves with the rest.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)", [user_id, duplicate_id])
+
+    reader = psycopg.connect(own_database)
+    failure = []
+    try:
+        # The queue row is deleted but the request's transaction stays open.
+        reader.execute("DELETE FROM reading_list WHERE user_id = %s AND book_id = %s", [user_id, duplicate_id])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # pragma: no cover - the repair must not fail
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the migration is blocked on the queue row this request
+        # holds, then save the Reading as start_reading() would. Under the old
+        # order that insert waited on the Book the migration had already locked.
+        _wait_for_lock_wait(own_database)
+        reader.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+            [user_id, duplicate_id],
+        )
+        reader.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        reader.close()
+
+    assert not failure, f"the migration failed: {failure}"
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status FROM readings").fetchall()
+        queued = conn.execute("SELECT book_id FROM reading_list").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "In Progress")]
+    assert queued == []
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
 def test_0010_folds_a_reading_logged_against_both_records(own_database):
     """The same read on both records is one entry, left on the real Book."""
     _upgrade_database(own_database, "0009")
