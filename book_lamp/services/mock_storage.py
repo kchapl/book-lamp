@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, resolve_category
+from book_lamp.utils.books import Category, cover_is_blank, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
 
@@ -43,19 +43,30 @@ class MockStorage:
     def get_all_books(self) -> list[dict[str, Any]]:
         return self.books
 
-    def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
-        """Books with no cover, optionally narrowed to the given ids."""
+    def get_books_missing_covers(
+        self,
+        book_ids: Optional[list[int]] = None,
+        placeholder_hosts: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
+        """Books with no cover, optionally narrowed to the given ids.
+
+        A cover hosted where placeholders are served is included too: storage
+        cannot read bytes, so the run fingerprints it and decides.
+        """
         wanted = set(book_ids or [])
 
         def no_cover(value: Any) -> bool:
             return value is None or (isinstance(value, str) and not value.strip())
 
+        def on_placeholder_host(book: dict[str, Any]) -> bool:
+            covers = [book.get("thumbnail_url"), book.get("cover_url")]
+            return any(isinstance(url, str) and host in url for url in covers for host in (placeholder_hosts or []))
+
         return [
             book
             for book in self.books
             if (not wanted or book["id"] in wanted)
-            and no_cover(book.get("thumbnail_url"))
-            and no_cover(book.get("cover_url"))
+            and ((no_cover(book.get("thumbnail_url")) and no_cover(book.get("cover_url"))) or on_placeholder_host(book))
         ]
 
     def set_book_cover(
@@ -64,22 +75,33 @@ class MockStorage:
         isbn13: str,
         thumbnail_url: Optional[str] = None,
         cover_url: Optional[str] = None,
+        replace_urls: Optional[list[str]] = None,
     ) -> bool:
         """Write a Book's cover fields while it still has the ISBN it had.
 
         A corrected ISBN means the cover the lookup found belongs to a different
         edition, so the write is refused rather than attached to the wrong Book.
+        A stored cover may be replaced only when it is one of ``replace_urls``,
+        the placeholder URLs the run fingerprinted.
         """
         book = self.get_book_by_id(book_id)
         if book is None or book.get("isbn13") != isbn13:
             return False
 
-        def has_cover(value: Any) -> bool:
-            return value is not None and not (isinstance(value, str) and not value.strip())
-
         # A cover the reader added while the run was looking is kept: the run
-        # only ever fills a gap it saw at the start.
-        if has_cover(book.get("thumbnail_url")) or has_cover(book.get("cover_url")):
+        # only ever fills a gap it saw at the start, or replaces a placeholder
+        # it has just fingerprinted. Each field being written is checked on its
+        # own, so a placeholder left in the other field cannot authorise
+        # overwriting a real cover the reader has saved since.
+        replaceable = {url for url in (replace_urls or []) if url}
+
+        def writable(field: str) -> bool:
+            value = book.get(field)
+            return cover_is_blank(value) or (isinstance(value, str) and value.strip() in replaceable)
+
+        if thumbnail_url and not writable("thumbnail_url"):
+            return False
+        if cover_url and not writable("cover_url"):
             return False
         if thumbnail_url:
             book["thumbnail_url"] = thumbnail_url

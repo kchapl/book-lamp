@@ -184,14 +184,29 @@ class PostgresStorage:
         return self._collection_books(user_id=user_id)
 
     @with_retry
-    def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
+    def get_books_missing_covers(
+        self,
+        book_ids: Optional[list[int]] = None,
+        placeholder_hosts: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
         """Return the user's Books that have no cover, optionally narrowed to ids.
 
         A cover counts as missing when both cover fields are NULL or blank — the
-        same rule the missing-covers run applies before it writes one.
+        same rule the missing-covers run applies before it writes one. A cover
+        hosted where placeholders are served is included too: the storage cannot
+        read bytes, so the run fingerprints it and decides.
         """
-        conditions = ["COALESCE(NULLIF(TRIM(b.thumbnail_url), ''), NULLIF(TRIM(b.cover_url), '')) IS NULL"]
+        missing = "COALESCE(NULLIF(TRIM(b.thumbnail_url), ''), NULLIF(TRIM(b.cover_url), '')) IS NULL"
+        conditions: list[str] = []
         params: list[Any] = []
+        if placeholder_hosts:
+            on_placeholder_host = []
+            for host in placeholder_hosts:
+                on_placeholder_host.append("b.thumbnail_url ILIKE %s OR b.cover_url ILIKE %s")
+                params.extend([f"%{host}%", f"%{host}%"])
+            conditions.append(f"({missing} OR ({' OR '.join(on_placeholder_host)}))")
+        else:
+            conditions.append(missing)
         if book_ids:
             conditions.append("b.id = ANY(%s)")
             params.append(list(book_ids))
@@ -204,6 +219,7 @@ class PostgresStorage:
         isbn13: str,
         thumbnail_url: Optional[str] = None,
         cover_url: Optional[str] = None,
+        replace_urls: Optional[list[str]] = None,
     ) -> bool:
         """Write a Book's cover fields while it still has the ISBN it had.
 
@@ -214,8 +230,11 @@ class PostgresStorage:
 
         The row must still be missing a cover for the same reason: the reader
         can add one while the run is looking, and a Book that has a cover is
-        never touched by this run.
+        never touched by this run. ``replace_urls`` names the stored covers the
+        run fingerprinted as registered placeholders; those may be replaced,
+        while anything else the reader holds may not.
         """
+        replaceable = list(replace_urls or [])
         with self.pool.connection() as conn:
             row = conn.execute(
                 """
@@ -224,13 +243,31 @@ class PostgresStorage:
                     cover_url = COALESCE(%s, cover_url)
                 WHERE id = %s
                   AND isbn13 = %s
-                  AND COALESCE(
-                      NULLIF(TRIM(thumbnail_url), ''),
-                      NULLIF(TRIM(cover_url), '')
-                  ) IS NULL
+                  -- Each field being written must still be blank or a
+                  -- placeholder itself: a placeholder in the other field does
+                  -- not authorise overwriting a real cover saved mid-run.
+                  AND (
+                      %s::text IS NULL
+                      OR NULLIF(TRIM(thumbnail_url), '') IS NULL
+                      OR thumbnail_url = ANY(%s::text[])
+                  )
+                  AND (
+                      %s::text IS NULL
+                      OR NULLIF(TRIM(cover_url), '') IS NULL
+                      OR cover_url = ANY(%s::text[])
+                  )
                 RETURNING id
                 """,
-                [thumbnail_url, cover_url, book_id, isbn13],
+                [
+                    thumbnail_url,
+                    cover_url,
+                    book_id,
+                    isbn13,
+                    thumbnail_url,
+                    replaceable,
+                    cover_url,
+                    replaceable,
+                ],
             ).fetchone()
             return row is not None
 

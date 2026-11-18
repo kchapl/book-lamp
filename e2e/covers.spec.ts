@@ -24,7 +24,8 @@ test('runs the missing-covers utility from the account menu', async ({ page }) =
                 id: 'e2e-covers',
                 status: 'completed',
                 progress: 100,
-                result: 'Checked 5 book(s) without a cover: filled 3, 2 still missing.',
+                result:
+                    'Checked 5 book(s) without a cover: filled 3, replaced 1 placeholders, 1 still missing.',
             },
         })
     );
@@ -36,6 +37,6 @@ test('runs the missing-covers utility from the account menu', async ({ page }) =
     await menu.getByText('Fill missing covers', { exact: true }).click();
 
     await expect(page.locator('.job-indicator')).toHaveText(
-        'Checked 5 book(s) without a cover: filled 3, 2 still missing.'
+        'Checked 5 book(s) without a cover: filled 3, replaced 1 placeholders, 1 still missing.'
     );
 });

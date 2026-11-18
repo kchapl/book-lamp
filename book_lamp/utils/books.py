@@ -4,6 +4,11 @@ from collections.abc import Mapping
 from typing import Any, NamedTuple, Optional
 
 
+def cover_is_blank(value: object) -> bool:
+    """Whether a stored cover value counts as no cover at all."""
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
 def normalize_isbn(isbn: str) -> str:
     """Remove hyphens and other non-digit characters from ISBN, preserving final 'X'."""
     if not isbn:

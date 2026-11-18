@@ -1385,6 +1385,55 @@ def test_the_missing_covers_run_reads_and_writes_only_covers(pg_storage):
     assert filled["title"] == "Missing"
     assert filled["publisher"] == "Kept House"
 
+    # A cover on a host that serves placeholders is included in the read, and
+    # may be replaced once the run has fingerprinted it as one.
+    placeholder_url = "https://images.penguinrandomhouse.com/cover/9780000000105"
+    placeholder_book = pg_storage.add_book(
+        isbn13="9780000000105",
+        title="Placeholder",
+        authors=["D"],
+        thumbnail_url=placeholder_url,
+    )
+    pg_storage.add_to_reading_list(placeholder_book["id"])
+    widened = {
+        book["id"] for book in pg_storage.get_books_missing_covers(placeholder_hosts=["images.penguinrandomhouse.com"])
+    }
+    assert placeholder_book["id"] in widened
+    assert placeholder_book["id"] not in {book["id"] for book in pg_storage.get_books_missing_covers()}
+    assert not pg_storage.set_book_cover(
+        placeholder_book["id"], "9780000000105", thumbnail_url="https://example.com/real.jpg"
+    )
+    assert pg_storage.set_book_cover(
+        placeholder_book["id"],
+        "9780000000105",
+        thumbnail_url="https://example.com/real.jpg",
+        replace_urls=[placeholder_url],
+    )
+
+    # A real cover saved mid-run is never overwritten just because the other
+    # field still holds a placeholder.
+    stuck = pg_storage.add_book(
+        isbn13="9780000000106",
+        title="Stuck",
+        authors=["E"],
+        thumbnail_url=f"{placeholder_url}/thumb",
+        cover_url=f"{placeholder_url}/cover",
+    )
+    pg_storage.add_to_reading_list(stuck["id"])
+    assert pg_storage.set_book_cover(
+        stuck["id"],
+        "9780000000106",
+        thumbnail_url="https://example.com/reader.jpg",
+        cover_url="https://example.com/reader2.jpg",
+        replace_urls=[f"{placeholder_url}/thumb", f"{placeholder_url}/cover"],
+    )
+    assert not pg_storage.set_book_cover(
+        stuck["id"],
+        "9780000000106",
+        thumbnail_url="https://example.com/run.jpg",
+        replace_urls=[f"{placeholder_url}/thumb"],
+    )
+
     still_missing = {book["id"] for book in pg_storage.get_books_missing_covers()}
     assert still_missing == {blank["id"]}
 
