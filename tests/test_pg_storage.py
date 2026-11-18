@@ -768,34 +768,296 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
     assert stamped == "0010"
 
 
-@pytest.mark.parametrize("history", ["reading", "reading_list"])
-def test_0010_refuses_an_empty_keyed_duplicate_that_carries_history(own_database, history):
-    """History makes the row a Book to keep, not a duplicate to discard."""
+def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
+    """The reader's history moves with the Book it belongs to.
+
+    A Reading and a queue entry that only the duplicate holds move to the real
+    Book, so deleting the duplicate cannot take them with it.
+    """
     _upgrade_database(own_database, "0009")
-    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
     duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
     with psycopg.connect(own_database) as conn:
         user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
-        if history == "reading":
+        conn.execute(
+            "INSERT INTO readings (user_id, book_id, status, rating) VALUES (%s, %s, 'Completed', 5)",
+            [user_id, duplicate_id],
+        )
+        conn.execute(
+            "INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)",
+            [user_id, duplicate_id],
+        )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status, rating FROM readings").fetchall()
+        queued = conn.execute("SELECT book_id FROM reading_list").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "Completed", 5)]
+    assert queued == [(real_id,)]
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
+def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_database):
+    """Queueing both records leaves one entry, at the position it already had.
+
+    The move inserts what the duplicate's queue held, so a reader who already
+    queued the real Book must keep that entry rather than gaining a second one
+    ahead of, or behind, the rest of their list.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO reading_list (user_id, book_id, position) VALUES (%s, %s, 1)", [user_id, real_id])
+        conn.execute(
+            "INSERT INTO reading_list (user_id, book_id, position) VALUES (%s, %s, 2)", [user_id, duplicate_id]
+        )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        queued = conn.execute("SELECT book_id, position FROM reading_list").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert queued == [(real_id, 1)]
+    assert stamped == "0010"
+
+
+def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
+    """`start_reading()` takes the queue row and then the Book; so must this.
+
+    The reader deletes its Reading List entry and stays open, exactly as
+    `start_reading()` does before it inserts the Reading. A migration that took
+    the Book lock first would then wait on that queue row while the reader's
+    insert waits on the Book: a deadlock, which Postgres resolves by aborting
+    one of the two. Moving the queue before the Book locks leaves the reader
+    free to finish, and the Reading it saves moves with the rest.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)", [user_id, duplicate_id])
+
+    reader = psycopg.connect(own_database)
+    failure = []
+    try:
+        # The queue row is deleted but the request's transaction stays open.
+        reader.execute("DELETE FROM reading_list WHERE user_id = %s AND book_id = %s", [user_id, duplicate_id])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # pragma: no cover - the repair must not fail
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the migration is blocked on the queue row this request
+        # holds, then save the Reading as start_reading() would. Under the old
+        # order that insert waited on the Book the migration had already locked.
+        _wait_for_lock_wait(own_database)
+        reader.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
+            [user_id, duplicate_id],
+        )
+        reader.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        reader.close()
+
+    assert not failure, f"the migration failed: {failure}"
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status FROM readings").fetchall()
+        queued = conn.execute("SELECT book_id FROM reading_list").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "In Progress")]
+    assert queued == []
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
+def test_0010_folds_a_reading_logged_against_both_records(own_database):
+    """The same read on both records is one entry, left on the real Book."""
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        for book_id in (real_id, duplicate_id):
             conn.execute(
-                "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'In Progress')",
-                [user_id, duplicate_id],
-            )
-        else:
-            conn.execute(
-                "INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)",
-                [user_id, duplicate_id],
+                "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
+                "VALUES (%s, %s, 'Completed', 4, DATE '2026-07-30', DATE '2026-08-12')",
+                [user_id, book_id],
             )
 
-    with pytest.raises(RuntimeError, match="Refusing to delete ISBN-less Book"):
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status, rating FROM readings").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "Completed", 4)]
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
+def test_0010_folds_a_reread_logged_against_both_records(own_database):
+    """Every duplicate Reading folds into its own match on the survivor.
+
+    Two identical Readings on each record are a re-read logged twice. Pairing
+    them one for one folds both and the repair finishes; folding only the
+    duplicate's first would leave one behind and refuse a history it can fully
+    account for.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        for book_id in (real_id, duplicate_id):
+            for _ in range(2):
+                conn.execute(
+                    "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
+                    "VALUES (%s, %s, 'Completed', 4, DATE '2026-07-30', DATE '2026-08-12')",
+                    [user_id, book_id],
+                )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status FROM readings").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "Completed"), (real_id, "Completed")]
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
+def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
+    """A match is found per Reading, not only for the duplicate's first one.
+
+    The same two Readings sit in the opposite order on each record, so the
+    duplicate's later Reading matches the survivor's earlier one. Pairing per
+    Reading folds both; matching only the duplicate's earliest would fold the
+    one that happens to line up and refuse a history that pairs exactly.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        # The same two Readings, logged in the opposite order on each record.
+        for book_id, statuses in ((real_id, ("Abandoned", "Completed")), (duplicate_id, ("Completed", "Abandoned"))):
+            for status in statuses:
+                conn.execute(
+                    "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
+                    "VALUES (%s, %s, %s, %s, DATE '2026-07-30', DATE '2026-08-12')",
+                    [user_id, book_id, status, 4 if status == "Completed" else 0],
+                )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, status FROM readings ORDER BY id").fetchall()
+        duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, "Abandoned"), (real_id, "Completed")]
+    assert duplicate == 0
+    assert stamped == "0010"
+
+
+def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
+    """update_reading() rewrites a Reading without taking its Book's lock.
+
+    An edit can raise the duplicate's rating while the fold compares Readings.
+    The fold must see what the edit committed, not the snapshot it started from,
+    and refuse a Reading that no longer matches the survivor rather than folding
+    the newly saved rating away.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        reading_ids = {}
+        for book_id in (real_id, duplicate_id):
+            reading_ids[book_id] = conn.execute(
+                "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
+                "VALUES (%s, %s, 'Completed', 4, DATE '2026-07-30', DATE '2026-08-12') RETURNING id",
+                [user_id, book_id],
+            ).fetchone()[0]
+
+    editor = psycopg.connect(own_database)
+    failure = []
+    try:
+        # Like the update endpoint: keyed by the Reading, so it needs no Book lock.
+        editor.execute("UPDATE readings SET rating = 5 WHERE id = %s", [reading_ids[duplicate_id]])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the fold is blocked on this row, then let the edit commit
+        # so the fold has to compare against the rating that was saved.
+        _wait_for_lock_wait(own_database)
+        editor.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        editor.close()
+
+    assert failure, "the migration folded the rating the edit saved"
+    assert "differ" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, rating FROM readings ORDER BY id").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, 4), (duplicate_id, 5)]
+    assert stamped == "0009"
+
+
+def test_0010_refuses_a_reading_that_differs_from_the_real_books(own_database):
+    """Two different readings of one work are a person's merge, not a fold."""
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'Completed')",
+            [user_id, real_id],
+        )
+        conn.execute(
+            "INSERT INTO readings (user_id, book_id, status) VALUES (%s, %s, 'Abandoned')",
+            [user_id, duplicate_id],
+        )
+
+    with pytest.raises(RuntimeError, match="differ"):
         _upgrade_database(own_database, "head")
 
-    # The refusal is the whole migration: the row is still there and the
-    # revision is not stamped.
+    # The refusal is the whole migration: neither the Book nor either Reading
+    # has moved, and the revision is not stamped.
     with psycopg.connect(own_database) as conn:
         held = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
+        readings = conn.execute("SELECT count(*) FROM readings").fetchone()[0]
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert held == 1
+    assert readings == 2
     assert stamped == "0009"
 
 
@@ -855,15 +1117,15 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
     """A deployment serves requests while migrations run (DEPLOYMENT.md).
 
     The Reading is inserted but its transaction stays open while the migration
-    starts, so a migration that counted first would see zero and then cascade
-    the Reading away with the duplicate. Because the candidate is locked before
-    the count, the migration waits; once the Reading commits, the count sees it
-    and the repair refuses. The commit happens only once the migration is seen
-    waiting on that lock; without the lock nothing waits, so the Reading commits
-    before the count and the assertions below fail.
+    starts, so a migration that moved history before the commit would see none
+    and then cascade the Reading away with the duplicate. Because the candidate
+    is locked first, the migration waits; once the Reading commits it moves to
+    the surviving Book. The commit happens only once the migration is seen
+    waiting on that lock; without the lock nothing waits and the Reading is
+    deleted, so the assertions below fail.
     """
     _upgrade_database(own_database, "0009")
-    _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
     duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
 
     reader = psycopg.connect(own_database)
@@ -878,7 +1140,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         def migrate():
             try:
                 _upgrade_database(own_database, "head")
-            except Exception as exc:  # the refusal is the expected outcome
+            except Exception as exc:  # pragma: no cover - the repair must not fail
                 failure.append(exc)
 
         worker = threading.Thread(target=migrate)
@@ -886,7 +1148,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
 
         # The migration cannot get past the Book this transaction holds, so wait
         # for its ungranted lock before committing. The wait is observed rather
-        # than timed, so the test proves the lock is taken before the count.
+        # than timed, so the test proves the lock is taken before history moves.
         _wait_for_lock_wait(own_database)
         reader.commit()
         worker.join(timeout=30)
@@ -894,16 +1156,15 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
     finally:
         reader.close()
 
-    assert failure, "the migration deleted the duplicate instead of refusing"
-    assert "Refusing to delete ISBN-less Book" in str(failure[0])
+    assert not failure, f"the migration failed: {failure}"
 
     with psycopg.connect(own_database) as conn:
-        readings = conn.execute("SELECT count(*) FROM readings").fetchone()[0]
+        readings = conn.execute("SELECT book_id, status FROM readings").fetchall()
         duplicate = conn.execute("SELECT count(*) FROM books WHERE btrim(isbn13) = ''").fetchone()[0]
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-    assert readings == 1
-    assert duplicate == 1
-    assert stamped == "0009"
+    assert readings == [(real_id, "In Progress")]
+    assert duplicate == 0
+    assert stamped == "0010"
 
 
 def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):
@@ -961,4 +1222,123 @@ def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own
         ("9780441013593", None),
         ("", "http://example.com/duplicate.jpg"),
     ]
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_a_duplicates_isbn_moves_while_the_queue_moves(own_database):
+    """The queue moves before the Books are locked, so the candidates are re-read.
+
+    An edit can give the duplicate an ISBN while the Reading List transfer runs.
+    Its entry has by then already moved to the survivor, while the row itself is
+    no longer one this repair deletes, so the migration refuses and the move
+    rolls back instead of leaving the entry on a Book it has to keep.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)", [user_id, duplicate_id])
+
+    # A request still holding this queue row stops the transfer part-way through,
+    # which is the window an edit lands in.
+    holder = psycopg.connect(own_database)
+    failure = []
+    try:
+        holder.execute(
+            "SELECT 1 FROM reading_list WHERE user_id = %s AND book_id = %s FOR UPDATE",
+            [user_id, duplicate_id],
+        )
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # The candidate was read before this edit commits and is re-read after
+        # it, so the two disagree and the repair must not go on.
+        _wait_for_lock_wait(own_database)
+        with psycopg.connect(own_database) as editor:
+            editor.execute("UPDATE books SET isbn13 = '9780441013593' WHERE id = %s", [duplicate_id])
+        holder.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        holder.close()
+
+    assert failure, "the migration moved the queue entry and repaired around the edit"
+    assert "catalogue changed while the Reading List moved" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT id, isbn13 FROM books ORDER BY id").fetchall()
+        queued = conn.execute("SELECT book_id FROM reading_list").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [(real_id, "9780008644833"), (duplicate_id, "9780441013593")]
+    assert queued == [(duplicate_id,)]
+    assert stamped == "0009"
+
+
+def test_0010_refuses_when_the_real_book_moves_to_another_row_mid_migration(own_database):
+    """The queue moves to an id; if REAL_ISBN lands on another row, refuse.
+
+    An edit can change the surviving Book's ISBN while the Reading List transfer
+    runs, and another row can take that ISBN. The entries were moved to the id
+    matched before that, which is no longer the row this repair keeps, so the
+    migration refuses and the move rolls back.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    other_id = _write_book(own_database, "9780141036144", "Brave New World", ["Aldous Huxley"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        conn.execute("INSERT INTO reading_list (user_id, book_id) VALUES (%s, %s)", [user_id, duplicate_id])
+
+    holder = psycopg.connect(own_database)
+    failure = []
+    try:
+        holder.execute(
+            "SELECT 1 FROM reading_list WHERE user_id = %s AND book_id = %s FOR UPDATE",
+            [user_id, duplicate_id],
+        )
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the transfer is under way, then move the ISBN the repair
+        # matched on to a different row while the queue entries sit on the old
+        # one.
+        _wait_for_lock_wait(own_database)
+        with psycopg.connect(own_database) as editor:
+            editor.execute("UPDATE books SET isbn13 = '9780441013593' WHERE id = %s", [real_id])
+            editor.execute("UPDATE books SET isbn13 = '9780008644833' WHERE id = %s", [other_id])
+        holder.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        holder.close()
+
+    assert failure, "the migration moved the queue entry onto a Book it keeps"
+    assert "catalogue changed while the Reading List moved" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        books = conn.execute("SELECT id, isbn13 FROM books ORDER BY id").fetchall()
+        queued = conn.execute("SELECT book_id FROM reading_list").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert books == [
+        (real_id, "9780441013593"),
+        (duplicate_id, ""),
+        (other_id, "9780008644833"),
+    ]
+    assert queued == [(duplicate_id,)]
     assert stamped == "0009"
