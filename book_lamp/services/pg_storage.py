@@ -160,9 +160,9 @@ class PostgresStorage:
     ) -> list[dict[str, Any]]:
         """The reader's collection, with Authors, narrowed by extra conditions.
 
-        `conditions` are ANDed onto the shared scope, and each takes one
-        placeholder in `params`, in order. `user_id` overrides the instance's
-        reader, for the callers that read someone else's collection.
+        `conditions` are ANDed onto the shared scope; `params` fills the
+        placeholders those conditions contain, in order. `user_id` overrides the
+        instance's reader, for the callers that read someone else's collection.
         """
         query = _COLLECTION_SCOPE
         for condition in conditions or []:
