@@ -93,16 +93,25 @@ describe('ReadingListPage row links', () => {
         expect(container.querySelector('.item-placeholder')?.closest('a')).toBeNull();
     });
 
-    it('still starts and removes the Book from the row', async () => {
+    it('starts the Book from the row', async () => {
         list.mockResolvedValue({ books: [queuedBook] });
 
         renderPage();
         await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
 
         fireEvent.click(button(/start reading/i));
+
         await waitFor(() => expect(start).toHaveBeenCalledWith(1));
+    });
+
+    it('removes the Book from the row', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
 
         fireEvent.click(button(/remove/i));
+
         await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
     });
 });
