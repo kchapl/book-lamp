@@ -1,3 +1,4 @@
+import html
 import re
 from collections.abc import Mapping
 from typing import Any, NamedTuple, Optional
@@ -241,6 +242,252 @@ def normalise_major_bisac(value: object) -> Optional[str]:
         return None
 
     return main_cat.upper()
+
+
+#: Words a title carries as glue rather than meaning. Title case leaves them
+#: lower unless they open or close the title, or follow a colon, dash or
+#: opening bracket.
+_TITLE_SMALL_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "for",
+        "so",
+        "yet",
+        "as",
+        "at",
+        "by",
+        "from",
+        "in",
+        "into",
+        "of",
+        "off",
+        "on",
+        "onto",
+        "out",
+        "over",
+        "per",
+        "to",
+        "up",
+        "via",
+        "with",
+        "vs",
+    }
+)
+
+#: A dotted form such as "U.S.A." names something, so it is neither re-cased
+#: nor stripped of its final full stop.
+_DOTTED_ABBREVIATION = re.compile(r"^(?:[A-Za-z]\.){2,}[A-Za-z]?\.?$")
+
+#: A title may end with an abbreviation whose full stop is part of the word, so
+#: "Martin Luther King Jr." keeps it. The set is the abbreviations a title
+#: carries; a plain word ending the title has its stop removed.
+_TITLE_ABBREVIATIONS = frozenset(
+    {
+        "al",
+        "approx",
+        "co",
+        "corp",
+        "dr",
+        "ed",
+        "eds",
+        "etc",
+        "fig",
+        "figs",
+        "inc",
+        "jr",
+        "ltd",
+        "mr",
+        "mrs",
+        "ms",
+        "no",
+        "p",
+        "pp",
+        "prof",
+        "rev",
+        "sr",
+        "st",
+        "vol",
+        "vs",
+    }
+)
+
+#: Initials a title carries as initials. Structure cannot tell "CIA" from
+#: "WAR", so the ones a Book title uses are named; everything else is read as a
+#: shouted word and title-cased.
+_TITLE_INITIALISMS = frozenset(
+    {
+        "AI",
+        "API",
+        "BBC",
+        "CIA",
+        "DNA",
+        "FBI",
+        "HTML",
+        "ISBN",
+        "NASA",
+        "NATO",
+        "NHS",
+        "TV",
+        "UK",
+        "USA",
+    }
+)
+
+#: Roman numerals, which a title writes as numerals rather than as words.
+_ROMAN_NUMERALS = frozenset(
+    {
+        "I",
+        "II",
+        "III",
+        "IV",
+        "V",
+        "VI",
+        "VII",
+        "VIII",
+        "IX",
+        "X",
+        "XI",
+        "XII",
+        "XIII",
+        "XIV",
+        "XV",
+        "XVI",
+        "XVII",
+        "XVIII",
+        "XIX",
+        "XX",
+        "XXI",
+    }
+)
+
+#: Characters that end or open a title's part, so the word after them starts a
+#: new one and is capitalised even when it is a small word.
+_TITLE_BREAK_AFTER = re.compile(r"[:\u2014\u2013(\[]$")
+_TITLE_BREAK_BEFORE = re.compile(r"^[\u201c\"'(\[]")
+
+
+def normalise_provider_title(title: Optional[str]) -> Optional[str]:
+    """Tidy a title exactly as a metadata provider supplied it.
+
+    Providers are inconsistent in mechanical ways: an escaped entity, a run of
+    spaces, a full stop that only ends the title, an all-caps record beside a
+    sentence-cased one. The repair is mechanical and adds no word: a title
+    missing a leading "The" is left as it is, because guessing one would name a
+    work the provider never described.
+
+    Title case is applied only to a title that carries no case of its own: all
+    upper, all lower, or sentence case with nothing capitalised after the first
+    letter. A title already cased mixed — "The Lord of the Rings", "iPhone" — is
+    the provider's choice and is left exactly as it arrived.
+
+    Call this where a provider's answer is parsed, never on what the reader
+    typed: a reader's own title is theirs.
+    """
+    if title is None:
+        return None
+
+    text = re.sub(r"\s+", " ", html.unescape(str(title))).strip()
+    if not text:
+        return text
+
+    text = _drop_trailing_full_stop(text)
+    if _needs_title_case(text):
+        text = _title_case(text)
+    return text
+
+
+def _drop_trailing_full_stop(text: str) -> str:
+    """Remove a full stop that only terminates the title.
+
+    Other terminal punctuation stands, an ellipsis stands, and an abbreviation
+    keeps the full stop that belongs to it: "Martin Luther King Jr." ends in a
+    word, not in a stop.
+    """
+    if not text.endswith(".") or text.endswith(".."):
+        return text
+    # Check the final token as the provider wrote it: "U.S." is a dotted
+    # abbreviation, and testing the token after cutting the dot would leave
+    # "U.S", which no longer looks like one.
+    if _DOTTED_ABBREVIATION.match(text.split()[-1]):
+        return text
+    head = text[:-1].rstrip()
+    if not head:
+        return text
+    if re.sub(r"[^A-Za-z]", "", head.split()[-1]).lower() in _TITLE_ABBREVIATIONS:
+        return text
+    return head
+
+
+def _needs_title_case(text: str) -> bool:
+    """Whether the title carries no casing worth keeping."""
+    letters = [char for char in text if char.isalpha()]
+    if len(letters) < 2:
+        return False
+    if all(char.isupper() for char in letters):
+        return True
+    return all(char.islower() for char in letters[1:])
+
+
+def _title_case(text: str) -> str:
+    words = text.split(" ")
+    cased = []
+    # A word is capitalised when it opens the title, when the word before it
+    # ended with a break, when it opens with a bracket or quote of its own, and
+    # when it closes the title.
+    after_break = True
+    for index, word in enumerate(words):
+        last = index == len(words) - 1
+        opens_part = after_break or bool(_TITLE_BREAK_BEFORE.match(word))
+        cased.append(_case_word(word, force=opens_part or last))
+        after_break = bool(_TITLE_BREAK_AFTER.search(word))
+    return " ".join(cased)
+
+
+def _case_word(word: str, force: bool) -> str:
+    if not word or _DOTTED_ABBREVIATION.match(word):
+        return word
+    if "-" in word:
+        # Both halves of a hyphenated word are capitalised: "Spider-Man".
+        return "-".join(_case_word(part, force=True) for part in word.split("-"))
+    if not any(char.isalpha() for char in word):
+        return word
+    if not force and re.sub(r"[^A-Za-z']", "", word).lower() in _TITLE_SMALL_WORDS:
+        return re.sub(r"[A-Za-z]", lambda match: match.group(0).lower(), word)
+    if _reads_as_acronym(word):
+        return word
+
+    cased = []
+    seen_letter = False
+    for char in word:
+        if not char.isalpha():
+            cased.append(char)
+            continue
+        cased.append(char.upper() if not seen_letter else char.lower())
+        seen_letter = True
+    return "".join(cased)
+
+
+def _reads_as_acronym(word: str) -> bool:
+    """Whether an all-caps token is written as initials rather than as a word.
+
+    Only a title the provider shouted gives a token caps to preserve, so a
+    lower-case "spy" is never mistaken for one. Structure cannot separate an
+    initialism from a shouted word — "CIA" and "WAR" differ in nothing a rule
+    can see — so the initialisms a title carries are named, along with the
+    roman numerals a title writes as numerals ("World War III"). Everything
+    else is read as a word: "AN", "IT", "US" and "WE" become "An", "It", "Us"
+    and "We".
+    """
+    if not word.isupper():
+        return False
+    bare = re.sub(r"[^A-Za-z]", "", word)
+    return bare in _TITLE_INITIALISMS or bare in _ROMAN_NUMERALS
 
 
 def normalise_bisac_category(
