@@ -24,8 +24,6 @@ interface BookExhibitProps {
 const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) => {
     const cover = book.cover_url || book.thumbnail_url;
     const Title = titleAs;
-    // The stored title keeps its subtitle; the card reads the two parts apart,
-    // so the heading names the work and the subtitle qualifies the edition.
     const { title, subtitle } = splitSubtitle(book.title);
 
     return (
