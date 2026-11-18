@@ -131,7 +131,7 @@ def test_api_create_book_isbn_test_mode(authenticated_client):
     )
     assert resp.status_code == 201
     body = _json(resp)
-    assert body["title"] == "Test Book"
+    assert body["title"] == "The Last English King"
 
 
 def test_api_create_book_missing_isbn_and_title(authenticated_client):
@@ -422,7 +422,7 @@ def test_api_lookup_isbn_test_mode(authenticated_client):
     resp = authenticated_client.get("/api/books/lookup?isbn=9780000000000")
     assert resp.status_code == 200
     body = _json(resp)
-    assert body["title"] == "Test Book"
+    assert body["title"] == "The Last English King"
 
 
 def test_api_lookup_isbn_missing_param(authenticated_client):

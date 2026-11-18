@@ -57,7 +57,9 @@ not something to paper over.
 - `/test/reset` clears the in-memory store.
 - `/test/connect` and `/test/disconnect` sign the test reader in and out, which
   is what makes the auth gate testable.
-- `/api/books/lookup` answers the canned ISBN `9780000000000` as "Test Book".
+- `/api/books/lookup` answers the canned ISBN `9780000000000` with a provider
+  title that needs normalising (`  the  last english king. `), so the journey
+  sees it stored and shown as "The Last English King".
 - CSRF checks are bypassed.
 
 The flag bypasses sign-in, so `create_app()` refuses it unless the process is
