@@ -19,8 +19,6 @@ import threading
 from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
-import requests
-
 logger = logging.getLogger("book_lamp")
 
 #: The SHA-256 of each image a host serves as a placeholder. A digest is the
@@ -36,21 +34,6 @@ PLACEHOLDER_DIGESTS = {
 #: The hosts whose images may be placeholders, in a stable order.
 PLACEHOLDER_HOSTS = tuple(PLACEHOLDER_DIGESTS)
 
-_session: Optional[requests.Session] = None
-
-
-def _get_session() -> requests.Session:
-    """Get or create the session the fingerprint downloads use."""
-    global _session
-    if _session is None:
-        _session = requests.Session()
-        _session.headers.update(
-            {
-                "User-Agent": "BookLamp/1.0 (personal reading tracker; https://github.com/book-lamp)",
-            }
-        )
-    return _session
-
 
 def _host_of(url: str) -> Optional[str]:
     try:
@@ -65,13 +48,24 @@ class CoverFingerprints:
     One instance belongs to one run: a URL needed twice is downloaded once, and
     a failed download is remembered as "not known to be a placeholder" rather
     than retried for every Book that shares the URL.
+
+    Downloads go through ``session_factory``: the caller's own session, so the
+    cover providers and these checks share one connection pool and one set of
+    headers instead of keeping a second one in step.
     """
 
-    def __init__(self, session_factory: Callable[[], Any] = _get_session) -> None:
+    def __init__(self, session_factory: Callable[[], Any]) -> None:
         self._session_factory = session_factory
         self._verdicts: dict[str, bool] = {}
         self._url_locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
+
+    def verdict(self, url: object) -> Optional[bool]:
+        """The verdict this run already reached for ``url``, if it has one."""
+        if not isinstance(url, str):
+            return None
+        with self._guard:
+            return self._verdicts.get(url.strip())
 
     def is_placeholder(self, url: object) -> bool:
         """Whether the bytes at ``url`` are a registered placeholder.

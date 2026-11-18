@@ -333,16 +333,14 @@ def test_the_cover_lookup_returns_a_real_penguin_cover(monkeypatch):
 
 
 def _fingerprints_knowing(monkeypatch, placeholders):
-    """Treat exactly these URLs as fingerprinted placeholders, in both seams."""
+    """Treat exactly these URLs as fingerprinted placeholders in the run."""
     import book_lamp.routes.books as books_route
-    import book_lamp.services.book_lookup as lookup_module
 
     class _FakeFingerprints:
         def is_placeholder(self, url):
             return url in placeholders
 
-    monkeypatch.setattr(books_route, "CoverFingerprints", lambda: _FakeFingerprints())
-    monkeypatch.setattr(lookup_module, "CoverFingerprints", lambda: _FakeFingerprints())
+    monkeypatch.setattr(books_route, "CoverFingerprints", lambda **kwargs: _FakeFingerprints())
 
 
 def test_run_replaces_a_stored_placeholder(authenticated_client, monkeypatch):
@@ -450,6 +448,81 @@ def test_the_report_names_every_outcome(authenticated_client, monkeypatch):
     assert storage.get_book_by_id(missing["id"])["cover_url"] is not None
     assert storage.get_book_by_id(placeholder["id"])["cover_url"] == "https://example.com/9780000000082-L.jpg"
     assert storage.get_book_by_id(uncovered["id"])["thumbnail_url"] is None
+
+
+def test_lookups_share_the_runs_verdicts():
+    """The route's instance is the lookup's, so its verdicts are reused."""
+    import book_lamp.services.book_lookup as lookup_module
+
+    seen: list[str] = []
+
+    class _FakeFingerprints:
+        def is_placeholder(self, url):
+            seen.append(url)
+            return url == PLACEHOLDER_URL
+
+    with patch(
+        "book_lamp.services.book_lookup.lookup_book_by_isbn13",
+        return_value={"thumbnail_url": PLACEHOLDER_URL},
+    ):
+        found = lookup_module.look_up_missing_covers(
+            [{"id": 1, "isbn13": "9780000000099"}],
+            fingerprints=_FakeFingerprints(),
+        )
+
+    assert found == {}
+    assert seen == [PLACEHOLDER_URL]
+
+
+def test_a_placeholder_already_fingerprinted_costs_no_second_download(monkeypatch):
+    """A stored placeholder is not downloaded again when the lookup reaches it."""
+    import book_lamp.services.book_lookup as lookup_module
+
+    def refuse():
+        pytest.fail("a URL this run already fingerprinted must not be downloaded again")
+
+    fingerprints = CoverFingerprints(session_factory=refuse)
+    fingerprints.is_placeholder_bytes(PLACEHOLDER_URL, PLACEHOLDER_FIXTURE.read_bytes())
+    monkeypatch.setattr(lookup_module, "_get_session", refuse)
+
+    assert lookup_module._lookup_penguin_cover("9780000000099", fingerprints) is None
+
+
+def test_a_real_penguin_cover_already_fingerprinted_is_returned(monkeypatch):
+    import book_lamp.services.book_lookup as lookup_module
+
+    def refuse():
+        pytest.fail("a URL this run already fingerprinted must not be downloaded again")
+
+    fingerprints = CoverFingerprints(session_factory=refuse)
+    fingerprints.is_placeholder_bytes(PLACEHOLDER_URL, b"real cover" * 500)
+    monkeypatch.setattr(lookup_module, "_get_session", refuse)
+
+    assert lookup_module._lookup_penguin_cover("9780000000099", fingerprints) == PLACEHOLDER_URL
+
+
+def test_a_reader_cover_saved_mid_run_is_not_overwritten(authenticated_client):
+    """A placeholder in the other field cannot authorise the write."""
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780000000099",
+        title="Reader saved one",
+        authors=["A"],
+        thumbnail_url=PLACEHOLDER_URL,
+        cover_url=PLACEHOLDER_URL,
+    )
+    # The reader saves a real cover while the run is looking.
+    book["thumbnail_url"] = "https://example.com/reader.jpg"
+
+    assert not storage.set_book_cover(
+        book["id"],
+        "9780000000099",
+        thumbnail_url="https://example.com/run-M.jpg",
+        cover_url="https://example.com/run-L.jpg",
+        replace_urls=[PLACEHOLDER_URL],
+    )
+    assert book["thumbnail_url"] == "https://example.com/reader.jpg"
+    assert book["cover_url"] == PLACEHOLDER_URL
 
 
 def test_the_in_memory_storage_widens_missing_to_placeholder_hosts(authenticated_client):

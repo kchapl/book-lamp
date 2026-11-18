@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Union
 
 from flask import Blueprint, Response, current_app, jsonify, request, session
@@ -22,7 +23,7 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
+from book_lamp.utils.books import cover_is_blank, isbn10_to_isbn13, normalize_isbn
 from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
@@ -61,9 +62,14 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         raise
 
 
-def _blank_cover(value: object) -> bool:
-    """Whether a stored cover value counts as no cover at all."""
-    return value is None or (isinstance(value, str) and not value.strip())
+def _stored_placeholders(book: dict, fingerprints: CoverFingerprints) -> tuple[list[str], set[str]]:
+    """The cover URLs a Book holds, and the ones that serve a placeholder."""
+    stored: list[str] = []
+    for field in ("thumbnail_url", "cover_url"):
+        value = book.get(field)
+        if isinstance(value, str) and value.strip():
+            stored.append(value.strip())
+    return stored, {url for url in stored if fingerprints.is_placeholder(url)}
 
 
 def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: int):
@@ -73,7 +79,7 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
     registered placeholder. Only a Book's cover fields are written, and a real
     cover — added before the run or while it looks — is never replaced.
     """
-    from book_lamp.services.book_lookup import look_up_missing_covers
+    from book_lamp.services.book_lookup import _get_session, look_up_missing_covers
 
     try:
         storage: Union[MockStorage, PostgresStorage]
@@ -82,37 +88,45 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
         else:
             storage = PostgresStorage(user_id=user_id)
 
-        fingerprints = CoverFingerprints()
+        fingerprints = CoverFingerprints(session_factory=_get_session)
         books = storage.get_books_missing_covers(
             book_ids or None,
             placeholder_hosts=list(PLACEHOLDER_HOSTS),
         )
+        job_queue = get_job_queue()
 
         # A Book whose cover sits on a host that serves placeholders is only a
         # candidate when the bytes really are one; a real cover there is not
-        # missing, and the registry host alone does not make it so.
+        # missing, and the registry host alone does not make it so. A registry
+        # host serves one URL per edition, so these downloads are not shared
+        # between Books: they run in the pool rather than one after another on
+        # the job thread, and the job reports them as they settle.
         candidates: list[tuple[dict, set[str]]] = []
-        for book in books:
-            stored: list[str] = []
-            for field in ("thumbnail_url", "cover_url"):
-                value = book.get(field)
-                if isinstance(value, str) and value.strip():
-                    stored.append(value.strip())
-            placeholders = {url for url in stored if fingerprints.is_placeholder(url)}
-            if placeholders:
-                candidates.append((book, placeholders))
-            elif not stored:
-                candidates.append((book, set()))
+        scanned = 0
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(_stored_placeholders, book, fingerprints): book for book in books}
+            for future in as_completed(futures):
+                book = futures[future]
+                stored, placeholders = future.result()
+                if placeholders:
+                    # The snapshot is the Book as the run found it: the write
+                    # guard compares it with the row, so the reader's mid-run
+                    # edit is visible as a difference rather than folded in.
+                    candidates.append((dict(book), placeholders))
+                elif not stored:
+                    candidates.append((dict(book), set()))
+                scanned += 1
+                if books:
+                    job_queue.update_progress(job_id, int(scanned * 50 / len(books)))
 
         total = len(candidates)
         if total == 0:
             logger.info(f"Background job {job_id}: no books are missing a cover")
             return "No books are missing a cover."
 
-        job_queue = get_job_queue()
-
         def report_progress(done: int, count: int) -> None:
-            job_queue.update_progress(job_id, int(done * 100 / count))
+            # Fingerprinting the stored covers filled the first half of the bar.
+            job_queue.update_progress(job_id, 50 + int(done * 50 / count))
 
         # The ISBN each lookup answers for is the one the row had when the run
         # started, so it is read once, before any provider is asked.
@@ -135,7 +149,7 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
                 field: url
                 for field, url in cover.items()
                 if field in ("thumbnail_url", "cover_url")
-                and (_blank_cover(book.get(field)) or str(book.get(field)).strip() in placeholder_urls)
+                and (cover_is_blank(book.get(field)) or str(book.get(field)).strip() in placeholder_urls)
             }
             if not payload:
                 continue

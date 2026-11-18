@@ -243,17 +243,31 @@ class PostgresStorage:
                     cover_url = COALESCE(%s, cover_url)
                 WHERE id = %s
                   AND isbn13 = %s
+                  -- Each field being written must still be blank or a
+                  -- placeholder itself: a placeholder in the other field does
+                  -- not authorise overwriting a real cover saved mid-run.
                   AND (
-                      COALESCE(
-                          NULLIF(TRIM(thumbnail_url), ''),
-                          NULLIF(TRIM(cover_url), '')
-                      ) IS NULL
-                      OR thumbnail_url = ANY(%s)
-                      OR cover_url = ANY(%s)
+                      %s::text IS NULL
+                      OR NULLIF(TRIM(thumbnail_url), '') IS NULL
+                      OR thumbnail_url = ANY(%s::text[])
+                  )
+                  AND (
+                      %s::text IS NULL
+                      OR NULLIF(TRIM(cover_url), '') IS NULL
+                      OR cover_url = ANY(%s::text[])
                   )
                 RETURNING id
                 """,
-                [thumbnail_url, cover_url, book_id, isbn13, replaceable, replaceable],
+                [
+                    thumbnail_url,
+                    cover_url,
+                    book_id,
+                    isbn13,
+                    thumbnail_url,
+                    replaceable,
+                    cover_url,
+                    replaceable,
+                ],
             ).fetchone()
             return row is not None
 

@@ -960,10 +960,16 @@ def _lookup_penguin_cover(
     placeholder is no answer at all: this returns None and the chain keeps
     looking at the next provider.
     """
-    session = _get_session()
     url = f"https://images.penguinrandomhouse.com/cover/{isbn13}"
-    fingerprints = fingerprints or CoverFingerprints()
+    fingerprints = fingerprints or CoverFingerprints(session_factory=_get_session)
 
+    known = fingerprints.verdict(url)
+    if known is not None:
+        # This run has already fingerprinted this URL, as a stored cover or as
+        # another Book's answer: the download is not repeated.
+        return None if known else url
+
+    session = _get_session()
     try:
         logger.debug(f"Checking Penguin Random House for {isbn13}: {url}")
         # Need to allow redirects as it might redirect to a specific size
@@ -1306,7 +1312,7 @@ def look_up_missing_covers(
     # the same URL cost one download, and nothing is remembered afterwards. The
     # run passes its own, so the stored covers it fingerprinted are the same
     # verdicts these lookups use.
-    fingerprints = fingerprints or CoverFingerprints()
+    fingerprints = fingerprints or CoverFingerprints(session_factory=_get_session)
 
     def cover_for(book: Dict[str, Any]) -> Optional[Dict[str, str]]:
         from book_lamp.utils.books import normalize_isbn

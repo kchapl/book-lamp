@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, resolve_category
+from book_lamp.utils.books import Category, cover_is_blank, resolve_category
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
 
@@ -88,17 +88,21 @@ class MockStorage:
         if book is None or book.get("isbn13") != isbn13:
             return False
 
-        def has_cover(value: Any) -> bool:
-            return value is not None and not (isinstance(value, str) and not value.strip())
-
         # A cover the reader added while the run was looking is kept: the run
         # only ever fills a gap it saw at the start, or replaces a placeholder
-        # it has just fingerprinted.
+        # it has just fingerprinted. Each field being written is checked on its
+        # own, so a placeholder left in the other field cannot authorise
+        # overwriting a real cover the reader has saved since.
         replaceable = {url for url in (replace_urls or []) if url}
-        if has_cover(book.get("thumbnail_url")) or has_cover(book.get("cover_url")):
-            held = {url for url in (book.get("thumbnail_url"), book.get("cover_url")) if isinstance(url, str)}
-            if not held & replaceable:
-                return False
+
+        def writable(field: str) -> bool:
+            value = book.get(field)
+            return cover_is_blank(value) or (isinstance(value, str) and value.strip() in replaceable)
+
+        if thumbnail_url and not writable("thumbnail_url"):
+            return False
+        if cover_url and not writable("cover_url"):
+            return False
         if thumbnail_url:
             book["thumbnail_url"] = thumbnail_url
         if cover_url:
