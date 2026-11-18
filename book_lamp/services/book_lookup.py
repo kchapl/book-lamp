@@ -11,6 +11,7 @@ from book_lamp.utils.books import (
     isbn10_to_isbn13,
     isbn13_to_isbn10,
     normalise_bisac_category,
+    normalise_provider_title,
     normalize_isbn,
     parse_publication_year,
 )
@@ -153,7 +154,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         cover_url = cover.get("large") or cover.get("medium")
 
     return {
-        "title": html.unescape(title) if title else title,
+        "title": normalise_provider_title(title),
         # The provider gives a list, so the list is what travels; the display
         # string is derived from it for anything that still reads one.
         "authors": names,
@@ -248,7 +249,7 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
                 authors = doc.get("author_name") or []
                 publishers = doc.get("publisher") or []
                 return {
-                    "title": doc.get("title"),
+                    "title": normalise_provider_title(doc.get("title")),
                     "authors": list(authors),
                     "author": display(authors) if authors else None,
                     "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
@@ -354,12 +355,13 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
         seen_titles: Dict[str, Dict[str, Any]] = {}
 
         for doc in docs:
-            raw_title = doc.get("title")
+            raw_title = normalise_provider_title(doc.get("title"))
             if not raw_title:
                 continue
 
-            # Normalise title for dedup purposes (lower, strip)
-            norm_title = raw_title.strip().lower()
+            # Dedupe on the title the reader would see, so two records that
+            # differ only in case are one entry.
+            norm_title = raw_title.lower()
 
             year_val = doc.get("first_publish_year")
             try:
@@ -385,7 +387,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
             publisher = publishers[0] if publishers else None
 
             entry: Dict[str, Any] = {
-                "title": raw_title.strip(),
+                "title": raw_title,
                 "author": author_str,
                 # The display string joins names with a comma, which storage reads
                 # back as one "Last, First" person; the list is what keeps them
@@ -606,7 +608,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
         cover_id = doc.get("cover_i")
         results.append(
             {
-                "title": html.unescape(doc.get("title") or ""),
+                "title": normalise_provider_title(doc.get("title") or ""),
                 "authors": names,
                 "author": display(names),
                 "isbn13": isbn13,
@@ -803,7 +805,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
     bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
 
     return {
-        "title": html.unescape(info.get("title", "")),
+        "title": normalise_provider_title(info.get("title", "")),
         "authors": [html.unescape(name) for name in info.get("authors", [])],
         "author": display(info.get("authors", [])) if info.get("authors") else None,
         "publish_date": info.get("publishedDate"),
@@ -836,7 +838,7 @@ def _lookup_itunes_search(title: str, author: Optional[str] = None) -> Optional[
                 thumbnail = base_url.replace("100x100bb", "200x200bb")
                 cover = base_url.replace("100x100bb", "600x600bb")
                 return {
-                    "title": item.get("trackName"),
+                    "title": normalise_provider_title(item.get("trackName")),
                     "author": item.get("artistName"),
                     "thumbnail_url": thumbnail,
                     "cover_url": cover,
@@ -879,7 +881,7 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             cover_url = base_url.replace("100x100bb", "600x600bb")
 
         return {
-            "title": html.unescape(title) if title else title,
+            "title": normalise_provider_title(title),
             "author": html.unescape(author_name) if author_name else author_name,
             "publish_date": publish_date,
             "thumbnail_url": thumbnail_url,

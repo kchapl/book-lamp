@@ -320,3 +320,37 @@ def test_author_page_unauthorised_redirect(client):
 
     resp = client.get("/api/author/jane-austen")
     assert resp.status_code == 302
+
+
+def test_an_owned_title_is_compared_as_it_reads(authenticated_client, monkeypatch):
+    """A different spelling alone must not offer an owned work as unread.
+
+    The author search returns provider titles through the normaliser, so an
+    owned "Dune." comes back as "Dune" under another edition's ISBN. Comparing
+    the stored spelling with the tidied one would offer the work the reader
+    already has; both sides are compared as they read, and the stored title
+    keeps the reader's spelling.
+    """
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    storage.add_book(isbn13="9780441013593", title="Dune.", authors=["Frank Herbert"])
+
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Dune.",
+                "author": "Frank Herbert",
+                "isbn13": "9780441172719",
+            }
+        ],
+    )
+
+    page = authenticated_client.get("/api/author/frank-herbert").get_json()
+
+    assert page["unread_books"] == []
+    assert [b["title"] for b in page["read_books"]] == ["Dune."]
