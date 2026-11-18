@@ -102,6 +102,11 @@ describe('ReadingListPage row links', () => {
         fireEvent.click(button(/start reading/i));
         await waitFor(() => expect(start).toHaveBeenCalledWith(1));
 
+        // Starting hides the row at once and refetches the queue, so the next
+        // action waits for the row the refetch brings back rather than racing
+        // the empty state between the two.
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
+
         fireEvent.click(button(/remove/i));
         await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
     });
