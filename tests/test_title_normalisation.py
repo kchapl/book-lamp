@@ -55,6 +55,11 @@ def _session_returning(payload: dict) -> _Session:
         # A subtitle after a break is part of the same title, and is cased too.
         ("dune: the sequel", "Dune: The Sequel"),
         ("the spy — a novel", "The Spy — A Novel"),
+        # A part a bracket or a quote opens is a part of its own, so the word
+        # inside it is capitalised even when it is a small word.
+        ("the spy (a novel)", "The Spy (A Novel)"),
+        ("THE MAN (OF THE YEAR)", "The Man (Of the Year)"),
+        ('the spy "a novel"', 'The Spy "A Novel"'),
         # Terminal punctuation other than a full stop stands.
         ("The Last King!", "The Last King!"),
         # An ellipsis is not a full stop that only terminates; title case still

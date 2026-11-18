@@ -435,11 +435,15 @@ def _needs_title_case(text: str) -> bool:
 def _title_case(text: str) -> str:
     words = text.split(" ")
     cased = []
-    force = True
+    # A word is capitalised when it opens the title, when the word before it
+    # ended with a break, when it opens with a bracket or quote of its own, and
+    # when it closes the title.
+    after_break = True
     for index, word in enumerate(words):
         last = index == len(words) - 1
-        cased.append(_case_word(word, force=force or last))
-        force = bool(_TITLE_BREAK_AFTER.search(word) or _TITLE_BREAK_BEFORE.match(word))
+        opens_part = after_break or bool(_TITLE_BREAK_BEFORE.match(word))
+        cased.append(_case_word(word, force=opens_part or last))
+        after_break = bool(_TITLE_BREAK_AFTER.search(word))
     return " ".join(cased)
 
 
