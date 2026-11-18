@@ -301,9 +301,9 @@ export async function findBooksByTitleAuthor(title: string, author: string): Pro
     return data.books;
 }
 
-// Fetch covers
-export async function fetchCovers(bookIds: number[]): Promise<void> {
-    await fetchJSON(`${API_BASE}/books/fetch-covers`, {
+// Fill in covers for Books that have none. No ids means the whole collection.
+export async function fetchCovers(bookIds: number[] = []): Promise<{ job_id: string }> {
+    return fetchJSON(`${API_BASE}/books/fetch-covers`, {
         method: 'POST',
         body: JSON.stringify({ book_ids: bookIds }),
     });

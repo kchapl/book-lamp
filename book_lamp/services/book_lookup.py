@@ -1,7 +1,7 @@
 import html
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 
@@ -1256,3 +1256,72 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
 
     logger.info(f"Successfully updated {updated_count} books")
     return updated_count
+
+
+def _usable_cover_url(value: Any) -> Optional[str]:
+    """A provider's cover URL, or None when it is blank."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
+
+
+def look_up_missing_covers(
+    books: List[Dict[str, Any]],
+    max_workers: int = 5,
+    on_progress: Optional[Callable[[int, int], None]] = None,
+) -> Dict[int, Dict[str, str]]:
+    """Find covers for Books that have none.
+
+    Returns ``{book id: cover fields}`` for the Books a provider could cover.
+    Only cover fields are ever returned: this is the seam the missing-covers run
+    writes through, so it cannot touch a title, an author or any other metadata.
+    A Book whose lookup fails, or that no provider can cover, is absent from the
+    result rather than raising — one provider's bad day must not fail the run.
+
+    ``on_progress`` is called with (books checked, books total) as each lookup
+    settles, which is how the job reports progress.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    found: Dict[int, Dict[str, str]] = {}
+
+    def cover_for(book: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        from book_lamp.utils.books import normalize_isbn
+
+        isbn = normalize_isbn(str(book.get("isbn13") or ""))
+        if not isbn:
+            return None
+        info = lookup_book_by_isbn13(
+            isbn,
+            title=book.get("title"),
+            author=book.get("author"),
+        )
+        if not info:
+            return None
+        cover: Dict[str, str] = {}
+        for field in ("thumbnail_url", "cover_url"):
+            url = _usable_cover_url(info.get(field))
+            if url:
+                cover[field] = url
+        return cover or None
+
+    total = len(books)
+    done = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(cover_for, book): book for book in books}
+        for future in as_completed(futures):
+            book = futures[future]
+            try:
+                cover = future.result()
+            except Exception:
+                logger.exception(f"Cover lookup failed for {book.get('title', 'Unknown')}")
+                cover = None
+            if cover:
+                found[book["id"]] = cover
+            done += 1
+            if on_progress:
+                on_progress(done, total)
+
+    logger.info(f"Found covers for {len(found)} of {total} book(s) that had none")
+    return found

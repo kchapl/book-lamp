@@ -1342,3 +1342,65 @@ def test_0010_refuses_when_the_real_book_moves_to_another_row_mid_migration(own_
     ]
     assert queued == [(duplicate_id,)]
     assert stamped == "0009"
+
+
+def test_the_missing_covers_run_reads_and_writes_only_covers(pg_storage):
+    """The missing-covers run's storage seam, against real Postgres.
+
+    A cover is missing when both fields are NULL or blank; the read is scoped to
+    the collection and the ids asked for; the write never touches another field.
+    """
+    covered = pg_storage.add_book(
+        isbn13="9780000000101",
+        title="Covered",
+        authors=["A"],
+        publisher="Kept House",
+        thumbnail_url="https://example.com/old.jpg",
+    )
+    missing = pg_storage.add_book(isbn13="9780000000102", title="Missing", authors=["B"], publisher="Kept House")
+    blank = pg_storage.add_book(isbn13="9780000000103", title="Blank", authors=["C"], thumbnail_url="   ")
+    for book in (covered, missing, blank):
+        pg_storage.add_to_reading_list(book["id"])
+
+    missing_ids = {book["id"] for book in pg_storage.get_books_missing_covers()}
+    assert missing_ids == {missing["id"], blank["id"]}
+
+    scoped = pg_storage.get_books_missing_covers([missing["id"], covered["id"]])
+    assert {book["id"] for book in scoped} == {missing["id"]}
+
+    assert pg_storage.set_book_cover(
+        missing["id"],
+        "9780000000102",
+        thumbnail_url="https://example.com/new-M.jpg",
+        cover_url="https://example.com/new-L.jpg",
+    )
+
+    kept = pg_storage.get_book_by_id(covered["id"])
+    assert kept["thumbnail_url"] == "https://example.com/old.jpg"
+    assert kept["publisher"] == "Kept House"
+
+    filled = pg_storage.get_book_by_id(missing["id"])
+    assert filled["thumbnail_url"] == "https://example.com/new-M.jpg"
+    assert filled["cover_url"] == "https://example.com/new-L.jpg"
+    assert filled["title"] == "Missing"
+    assert filled["publisher"] == "Kept House"
+
+    still_missing = {book["id"] for book in pg_storage.get_books_missing_covers()}
+    assert still_missing == {blank["id"]}
+
+    # A cover added while the run was looking is not replaced.
+    assert not pg_storage.set_book_cover(
+        missing["id"],
+        "9780000000102",
+        thumbnail_url="https://example.com/later.jpg",
+    )
+    assert pg_storage.get_book_by_id(missing["id"])["thumbnail_url"] == "https://example.com/new-M.jpg"
+
+    # A cover the lookup found for an ISBN the row no longer has is not written:
+    # the reader corrected the edition while the run was looking.
+    assert not pg_storage.set_book_cover(
+        blank["id"],
+        "9780000000104",
+        thumbnail_url="https://example.com/stale.jpg",
+    )
+    assert pg_storage.get_book_by_id(blank["id"])["thumbnail_url"] == "   "

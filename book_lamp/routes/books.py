@@ -60,6 +60,54 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         raise
 
 
+def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: int):
+    """Background task: fill in covers for the Books that have none.
+
+    Only a Book's cover fields are written, and only for Books that had no
+    cover when the run started; a Book that already has one is never considered.
+    """
+    from book_lamp.services.book_lookup import look_up_missing_covers
+
+    try:
+        storage: Union[MockStorage, PostgresStorage]
+        if is_test_mode():
+            storage = _mock_storage_singleton
+        else:
+            storage = PostgresStorage(user_id=user_id)
+
+        books = storage.get_books_missing_covers(book_ids or None)
+        total = len(books)
+        if total == 0:
+            logger.info(f"Background job {job_id}: no books are missing a cover")
+            return "No books are missing a cover."
+
+        job_queue = get_job_queue()
+
+        def report_progress(done: int, count: int) -> None:
+            job_queue.update_progress(job_id, int(done * 100 / count))
+
+        # The ISBN each lookup answers for is the one the row had when the run
+        # started, so it is read once, before any provider is asked.
+        isbn_by_id = {book["id"]: str(book.get("isbn13") or "") for book in books}
+
+        covers = look_up_missing_covers(books, on_progress=report_progress)
+        filled = 0
+        for book in books:
+            cover = covers.get(book["id"])
+            if not cover:
+                continue
+            # Requiring that ISBN to still match keeps a Book the reader
+            # corrected mid-run from getting the old edition's cover.
+            if storage.set_book_cover(book["id"], isbn_by_id[book["id"]], **cover):
+                filled += 1
+        result_msg = f"Checked {total} book(s) without a cover: " f"filled {filled}, {total - filled} still missing."
+        logger.info(f"Background job {job_id}: completed - {result_msg}")
+        return result_msg
+    except Exception:
+        logger.exception(f"Background job {job_id} failed")
+        raise
+
+
 def _payload_authors(data: dict) -> list[str]:
     """The Authors a create or edit payload names.
 
@@ -579,12 +627,26 @@ def api_discover_books():
 @books_bp.route("/api/books/fetch-covers", methods=["POST"])
 @authorisation_required
 @csrf_protect
-def api_fetch_missing_data():
-    """Queue a background job to fetch missing covers and metadata."""
+def api_fill_missing_covers():
+    """Queue a job that fills in covers for the Books that have none.
+
+    An empty or absent ``book_ids`` means the whole collection. Books that
+    already have a cover are never considered, whatever the request names.
+    """
+    payload = request.get_json(silent=True) or {}
+    raw_ids = payload.get("book_ids") or []
+    if not isinstance(raw_ids, list):
+        return jsonify({"error": "book_ids must be a list"}), 400
+    try:
+        book_ids = [int(value) for value in raw_ids]
+    except (TypeError, ValueError):
+        return jsonify({"error": "book_ids must be integers"}), 400
+
     job_queue = get_job_queue()
     job_id = job_queue.submit_job(
-        "fetch_missing_data",
-        _background_fetch_missing_data,
+        "fill_missing_covers",
+        _background_fill_missing_covers,
+        book_ids,
         session["user_id"],
     )
     return jsonify({"job_id": job_id})

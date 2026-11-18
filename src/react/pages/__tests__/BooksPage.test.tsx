@@ -13,6 +13,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import BooksPage from '../BooksPage';
 import { getBooks, searchBooks } from '../../services/api';
+import {
+    CollectionRevisionProvider,
+    useRefreshCollection,
+} from '../../hooks/useCollectionRevision';
 
 vi.mock('../../services/api', () => ({
     getBooks: vi.fn(),
@@ -158,6 +162,30 @@ describe('BooksPage search', () => {
 
         await waitFor(() => expect(screen.getByText('location:/books?q=dune')).toBeInTheDocument());
         expect(search).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('BooksPage background refresh', () => {
+    const RefreshButton: React.FC = () => {
+        const refreshCollection = useRefreshCollection();
+        return <button onClick={refreshCollection}>Refresh collection</button>;
+    };
+
+    it('refetches the shelf when a background run changes the collection', async () => {
+        render(
+            <MemoryRouter>
+                <CollectionRevisionProvider>
+                    <BooksPage />
+                    <RefreshButton />
+                </CollectionRevisionProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByText('Refresh collection'));
+
+        await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
     });
 });
 

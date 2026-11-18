@@ -5,6 +5,7 @@ import BookExhibit from '../components/BookExhibit';
 import Icon from '../components/Icon';
 import { Button, Select, SelectOption, TextField } from '../ui';
 import { useResource } from '../hooks/useResource';
+import { useCollectionRevision } from '../hooks/useCollectionRevision';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import type { Book, BooksFilters } from '../types';
 
@@ -22,6 +23,7 @@ const NO_FILTERS: Record<string, string> = Object.fromEntries(
 
 const BooksPage: React.FC = () => {
     const [searchParams] = useSearchParams();
+    const collectionRevision = useCollectionRevision();
     const [searchQuery, setSearchQuery] = useState('');
     const {
         values: filters,
@@ -39,7 +41,9 @@ const BooksPage: React.FC = () => {
         return { books: data.books || [], categories: data.categories || [] };
     };
 
-    const { data, loading, error } = useResource(loadBooks, [searchParams], {
+    // A background run that fills covers bumps the revision, so the shelf
+    // refetches instead of keeping the covers it was showing when the run began.
+    const { data, loading, error } = useResource(loadBooks, [searchParams, collectionRevision], {
         errorMessage: 'Failed to load books',
     });
 
