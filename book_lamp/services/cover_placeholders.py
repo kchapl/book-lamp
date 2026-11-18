@@ -16,7 +16,7 @@ and a later run asks again.
 import hashlib
 import logging
 import threading
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -67,7 +67,7 @@ class CoverFingerprints:
     than retried for every Book that shares the URL.
     """
 
-    def __init__(self, session_factory: Callable[[], object] = _get_session) -> None:
+    def __init__(self, session_factory: Callable[[], Any] = _get_session) -> None:
         self._session_factory = session_factory
         self._verdicts: dict[str, bool] = {}
         self._url_locks: dict[str, threading.Lock] = {}

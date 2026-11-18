@@ -93,11 +93,11 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
         # missing, and the registry host alone does not make it so.
         candidates: list[tuple[dict, set[str]]] = []
         for book in books:
-            stored = [
-                book.get(field).strip()
-                for field in ("thumbnail_url", "cover_url")
-                if isinstance(book.get(field), str) and book.get(field).strip()
-            ]
+            stored: list[str] = []
+            for field in ("thumbnail_url", "cover_url"):
+                value = book.get(field)
+                if isinstance(value, str) and value.strip():
+                    stored.append(value.strip())
             placeholders = {url for url in stored if fingerprints.is_placeholder(url)}
             if placeholders:
                 candidates.append((book, placeholders))
