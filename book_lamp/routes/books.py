@@ -9,7 +9,7 @@ from flask import Blueprint, Response, current_app, jsonify, request, session
 
 from book_lamp.middleware.auth import authorisation_required
 from book_lamp.middleware.csrf import csrf_protect
-from book_lamp.services.cover_placeholders import CoverFingerprints, PLACEHOLDER_HOSTS
+from book_lamp.services.cover_placeholders import PLACEHOLDER_HOSTS, CoverFingerprints
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
