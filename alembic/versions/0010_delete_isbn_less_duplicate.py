@@ -43,6 +43,12 @@ first and both sides take the queue row before the Book. A queue row a reader
 adds after the move is deleted with the Book by ON DELETE CASCADE instead of
 moving, which is where an entry for a Book that no longer exists would end.
 
+The Readings are locked before they are compared. `update_reading()` rewrites
+a Reading without taking its Book's lock, so a fold that compared a snapshot
+could delete the row an edit committed while the delete waited on that row:
+the delete would go on to fold the Reading away at its old values. With both
+sides' rows held first, the comparison runs on the values the edits left.
+
 The surviving Book is locked the same way, and the cover is copied to it by id.
 An edit may change a Book's ISBN while the deployment still serves requests, so
 matching the survivor by ISBN alone could find it, then have an edit commit
@@ -129,8 +135,18 @@ def _move_queue(bind: Connection, real_id: int, duplicate_ids: list[int]) -> Non
 
 
 def _move_readings(bind: Connection, row: RowMapping, real_id: int) -> None:
-    """Carry the duplicate's Readings to the survivor, under its Book lock."""
+    """Carry the duplicate's Readings to the survivor, under both sides' locks."""
     duplicate_id = row["id"]
+
+    # update_reading() rewrites a Reading without taking its Book's lock, so a
+    # fold that compared a snapshot could delete the row an edit committed while
+    # the delete waited on it. Hold both sides' Readings first: the comparisons
+    # below then run on the values the edits left, and an edited Reading that no
+    # longer matches is refused rather than folded away.
+    bind.execute(
+        text("SELECT 1 FROM readings WHERE book_id IN (:duplicate, :real) FOR UPDATE"),
+        {"real": real_id, "duplicate": duplicate_id},
+    )
 
     # A reader with no Reading of the real Book keeps this one, moved across.
     bind.execute(

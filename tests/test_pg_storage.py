@@ -976,6 +976,61 @@ def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
     assert stamped == "0010"
 
 
+def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
+    """update_reading() rewrites a Reading without taking its Book's lock.
+
+    An edit can raise the duplicate's rating while the fold compares Readings.
+    The fold must see what the edit committed, not the snapshot it started from,
+    and refuse a Reading that no longer matches the survivor rather than folding
+    the newly saved rating away.
+    """
+    _upgrade_database(own_database, "0009")
+    real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
+    duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
+    with psycopg.connect(own_database) as conn:
+        user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
+        reading_ids = {}
+        for book_id in (real_id, duplicate_id):
+            reading_ids[book_id] = conn.execute(
+                "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
+                "VALUES (%s, %s, 'Completed', 4, DATE '2026-07-30', DATE '2026-08-12') RETURNING id",
+                [user_id, book_id],
+            ).fetchone()[0]
+
+    editor = psycopg.connect(own_database)
+    failure = []
+    try:
+        # Like the update endpoint: keyed by the Reading, so it needs no Book lock.
+        editor.execute("UPDATE readings SET rating = 5 WHERE id = %s", [reading_ids[duplicate_id]])
+
+        def migrate():
+            try:
+                _upgrade_database(own_database, "head")
+            except Exception as exc:  # the refusal is the expected outcome
+                failure.append(exc)
+
+        worker = threading.Thread(target=migrate)
+        worker.start()
+
+        # Wait until the fold is blocked on this row, then let the edit commit
+        # so the fold has to compare against the rating that was saved.
+        _wait_for_lock_wait(own_database)
+        editor.commit()
+        worker.join(timeout=30)
+        assert not worker.is_alive(), "the migration did not finish"
+    finally:
+        editor.close()
+
+    assert failure, "the migration folded the rating the edit saved"
+    assert "differ" in str(failure[0])
+
+    with psycopg.connect(own_database) as conn:
+        readings = conn.execute("SELECT book_id, rating FROM readings ORDER BY id").fetchall()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+    assert readings == [(real_id, 4), (duplicate_id, 5)]
+    assert stamped == "0009"
+
+
 def test_0010_refuses_a_reading_that_differs_from_the_real_books(own_database):
     """Two different readings of one work are a person's merge, not a fold."""
     _upgrade_database(own_database, "0009")
