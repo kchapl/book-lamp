@@ -946,18 +946,19 @@ def test_0010_folds_a_reread_logged_against_both_records(own_database):
 def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
     """A match is found per Reading, not only for the duplicate's first one.
 
-    The reader's re-read sits in a different order on each record, so the
+    The same two Readings sit in the opposite order on each record, so the
     duplicate's later Reading matches the survivor's earlier one. Pairing per
-    Reading folds both; matching only the duplicate's earliest would leave the
-    survivor's own match unused and refuse a history that lines up exactly.
+    Reading folds both; matching only the duplicate's earliest would fold the
+    one that happens to line up and refuse a history that pairs exactly.
     """
     _upgrade_database(own_database, "0009")
     real_id = _write_book(own_database, "9780008644833", "The Spy in the Archive", ["Gordon Carera"])
     duplicate_id = _write_book(own_database, "", "The Spy in the Archive", ["Gordon Carera"])
     with psycopg.connect(own_database) as conn:
         user_id = conn.execute("INSERT INTO users (email) VALUES ('reader@example.com') RETURNING id").fetchone()[0]
-        for status in ("Abandoned", "Completed"):
-            for book_id in (real_id, duplicate_id):
+        # The same two Readings, logged in the opposite order on each record.
+        for book_id, statuses in ((real_id, ("Abandoned", "Completed")), (duplicate_id, ("Completed", "Abandoned"))):
+            for status in statuses:
                 conn.execute(
                     "INSERT INTO readings (user_id, book_id, status, rating, start_date, end_date) "
                     "VALUES (%s, %s, %s, %s, DATE '2026-07-30', DATE '2026-08-12')",
