@@ -93,25 +93,25 @@ describe('ReadingListPage row links', () => {
         expect(container.querySelector('.item-placeholder')?.closest('a')).toBeNull();
     });
 
-    it('still starts and removes the Book from the row', async () => {
-        // Each load answers with a fresh list: the page keeps its optimistic
-        // view until the arriving data changes, and one shared array could
-        // leave the row hidden after the refetch, making the wait below fail
-        // for a reason the test did not intend to exercise.
-        list.mockImplementation(async () => ({ books: [{ ...queuedBook }] }));
+    it('starts the Book from the row', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
 
         renderPage();
         await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
 
         fireEvent.click(button(/start reading/i));
-        await waitFor(() => expect(start).toHaveBeenCalledWith(1));
 
-        // Starting hides the row at once and refetches the queue, so the next
-        // action waits for the row the refetch brings back rather than racing
-        // the empty state between the two.
+        await waitFor(() => expect(start).toHaveBeenCalledWith(1));
+    });
+
+    it('removes the Book from the row', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        renderPage();
         await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
 
         fireEvent.click(button(/remove/i));
+
         await waitFor(() => expect(remove).toHaveBeenCalledWith(1));
     });
 });
