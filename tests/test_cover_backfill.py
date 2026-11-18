@@ -144,6 +144,30 @@ def test_run_honours_named_book_ids(authenticated_client):
     assert storage.get_book_by_id(other["id"])["thumbnail_url"] is None
 
 
+def test_run_leaves_a_book_whose_isbn_changed_mid_run(authenticated_client):
+    """A corrected ISBN gets no cover: the lookup answered for the old edition."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000061", title="Corrected", authors=["A"])
+
+    def correct_the_isbn(isbn, **kwargs):
+        storage.get_book_by_id(book["id"])["isbn13"] = "9780000000062"
+        return _provider_answer(isbn)
+
+    with patch(
+        "book_lamp.services.book_lookup.lookup_book_by_isbn13",
+        side_effect=correct_the_isbn,
+    ):
+        response = authenticated_client.post("/api/books/fetch-covers", json={})
+        assert response.status_code == 200
+        job = _finished(response.get_json()["job_id"])
+
+    assert job.status.value == "completed"
+    assert "filled 0" in job.result
+    corrected = storage.get_book_by_id(book["id"])
+    assert corrected["thumbnail_url"] is None
+    assert corrected["cover_url"] is None
+
+
 def test_run_reports_when_nothing_is_missing(authenticated_client):
     storage = get_storage()
     storage.add_book(

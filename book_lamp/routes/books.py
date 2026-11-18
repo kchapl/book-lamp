@@ -86,13 +86,20 @@ def _background_fill_missing_covers(job_id: str, book_ids: list[int], user_id: i
         def report_progress(done: int, count: int) -> None:
             job_queue.update_progress(job_id, int(done * 100 / count))
 
+        # The ISBN each lookup answers for is the one the row had when the run
+        # started, so it is read once, before any provider is asked.
+        isbn_by_id = {book["id"]: str(book.get("isbn13") or "") for book in books}
+
         covers = look_up_missing_covers(books, on_progress=report_progress)
+        filled = 0
         for book in books:
             cover = covers.get(book["id"])
-            if cover:
-                storage.set_book_cover(book["id"], **cover)
-
-        filled = len(covers)
+            if not cover:
+                continue
+            # Requiring that ISBN to still match keeps a Book the reader
+            # corrected mid-run from getting the old edition's cover.
+            if storage.set_book_cover(book["id"], isbn_by_id[book["id"]], **cover):
+                filled += 1
         result_msg = f"Checked {total} book(s) without a cover: " f"filled {filled}, {total - filled} still missing."
         logger.info(f"Background job {job_id}: completed - {result_msg}")
         return result_msg

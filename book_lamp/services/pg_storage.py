@@ -191,20 +191,27 @@ class PostgresStorage:
     def set_book_cover(
         self,
         book_id: int,
+        isbn13: str,
         thumbnail_url: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> bool:
-        """Write a Book's cover fields, never clearing one that is already set."""
+        """Write a Book's cover fields while it still has the ISBN it had.
+
+        The lookup ran against the ISBN the row held when the run started, and
+        the reader can correct that ISBN while it runs. Requiring it to still
+        match makes such a write land on nothing, rather than attach the old
+        edition's cover to a Book that is now a different edition.
+        """
         with self.pool.connection() as conn:
             row = conn.execute(
                 """
                 UPDATE books SET
                     thumbnail_url = COALESCE(%s, thumbnail_url),
                     cover_url = COALESCE(%s, cover_url)
-                WHERE id = %s
+                WHERE id = %s AND isbn13 = %s
                 RETURNING id
                 """,
-                [thumbnail_url, cover_url, book_id],
+                [thumbnail_url, cover_url, book_id, isbn13],
             ).fetchone()
             return row is not None
 

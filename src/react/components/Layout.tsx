@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppContext } from '../App';
 import { fetchCovers, getJobStatus } from '../services/api';
+import { useRefreshCollection } from '../hooks/useCollectionRevision';
 import Icon, { IconName } from './Icon';
 import { Button, IconButton } from '../ui';
 
@@ -30,6 +31,8 @@ interface BackgroundJob {
     result: string | null;
     error: string | null;
     done: boolean;
+    /** Whether the run wrote collection data a page may be showing. */
+    refreshesCollection: boolean;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -37,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     const [showThemeMenu, setShowThemeMenu] = useState(false);
     const [showAccountMenu, setShowAccountMenu] = useState(false);
     const [job, setJob] = useState<BackgroundJob | null>(null);
+    const refreshCollection = useRefreshCollection();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
     const accountRef = useRef<HTMLDivElement>(null);
@@ -45,7 +49,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         const params = new URLSearchParams(window.location.search);
         const jobId = params.get('job_id');
         if (jobId) {
-            setJob({ id: jobId, progress: 0, result: null, error: null, done: false });
+            setJob({
+                id: jobId,
+                progress: 0,
+                result: null,
+                error: null,
+                done: false,
+                refreshesCollection: false,
+            });
         }
     }, [location]);
 
@@ -54,6 +65,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     useEffect(() => {
         const jobId = job?.id;
         if (!jobId) return;
+        const refreshesCollection = job?.refreshesCollection ?? false;
 
         let cancelled = false;
         let timer: number | undefined;
@@ -65,6 +77,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 const done = status.status === 'completed' || status.status === 'failed';
                 setJob({
                     id: jobId,
+                    refreshesCollection,
                     progress: status.progress ?? 0,
                     result: status.result ?? null,
                     error: status.status === 'failed' ? status.error || 'The job failed' : null,
@@ -75,6 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 if (!cancelled) {
                     setJob({
                         id: jobId,
+                        refreshesCollection,
                         progress: 0,
                         result: null,
                         error: err instanceof Error ? err.message : 'Could not check the job',
@@ -89,7 +103,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             cancelled = true;
             if (timer !== undefined) window.clearTimeout(timer);
         };
-    }, [job?.id]);
+    }, [job?.id, job?.refreshesCollection]);
+
+    // The run changed the collection while a page may be showing it: My Books
+    // keeps its cards, so the page has to refetch to show the new covers.
+    useEffect(() => {
+        if (!job?.done || !job.refreshesCollection || job.error) return;
+        refreshCollection();
+    }, [job?.id, job?.done, job?.refreshesCollection, job?.error, refreshCollection]);
 
     useEffect(() => {
         if (!job?.done) return;
@@ -103,7 +124,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         setShowAccountMenu(false);
         try {
             const { job_id } = await fetchCovers([]);
-            setJob({ id: job_id, progress: 0, result: null, error: null, done: false });
+            setJob({
+                id: job_id,
+                progress: 0,
+                result: null,
+                error: null,
+                done: false,
+                refreshesCollection: true,
+            });
         } catch (err) {
             setJob({
                 id: '',
@@ -111,6 +139,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 result: null,
                 error: err instanceof Error ? err.message : 'Could not start the cover lookup',
                 done: true,
+                refreshesCollection: false,
             });
         }
     };

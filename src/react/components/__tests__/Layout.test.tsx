@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Layout from '../Layout';
 import { AppContext } from '../../App';
 import { fetchCovers, getJobStatus } from '../../services/api';
+import { CollectionRevisionProvider, useCollectionRevision } from '../../hooks/useCollectionRevision';
 
 vi.mock('../../services/api', () => ({
     fetchCovers: vi.fn(),
@@ -62,23 +63,27 @@ describe('Layout navigation', () => {
 });
 
 describe('Layout account menu', () => {
+    const RevisionProbe: React.FC = () => <p>{`revision:${useCollectionRevision()}`}</p>;
+
     const renderLayout = (isAuthorized = true) => {
         const logoutUser = vi.fn();
         const utils = render(
             <MemoryRouter>
-                <AppContext.Provider
-                    value={{
-                        theme: 'system',
-                        setTheme: vi.fn(),
-                        isAuthorized,
-                        setIsAuthorized: vi.fn(),
-                        googleClientId: null,
-                        syncStatus: 'ok',
-                        logoutUser,
-                    }}
-                >
-                    <Layout><div>Reading room</div></Layout>
-                </AppContext.Provider>
+                <CollectionRevisionProvider>
+                    <AppContext.Provider
+                        value={{
+                            theme: 'system',
+                            setTheme: vi.fn(),
+                            isAuthorized,
+                            setIsAuthorized: vi.fn(),
+                            googleClientId: null,
+                            syncStatus: 'ok',
+                            logoutUser,
+                        }}
+                    >
+                        <Layout><div>Reading room</div><RevisionProbe /></Layout>
+                    </AppContext.Provider>
+                </CollectionRevisionProvider>
             </MemoryRouter>
         );
         return { ...utils, logoutUser };
@@ -136,6 +141,41 @@ describe('Layout account menu', () => {
                 'Checked 2 book(s) without a cover: filled 1, 1 still missing.'
             )
         ).toBeInTheDocument();
+    });
+
+    it('refetches the collection when the run that filled covers finishes', async () => {
+        vi.mocked(fetchCovers).mockResolvedValue({ job_id: 'cover-job' });
+        vi.mocked(getJobStatus).mockResolvedValue({
+            id: 'cover-job',
+            status: 'completed',
+            progress: 100,
+            result: 'Checked 1 book(s) without a cover: filled 1, 0 still missing.',
+        });
+
+        const { container } = renderLayout();
+        expect(screen.getByText('revision:0')).toBeInTheDocument();
+
+        openMenu(container);
+        fireEvent.click(coversItem(container) as HTMLElement);
+
+        expect(await screen.findByText('revision:1')).toBeInTheDocument();
+    });
+
+    it('does not refetch the collection when the run fails', async () => {
+        vi.mocked(fetchCovers).mockResolvedValue({ job_id: 'cover-job' });
+        vi.mocked(getJobStatus).mockResolvedValue({
+            id: 'cover-job',
+            status: 'failed',
+            progress: 0,
+            error: 'No provider answered',
+        });
+
+        const { container } = renderLayout();
+        openMenu(container);
+        fireEvent.click(coversItem(container) as HTMLElement);
+
+        expect(await screen.findByText('No provider answered')).toBeInTheDocument();
+        expect(screen.getByText('revision:0')).toBeInTheDocument();
     });
 
     it('keeps the cover utility out of the nav until the account menu is open', () => {

@@ -61,12 +61,17 @@ class MockStorage:
     def set_book_cover(
         self,
         book_id: int,
+        isbn13: str,
         thumbnail_url: Optional[str] = None,
         cover_url: Optional[str] = None,
     ) -> bool:
-        """Write a Book's cover fields, never clearing one that is already set."""
+        """Write a Book's cover fields while it still has the ISBN it had.
+
+        A corrected ISBN means the cover the lookup found belongs to a different
+        edition, so the write is refused rather than attached to the wrong Book.
+        """
         book = self.get_book_by_id(book_id)
-        if book is None:
+        if book is None or book.get("isbn13") != isbn13:
             return False
         if thumbnail_url:
             book["thumbnail_url"] = thumbnail_url
