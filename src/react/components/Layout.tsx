@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AppContext } from '../App';
+import { fetchCovers, getJobStatus } from '../services/api';
 import Icon, { IconName } from './Icon';
 import { Button, IconButton } from '../ui';
 
@@ -22,11 +23,20 @@ const THEME_OPTIONS: { value: 'light' | 'dark' | 'system'; label: string; icon: 
     { value: 'system', label: 'System', icon: 'monitor' },
 ];
 
+/** A background job the layout is reporting on, wherever the reader is. */
+interface BackgroundJob {
+    id: string;
+    progress: number;
+    result: string | null;
+    error: string | null;
+    done: boolean;
+}
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const { theme, setTheme, syncStatus, isAuthorized, logoutUser } = useContext(AppContext);
     const [showThemeMenu, setShowThemeMenu] = useState(false);
     const [showAccountMenu, setShowAccountMenu] = useState(false);
-    const [jobIndicator, setJobIndicator] = useState<string | null>(null);
+    const [job, setJob] = useState<BackgroundJob | null>(null);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const location = useLocation();
     const accountRef = useRef<HTMLDivElement>(null);
@@ -35,9 +45,75 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         const params = new URLSearchParams(window.location.search);
         const jobId = params.get('job_id');
         if (jobId) {
-            setJobIndicator(jobId);
+            setJob({ id: jobId, progress: 0, result: null, error: null, done: false });
         }
     }, [location]);
+
+    // A job started by a redirect (an import, a backfill) reports through the
+    // same strip, so the reader sees it finish wherever the redirect landed.
+    useEffect(() => {
+        const jobId = job?.id;
+        if (!jobId) return;
+
+        let cancelled = false;
+        let timer: number | undefined;
+
+        const poll = async () => {
+            try {
+                const status = await getJobStatus(jobId);
+                if (cancelled) return;
+                const done = status.status === 'completed' || status.status === 'failed';
+                setJob({
+                    id: jobId,
+                    progress: status.progress ?? 0,
+                    result: status.result ?? null,
+                    error: status.status === 'failed' ? status.error || 'The job failed' : null,
+                    done,
+                });
+                if (!done) timer = window.setTimeout(poll, 1000);
+            } catch (err) {
+                if (!cancelled) {
+                    setJob({
+                        id: jobId,
+                        progress: 0,
+                        result: null,
+                        error: err instanceof Error ? err.message : 'Could not check the job',
+                        done: true,
+                    });
+                }
+            }
+        };
+
+        poll();
+        return () => {
+            cancelled = true;
+            if (timer !== undefined) window.clearTimeout(timer);
+        };
+    }, [job?.id]);
+
+    useEffect(() => {
+        if (!job?.done) return;
+        // The report is feedback, not a fixture: it goes away on its own.
+        const timer = window.setTimeout(() => setJob(null), 10000);
+        return () => window.clearTimeout(timer);
+    }, [job?.id, job?.done]);
+
+    /** A general utility, so it lives in the menu rather than on a page. */
+    const fillMissingCovers = async () => {
+        setShowAccountMenu(false);
+        try {
+            const { job_id } = await fetchCovers([]);
+            setJob({ id: job_id, progress: 0, result: null, error: null, done: false });
+        } catch (err) {
+            setJob({
+                id: '',
+                progress: 0,
+                result: null,
+                error: err instanceof Error ? err.message : 'Could not start the cover lookup',
+                done: true,
+            });
+        }
+    };
 
     useEffect(() => {
         // A route change always closes the mobile menu and its dropdowns.
@@ -178,6 +254,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                                         <Button
                                             variant="text"
                                             role="menuitem"
+                                            aria-label="Fill in missing book covers"
+                                            onClick={fillMissingCovers}
+                                        >
+                                            Fill missing covers
+                                        </Button>
+                                        <Button
+                                            variant="text"
+                                            role="menuitem"
                                             aria-label="Export my data as CSV"
                                             onClick={() => {
                                                 setShowAccountMenu(false);
@@ -217,10 +301,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 />
             )}
 
-            {jobIndicator && (
-                <div className="job-indicator" data-job-id={jobIndicator} role="status">
-                    <span className="spinner" aria-hidden="true" />
-                    Preparing metadata…
+            {job && (
+                <div className="job-indicator" data-job-id={job.id} role="status">
+                    {job.result || job.error ? (
+                        <span>{job.error ?? job.result}</span>
+                    ) : (
+                        <>
+                            <span className="spinner" aria-hidden="true" />
+                            {job.progress > 0 ? `Working… ${job.progress}%` : 'Working…'}
+                        </>
+                    )}
                 </div>
             )}
 

@@ -6,14 +6,15 @@ import { resetAndSeed } from './seed';
  *
  * The provider chain is a live network call, and the run's backend behaviour is
  * covered by the integration tests. What this journey pins is the screen: the
- * reader starts the run from My Books and sees the report it finishes with. The
- * job endpoints are answered here so the suite never depends on a provider.
+ * reader finds the utility in the account menu and the layout reports the run
+ * it finishes with. The job endpoints are answered here so the suite never
+ * depends on a provider.
  */
 test.beforeEach(async ({ request }) => {
     await resetAndSeed(request);
 });
 
-test('starts the missing-covers run and shows its report', async ({ page }) => {
+test('runs the missing-covers utility from the account menu', async ({ page }) => {
     await page.route('**/api/books/fetch-covers', (route) =>
         route.fulfill({ json: { job_id: 'e2e-covers' } })
     );
@@ -29,9 +30,12 @@ test('starts the missing-covers run and shows its report', async ({ page }) => {
     );
 
     await page.goto('/books');
-    await page.getByRole('button', { name: 'Fill missing covers' }).click();
+    await page.getByRole('button', { name: 'Account' }).click();
+    const menu = page.locator('.account-menu');
+    await expect(menu).toBeVisible();
+    await menu.getByText('Fill missing covers', { exact: true }).click();
 
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(page.locator('.job-indicator')).toHaveText(
         'Checked 5 book(s) without a cover: filled 3, 2 still missing.'
     );
 });

@@ -4,6 +4,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Layout from '../Layout';
 import { AppContext } from '../../App';
+import { fetchCovers, getJobStatus } from '../../services/api';
+
+vi.mock('../../services/api', () => ({
+    fetchCovers: vi.fn(),
+    getJobStatus: vi.fn(),
+}));
 
 const locationAssign = vi.fn();
 
@@ -82,6 +88,8 @@ describe('Layout account menu', () => {
         container.querySelector('md-text-button[aria-label="Account"]') as HTMLElement | null;
     const exportItem = (container: HTMLElement) =>
         container.querySelector('md-text-button[aria-label="Export my data as CSV"]') as HTMLElement | null;
+    const coversItem = (container: HTMLElement) =>
+        container.querySelector('md-text-button[aria-label="Fill in missing book covers"]') as HTMLElement | null;
     const signOutItem = (container: HTMLElement) =>
         container.querySelector('md-text-button[aria-label="Sign out"]') as HTMLElement | null;
 
@@ -106,6 +114,38 @@ describe('Layout account menu', () => {
         fireEvent.click(exportItem(container) as HTMLElement);
 
         expect(locationAssign).toHaveBeenCalledWith('/api/export/csv');
+    });
+
+    it('starts the missing-covers run from the account menu and shows its report', async () => {
+        vi.mocked(fetchCovers).mockResolvedValue({ job_id: 'cover-job' });
+        vi.mocked(getJobStatus).mockResolvedValue({
+            id: 'cover-job',
+            status: 'completed',
+            progress: 100,
+            result: 'Checked 2 book(s) without a cover: filled 1, 1 still missing.',
+        });
+
+        const { container } = renderLayout();
+        openMenu(container);
+
+        fireEvent.click(coversItem(container) as HTMLElement);
+
+        expect(fetchCovers).toHaveBeenCalledWith([]);
+        expect(
+            await screen.findByText(
+                'Checked 2 book(s) without a cover: filled 1, 1 still missing.'
+            )
+        ).toBeInTheDocument();
+    });
+
+    it('keeps the cover utility out of the nav until the account menu is open', () => {
+        const { container } = renderLayout();
+
+        expect(coversItem(container)).not.toBeInTheDocument();
+
+        openMenu(container);
+
+        expect(coversItem(container)).toBeInTheDocument();
     });
 
     it('signs out from the account menu', () => {
