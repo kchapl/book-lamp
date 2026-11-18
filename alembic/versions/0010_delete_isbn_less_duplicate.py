@@ -15,9 +15,10 @@ The duplicate's history is the reader's, so it moves to the surviving Book
 first. Reading List entries move across; a reader who already queued the real
 Book keeps that entry rather than gaining a second. A Reading moves unless the
 same reader logged the same reading (status, dates and rating) against the real
-Book, in which case the duplicate entry is folded away. A reading that says
-something different is never folded: the migration stops, names it, and leaves
-the decision to a person.
+Book, in which case the duplicate entry is folded away -- one surviving Reading
+per duplicate Reading, so a re-read logged on both records folds entry for
+entry. A reading that says something different is never folded: the migration
+stops, names it, and leaves the decision to a person.
 
 The delete is limited to an empty-keyed Book whose title and authors match the
 real record. Anything else stops the migration and is named, because a row this
@@ -141,25 +142,36 @@ def _move_readings(bind: Connection, row: RowMapping, real_id: int) -> None:
         {"real": real_id, "duplicate": duplicate_id},
     )
 
-    # The same read logged against both records is one entry; fold the earliest
-    # duplicate away when the surviving Reading says exactly the same thing.
+    # The same read logged against both records is one entry: a duplicate
+    # Reading is folded away when the survivor has a match for it on what the
+    # Reading says, paired one for one so a re-read logged on both sides is
+    # matched entry for entry rather than only on its first entry. A Reading
+    # left over is one the survivor cannot account for; a person decides below.
     bind.execute(
         text("""
             DELETE FROM readings r
             USING (
-                SELECT id, user_id, row_number() OVER (PARTITION BY user_id ORDER BY id) AS occurrence
+                SELECT id, user_id, status, rating, start_date, end_date,
+                       row_number() OVER (
+                           PARTITION BY user_id, status, rating, start_date, end_date ORDER BY id
+                       ) AS occurrence
                 FROM readings WHERE book_id = :duplicate
             ) d
             WHERE r.id = d.id
-              AND d.occurrence = 1
               AND EXISTS (
-                  SELECT 1 FROM readings kept
-                  WHERE kept.book_id = :real
-                    AND kept.user_id = d.user_id
-                    AND kept.status = r.status
-                    AND kept.rating IS NOT DISTINCT FROM r.rating
-                    AND kept.start_date IS NOT DISTINCT FROM r.start_date
-                    AND kept.end_date IS NOT DISTINCT FROM r.end_date
+                  SELECT 1 FROM (
+                      SELECT user_id, status, rating, start_date, end_date,
+                             row_number() OVER (
+                                 PARTITION BY user_id, status, rating, start_date, end_date ORDER BY id
+                             ) AS occurrence
+                      FROM readings WHERE book_id = :real
+                  ) kept
+                  WHERE kept.user_id = d.user_id
+                    AND kept.status = d.status
+                    AND kept.rating IS NOT DISTINCT FROM d.rating
+                    AND kept.start_date IS NOT DISTINCT FROM d.start_date
+                    AND kept.end_date IS NOT DISTINCT FROM d.end_date
+                    AND kept.occurrence = d.occurrence
               )
             """),
         {"real": real_id, "duplicate": duplicate_id},
