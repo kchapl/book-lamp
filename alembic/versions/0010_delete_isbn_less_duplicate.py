@@ -138,11 +138,8 @@ def _move_readings(bind: Connection, row: RowMapping, real_id: int) -> None:
     """Carry the duplicate's Readings to the survivor, under both sides' locks."""
     duplicate_id = row["id"]
 
-    # update_reading() rewrites a Reading without taking its Book's lock, so a
-    # fold that compared a snapshot could delete the row an edit committed while
-    # the delete waited on it. Hold both sides' Readings first: the comparisons
-    # below then run on the values the edits left, and an edited Reading that no
-    # longer matches is refused rather than folded away.
+    # Hold both sides before comparing them; `update_reading()` takes no Book
+    # lock, so a snapshot compare could fold an edit away (see the module notes).
     bind.execute(
         text("SELECT 1 FROM readings WHERE book_id IN (:duplicate, :real) FOR UPDATE"),
         {"real": real_id, "duplicate": duplicate_id},
