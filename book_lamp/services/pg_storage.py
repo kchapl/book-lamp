@@ -127,6 +127,17 @@ class PostgresStorage:
             logger.error(f"Health check failed: {e}")
             return False
 
+    def _books_with_author_names(self, rows) -> list[dict[str, Any]]:
+        """Attach the Authors list and its display string to each row."""
+        books = []
+        for row_raw in rows:
+            book = cast(Dict[str, Any], row_raw)
+            authors_list = [a for a in (book.get("author_names") or []) if a is not None]
+            book["authors"] = authors_list
+            book["author"] = display(authors_list)
+            books.append(book)
+        return books
+
     @with_retry
     def get_all_books(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return all books known to the system for a given user.
@@ -147,17 +158,55 @@ class PostgresStorage:
         """
         with self.pool.connection() as conn:
             rows = conn.execute(query, [effective_user_id, effective_user_id]).fetchall()
-            books = []
-            for row_raw in rows:
-                book = cast(Dict[str, Any], row_raw)
+            return self._books_with_author_names(rows)
 
-                # One spelling of the display string, from the links in stored
-                # order, so every path that names a Book's authors agrees.
-                authors_list = [a for a in (book.get("author_names") or []) if a is not None]
-                book["authors"] = authors_list
-                book["author"] = display(authors_list)
-                books.append(book)
-            return books
+    @with_retry
+    def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
+        """Return the user's Books that have no cover, optionally narrowed to ids.
+
+        A cover counts as missing when both cover fields are NULL or blank — the
+        same rule the missing-covers run applies before it writes one.
+        """
+        query = """
+            SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
+            FROM books b
+            LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
+            LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
+            LEFT JOIN book_authors ba ON b.id = ba.book_id
+            LEFT JOIN authors a ON ba.author_id = a.id
+            WHERE (rr.id IS NOT NULL OR rl.book_id IS NOT NULL)
+              AND COALESCE(NULLIF(TRIM(b.thumbnail_url), ''), NULLIF(TRIM(b.cover_url), '')) IS NULL
+        """
+        params: list[Any] = [self.user_id, self.user_id]
+        if book_ids:
+            query += " AND b.id = ANY(%s)"
+            params.append(list(book_ids))
+        query += " GROUP BY b.id"
+
+        with self.pool.connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return self._books_with_author_names(rows)
+
+    @with_retry
+    def set_book_cover(
+        self,
+        book_id: int,
+        thumbnail_url: Optional[str] = None,
+        cover_url: Optional[str] = None,
+    ) -> bool:
+        """Write a Book's cover fields, never clearing one that is already set."""
+        with self.pool.connection() as conn:
+            row = conn.execute(
+                """
+                UPDATE books SET
+                    thumbnail_url = COALESCE(%s, thumbnail_url),
+                    cover_url = COALESCE(%s, cover_url)
+                WHERE id = %s
+                RETURNING id
+                """,
+                [thumbnail_url, cover_url, book_id],
+            ).fetchone()
+            return row is not None
 
     def get_readings(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
         """Return readings for the current user, optionally filtered by book_id."""

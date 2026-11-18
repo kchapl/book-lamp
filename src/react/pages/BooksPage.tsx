@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getBooks, searchBooks } from '../services/api';
+import { fetchCovers, getBooks, getJobStatus, searchBooks } from '../services/api';
 import BookExhibit from '../components/BookExhibit';
 import Icon from '../components/Icon';
 import { Button, Select, SelectOption, TextField } from '../ui';
@@ -23,6 +23,12 @@ const NO_FILTERS: Record<string, string> = Object.fromEntries(
 const BooksPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const [searchQuery, setSearchQuery] = useState('');
+    const [coverRun, setCoverRun] = useState<{
+        progress: number;
+        result: string | null;
+        error: string | null;
+    } | null>(null);
+    const [fillingCovers, setFillingCovers] = useState(false);
     const {
         values: filters,
         set: setUrlFilters,
@@ -39,7 +45,7 @@ const BooksPage: React.FC = () => {
         return { books: data.books || [], categories: data.categories || [] };
     };
 
-    const { data, loading, error } = useResource(loadBooks, [searchParams], {
+    const { data, loading, error, reload } = useResource(loadBooks, [searchParams], {
         errorMessage: 'Failed to load books',
     });
 
@@ -79,6 +85,39 @@ const BooksPage: React.FC = () => {
         setSearchQuery('');
     };
 
+    /**
+     * Fill covers for Books that have none. The job runs in the background, so
+     * the page polls its status and shows the report it finishes with; the
+     * collection is refetched once the run is done.
+     */
+    const fillMissingCovers = async () => {
+        setFillingCovers(true);
+        setCoverRun({ progress: 0, result: null, error: null });
+        try {
+            const { job_id } = await fetchCovers([]);
+            for (;;) {
+                const job = await getJobStatus(job_id);
+                const finished = job.status === 'completed' || job.status === 'failed';
+                setCoverRun({
+                    progress: job.progress ?? 0,
+                    result: job.result ?? null,
+                    error: job.status === 'failed' ? job.error || 'The cover lookup failed' : null,
+                });
+                if (finished) break;
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+            reload();
+        } catch (err) {
+            setCoverRun({
+                progress: 0,
+                result: null,
+                error: err instanceof Error ? err.message : 'Could not start the cover lookup',
+            });
+        } finally {
+            setFillingCovers(false);
+        }
+    };
+
     const activeQuery = searchParams.get('q');
     // Sorting is not a filter: choosing one must not make "Clear" appear.
     const hasActiveFilters = (['status', 'year', 'month', 'rating', 'category'] as const).some(
@@ -95,6 +134,14 @@ const BooksPage: React.FC = () => {
                         <p className="text-muted">
                             {books.length} {books.length === 1 ? 'book' : 'books'}
                             {activeQuery ? ` matching “${activeQuery}”` : ''}
+                        </p>
+                    )}
+                    <Button variant="tonal" onClick={fillMissingCovers} disabled={fillingCovers}>
+                        {fillingCovers ? 'Looking for covers…' : 'Fill missing covers'}
+                    </Button>
+                    {coverRun && (
+                        <p className="text-muted" role="status">
+                            {coverRun.error ?? coverRun.result ?? `Checking ${coverRun.progress}%…`}
                         </p>
                     )}
                 </div>

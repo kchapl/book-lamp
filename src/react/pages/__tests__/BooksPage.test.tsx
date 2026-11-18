@@ -12,10 +12,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import BooksPage from '../BooksPage';
-import { getBooks, searchBooks } from '../../services/api';
+import { fetchCovers, getBooks, getJobStatus, searchBooks } from '../../services/api';
 
 vi.mock('../../services/api', () => ({
+    fetchCovers: vi.fn(),
     getBooks: vi.fn(),
+    getJobStatus: vi.fn(),
     searchBooks: vi.fn(),
 }));
 
@@ -158,6 +160,33 @@ describe('BooksPage search', () => {
 
         await waitFor(() => expect(screen.getByText('location:/books?q=dune')).toBeInTheDocument());
         expect(search).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('BooksPage missing covers', () => {
+    it('runs the missing-covers job and reports what it found', async () => {
+        const covers = vi.mocked(fetchCovers);
+        const status = vi.mocked(getJobStatus);
+        covers.mockResolvedValue({ job_id: 'job-1' });
+        status.mockResolvedValue({
+            id: 'job-1',
+            status: 'completed',
+            progress: 100,
+            result: 'Checked 3 book(s) without a cover: filled 2, 1 still missing.',
+        });
+
+        renderPage();
+        await screen.findByText('No books found');
+
+        fireEvent.click(screen.getByText('Fill missing covers'));
+
+        await screen.findByText(
+            'Checked 3 book(s) without a cover: filled 2, 1 still missing.'
+        );
+        expect(covers).toHaveBeenCalledWith([]);
+        expect(status).toHaveBeenCalledWith('job-1');
+        // The collection is refetched, so filled covers appear without a reload.
+        await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
     });
 });
 

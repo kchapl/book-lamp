@@ -43,6 +43,37 @@ class MockStorage:
     def get_all_books(self) -> list[dict[str, Any]]:
         return self.books
 
+    def get_books_missing_covers(self, book_ids: Optional[list[int]] = None) -> list[dict[str, Any]]:
+        """Books with no cover, optionally narrowed to the given ids."""
+        wanted = set(book_ids or [])
+
+        def no_cover(value: Any) -> bool:
+            return value is None or (isinstance(value, str) and not value.strip())
+
+        return [
+            book
+            for book in self.books
+            if (not wanted or book["id"] in wanted)
+            and no_cover(book.get("thumbnail_url"))
+            and no_cover(book.get("cover_url"))
+        ]
+
+    def set_book_cover(
+        self,
+        book_id: int,
+        thumbnail_url: Optional[str] = None,
+        cover_url: Optional[str] = None,
+    ) -> bool:
+        """Write a Book's cover fields, never clearing one that is already set."""
+        book = self.get_book_by_id(book_id)
+        if book is None:
+            return False
+        if thumbnail_url:
+            book["thumbnail_url"] = thumbnail_url
+        if cover_url:
+            book["cover_url"] = cover_url
+        return True
+
     def get_readings(self, book_id: Optional[int] = None) -> list[dict[str, Any]]:
         records = []
         if book_id is None:
