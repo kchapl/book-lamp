@@ -62,6 +62,18 @@ def _session_returning(payload: dict) -> _Session:
         ("Wait for it...", "Wait for It..."),
         # Initials in a shouted title survive as initials.
         ("A GUIDE FOR THE BBC", "A Guide for the BBC"),
+        # A shouted title is read as words: two-letter pronouns and particles
+        # are not initials, so they are title-cased like everything else.
+        ("AN UNEXPECTED JOURNEY", "An Unexpected Journey"),
+        ("IT ENDS WITH US", "It Ends with Us"),
+        ("WHERE WE ARE GOING", "Where We Are Going"),
+        # Initials and numerals a title carries stay as the provider wrote them.
+        ("THE CIA FILES", "The CIA Files"),
+        ("WORLD WAR III", "World War III"),
+        # A full stop that belongs to an abbreviation is part of the word.
+        ("Martin Luther King Jr.", "Martin Luther King Jr."),
+        ("Acme Inc.", "Acme Inc."),
+        ("Collected Poems Vol.", "Collected Poems Vol."),
     ],
 )
 def test_a_provider_title_is_tidied_without_changing_what_it_names(raw, expected):

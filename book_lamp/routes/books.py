@@ -21,17 +21,12 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import isbn10_to_isbn13, normalise_provider_title, normalize_isbn
+from book_lamp.utils.books import isbn10_to_isbn13, normalize_isbn
 from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
 logger = logging.getLogger("book_lamp")
 books_bp = Blueprint("books", __name__)
-
-#: The canned lookup in test mode stands in for a provider response, so it is
-#: given a title that needs tidying: the journey exercises the normalisation a
-#: real parser would have applied.
-TEST_LOOKUP_TITLE = "  the  last english king. "
 
 
 def _background_fetch_missing_data(job_id: str, user_id: int):
@@ -372,7 +367,7 @@ def api_create_book():
 
         if is_test_mode() and isbn == TEST_ISBN:
             book_data = {
-                "title": normalise_provider_title(TEST_LOOKUP_TITLE),
+                "title": "Test Book",
                 "authors": ["Test Author"],
                 "publish_date": "2019-05-02",
                 "thumbnail_url": "http://example.com/thumb.jpg",
@@ -548,7 +543,7 @@ def api_lookup_isbn():
     if is_test_mode() and isbn == TEST_ISBN:
         return jsonify(
             {
-                "title": normalise_provider_title(TEST_LOOKUP_TITLE),
+                "title": "Test Book",
                 "author": "Test Author",
                 "isbn13": TEST_ISBN,
             }

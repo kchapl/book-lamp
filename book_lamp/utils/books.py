@@ -284,6 +284,88 @@ _TITLE_SMALL_WORDS = frozenset(
 #: nor stripped of its final full stop.
 _DOTTED_ABBREVIATION = re.compile(r"^(?:[A-Za-z]\.){2,}[A-Za-z]?\.?$")
 
+#: A title may end with an abbreviation whose full stop is part of the word, so
+#: "Martin Luther King Jr." keeps it. The set is the abbreviations a title
+#: carries; a plain word ending the title has its stop removed.
+_TITLE_ABBREVIATIONS = frozenset(
+    {
+        "al",
+        "approx",
+        "co",
+        "corp",
+        "dr",
+        "ed",
+        "eds",
+        "etc",
+        "fig",
+        "figs",
+        "inc",
+        "jr",
+        "ltd",
+        "mr",
+        "mrs",
+        "ms",
+        "no",
+        "p",
+        "pp",
+        "prof",
+        "rev",
+        "sr",
+        "st",
+        "vol",
+        "vs",
+    }
+)
+
+#: Initials a title carries as initials. Structure cannot tell "CIA" from
+#: "WAR", so the ones a Book title uses are named; everything else is read as a
+#: shouted word and title-cased.
+_TITLE_INITIALISMS = frozenset(
+    {
+        "AI",
+        "API",
+        "BBC",
+        "CIA",
+        "DNA",
+        "FBI",
+        "HTML",
+        "ISBN",
+        "NASA",
+        "NATO",
+        "NHS",
+        "TV",
+        "UK",
+        "USA",
+    }
+)
+
+#: Roman numerals, which a title writes as numerals rather than as words.
+_ROMAN_NUMERALS = frozenset(
+    {
+        "I",
+        "II",
+        "III",
+        "IV",
+        "V",
+        "VI",
+        "VII",
+        "VIII",
+        "IX",
+        "X",
+        "XI",
+        "XII",
+        "XIII",
+        "XIV",
+        "XV",
+        "XVI",
+        "XVII",
+        "XVIII",
+        "XIX",
+        "XX",
+        "XXI",
+    }
+)
+
 #: Characters that end or open a title's part, so the word after them starts a
 #: new one and is capitalised even when it is a small word.
 _TITLE_BREAK_AFTER = re.compile(r"[:\u2014\u2013(\[]$")
@@ -323,13 +405,19 @@ def normalise_provider_title(title: Optional[str]) -> Optional[str]:
 def _drop_trailing_full_stop(text: str) -> str:
     """Remove a full stop that only terminates the title.
 
-    Other terminal punctuation stands, an ellipsis stands, and a dotted
-    abbreviation keeps its own full stop.
+    Other terminal punctuation stands, an ellipsis stands, and an abbreviation
+    keeps the full stop that belongs to it: "Martin Luther King Jr." ends in a
+    word, not in a stop.
     """
     if not text.endswith(".") or text.endswith(".."):
         return text
     head = text[:-1].rstrip()
-    if not head or _DOTTED_ABBREVIATION.match(head.split()[-1]):
+    if not head:
+        return text
+    last = head.split()[-1]
+    if _DOTTED_ABBREVIATION.match(last):
+        return text
+    if re.sub(r"[^A-Za-z]", "", last).lower() in _TITLE_ABBREVIATIONS:
         return text
     return head
 
@@ -380,23 +468,20 @@ def _case_word(word: str, force: bool) -> str:
 
 
 def _reads_as_acronym(word: str) -> bool:
-    """Whether an all-caps token reads as initials rather than a shouted word.
+    """Whether an all-caps token is written as initials rather than as a word.
 
     Only a title the provider shouted gives a token caps to preserve, so a
-    lower-case "spy" is never mistaken for one. Two letters are initials
-    ("TV"); a longer token has to be unpronounceable to be: "BBC" is, while
-    "SPY" and "THE" are words.
+    lower-case "spy" is never mistaken for one. Structure cannot separate an
+    initialism from a shouted word — "CIA" and "WAR" differ in nothing a rule
+    can see — so the initialisms a title carries are named, along with the
+    roman numerals a title writes as numerals ("World War III"). Everything
+    else is read as a word: "AN", "IT", "US" and "WE" become "An", "It", "Us"
+    and "We".
     """
     if not word.isupper():
         return False
-    letters = [char for char in word if char.isalpha()]
-    if len(letters) < 2:
-        return False
-    if len(letters) <= 2:
-        return True
-    if len(letters) > 4:
-        return False
-    return not any(char in "AEIOUY" for char in letters)
+    bare = re.sub(r"[^A-Za-z]", "", word)
+    return bare in _TITLE_INITIALISMS or bare in _ROMAN_NUMERALS
 
 
 def normalise_bisac_category(
