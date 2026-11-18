@@ -79,6 +79,11 @@ def _session_returning(payload: dict) -> _Session:
         ("Martin Luther King Jr.", "Martin Luther King Jr."),
         ("Acme Inc.", "Acme Inc."),
         ("Collected Poems Vol.", "Collected Poems Vol."),
+        # A title that is only a dotted abbreviation keeps its dot: "U.S." is
+        # not a sentence that happens to end in a full stop.
+        ("U.S.", "U.S."),
+        ("U.K.", "U.K."),
+        ("A History of the U.S.", "A History of the U.S."),
     ],
 )
 def test_a_provider_title_is_tidied_without_changing_what_it_names(raw, expected):

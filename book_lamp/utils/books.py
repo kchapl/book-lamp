@@ -411,13 +411,15 @@ def _drop_trailing_full_stop(text: str) -> str:
     """
     if not text.endswith(".") or text.endswith(".."):
         return text
+    # Check the final token as the provider wrote it: "U.S." is a dotted
+    # abbreviation, and testing the token after cutting the dot would leave
+    # "U.S", which no longer looks like one.
+    if _DOTTED_ABBREVIATION.match(text.split()[-1]):
+        return text
     head = text[:-1].rstrip()
     if not head:
         return text
-    last = head.split()[-1]
-    if _DOTTED_ABBREVIATION.match(last):
-        return text
-    if re.sub(r"[^A-Za-z]", "", last).lower() in _TITLE_ABBREVIATIONS:
+    if re.sub(r"[^A-Za-z]", "", head.split()[-1]).lower() in _TITLE_ABBREVIATIONS:
         return text
     return head
 
