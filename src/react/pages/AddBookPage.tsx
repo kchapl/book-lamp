@@ -8,15 +8,14 @@ import {
 } from '../services/api';
 import { Button, TextField } from '../ui';
 import type { BookMatch } from '../types';
-import { splitSubtitle } from '../utils/title';
 import type { Html5Qrcode } from 'html5-qrcode';
 
 /** One row of the discovery list: the candidate, and what the row shows of it. */
 interface DiscoveredRow {
     candidate: BookMatch;
-    /** The title, with a subtitle taken off the end when the provider separated it. */
+    /** The main title the provider supplied. */
     title: string;
-    /** The part that tells one edition from another, when it is separable. */
+    /** The subtitle the provider supplied, when it separated the two. */
     subtitle?: string;
     author?: string;
     /** The ISBN this row would add, which is what a reader can check a copy against. */
@@ -39,16 +38,13 @@ const normalizeIsbn = (value: string) => value.replace(/[-\s]/g, '');
  * the row itself gives the reader nothing else.
  */
 function describeCandidates(candidates: BookMatch[]): DiscoveredRow[] {
-    const rows: DiscoveredRow[] = candidates.map((candidate) => {
-        const { title, subtitle } = splitSubtitle(candidate.title || '');
-        return {
-            candidate,
-            title,
-            subtitle,
-            author: candidate.author || (candidate.authors ?? []).join(', ') || undefined,
-            isbn: candidate.isbn13,
-        };
-    });
+    const rows: DiscoveredRow[] = candidates.map((candidate) => ({
+        candidate,
+        title: candidate.title || '',
+        subtitle: candidate.subtitle,
+        author: candidate.author || (candidate.authors ?? []).join(', ') || undefined,
+        isbn: candidate.isbn13,
+    }));
 
     // Rows that would show the same thing are grouped by exactly what is
     // visible, the ISBN included, so a row is only numbered when the reader has
@@ -85,6 +81,7 @@ const AddBookPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const [isbn, setIsbn] = useState(searchParams.get('isbn') || '');
     const [title, setTitle] = useState('');
+    const [subtitle, setSubtitle] = useState('');
     const [author, setAuthor] = useState('');
     const [publisher, setPublisher] = useState('');
     const [year, setYear] = useState('');
@@ -210,6 +207,7 @@ const AddBookPage: React.FC = () => {
             }
             if (book && (book.title || book.author)) {
                 setTitle(book.title || '');
+                setSubtitle(book.subtitle || '');
                 setAuthor(book.author || '');
                 setPublisher(book.publisher || '');
                 setYear(book.publication_year ? String(book.publication_year) : '');
@@ -250,6 +248,7 @@ const AddBookPage: React.FC = () => {
             });
         }
         if (match.title) setTitle(match.title);
+        setSubtitle(match.subtitle || '');
         const matchedAuthor = match.author || (match.authors ?? []).join(', ');
         if (matchedAuthor) setAuthor(matchedAuthor);
         if (match.publisher) setPublisher(match.publisher);
@@ -356,6 +355,7 @@ const AddBookPage: React.FC = () => {
         try {
             const book = await createBook({
                 title: candidate.title,
+                subtitle: candidate.subtitle,
                 author: candidate.author,
                 authors: candidate.authors,
                 isbn: candidate.isbn13,
@@ -394,6 +394,7 @@ const AddBookPage: React.FC = () => {
             const usableCover = cover && normalizeIsbn(cover.isbn) === isbnToUse ? cover : null;
             let details = {
                 title: title.trim(),
+                subtitle: subtitle.trim() || undefined,
                 author: author.trim(),
                 publisher: publisher.trim() || undefined,
                 publication_year: year ? parseInt(year, 10) || undefined : undefined,
@@ -412,6 +413,7 @@ const AddBookPage: React.FC = () => {
                     applyMatch(match);
                     details = {
                         title: (match.title || details.title).trim(),
+                        subtitle: match.subtitle || details.subtitle,
                         author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
@@ -590,6 +592,13 @@ const AddBookPage: React.FC = () => {
                     />
                     
                     <TextField
+                        id="subtitle"
+                        label="Subtitle (optional)"
+                        value={subtitle}
+                        onValueChange={setSubtitle}
+                    />
+
+                    <TextField
                         id="author"
                         label="Author"
                         required
@@ -627,6 +636,9 @@ const AddBookPage: React.FC = () => {
                                         )}
                                         <div className="book-info">
                                             <div className="book-title">{match.title}</div>
+                                            {match.subtitle && (
+                                                <div className="book-subtitle">{match.subtitle}</div>
+                                            )}
                                             <div className="section-info">
                                                 {[match.author, match.publication_year, match.publisher, match.isbn13]
                                                     .filter((value) => value !== undefined && value !== null && value !== '')

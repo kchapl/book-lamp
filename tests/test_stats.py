@@ -127,6 +127,27 @@ def test_api_stats_redirect(authenticated_client):
     assert "dashboard" in resp.location
 
 
+def test_dashboard_counts_a_series_by_title_and_subtitle():
+    """Two Books of one series that share a main title are two works, not one."""
+    books = [
+        {"id": 1, "title": "The Expanse", "subtitle": "Leviathan Wakes", "series": "The Expanse"},
+        {"id": 2, "title": "The Expanse", "subtitle": "Caliban's War", "series": "The Expanse"},
+        {"id": 3, "title": "The Expanse", "subtitle": "Leviathan Wakes", "series": "The Expanse"},
+    ]
+    records = [
+        {"book_id": 1, "status": "Completed", "end_date": "2026-01-02"},
+        {"book_id": 2, "status": "Completed", "end_date": "2026-02-02"},
+        {"book_id": 3, "status": "Completed", "end_date": "2026-03-02"},
+    ]
+
+    stats = calculate_collection_stats(books, records)
+
+    series = {entry["name"]: entry for entry in stats["top_series"]}["The Expanse"]
+    # The third Book is the same title and subtitle again, so it is the same work.
+    assert series["count"] == 2
+    assert series["books"] == ["The Expanse: Leviathan Wakes", "The Expanse: Caliban's War"]
+
+
 def test_dashboard_ignores_a_rating_on_a_reading_that_has_not_completed():
     """A rating belongs to a finished Reading, so it must not move the average."""
     books = [{"id": 1, "title": "A Book", "authors": ["An Author"]}]

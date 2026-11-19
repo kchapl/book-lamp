@@ -320,6 +320,45 @@ describe('BookDetailPage edit book', () => {
         expect(field('edit-author-1')?.value).toBe('Terry Pratchett');
     });
 
+    it('shows the stored subtitle under the heading and lets an edit correct it', async () => {
+        const withSubtitle = {
+            ...coauthored,
+            title: 'The Spy and the Traitor',
+            subtitle: 'The Greatest Espionage Story of the Cold War',
+        };
+        detail.mockResolvedValue(withSubtitle);
+        save.mockResolvedValue(undefined);
+
+        renderPage();
+
+        const heading = await screen.findByRole('heading', {
+            level: 1,
+            name: 'The Spy and the Traitor',
+        });
+        expect(heading.textContent).toBe('The Spy and the Traitor');
+        expect(screen.getByText('The Greatest Espionage Story of the Cold War')).toHaveClass(
+            'book-subtitle-heading'
+        );
+
+        fireEvent.click(button(/^edit$/i));
+        await waitFor(() => expect(field('edit-subtitle')).toBeInTheDocument());
+        expect(field('edit-subtitle')?.value).toBe(
+            'The Greatest Espionage Story of the Cold War'
+        );
+
+        typeInto('edit-subtitle', 'A True Story');
+        fireEvent.click(button(/^save$/i));
+
+        await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+        expect(save).toHaveBeenCalledWith(
+            1,
+            expect.objectContaining({
+                title: 'The Spy and the Traitor',
+                subtitle: 'A True Story',
+            })
+        );
+    });
+
     it('sends the names as a list when an unrelated field is saved', async () => {
         detail.mockResolvedValue(coauthored);
         save.mockResolvedValue(undefined);

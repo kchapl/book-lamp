@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from book_lamp.services.recommendations import (
     CACHE_TTL_DAYS,
     _is_cache_stale,
+    get_all_known_titles,
     get_liked_books,
     get_or_refresh_recommendations,
     refresh_recommendations,
@@ -85,6 +86,31 @@ def test_get_liked_books_only_completed():
     ]
     storage = _make_storage(books=books, records=records)
     assert get_liked_books(storage) == []
+
+
+def test_a_series_names_the_volume_the_reader_rated():
+    """Every volume shares a main title, so the prompt needs the subtitle too."""
+    books = [
+        {"id": 1, "title": "The Expanse", "subtitle": "Leviathan Wakes", "author": "James S. A. Corey"},
+        {"id": 2, "title": "The Expanse", "subtitle": "Caliban's War", "author": "James S. A. Corey"},
+    ]
+    records = [
+        {"book_id": 1, "status": "Completed", "rating": 5, "end_date": "2024-01-01"},
+        {"book_id": 2, "status": "Completed", "rating": 4, "end_date": "2024-02-01"},
+    ]
+    storage = _make_storage(books=books, records=records)
+
+    liked = get_liked_books(storage)
+
+    assert [b["title"] for b in liked] == [
+        "The Expanse: Caliban's War",
+        "The Expanse: Leviathan Wakes",
+    ]
+    # Both projections the prompt is built from carry the whole name.
+    assert get_all_known_titles(storage) == [
+        "The Expanse: Leviathan Wakes",
+        "The Expanse: Caliban's War",
+    ]
 
 
 def test_get_liked_books_sorted_by_end_date():

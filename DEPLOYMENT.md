@@ -73,6 +73,47 @@ and names the Books that fail, so a Book needing attention stops the deploy
 instead of losing its author. See
 `docs/adr/0005-a-books-authors-come-from-the-links.md`.
 
+### Book subtitles (#384)
+
+Migration `0011` adds `books.subtitle` and nothing else. The build command runs
+it while the previous instance is still serving (see "Schema changes that span
+two releases"), and that instance keeps writing the combined title it always
+did: a rewrite in the migration could be undone by an edit opened before the
+deploy and saved after it, leaving the combined title beside the new subtitle
+and showing the subtitle twice.
+
+The split therefore waits until the old writers have stopped, and is a one-off
+step. After the release has switched over, run:
+
+```bash
+uv run python scripts/backfill_subtitles.py --split-titles
+```
+
+It divides the stored titles by the shared rule: a colon or a spaced dash, a
+main title longer than three characters, and a non-empty remainder. `Re: Zero`,
+`10:04`, `Spider-Man` and a title with no separator stay whole, and the parts
+recombine into the original apart from the whitespace the rule normalises. The
+same run then fills the missing subtitles described below, so one command does
+both jobs.
+
+Do not repeat `--split-titles`: clearing a subtitle is how a reader keeps a
+whole title such as `Foo Bar: Baz` after undoing a split, and another run would
+divide it again. Later runs fill subtitles only:
+
+```bash
+uv run python scripts/backfill_subtitles.py
+```
+
+The fill asks Open Library first and Google Books second, fills only rows whose
+subtitle is NULL, and skips a title that still carries its subtitle rather than
+store the pair twice. A repeat never overwrites a stored subtitle, but it cannot
+tell one a reader cleared from one never filled: a cleared subtitle is stored as
+NULL, so a suggestion the reader removed can come back. `--report` counts what a
+run would find without writing, and `--dry-run` does the work without saving it.
+
+A wrong split is recovered by editing the Book: the edit form stores the title
+and subtitle as typed.
+
 ### First-Time Setup
 
 After deployment:

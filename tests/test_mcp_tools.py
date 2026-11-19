@@ -78,6 +78,17 @@ def test_search_finds_a_book_by_title_and_offers_its_isbn(verified) -> None:
     assert found[0]["isbn13"] == "9780593135204"
 
 
+def test_search_and_get_book_carry_a_stored_subtitle(verified) -> None:
+    """A migrated name is title plus subtitle, and both reach the client."""
+    storage.add_book(isbn13="9781635575637", title="Piranesi", subtitle="A Novel", authors=["Susanna Clarke"])
+
+    found = _call("search_books", {"query": "piranesi"}).data
+    assert found[0]["subtitle"] == "A Novel"
+
+    book = _call("get_book", {"identifier": "9781635575637"}).data
+    assert book["subtitle"] == "A Novel"
+
+
 def test_search_answers_nothing_for_a_title_the_collection_does_not_have(verified) -> None:
     _seed()
 

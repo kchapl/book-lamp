@@ -303,6 +303,12 @@ const BookDetailPage: React.FC = () => {
                         value={editForm.title || ''}
                         onValueChange={(value) => setEditForm({ ...editForm, title: value })}
                     />
+                    <TextField
+                        id="edit-subtitle"
+                        label="Subtitle (optional)"
+                        value={editForm.subtitle || ''}
+                        onValueChange={(value) => setEditForm({ ...editForm, subtitle: value })}
+                    />
                     <div className="author-rows">
                         {(editForm.authors ?? []).map((name, index) => (
                             <div className="author-row" key={index}>
@@ -385,6 +391,7 @@ const BookDetailPage: React.FC = () => {
                                 </span>
                             )}
                             <h1>{book.title}</h1>
+                            {book.subtitle && <p className="book-subtitle-heading">{book.subtitle}</p>}
                             <p className="author">
                                 by{' '}
                                 {authors.length > 0

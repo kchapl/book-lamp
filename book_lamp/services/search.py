@@ -32,6 +32,29 @@ def _words(text: str) -> List[str]:
     return _WORD.findall(text.lower())
 
 
+#: A token that is nothing but subtitle punctuation: the colon, or the spaced
+#: dash, that once joined a title to its subtitle.
+_SUBTITLE_SEPARATOR_TOKEN = re.compile(r"^[:\u2013\u2014-]+$")
+
+
+def _query_tokens(lowered_query: str) -> List[str]:
+    """The query's words, with a subtitle separator read as the break it is.
+
+    A Book stores its title and subtitle apart, so ``Piranesi: A Novel`` is
+    stored as ``Piranesi`` and ``A Novel``; the separator is in neither field.
+    Left whole, the token ``piranesi:`` would match nothing and the full title
+    the reader still knows would find no Book. Only separator punctuation is
+    treated this way: every other punctuation-bearing token stays literal, so
+    ``^The`` still asks for a caret.
+    """
+    tokens: List[str] = []
+    for token in lowered_query.split():
+        if _SUBTITLE_SEPARATOR_TOKEN.match(token):
+            continue
+        tokens.append(token.rstrip(":") or token)
+    return tokens
+
+
 def _typo_budget(word: str) -> int:
     """How many edits a word of this length is allowed to carry.
 
@@ -205,7 +228,7 @@ def calculate_relevance_score(
     lowered_query = query.lower()
     # Field values are lower-cased for matching, so the query's words have to be
     # too — otherwise a capitalised query would only ever match as a "typo".
-    tokens = lowered_query.split()
+    tokens = _query_tokens(lowered_query)
     if not tokens:
         return 0.0
     score = 0.0
@@ -214,6 +237,8 @@ def calculate_relevance_score(
     # Field weights (higher weight = more important match)
     weights = {
         "title": 10.0,
+        # A subtitle is part of how a Book names itself, just below its title.
+        "subtitle": 9.0,
         "author": 8.0,
         "isbn13": 7.0,
         "series": 6.0,

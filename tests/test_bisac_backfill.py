@@ -53,6 +53,62 @@ def test_enhance_books_replaces_dewey_with_bisac(mock_storage):
     assert updated_book["bisac_sub_category"] == "General"
 
 
+def test_a_combined_provider_title_is_split_before_it_is_stored():
+    """The batch parser leaves a title whole; enhancement reads it as parts.
+
+    Open Library's parsed title is not split, so a combined ``Piranesi: A
+    Novel`` would otherwise be written as the title with no subtitle.
+    """
+    books = [{"isbn13": "9780000000006", "title": "Placeholder", "authors": ["An Author"]}]
+
+    with patch(
+        "book_lamp.services.book_lookup.lookup_books_batch",
+        return_value={
+            "9780000000006": {
+                "title": "Piranesi: A Novel",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        },
+    ):
+        enhance_books_batch(books, force_refresh=True)
+
+    assert (books[0]["title"], books[0]["subtitle"]) == ("Piranesi", "A Novel")
+
+
+def test_the_metadata_backfill_keeps_the_stored_name(monkeypatch):
+    """Refreshing metadata must not rename a Book the reader corrected.
+
+    The reader kept ``Foo Bar: Baz`` whole by clearing its subtitle, and the
+    provider knows a different name and subtitle. The backfill has to leave the
+    stored pair alone while it refreshes everything else.
+    """
+    from book_lamp.routes.books import _background_fetch_missing_data
+    from book_lamp.services.storage_factory import get_storage
+
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000005", title="Foo Bar: Baz", authors=["An Author"])
+
+    monkeypatch.setattr(
+        "book_lamp.services.book_lookup.lookup_books_batch",
+        lambda isbns, force_refresh=False: {
+            "9780000000005": {
+                "title": "Piranesi: A Novel",
+                "subtitle": "A Novel",
+                "bisac_category": "FICTION / General",
+                "bisac_main_category": "FICTION",
+                "bisac_sub_category": "General",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        },
+    )
+
+    _background_fetch_missing_data("job-1", user_id=1)
+
+    stored = storage.get_book_by_id(book["id"])
+    assert (stored["title"], stored["subtitle"]) == ("Foo Bar: Baz", None)
+    assert stored["bisac_category"] == "FICTION / General"
+
+
 def test_enhance_books_preserves_bisac(mock_storage):
     # Setup: A book already has a BISAC category
     book = mock_storage.add_book(

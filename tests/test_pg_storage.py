@@ -101,6 +101,56 @@ def test_add_book_and_get_by_isbn(pg_storage):
     assert book["authors"] == ["Aldous Huxley"]
 
 
+def test_the_subtitle_fill_does_not_land_beside_an_edited_title(pg_storage):
+    """A provider answer is dropped when the reader changed the title meanwhile.
+
+    The edit route can store ``Piranesi: A Novel`` with no subtitle while the
+    provider is being asked; writing ``A Novel`` beside that title would store
+    the same words twice, so the write guards on the title it read.
+    """
+    from scripts.backfill_subtitles import _write_subtitle
+
+    book = pg_storage.add_book(isbn13="9780241181346", title="Piranesi", authors=["Susanna Clarke"])
+    read_book = {"id": book["id"], "title": "Piranesi"}
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13="9780241181346",
+        title="Piranesi: A Novel",
+        authors=["Susanna Clarke"],
+    )
+
+    wrote = _write_subtitle(pg_storage.pool, read_book, "9780241181346", "A Novel")
+
+    assert wrote is False
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert stored["title"] == "Piranesi: A Novel"
+    assert stored["subtitle"] is None
+
+
+def test_subtitle_is_stored_and_updated(pg_storage):
+    pg_storage.add_book(
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="The Greatest Espionage Story of the Cold War",
+        authors=["Ben Macintyre"],
+    )
+    book = pg_storage.get_book_by_isbn("9780241181346")
+    assert book["title"] == "The Spy and the Traitor"
+    assert book["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="A True Story",
+        authors=["Ben Macintyre"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["subtitle"] == "A True Story"
+
+    pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
+    assert pg_storage.get_reading_history()[0]["book_title"] == ("The Spy and the Traitor: A True Story")
+
+
 def test_upsert_book_idempotency(pg_storage):
     # First insert
     pg_storage.upsert_book(isbn13="9780141036144", title="Brave New World", authors=["Aldous Huxley"])
@@ -137,6 +187,54 @@ def test_multi_user_isolation(pg_storage):
 
     assert len(storage2.get_readings()) == 1
     assert storage2.get_readings()[0]["status"] == "In Progress"
+
+
+def test_bulk_import_keeps_a_title_the_reader_kept_whole(pg_storage):
+    """A metadata backfill resends every stored Book; it must not re-split one.
+
+    Clearing the subtitle is how a wrong split is undone, and the backfill runs
+    even when a lookup finds nothing new, so the stored pair has to survive it.
+    """
+    book = pg_storage.add_book(isbn13="9780241181346", title="Foo Bar: Baz", authors=["An Author"])
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780241181346",
+                    "title": "Foo Bar: Baz",
+                    "author": "An Author",
+                    "publication_year": None,
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert stored["title"] == "Foo Bar: Baz"
+    assert stored["subtitle"] is None
+
+
+def test_bulk_import_splits_a_combined_title_only_when_asked(pg_storage):
+    """An imported file is external text, so its caller asks for the split."""
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780241181347",
+                    "title": "Piranesi: A Novel",
+                    "author": "Susanna Clarke",
+                    "publication_year": None,
+                },
+                "record": None,
+            }
+        ],
+        infer_subtitles=True,
+    )
+
+    stored = pg_storage.get_book_by_isbn("9780241181347")
+    assert (stored["title"], stored["subtitle"]) == ("Piranesi", "A Novel")
 
 
 def test_bulk_import(pg_storage):
@@ -765,7 +863,37 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
         ("9780441013593", "Dune", None),
     ]
     assert links == 2
-    assert stamped == "0010"
+    assert stamped == "0011"
+
+
+def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database):
+    """Deferred: a late save by the old instance must not be able to double."""
+    _upgrade_database(own_database, "0010")
+    titles = {
+        "9780000000001": "A History of England in 100 Places: From Stonehenge to the Gherkin",
+        "9780000000002": "The Spy in the Archive — A Novel",
+        "9780000000003": "Re: Zero",
+        "9780000000004": "10:04",
+        "9780000000005": "Spider-Man",
+        "9780000000006": "Dune Messiah",
+    }
+    with psycopg.connect(own_database) as conn:
+        for isbn, title in titles.items():
+            conn.execute("INSERT INTO books (isbn13, title) VALUES (%s, %s)", [isbn, title])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        rows = {
+            isbn: (title, subtitle)
+            for isbn, title, subtitle in conn.execute("SELECT isbn13, title, subtitle FROM books ORDER BY isbn13")
+        }
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    # Splitting here would race the instance still writing combined titles, so
+    # every stored title stays as it is until the backfill script runs.
+    assert rows == {isbn: (title, None) for isbn, title in titles.items()}
+    assert stamped == "0011"
 
 
 def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
@@ -798,7 +926,7 @@ def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
     assert readings == [(real_id, "Completed", 5)]
     assert queued == [(real_id,)]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_database):
@@ -824,7 +952,7 @@ def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_d
         queued = conn.execute("SELECT book_id, position FROM reading_list").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert queued == [(real_id, 1)]
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
@@ -883,7 +1011,7 @@ def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
     assert readings == [(real_id, "In Progress")]
     assert queued == []
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_folds_a_reading_logged_against_both_records(own_database):
@@ -908,7 +1036,7 @@ def test_0010_folds_a_reading_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed", 4)]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_folds_a_reread_logged_against_both_records(own_database):
@@ -940,7 +1068,7 @@ def test_0010_folds_a_reread_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
@@ -973,7 +1101,7 @@ def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Abandoned"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
@@ -1110,7 +1238,7 @@ def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
         books = conn.execute("SELECT isbn13, title FROM books").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert books == [("9780008644833", "The Spy in the Archive")]
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
@@ -1164,7 +1292,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "In Progress")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):

@@ -37,6 +37,9 @@ const AuthorPage: React.FC = () => {
             // making a second copy.
             await createBook({
                 title: book.title,
+                // The endpoint stores what it is given rather than looking the
+                // result up again, so a subtitle left out here stays NULL.
+                subtitle: book.subtitle,
                 author: book.author || data?.author_name || '',
                 // The names themselves, not only their display string: that one
                 // joins them with a comma, which storage reads as one person.
@@ -85,6 +88,9 @@ const AuthorPage: React.FC = () => {
                                 )}
                                 <div className="book-info">
                                     <Link to={`/books/${book.id}`} className="book-title">{book.title}</Link>
+                                    {book.subtitle && (
+                                        <span className="book-subtitle">{book.subtitle}</span>
+                                    )}
                                     {book.publication_year && (
                                         <span className="year">({book.publication_year})</span>
                                     )}
@@ -108,6 +114,9 @@ const AuthorPage: React.FC = () => {
                                 )}
                                 <div className="book-info">
                                     <Link to={`/books/${book.id}`} className="book-title">{book.title}</Link>
+                                    {book.subtitle && (
+                                        <span className="book-subtitle">{book.subtitle}</span>
+                                    )}
                                     <span className={`status-badge ${READING_LIST_CLASS}`}>On Reading List</span>
                                 </div>
                             </div>
@@ -135,6 +144,9 @@ const AuthorPage: React.FC = () => {
                                     )}
                                     <div className="book-info">
                                         <span className="book-title">{book.title}</span>
+                                        {book.subtitle && (
+                                            <span className="book-subtitle">{book.subtitle}</span>
+                                        )}
                                         {book.publication_year && (
                                             <span className="year">({book.publication_year})</span>
                                         )}

@@ -98,6 +98,9 @@ const StatsPage: React.FC = () => {
                                             {IN_PROGRESS_STATUS}
                                         </span>
                                         <h3>{book.title}</h3>
+                                        {book.subtitle && (
+                                            <p className="lectern-subtitle">{book.subtitle}</p>
+                                        )}
                                         <p>{book.author || 'Unknown author'}</p>
                                     </div>
                                 </Link>

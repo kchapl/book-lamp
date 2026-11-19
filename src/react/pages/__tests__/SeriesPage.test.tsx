@@ -24,6 +24,7 @@ const books: Book[] = [
     {
         id: 1,
         title: 'Leviathan Wakes',
+        subtitle: 'Book One of the Expanse',
         author: 'James S. A. Corey',
         publication_year: 2011,
         latest_status: 'Completed',
@@ -80,6 +81,15 @@ describe('SeriesPage', () => {
 
         const link = await screen.findByRole('link', { name: 'Leviathan Wakes' });
         expect(link).toHaveAttribute('href', '/books/1');
+    });
+
+    it('shows a stored subtitle under the Book title', async () => {
+        page.mockResolvedValue({ series_name: 'The Expanse', books });
+
+        renderPage();
+
+        await screen.findByText('Leviathan Wakes');
+        expect(screen.getByText('Book One of the Expanse')).toHaveClass('book-subtitle');
     });
 
     it('shows each Book its reading state, and marks the ones with no Reading at all', async () => {

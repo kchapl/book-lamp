@@ -284,6 +284,7 @@ describe('AddBookPage discover search', () => {
         discover.mockResolvedValue([
             {
                 title: 'Dune',
+                subtitle: 'Book One of the Dune Chronicles',
                 author: 'Frank Herbert',
                 publication_year: 1965,
                 isbn13: '9780441172719',
@@ -314,6 +315,7 @@ describe('AddBookPage discover search', () => {
         expect(create).toHaveBeenCalledWith(
             expect.objectContaining({
                 title: 'Dune',
+                subtitle: 'Book One of the Dune Chronicles',
                 author: 'Frank Herbert',
                 isbn: '9780441172719',
                 publication_year: 1965,
@@ -334,7 +336,8 @@ describe('AddBookPage discover search', () => {
                 isbn13: '9781848549234',
             },
             {
-                title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
+                title: 'A History of England in 100 Places',
+                subtitle: 'From Stonehenge to the Gherkin',
                 author: 'John Julius Norwich',
                 publication_year: 2011,
                 publisher: 'John Murray',
@@ -413,9 +416,27 @@ describe('AddBookPage discover search', () => {
         expect(screen.getByText(/Option 2 of 2/)).toBeInTheDocument();
     });
 
-    it('keeps a short prefix attached to what follows it', async () => {
-        // "Re: Zero" is a title, not a subtitle: a prefix of three characters
-        // or fewer is too short to tell the reader which Book this is.
+    it('shows the subtitle the provider stored, not a split of the title', async () => {
+        discover.mockResolvedValue([
+            {
+                title: 'Piranesi',
+                subtitle: 'A Novel',
+                author: 'Susanna Clarke',
+                isbn13: '9781635575637',
+            },
+        ]);
+
+        renderPage();
+        typeInto('discover-query', 'Piranesi');
+        fireEvent.click(button(/^search$/i));
+
+        expect(await screen.findByText('Piranesi')).toBeInTheDocument();
+        expect(screen.getByText('A Novel')).toBeInTheDocument();
+    });
+
+    it('leaves a combined title whole when the provider supplied no subtitle', async () => {
+        // No surface splits a title at render: where a provider gave one string,
+        // that is the title until the Book is stored by the shared rule.
         discover.mockResolvedValue([
             { title: 'Re: Zero', author: 'Tappei Nagatsuki', isbn13: '9780316395344' },
         ]);
@@ -426,35 +447,6 @@ describe('AddBookPage discover search', () => {
 
         expect(await screen.findByText('Re: Zero')).toBeInTheDocument();
         expect(screen.queryByText('Zero')).not.toBeInTheDocument();
-    });
-
-    it('keeps a colon that belongs to the title', async () => {
-        // "10:04" is a title; its colon is not a subtitle separator.
-        discover.mockResolvedValue([
-            { title: '10:04', author: 'Ben Lerner', isbn13: '9780000000019' },
-        ]);
-
-        renderPage();
-        typeInto('discover-query', '10:04');
-        fireEvent.click(button(/^search$/i));
-
-        expect(await screen.findByText('10:04')).toBeInTheDocument();
-        expect(screen.queryByText('10')).not.toBeInTheDocument();
-    });
-
-    it('splits a colon that really separates a subtitle', async () => {
-        // The guard only keeps a split whose prefix is too short to name the
-        // Book, so a title long enough to stand on its own still gets one.
-        discover.mockResolvedValue([
-            { title: 'Piranesi: A Novel', author: 'Susanna Clarke', isbn13: '9781635575637' },
-        ]);
-
-        renderPage();
-        typeInto('discover-query', 'Piranesi');
-        fireEvent.click(button(/^search$/i));
-
-        expect(await screen.findByText('Piranesi')).toBeInTheDocument();
-        expect(screen.getByText('A Novel')).toBeInTheDocument();
     });
 
     it('queues the existing Book when the candidate is already owned', async () => {
