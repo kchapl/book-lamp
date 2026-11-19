@@ -82,8 +82,10 @@ def test_the_full_title_does_not_repeat_a_subtitle_the_title_already_has():
     assert full_title("Piranesi: A Novel", "A Novel") == "Piranesi: A Novel"
     # A title that already carries its subtitle is returned as it stands.
     assert full_title("Piranesi - A Novel", "A Novel") == "Piranesi - A Novel"
-    # A colon inside a stored title is not a heading: display never re-splits.
-    assert full_title('=HYPERLINK("https://example.com")', None) == '=HYPERLINK("https://example.com")'
+    # A colon inside a stored title is not a heading: with a subtitle that does
+    # not match, the title passes through the suffix check whole, not re-split.
+    url_title = '=HYPERLINK("https://example.com")'
+    assert full_title(url_title, "A Novel") == f"{url_title}: A Novel"
 
 
 def test_the_full_title_recombines_the_parts_for_export_and_the_log():
