@@ -15,6 +15,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from book_lamp.utils.books import full_title
+
 logger = logging.getLogger(__name__)
 
 # How many days before the cached recommendations are considered stale.
@@ -69,7 +71,10 @@ def get_liked_books(storage: Any) -> List[Dict[str, Any]]:
         if book:
             liked.append(
                 {
-                    "title": book["title"],
+                    # The title and its subtitle are one name: every volume of a
+                    # series shares its main title, so the prompt would otherwise
+                    # name them all alike and lose which one was rated.
+                    "title": full_title(book["title"], book.get("subtitle")),
                     "author": book.get("author", ""),
                     "end_date": record.get("end_date") or "",
                 }
@@ -82,7 +87,7 @@ def get_liked_books(storage: Any) -> List[Dict[str, Any]]:
 
 def get_all_known_titles(storage: Any) -> List[str]:
     """Return titles of every book the user has already read or intends to read (pure)."""
-    return list(b["title"] for b in storage.get_all_books())
+    return [full_title(b["title"], b.get("subtitle")) for b in storage.get_all_books()]
 
 
 def refresh_recommendations(storage: Any, llm_client: Any) -> Optional[List[Dict[str, Any]]]:

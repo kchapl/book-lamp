@@ -340,6 +340,40 @@ def test_an_owned_book_without_a_subtitle_matches_the_edition_that_has_one(authe
     assert [b["title"] for b in page["read_books"]] == ["Dune"]
 
 
+def test_a_result_that_keeps_the_subtitle_in_its_title_is_owned(authenticated_client, monkeypatch):
+    """Storage split the owned Book; a provider result may not have been split."""
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    # The stored pair is split, as migration 0011 leaves it.
+    storage.add_book(
+        isbn13="9781635575637",
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["Susanna Clarke"],
+    )
+
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Piranesi: A Novel",
+                "subtitle": None,
+                "author": "Susanna Clarke",
+                "isbn13": "9781635575638",
+            }
+        ],
+    )
+
+    page = authenticated_client.get("/api/author/susanna-clarke").get_json()
+
+    assert page["unread_books"] == []
+    assert [b["subtitle"] for b in page["read_books"]] == ["A Novel"]
+
+
 def test_two_subtitles_that_disagree_are_two_works(authenticated_client, monkeypatch):
     """An owned pair does not swallow a different work under the same main title."""
     import book_lamp.routes.authors as authors_route

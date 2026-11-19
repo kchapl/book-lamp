@@ -6,7 +6,7 @@ from book_lamp.middleware.auth import authorisation_required
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.storage_factory import get_storage, is_test_mode
 from book_lamp.utils.authors import matches
-from book_lamp.utils.books import full_title, normalise_provider_title
+from book_lamp.utils.books import full_title, normalise_provider_title, split_title_parts
 from book_lamp.utils.publishers import normalize_publisher, publisher_slug
 
 authors_bp = Blueprint("authors", __name__)
@@ -24,6 +24,24 @@ def _title_key(title: object, subtitle: object = None) -> str:
     return (normalise_provider_title(full_title(str(title or ""), str(subtitle or ""))) or "").lower()
 
 
+def _title_parts(title: object, subtitle: object) -> tuple[str, str]:
+    """A result's main title and subtitle as storage would hold them.
+
+    Storage keeps a title and its subtitle apart, but author lookup returns a
+    provider's title untouched, so a result may still carry ``Foo: Bar`` as its
+    title with no subtitle of its own. The split is taken before comparing, or
+    the combined key would never equal the stored main title.
+    """
+    main, second = split_title_parts(str(title or ""), str(subtitle or ""))
+    if second:
+        # A provider may also leave the subtitle inside the title while giving
+        # it separately; the stored pair repeats it once, never twice.
+        head, tail = split_title_parts(main)
+        if tail and tail.casefold() == second.casefold():
+            main = head
+    return _title_key(main), _title_key(second)
+
+
 def _same_work(owned: dict, title: object, subtitle: object) -> bool:
     """Whether a search result names a work the reader already has.
 
@@ -35,11 +53,12 @@ def _same_work(owned: dict, title: object, subtitle: object) -> bool:
     therefore unknown, and only two non-empty subtitles that disagree make two
     works.
     """
-    main_title = _title_key(title)
-    if not main_title or _title_key(owned.get("title")) != main_title:
+    main_title, result_subtitle = _title_parts(title, subtitle)
+    if not main_title:
         return False
-    owned_subtitle = _title_key(owned.get("subtitle"))
-    result_subtitle = _title_key(subtitle)
+    owned_main, owned_subtitle = _title_parts(owned.get("title"), owned.get("subtitle"))
+    if owned_main != main_title:
+        return False
     return not owned_subtitle or not result_subtitle or owned_subtitle == result_subtitle
 
 
