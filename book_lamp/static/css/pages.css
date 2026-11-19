@@ -381,6 +381,13 @@
     font-size: var(--md-sys-typescale-body-medium-size);
 }
 
+.item-info .item-subtitle {
+    margin-top: 2px;
+    color: var(--md-sys-color-on-surface-variant);
+    font-style: italic;
+    font-size: var(--md-sys-typescale-body-small-size);
+}
+
 .item-actions {
     display: flex;
     gap: var(--bl-space-2);
@@ -539,6 +546,16 @@
     font-style: italic;
 }
 
+/* The Book page's heading: the subtitle qualifies the edition, so it reads
+   beneath the title in the quieter supporting style. */
+.book-subtitle-heading {
+    margin: calc(-1 * var(--bl-space-1)) 0 var(--bl-space-3);
+    color: var(--md-sys-color-on-surface-variant);
+    font-family: var(--bl-font-ui);
+    font-size: var(--md-sys-typescale-body-large-size);
+    font-style: italic;
+}
+
 /* The ISBN a row would add, and which of identical-looking records it is. */
 .book-item .book-identity {
     margin-top: 2px;
@@ -661,6 +678,11 @@
 .lectern-body p {
     margin: 0;
     font-size: var(--md-sys-typescale-body-medium-size);
+}
+
+.lectern-body .lectern-subtitle {
+    color: var(--md-sys-color-on-surface-variant);
+    font-style: italic;
 }
 
 /* Status board — the collection by Reading Status */

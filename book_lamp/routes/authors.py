@@ -6,20 +6,22 @@ from book_lamp.middleware.auth import authorisation_required
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.storage_factory import get_storage, is_test_mode
 from book_lamp.utils.authors import matches
-from book_lamp.utils.books import normalise_provider_title
+from book_lamp.utils.books import full_title, normalise_provider_title
 from book_lamp.utils.publishers import normalize_publisher, publisher_slug
 
 authors_bp = Blueprint("authors", __name__)
 
 
-def _title_key(title: object) -> str:
-    """A title as it reads, for comparing a result with a stored Book.
+def _title_key(title: object, subtitle: object = None) -> str:
+    """A Book's whole title as it reads, for comparing a result with a stored Book.
 
     The stored title keeps the spelling the reader has; the comparison uses the
     same tidy form the author search returns, so "Dune." and "Dune" are one
-    work and an owned Book does not reappear as unread over a full stop.
+    work and an owned Book does not reappear as unread over a full stop. The
+    subtitle is part of that name, so two editions of different works under one
+    main title do not collapse into one.
     """
-    return (normalise_provider_title(str(title or "")) or "").lower()
+    return (normalise_provider_title(full_title(str(title or ""), str(subtitle or ""))) or "").lower()
 
 
 @authors_bp.route("/api/author/<path:author_slug>", methods=["GET"])
@@ -55,7 +57,7 @@ def api_author_page(author_slug: str):
             year = int(py) if py else 0
         except (ValueError, TypeError):
             year = 0
-        return (year, (b.get("title") or "").lower())
+        return (year, (b.get("title") or "").lower(), (b.get("subtitle") or "").lower())
 
     read_books.sort(key=sort_key)
     reading_list_books.sort(key=sort_key)
@@ -67,11 +69,11 @@ def api_author_page(author_slug: str):
             owned_isbns = {
                 b.get("isbn13", "").replace("-", "").replace(" ", "") for b in author_books if b.get("isbn13")
             }
-            owned_norm_titles = {_title_key(b.get("title")) for b in author_books}
+            owned_norm_titles = {_title_key(b.get("title"), b.get("subtitle")) for b in author_books}
 
             for ext_book in external_books:
                 isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
-                norm_title = _title_key(ext_book.get("title"))
+                norm_title = _title_key(ext_book.get("title"), ext_book.get("subtitle"))
                 if isbn and isbn in owned_isbns:
                     continue
                 if norm_title in owned_norm_titles:
@@ -119,7 +121,7 @@ def api_publisher_page(publisher_slug_path: str):
             year = int(py) if py else 0
         except (ValueError, TypeError):
             year = 0
-        return (year, (b.get("title") or "").lower())
+        return (year, (b.get("title") or "").lower(), (b.get("subtitle") or "").lower())
 
     publisher_books.sort(key=sort_key)
 

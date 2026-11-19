@@ -1,6 +1,8 @@
 export interface Book {
     id: number;
     title: string;
+    /** The half that qualifies the edition, stored apart from the title. */
+    subtitle?: string;
     author?: string;
     authors?: string[];
     isbn13?: string;
@@ -37,6 +39,7 @@ export interface Reading {
 export interface ReadingListItem {
     id: number;
     title: string;
+    subtitle?: string;
     author: string;
     thumbnail_url?: string;
     sort_order?: number;

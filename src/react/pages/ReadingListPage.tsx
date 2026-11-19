@@ -71,6 +71,7 @@ const SortableItem: React.FC<SortableItemProps> = ({ book, onRemove, onStartRead
                 <h2>
                     <Link to={`/books/${book.id}`}>{book.title}</Link>
                 </h2>
+                {book.subtitle && <p className="item-subtitle">{book.subtitle}</p>}
                 <p>{book.author}</p>
             </div>
             <div className="item-actions">

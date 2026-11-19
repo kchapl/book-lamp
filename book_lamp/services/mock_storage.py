@@ -3,7 +3,13 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, cover_is_blank, resolve_category
+from book_lamp.utils.books import (
+    Category,
+    cover_is_blank,
+    full_title,
+    resolve_category,
+    split_title_parts,
+)
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
 
@@ -150,6 +156,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         from book_lamp.utils.books import normalize_isbn
 
@@ -160,6 +167,7 @@ class MockStorage:
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
             "title": title,
+            "subtitle": subtitle,
             "author": display(authors),
             "authors": authors,
             "publication_year": publication_year,
@@ -200,6 +208,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         for book in self.books:
             if book["id"] == book_id:
@@ -215,6 +224,7 @@ class MockStorage:
                     {
                         "isbn13": isbn13,
                         "title": title,
+                        "subtitle": subtitle,
                         "author": display(authors),
                         "authors": authors,
                         "publication_year": publication_year,
@@ -254,6 +264,7 @@ class MockStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -261,6 +272,7 @@ class MockStorage:
                 book_id=existing["id"],
                 isbn13=isbn13,
                 title=title,
+                subtitle=subtitle,
                 authors=authors,
                 publication_year=publication_year,
                 thumbnail_url=thumbnail_url,
@@ -280,6 +292,7 @@ class MockStorage:
             return self.add_book(
                 isbn13=isbn13,
                 title=title,
+                subtitle=subtitle,
                 authors=authors,
                 publication_year=publication_year,
                 thumbnail_url=thumbnail_url,
@@ -368,6 +381,7 @@ class MockStorage:
             if book:
                 enriched = item.copy()
                 enriched["title"] = book.get("title", "")
+                enriched["subtitle"] = book.get("subtitle")
                 enriched["author"] = book.get("author", "")
                 enriched["thumbnail_url"] = book.get("thumbnail_url")
                 result.append(enriched)
@@ -412,9 +426,15 @@ class MockStorage:
             # An imported row is text from a file, so its names are read there;
             # a row that already carries the list is taken as given.
             imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
+            title, subtitle = split_title_parts(book_data["title"], book_data.get("subtitle"))
+            existing = self.get_book_by_isbn(book_data["isbn13"])
+            if subtitle is None and existing:
+                # A file without a subtitle is not a reader clearing one.
+                subtitle = existing.get("subtitle")
             book = self.upsert_book(
                 isbn13=book_data["isbn13"],
-                title=book_data["title"],
+                title=title,
+                subtitle=subtitle,
                 authors=imported_authors,
                 publication_year=book_data["publication_year"],
                 publisher=book_data.get("publisher"),
@@ -525,7 +545,8 @@ class MockStorage:
             if book:
                 # Create a copy of the record and enrich it
                 enriched_record = record.copy()
-                enriched_record["book_title"] = book["title"]
+                enriched_record["book_title"] = full_title(book["title"], book.get("subtitle"))
+                enriched_record["book_subtitle"] = book.get("subtitle")
                 enriched_record["book_author"] = book["author"]
                 enriched_record["book_authors"] = book.get("authors", [])
                 enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")

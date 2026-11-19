@@ -73,6 +73,32 @@ and names the Books that fail, so a Book needing attention stops the deploy
 instead of losing its author. See
 `docs/adr/0005-a-books-authors-come-from-the-links.md`.
 
+### Book subtitles (#384)
+
+Migration `0011` adds `books.subtitle` and splits the titles already stored by
+the shared rule: a colon or a spaced dash, a main title longer than three
+characters, and a non-empty remainder. Only titles that split safely are
+rewritten; `Re: Zero`, `10:04`, `Spider-Man` and a title with no separator keep
+their whole title. The parts recombine into the original apart from the
+whitespace the rule normalises.
+
+Because the rewrite happens while the previous instance is still serving (see
+"Schema changes that span two releases"), that instance briefly shows the main
+title without its subtitle. It is a presentation difference during the deploy,
+not data loss.
+
+After the release, fill in subtitles the migration could not split and that no
+provider has supplied yet:
+
+```bash
+uv run python scripts/backfill_subtitles.py
+```
+
+The script asks Open Library first and Google Books second, fills only rows
+whose subtitle is NULL, and never rewrites a title. It is idempotent. `--report`
+counts what a run would find without writing, and `--dry-run` does the lookups
+without saving them.
+
 ### First-Time Setup
 
 After deployment:

@@ -97,7 +97,14 @@ describe('StatsPage reading-status board', () => {
 
     it('mounts the books currently in progress on the lectern', async () => {
         vi.mocked(getBooks).mockResolvedValue({
-            books: [{ id: 1, title: 'The Dispossessed', author: 'A Lectern Author' }],
+            books: [
+                {
+                    id: 1,
+                    title: 'The Dispossessed',
+                    subtitle: 'An Ambiguous Utopia',
+                    author: 'A Lectern Author',
+                },
+            ],
         } as never);
 
         renderPage();
@@ -105,6 +112,7 @@ describe('StatsPage reading-status board', () => {
         await waitFor(() => {
             expect(screen.getByText('The Dispossessed')).toBeInTheDocument();
         });
+        expect(screen.getByText('An Ambiguous Utopia')).toHaveClass('lectern-subtitle');
         expect(screen.getByText('A Lectern Author')).toBeInTheDocument();
     });
 

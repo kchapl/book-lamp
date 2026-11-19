@@ -101,6 +101,30 @@ def test_add_book_and_get_by_isbn(pg_storage):
     assert book["authors"] == ["Aldous Huxley"]
 
 
+def test_subtitle_is_stored_and_updated(pg_storage):
+    pg_storage.add_book(
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="The Greatest Espionage Story of the Cold War",
+        authors=["Ben Macintyre"],
+    )
+    book = pg_storage.get_book_by_isbn("9780241181346")
+    assert book["title"] == "The Spy and the Traitor"
+    assert book["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="A True Story",
+        authors=["Ben Macintyre"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["subtitle"] == "A True Story"
+
+    pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
+    assert pg_storage.get_reading_history()[0]["book_title"] == ("The Spy and the Traitor: A True Story")
+
+
 def test_upsert_book_idempotency(pg_storage):
     # First insert
     pg_storage.upsert_book(isbn13="9780141036144", title="Brave New World", authors=["Aldous Huxley"])
@@ -765,7 +789,44 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
         ("9780441013593", "Dune", None),
     ]
     assert links == 2
-    assert stamped == "0010"
+    assert stamped == "0011"
+
+
+def test_0011_splits_only_the_titles_the_rule_can_split(own_database):
+    """The backfill rewrites what it can and leaves every other title exactly."""
+    _upgrade_database(own_database, "0010")
+    titles = {
+        "9780000000001": "A History of England in 100 Places: From Stonehenge to the Gherkin",
+        "9780000000002": "The Spy in the Archive — A Novel",
+        "9780000000003": "Re: Zero",
+        "9780000000004": "10:04",
+        "9780000000005": "Spider-Man",
+        "9780000000006": "Dune Messiah",
+    }
+    with psycopg.connect(own_database) as conn:
+        for isbn, title in titles.items():
+            conn.execute("INSERT INTO books (isbn13, title) VALUES (%s, %s)", [isbn, title])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        rows = {
+            isbn: (title, subtitle)
+            for isbn, title, subtitle in conn.execute("SELECT isbn13, title, subtitle FROM books ORDER BY isbn13")
+        }
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert rows["9780000000001"] == (
+        "A History of England in 100 Places",
+        "From Stonehenge to the Gherkin",
+    )
+    assert rows["9780000000002"] == ("The Spy in the Archive", "A Novel")
+    # The rule refuses these, so each keeps its whole title and gains no subtitle.
+    assert rows["9780000000003"] == ("Re: Zero", None)
+    assert rows["9780000000004"] == ("10:04", None)
+    assert rows["9780000000005"] == ("Spider-Man", None)
+    assert rows["9780000000006"] == ("Dune Messiah", None)
+    assert stamped == "0011"
 
 
 def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
@@ -798,7 +859,7 @@ def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
     assert readings == [(real_id, "Completed", 5)]
     assert queued == [(real_id,)]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_database):
@@ -824,7 +885,7 @@ def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_d
         queued = conn.execute("SELECT book_id, position FROM reading_list").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert queued == [(real_id, 1)]
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
@@ -883,7 +944,7 @@ def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
     assert readings == [(real_id, "In Progress")]
     assert queued == []
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_folds_a_reading_logged_against_both_records(own_database):
@@ -908,7 +969,7 @@ def test_0010_folds_a_reading_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed", 4)]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_folds_a_reread_logged_against_both_records(own_database):
@@ -940,7 +1001,7 @@ def test_0010_folds_a_reread_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
@@ -973,7 +1034,7 @@ def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Abandoned"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
@@ -1110,7 +1171,7 @@ def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
         books = conn.execute("SELECT isbn13, title FROM books").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert books == [("9780008644833", "The Spy in the Archive")]
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
@@ -1164,7 +1225,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "In Progress")]
     assert duplicate == 0
-    assert stamped == "0010"
+    assert stamped == "0011"
 
 
 def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):

@@ -156,6 +156,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "title": normalise_provider_title(title),
+        "subtitle": normalise_provider_title(data.get("subtitle")),
         # The provider gives a list, so the list is what travels; the display
         # string is derived from it for anything that still reads one.
         "authors": names,
@@ -239,7 +240,7 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
             params = {
                 "q": q,
                 "limit": "10",
-                "fields": "key,title,author_name,cover_i,first_publish_year,publisher",
+                "fields": "key,title,subtitle,author_name,cover_i,first_publish_year,publisher",
             }
             response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
             docs = response.json().get("docs") or []
@@ -251,6 +252,7 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
                 publishers = doc.get("publisher") or []
                 return {
                     "title": normalise_provider_title(doc.get("title")),
+                    "subtitle": normalise_provider_title(doc.get("subtitle")),
                     "authors": list(authors),
                     "author": display(authors) if authors else None,
                     "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
@@ -342,7 +344,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
     params: Dict[str, str] = {
         "author": author_name,
         "limit": str(min(max_results, 100)),
-        "fields": ("key,title,author_name,cover_i,first_publish_year," "isbn,publisher,subject,language"),
+        "fields": ("key,title,subtitle,author_name,cover_i,first_publish_year," "isbn,publisher,subject,language"),
     }
 
     books: List[Dict[str, Any]] = []
@@ -359,10 +361,12 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
             raw_title = normalise_provider_title(doc.get("title"))
             if not raw_title:
                 continue
+            raw_subtitle = normalise_provider_title(doc.get("subtitle"))
 
             # Dedupe on the title the reader would see, so two records that
-            # differ only in case are one entry.
-            norm_title = raw_title.lower()
+            # differ only in case are one entry, and two subtitles of one main
+            # title are two works.
+            norm_title = f"{raw_title}\u0000{raw_subtitle or ''}".lower()
 
             year_val = doc.get("first_publish_year")
             try:
@@ -389,6 +393,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
 
             entry: Dict[str, Any] = {
                 "title": raw_title,
+                "subtitle": raw_subtitle,
                 "author": author_str,
                 # The display string joins names with a comma, which storage reads
                 # back as one "Last, First" person; the list is what keeps them
@@ -577,7 +582,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     field would need: the edition the reader means still has to be in it.
     """
     session = _get_session()
-    fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
+    fields = "title,subtitle,author_name,isbn,cover_i,first_publish_year,publisher"
     query = f"{title} {author}" if author else title
 
     try:
@@ -610,6 +615,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
         results.append(
             {
                 "title": normalise_provider_title(doc.get("title") or ""),
+                "subtitle": normalise_provider_title(doc.get("subtitle")),
                 "authors": names,
                 "author": display(names),
                 "isbn13": isbn13,
@@ -807,6 +813,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
 
     return {
         "title": normalise_provider_title(info.get("title", "")),
+        "subtitle": normalise_provider_title(info.get("subtitle")),
         "authors": [html.unescape(name) for name in info.get("authors", [])],
         "author": display(info.get("authors", [])) if info.get("authors") else None,
         "publish_date": info.get("publishedDate"),
@@ -1087,6 +1094,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     """Create an empty metadata template."""
     return {
         "title": None,
+        "subtitle": None,
         "author": None,
         "publish_date": None,
         "thumbnail_url": None,
@@ -1227,6 +1235,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                 "thumbnail_url": "thumbnail_url",
                 "cover_url": "cover_url",
                 "title": "title",
+                "subtitle": "subtitle",
                 "authors": "authors",
                 "publisher": "publisher",
                 "description": "description",

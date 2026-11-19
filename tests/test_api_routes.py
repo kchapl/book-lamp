@@ -95,6 +95,23 @@ def test_api_export_csv_requires_authentication(client, monkeypatch):
     assert response.json == {"error": "Unauthorized"}
 
 
+def test_api_export_csv_keeps_one_full_title_column(authenticated_client):
+    """The export's shape does not change: the subtitle joins the title."""
+    storage = get_storage()
+    storage.add_book(
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="The Greatest Espionage Story of the Cold War",
+        authors=["Ben Macintyre"],
+    )
+
+    response = authenticated_client.get("/api/export/csv")
+    rows = list(csv.DictReader(io.StringIO(response.data.decode("utf-8-sig"))))
+
+    assert rows[0]["Title"] == "The Spy and the Traitor: The Greatest Espionage Story of the Cold War"
+    assert "Subtitle" not in rows[0]
+
+
 # ---------------------------------------------------------------------------
 # Books – create
 # ---------------------------------------------------------------------------

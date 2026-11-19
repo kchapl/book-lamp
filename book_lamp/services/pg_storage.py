@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, normalize_isbn, resolve_category
+from book_lamp.utils.books import Category, full_title, normalize_isbn, resolve_category, split_title_parts
 from book_lamp.utils.readings import require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
@@ -338,7 +338,7 @@ class PostgresStorage:
 
     def get_reading_list(self) -> list[dict[str, Any]]:
         query = """
-            SELECT rl.*, b.title, b.thumbnail_url,
+            SELECT rl.*, b.title, b.subtitle, b.thumbnail_url,
                    (SELECT string_agg(a.name, ', ' ORDER BY ba.position)
                     FROM book_authors ba
                     JOIN authors a ON a.id = ba.author_id
@@ -355,14 +355,15 @@ class PostgresStorage:
     def get_reading_history(self) -> list[dict[str, Any]]:
         """Retrieve all readings joined with book metadata."""
         query = """
-            SELECT rr.*, b.title as book_title, b.thumbnail_url as book_thumbnail_url,
+            SELECT rr.*, b.title as book_title, b.subtitle as book_subtitle,
+                   b.thumbnail_url as book_thumbnail_url,
                    array_agg(a.name ORDER BY ba.position) FILTER (WHERE a.name IS NOT NULL) AS book_author_names
             FROM readings rr
             JOIN books b ON rr.book_id = b.id
             LEFT JOIN book_authors ba ON ba.book_id = b.id
             LEFT JOIN authors a ON ba.author_id = a.id
             WHERE rr.user_id = %s AND rr.status IN ('In Progress', 'Completed', 'Abandoned')
-            GROUP BY rr.id, b.title, b.thumbnail_url
+            GROUP BY rr.id, b.title, b.subtitle, b.thumbnail_url
             ORDER BY rr.start_date DESC, rr.created_at DESC
         """
         with self.pool.connection() as conn:
@@ -371,6 +372,9 @@ class PostgresStorage:
             for row_raw in rows:
                 row = cast(Dict[str, Any], row_raw)
                 enriched = dict(row)
+                # The Reading Log names a Book by its whole title, the way it
+                # reads on the cover; the parts stay stored on the Book.
+                enriched["book_title"] = full_title(row["book_title"], row.get("book_subtitle"))
                 enriched["book_authors"] = [name for name in (row["book_author_names"] or []) if name is not None]
                 enriched["book_author"] = display(enriched["book_authors"])
 
@@ -418,6 +422,7 @@ class PostgresStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
@@ -438,13 +443,15 @@ class PostgresStorage:
                 # First try atomic upsert
                 query = """
                     INSERT INTO books (
-                        isbn13, title, publication_year, thumbnail_url,
+                        isbn13, title, subtitle, publication_year, thumbnail_url,
                         publisher, description, series, bisac_category,
                         bisac_main_category, bisac_sub_category, language,
                         page_count, physical_format, edition, cover_url
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (isbn13) DO UPDATE SET
                         title = EXCLUDED.title,
+                        -- A provider that knows no subtitle must not erase one.
+                        subtitle = COALESCE(EXCLUDED.subtitle, books.subtitle),
                         publication_year = EXCLUDED.publication_year,
                         thumbnail_url = EXCLUDED.thumbnail_url,
                         publisher = EXCLUDED.publisher,
@@ -467,6 +474,7 @@ class PostgresStorage:
                         [
                             target_isbn,
                             title,
+                            subtitle,
                             publication_year,
                             thumbnail_url,
                             publisher,
@@ -544,6 +552,7 @@ class PostgresStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
@@ -565,7 +574,7 @@ class PostgresStorage:
 
                 query = """
                     UPDATE books SET
-                        isbn13 = %s, title = %s, publication_year = %s,
+                        isbn13 = %s, title = %s, subtitle = %s, publication_year = %s,
                         thumbnail_url = %s, publisher = %s, description = %s, series = %s,
                         bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
                         language = %s, page_count = %s, physical_format = %s, edition = %s, cover_url = %s
@@ -576,6 +585,7 @@ class PostgresStorage:
                     [
                         normalize_isbn(isbn13),
                         title,
+                        subtitle,
                         publication_year,
                         thumbnail_url or existing["thumbnail_url"],
                         publisher or existing["publisher"],
@@ -614,11 +624,13 @@ class PostgresStorage:
         physical_format: Optional[str] = None,
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
+        subtitle: Optional[str] = None,
     ) -> dict[str, Any]:
         # add_book now handles duplicates atomically with ON CONFLICT DO UPDATE
         return self.add_book(
             isbn13=isbn13,
             title=title,
+            subtitle=subtitle,
             authors=authors,
             publication_year=publication_year,
             thumbnail_url=thumbnail_url,
@@ -763,6 +775,7 @@ class PostgresStorage:
                 for item in items:
                     book_data = item["book"]
                     record_data = item["record"]
+                    title, subtitle = split_title_parts(book_data["title"], book_data.get("subtitle"))
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
@@ -784,7 +797,7 @@ class PostgresStorage:
                         # Update book (simplified for bulk)
                         query = """
                             UPDATE books SET
-                                title = %s, publication_year = %s,
+                                title = %s, subtitle = COALESCE(%s, subtitle), publication_year = %s,
                                 publisher = %s, description = %s, series = %s,
                                 bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
                                 language = %s, page_count = %s, physical_format = %s, edition = %s,
@@ -795,7 +808,8 @@ class PostgresStorage:
                         conn.execute(
                             query,
                             [
-                                book_data["title"],
+                                title,
+                                subtitle,
                                 book_data["publication_year"],
                                 book_data.get("publisher"),
                                 book_data.get("description"),
@@ -815,13 +829,14 @@ class PostgresStorage:
                     else:
                         query = """
                             INSERT INTO books (
-                                isbn13, title, publication_year, thumbnail_url,
+                                isbn13, title, subtitle, publication_year, thumbnail_url,
                                 publisher, description, series, bisac_category,
                                 bisac_main_category, bisac_sub_category, language,
                                 page_count, physical_format, edition, cover_url
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (isbn13) DO UPDATE SET
                                 title = EXCLUDED.title,
+                                subtitle = COALESCE(EXCLUDED.subtitle, books.subtitle),
                                 publication_year = EXCLUDED.publication_year,
                                 thumbnail_url = EXCLUDED.thumbnail_url
                             RETURNING id
@@ -830,7 +845,8 @@ class PostgresStorage:
                             query,
                             [
                                 isbn13,
-                                book_data["title"],
+                                title,
+                                subtitle,
                                 book_data["publication_year"],
                                 book_data.get("thumbnail_url"),
                                 book_data.get("publisher"),

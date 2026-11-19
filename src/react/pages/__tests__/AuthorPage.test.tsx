@@ -40,6 +40,7 @@ const externalBook: ExternalBook = {
 const queuedBook: Book = {
     id: 7,
     title: 'Emma',
+    subtitle: 'A Novel',
     author: 'Jane Austen',
     isbn13: '9780141439600',
     publication_year: 1815,
@@ -70,6 +71,17 @@ const addButton = () =>
 
 beforeEach(() => {
     vi.clearAllMocks();
+});
+
+describe('AuthorPage stored subtitles', () => {
+    it("shows a Book's subtitle under its title", async () => {
+        authorPage.mockResolvedValue(page([], [queuedBook]));
+
+        renderPage();
+
+        await screen.findByText('Emma');
+        expect(screen.getByText('A Novel')).toHaveClass('book-subtitle');
+    });
 });
 
 describe('AuthorPage external results', () => {

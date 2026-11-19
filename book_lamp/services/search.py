@@ -214,6 +214,8 @@ def calculate_relevance_score(
     # Field weights (higher weight = more important match)
     weights = {
         "title": 10.0,
+        # A subtitle is part of how a Book names itself, just below its title.
+        "subtitle": 9.0,
         "author": 8.0,
         "isbn13": 7.0,
         "series": 6.0,

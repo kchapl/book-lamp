@@ -58,6 +58,7 @@ const button = (name: RegExp) => screen.getByText(name).closest(BUTTON_SELECTOR)
 const queuedBook: ReadingListItem = {
     id: 1,
     title: 'Piranesi',
+    subtitle: 'A Novel',
     author: 'Susanna Clarke',
 };
 
@@ -82,6 +83,16 @@ describe('ReadingListPage row links', () => {
         expect(cover).toHaveAccessibleName('Piranesi');
         // The image is decorative: the link already carries the Book's name.
         expect(container.querySelector('.item-cover-link img')).toHaveAttribute('alt', '');
+    });
+
+    it('shows the stored subtitle beneath the title', async () => {
+        list.mockResolvedValue({ books: [queuedBook] });
+
+        const { container } = renderPage();
+        await waitFor(() => expect(screen.getByText('Piranesi')).toBeInTheDocument());
+
+        expect(screen.getByText('A Novel')).toHaveClass('item-subtitle');
+        expect(container.querySelector('.item-info h2')?.textContent).toBe('Piranesi');
     });
 
     it('does not make the placeholder cover a link', async () => {

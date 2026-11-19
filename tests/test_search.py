@@ -15,6 +15,25 @@ def test_search_books_by_title():
     assert results[0]["title"] == "The Great Gatsby"
 
 
+def test_search_books_by_subtitle():
+    """A subtitle is part of how a Book names itself, so it is searchable."""
+    books = [
+        {
+            "id": 1,
+            "isbn13": "9780241181346",
+            "title": "The Spy and the Traitor",
+            "subtitle": "The Greatest Espionage Story of the Cold War",
+            "author": "Ben Macintyre",
+            "authors": ["Ben Macintyre"],
+        }
+    ]
+
+    results = search_books(books, [], "espionage")
+
+    assert len(results) == 1
+    assert results[0]["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
 def test_search_books_by_author():
     """Test searching books by author."""
     books = [
