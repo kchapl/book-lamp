@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, full_title, normalize_isbn, resolve_category, split_title_parts
+from book_lamp.utils.books import Category, full_title, normalize_isbn, normalise_title_pair, resolve_category
 from book_lamp.utils.readings import require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
@@ -778,7 +778,7 @@ class PostgresStorage:
                 for item in items:
                     book_data = item["book"]
                     record_data = item["record"]
-                    title, subtitle = split_title_parts(book_data["title"], book_data.get("subtitle"))
+                    title, subtitle = normalise_title_pair(book_data["title"], book_data.get("subtitle"))
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])

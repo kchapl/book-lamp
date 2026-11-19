@@ -7,8 +7,8 @@ from book_lamp.utils.books import (
     Category,
     cover_is_blank,
     full_title,
+    normalise_title_pair,
     resolve_category,
-    split_title_parts,
 )
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
@@ -429,7 +429,7 @@ class MockStorage:
             # An imported row is text from a file, so its names are read there;
             # a row that already carries the list is taken as given.
             imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
-            title, subtitle = split_title_parts(book_data["title"], book_data.get("subtitle"))
+            title, subtitle = normalise_title_pair(book_data["title"], book_data.get("subtitle"))
             existing = self.get_book_by_isbn(book_data["isbn13"])
             if subtitle is None and existing:
                 # A file without a subtitle is not a reader clearing one.

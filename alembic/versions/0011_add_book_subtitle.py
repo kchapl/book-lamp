@@ -22,8 +22,10 @@ The rewrite is visible to a deployment that still serves the previous instance
 (DEPLOYMENT.md runs migrations while it does): that instance shows the main
 title without the new subtitle until it is replaced, and a Book it edits during
 the deploy can be written with the combined title beside the subtitle set here.
-The application reads that pair as one name and the next save through the new
-instance stores the parts again, so no row loses text either way.
+Exports, the Reading Log and the statistics and recommendations built from them
+read that pair as one name (``full_title``); a detail view shows the stored
+fields until the Book is edited, and the next save through the new instance
+normalises the pair into its parts, so no row loses text either way.
 
 Revision ID: 0011
 Revises: 0010

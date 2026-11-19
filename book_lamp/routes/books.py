@@ -28,7 +28,7 @@ from book_lamp.utils.books import (
     full_title,
     isbn10_to_isbn13,
     normalize_isbn,
-    split_title_parts,
+    normalise_title_pair,
 )
 from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
@@ -462,9 +462,10 @@ def api_create_book():
             return jsonify({"error": f"No book data found for ISBN {isbn}"}), 404
 
     # A provider that separates the subtitle is believed; a combined one is
-    # split by the same rule everywhere else uses. The split happens here, at
-    # the write, so every surface reads the stored parts.
-    title, subtitle = split_title_parts(book_data.get("title"), book_data.get("subtitle"))
+    # split by the same rule everywhere else uses, and a subtitle the title
+    # already repeats is held once. The split happens here, at the write, so
+    # every surface reads the stored parts.
+    title, subtitle = normalise_title_pair(book_data.get("title"), book_data.get("subtitle"))
     authors = _book_data_authors(book_data)
 
     if not title or not authors:
@@ -542,7 +543,10 @@ def api_update_book(book_id: int):
     storage = get_storage()
     data = request.get_json(silent=True) or {}
 
-    title, subtitle = split_title_parts(data.get("title"), data.get("subtitle"))
+    # The previous instance writes the combined title while 0011 lands, and its
+    # edit form sends that title beside the stored subtitle. Saving stores the
+    # parts apart again, so no surface reads the subtitle twice.
+    title, subtitle = normalise_title_pair(data.get("title"), data.get("subtitle"))
     authors = _payload_authors(data)
 
     if not title or not authors:

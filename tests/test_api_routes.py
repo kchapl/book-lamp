@@ -263,6 +263,32 @@ def test_api_update_book_success(authenticated_client):
     assert updated["title"] == "New Title"
 
 
+def test_api_update_book_normalises_a_title_that_carries_its_subtitle(authenticated_client):
+    """A Book edited during the deploy is saved as its parts, not doubled.
+
+    The previous instance writes the combined title while 0011 lands, and its
+    edit form sends that title beside the stored subtitle. Saving must store
+    the two fields apart again, or the page shows the subtitle twice.
+    """
+    storage = get_storage()
+    book = storage.add_book(isbn13="557", title="Piranesi", subtitle="A Novel", authors=["Susanna Clarke"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "title": "Piranesi: A Novel",
+            "subtitle": "A Novel",
+            "author": "Susanna Clarke",
+            "isbn13": "9780306406157",
+        },
+    )
+
+    assert resp.status_code == 200
+    updated = storage.get_book_by_id(book["id"])
+    assert updated["title"] == "Piranesi"
+    assert updated["subtitle"] == "A Novel"
+
+
 def test_api_update_book_keeps_the_names_it_is_given(authenticated_client):
     """An edit that carries the list replaces the Authors with exactly those."""
     storage = get_storage()
