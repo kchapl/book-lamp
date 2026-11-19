@@ -11,7 +11,14 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, full_title, normalise_title_pair, normalize_isbn, resolve_category
+from book_lamp.utils.books import (
+    Category,
+    full_title,
+    normalise_edited_title_pair,
+    normalise_title_pair,
+    normalize_isbn,
+    resolve_category,
+)
 from book_lamp.utils.readings import require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
@@ -771,14 +778,23 @@ class PostgresStorage:
                         [i + 1, self.user_id, bid],
                     )
 
-    def bulk_import(self, items: list[dict[str, Any]]) -> int:
+    def bulk_import(self, items: list[dict[str, Any]], infer_subtitles: bool = False) -> int:
+        """Write imported rows, keeping a stored Book's title and subtitle apart.
+
+        ``infer_subtitles`` reads a combined title with no subtitle as provider
+        text (an imported file). The metadata backfill sends every stored Book
+        back through here, and a reader may have kept ``Foo Bar: Baz`` whole by
+        clearing its subtitle, so that split is only made when the caller says
+        the rows are external.
+        """
         import_count = 0
         with self.pool.connection() as conn:
             with conn.transaction():
                 for item in items:
                     book_data = item["book"]
                     record_data = item["record"]
-                    title, subtitle = normalise_title_pair(book_data["title"], book_data.get("subtitle"))
+                    pair = normalise_title_pair if infer_subtitles else normalise_edited_title_pair
+                    title, subtitle = pair(book_data["title"], book_data.get("subtitle"))
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])

@@ -7,6 +7,7 @@ from book_lamp.utils.books import (
     Category,
     cover_is_blank,
     full_title,
+    normalise_edited_title_pair,
     normalise_title_pair,
     resolve_category,
 )
@@ -420,7 +421,13 @@ class MockStorage:
                 pos += 1
         self.reading_list = new_list
 
-    def bulk_import(self, items: list[dict[str, Any]]) -> int:
+    def bulk_import(self, items: list[dict[str, Any]], infer_subtitles: bool = False) -> int:
+        """Write imported rows, keeping a stored Book's title and subtitle apart.
+
+        Only ``infer_subtitles`` reads a combined title as provider text; the
+        metadata backfill resends every stored Book, and a reader may have kept
+        ``Foo Bar: Baz`` whole by clearing its subtitle.
+        """
         import_count = 0
         for item in items:
             book_data = item["book"]
@@ -429,7 +436,8 @@ class MockStorage:
             # An imported row is text from a file, so its names are read there;
             # a row that already carries the list is taken as given.
             imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
-            title, subtitle = normalise_title_pair(book_data["title"], book_data.get("subtitle"))
+            pair = normalise_title_pair if infer_subtitles else normalise_edited_title_pair
+            title, subtitle = pair(book_data["title"], book_data.get("subtitle"))
             existing = self.get_book_by_isbn(book_data["isbn13"])
             if subtitle is None and existing:
                 # A file without a subtitle is not a reader clearing one.

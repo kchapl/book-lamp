@@ -189,6 +189,54 @@ def test_multi_user_isolation(pg_storage):
     assert storage2.get_readings()[0]["status"] == "In Progress"
 
 
+def test_bulk_import_keeps_a_title_the_reader_kept_whole(pg_storage):
+    """A metadata backfill resends every stored Book; it must not re-split one.
+
+    Clearing the subtitle is how a wrong split is undone, and the backfill runs
+    even when a lookup finds nothing new, so the stored pair has to survive it.
+    """
+    book = pg_storage.add_book(isbn13="9780241181346", title="Foo Bar: Baz", authors=["An Author"])
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780241181346",
+                    "title": "Foo Bar: Baz",
+                    "author": "An Author",
+                    "publication_year": None,
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert stored["title"] == "Foo Bar: Baz"
+    assert stored["subtitle"] is None
+
+
+def test_bulk_import_splits_a_combined_title_only_when_asked(pg_storage):
+    """An imported file is external text, so its caller asks for the split."""
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": "9780241181347",
+                    "title": "Piranesi: A Novel",
+                    "author": "Susanna Clarke",
+                    "publication_year": None,
+                },
+                "record": None,
+            }
+        ],
+        infer_subtitles=True,
+    )
+
+    stored = pg_storage.get_book_by_isbn("9780241181347")
+    assert (stored["title"], stored["subtitle"]) == ("Piranesi", "A Novel")
+
+
 def test_bulk_import(pg_storage):
     items = [
         {
