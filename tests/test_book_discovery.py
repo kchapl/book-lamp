@@ -34,6 +34,16 @@ def test_a_separate_pair_and_a_combined_title_do_not_double_the_subtitle():
     assert (merged["title"], merged["subtitle"]) == ("Piranesi", "A Novel")
 
 
+def test_a_provider_that_repeats_its_subtitle_does_not_double_it():
+    """A combined title beside that same subtitle is one name, not two."""
+    merged = lookup_module._merge_metadata(
+        {"isbn13": "9781635575637"},
+        {"title": "Piranesi: A Novel", "subtitle": "A Novel"},
+    )
+
+    assert (merged["title"], merged["subtitle"]) == ("Piranesi", "A Novel")
+
+
 def test_search_books_merges_providers_and_dedupes_on_isbn(monkeypatch):
     """One edition described by two providers is one candidate."""
     monkeypatch.setattr(

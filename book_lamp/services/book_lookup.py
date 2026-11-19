@@ -1009,6 +1009,15 @@ def _split_title_pair(book: Dict[str, Any]) -> None:
     if not book.get("title") and not book.get("subtitle"):
         return
     title, subtitle = split_title_parts(book.get("title"), book.get("subtitle"))
+    if title and subtitle:
+        # A provider that repeats the subtitle inside the title would otherwise
+        # be merged as "Piranesi: A Novel" beside "A Novel", which the log and
+        # exports recombine into "Piranesi: A Novel: A Novel". Only a title whose
+        # own tail is that subtitle is reduced, and an unsplittable title is
+        # left as it arrived.
+        head, tail = split_title_parts(title)
+        if tail and tail.casefold() == subtitle.casefold():
+            title = head
     if book.get("title"):
         book["title"] = title
     if subtitle and not book.get("subtitle"):
