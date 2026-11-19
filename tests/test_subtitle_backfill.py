@@ -1,6 +1,10 @@
 """The one-off subtitle backfill only fills a gap, and reports what it did."""
 
-from book_lamp.services.subtitle_backfill import backfill_missing_subtitles, report_subtitles
+from book_lamp.services.subtitle_backfill import (
+    backfill_missing_subtitles,
+    report_subtitles,
+    split_stored_titles,
+)
 
 
 def _books():
@@ -51,6 +55,35 @@ def test_a_provider_failure_is_counted_and_does_not_stop_the_run():
 
     assert counts["failed"] == 1
     assert counts["skipped"] == 2
+
+
+def test_stored_titles_are_split_after_the_old_instance_has_stopped():
+    """The deferred rewrite divides what it can and leaves the rest whole."""
+    books = [
+        {"id": 1, "isbn13": "9780000000001", "title": "Piranesi: A Novel", "subtitle": None},
+        {"id": 2, "isbn13": "9780000000002", "title": "Re: Zero", "subtitle": None},
+        {"id": 3, "isbn13": "9780000000003", "title": "A Book - A Memoir", "subtitle": "Stored"},
+    ]
+    writes = []
+
+    counts = split_stored_titles(
+        books,
+        write=lambda book, title, subtitle: writes.append((book["id"], title, subtitle)) or True,
+    )
+
+    assert counts == {"updated": 1, "skipped": 2, "failed": 0}
+    assert writes == [(1, "Piranesi", "A Novel")]
+
+
+def test_a_title_that_still_carries_its_subtitle_is_left_for_the_split():
+    """Filling only the subtitle would store the pair twice, so the row waits."""
+    counts = backfill_missing_subtitles(
+        [{"id": 1, "isbn13": "9780000000001", "title": "Piranesi: A Novel", "subtitle": None}],
+        lookup=lambda isbn: "A Novel",
+        write=lambda book_id, isbn, subtitle: True,
+    )
+
+    assert counts == {"updated": 0, "skipped": 1, "failed": 0}
 
 
 def test_the_report_counts_the_split_and_the_provider_only_subtitles():

@@ -1,9 +1,12 @@
 #!/usr/bin/env python
-"""Fill in missing Book subtitles from the metadata providers (#384).
+"""Split stored Book titles and fill in missing subtitles (#384).
 
-Run this once after migration 0011, and again only if a provider record has
-been corrected. It fills only rows whose subtitle is NULL, never rewrites a
-title, and reports how many rows it updated, skipped or failed.
+Run this once after the release has switched over, and again only if a provider
+record has been corrected. Migration 0011 adds the column but leaves the titles
+already stored alone, because it lands while the previous instance is still
+serving and writes combined titles. This script does the rewrite instead: it
+first divides the titles the shared rule can divide, then fills the subtitles no
+title carried from Open Library and Google Books, and reports what it did.
 
     uv run python scripts/backfill_subtitles.py
     uv run python scripts/backfill_subtitles.py --report
@@ -25,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from book_lamp.services.subtitle_backfill import (  # noqa: E402
     backfill_missing_subtitles,
     report_subtitles,
+    split_stored_titles,
 )
 
 
@@ -34,6 +38,17 @@ def _pool():
     if not os.environ.get("DATABASE_URL"):
         raise SystemExit("DATABASE_URL is not set")
     return get_pool()
+
+
+def _books_without_subtitle(pool) -> List[Dict[str, Any]]:
+    with pool.connection() as conn:
+        rows = conn.execute("""
+            SELECT id, isbn13, title, subtitle
+            FROM books
+            WHERE subtitle IS NULL
+            ORDER BY id
+            """).fetchall()
+    return [dict(row) for row in rows]
 
 
 def _books_missing_subtitle(pool) -> List[Dict[str, Any]]:
@@ -63,6 +78,20 @@ def _all_books(pool) -> List[Dict[str, Any]]:
             f"SELECT id, isbn13, title, {column} FROM books WHERE btrim(isbn13) <> '' ORDER BY id"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def _write_split(pool, book: Dict[str, Any], title: str, subtitle: str) -> bool:
+    """Store the parts only while the row still holds the title the run read."""
+    with pool.connection() as conn:
+        row = conn.execute(
+            """
+            UPDATE books SET title = %s, subtitle = %s
+            WHERE id = %s AND title = %s AND subtitle IS NULL
+            RETURNING id
+            """,
+            [title, subtitle, book["id"], book["title"]],
+        ).fetchone()
+    return row is not None
 
 
 def _write_subtitle(pool, book_id: int, isbn13: str, subtitle: str) -> bool:
@@ -107,6 +136,13 @@ def main() -> None:
     def progress(done: int, total: int) -> None:
         if done == total or done % 25 == 0:
             print(f"  {done}/{total}", file=sys.stderr)
+
+    counts = split_stored_titles(
+        _books_without_subtitle(pool),
+        write=None if args.dry_run else lambda book, title, subtitle: _write_split(pool, book, title, subtitle),
+        on_progress=progress,
+    )
+    print("Stored titles split: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
 
     counts = backfill_missing_subtitles(
         _books_missing_subtitle(pool),

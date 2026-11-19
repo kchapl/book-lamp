@@ -1,11 +1,12 @@
-"""Fill in a Book's subtitle from a metadata provider, one look at a time.
+"""Split stored titles and fill in a Book's subtitle from a provider.
 
-The stored title is the main title; the subtitle is a separate fact. This run
-only ever fills a *missing* subtitle: it reads the provider by ISBN (Open
-Library first, Google Books second), refuses to overwrite a subtitle already
-stored, and never rewrites the title. A split migration 0011 guessed from a
-combined title is therefore left as it is; only a Book whose subtitle is NULL
-can be changed by this script.
+The stored title is the main title; the subtitle is a separate fact. Migration
+0011 only adds the column: the rewrite of titles already stored happens here,
+after the release, so no instance still writing combined titles can undo it.
+The split runs first, by the shared rule, and touches only a title it can divide
+safely. The provider run then fills a *missing* subtitle (Open Library first,
+Google Books second), never overwrites one already stored, and skips a title
+that still carries its subtitle so an answer cannot store the pair twice.
 
 ``report`` answers the discovery questions the issue asks for before a run:
 how many stored titles split under the shared rule, of those how many the
@@ -19,6 +20,7 @@ from book_lamp.utils.books import full_title, normalize_isbn, split_title_parts
 
 SubtitleLookup = Callable[[str], Optional[str]]
 SubtitleWriter = Callable[[int, str, str], bool]
+TitleSplitWriter = Callable[[Dict[str, Any], str, str], bool]
 
 
 def look_up_subtitle(isbn13: str) -> Optional[str]:
@@ -41,6 +43,46 @@ def look_up_subtitle(isbn13: str) -> Optional[str]:
     return None
 
 
+def split_stored_titles(
+    books: Iterable[Dict[str, Any]],
+    write: Optional[TitleSplitWriter] = None,
+    on_progress: Optional[Callable[[int, int], None]] = None,
+) -> Dict[str, int]:
+    """Split stored combined titles into a main title and a subtitle.
+
+    This is the rewrite migration 0011 deliberately leaves out. It runs after
+    the release, when no instance that writes combined titles is still serving,
+    so a late save cannot put the subtitle back into the title. Only a title the
+    shared rule divides is touched, a row that already has a subtitle is not,
+    and ``write`` receives the whole book so it can guard on the title it read.
+    """
+    candidates = list(books)
+    counts = {"updated": 0, "skipped": 0, "failed": 0}
+    for done, book in enumerate(candidates, start=1):
+        if str(book.get("subtitle") or "").strip():
+            counts["skipped"] += 1
+            if on_progress:
+                on_progress(done, len(candidates))
+            continue
+
+        main, subtitle = split_title_parts(book.get("title"))
+        if subtitle is None:
+            counts["skipped"] += 1
+            if on_progress:
+                on_progress(done, len(candidates))
+            continue
+
+        try:
+            wrote = write(book, main, subtitle) if write else False
+        except Exception:
+            counts["failed"] += 1
+        else:
+            counts["updated" if wrote else "skipped"] += 1
+        if on_progress:
+            on_progress(done, len(candidates))
+    return counts
+
+
 def backfill_missing_subtitles(
     books: Iterable[Dict[str, Any]],
     lookup: SubtitleLookup = look_up_subtitle,
@@ -51,16 +93,20 @@ def backfill_missing_subtitles(
 
     Returns updated / skipped / failed counts. A Book with no ISBN cannot be
     looked up, and one that already has a subtitle is not asked about, so the
-    run is idempotent: a second run finds nothing to fill. ``write`` is called
-    with (book id, ISBN, subtitle) and must itself keep the row only when the
-    subtitle is still null, which is what makes a concurrent edit win.
+    run is idempotent: a second run finds nothing to fill. A title that still
+    carries its subtitle is skipped too: filling only the subtitle would store
+    the pair twice, and splitting the title is ``split_stored_titles``'s job.
+    ``write`` is called with (book id, ISBN, subtitle) and must itself keep the
+    row only when the subtitle is still null, which is what makes a concurrent
+    edit win.
     """
     candidates = list(books)
     counts = {"updated": 0, "skipped": 0, "failed": 0}
 
     for done, book in enumerate(candidates, start=1):
         isbn = normalize_isbn(str(book.get("isbn13") or ""))
-        if not isbn or str(book.get("subtitle") or "").strip():
+        _, split_subtitle = split_title_parts(book.get("title"))
+        if not isbn or str(book.get("subtitle") or "").strip() or split_subtitle:
             counts["skipped"] += 1
             if on_progress:
                 on_progress(done, len(candidates))
@@ -108,7 +154,7 @@ def report_subtitles(
     for book in books:
         stored_subtitle = str(book.get("subtitle") or "").strip()
         # Reconstruct the whole title first, so this counts the same rows before
-        # and after migration 0011 rewrote the stored title.
+        # and after the title split has run.
         _, split_subtitle = split_title_parts(full_title(book.get("title"), stored_subtitle))
         local_subtitle = stored_subtitle or split_subtitle
         if split_subtitle:

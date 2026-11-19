@@ -75,33 +75,32 @@ instead of losing its author. See
 
 ### Book subtitles (#384)
 
-Migration `0011` adds `books.subtitle` and splits the titles already stored by
-the shared rule: a colon or a spaced dash, a main title longer than three
-characters, and a non-empty remainder. Only titles that split safely are
-rewritten; `Re: Zero`, `10:04`, `Spider-Man` and a title with no separator keep
-their whole title. The parts recombine into the original apart from the
-whitespace the rule normalises.
+Migration `0011` adds `books.subtitle` and nothing else. The build command runs
+it while the previous instance is still serving (see "Schema changes that span
+two releases"), and that instance keeps writing the combined title it always
+did: a rewrite in the migration could be undone by an edit opened before the
+deploy and saved after it, leaving the combined title beside the new subtitle
+and showing the subtitle twice.
 
-Because the rewrite happens while the previous instance is still serving (see
-"Schema changes that span two releases"), that instance briefly shows the main
-title without its subtitle. It also keeps writing the title the way it always
-did, so a Book edited during the deploy can hold the combined title beside the
-subtitle this migration set. Nothing is lost: exports, the Reading Log, and the
-statistics and recommendations built from them read that pair as one name, a
-detail page shows the two stored fields as they are until then, and the next
-save through this release normalises the pair into its parts.
-
-After the release, fill in subtitles the migration could not split and that no
-provider has supplied yet:
+The split therefore waits until the old writers have stopped. After the release
+has switched over, run:
 
 ```bash
 uv run python scripts/backfill_subtitles.py
 ```
 
-The script asks Open Library first and Google Books second, fills only rows
-whose subtitle is NULL, and never rewrites a title. It is idempotent. `--report`
-counts what a run would find without writing, and `--dry-run` does the lookups
-without saving them.
+The script first divides the stored titles by the shared rule: a colon or a
+spaced dash, a main title longer than three characters, and a non-empty
+remainder. `Re: Zero`, `10:04`, `Spider-Man` and a title with no separator stay
+whole, and the parts recombine into the original apart from the whitespace the
+rule normalises. It then asks Open Library first and Google Books second for
+subtitles of the rows the rule could not divide, fills only rows whose subtitle
+is NULL, and skips a title that still carries its subtitle rather than store the
+pair twice. It is idempotent. `--report` counts what a run would find without
+writing, and `--dry-run` does the work without saving it.
+
+A wrong split is recovered by editing the Book: the edit form stores the title
+and subtitle as typed.
 
 ### First-Time Setup
 

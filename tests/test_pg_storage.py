@@ -792,8 +792,8 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
     assert stamped == "0011"
 
 
-def test_0011_splits_only_the_titles_the_rule_can_split(own_database):
-    """The backfill rewrites what it can and leaves every other title exactly."""
+def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database):
+    """Deferred: a late save by the old instance must not be able to double."""
     _upgrade_database(own_database, "0010")
     titles = {
         "9780000000001": "A History of England in 100 Places: From Stonehenge to the Gherkin",
@@ -816,16 +816,9 @@ def test_0011_splits_only_the_titles_the_rule_can_split(own_database):
         }
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 
-    assert rows["9780000000001"] == (
-        "A History of England in 100 Places",
-        "From Stonehenge to the Gherkin",
-    )
-    assert rows["9780000000002"] == ("The Spy in the Archive", "A Novel")
-    # The rule refuses these, so each keeps its whole title and gains no subtitle.
-    assert rows["9780000000003"] == ("Re: Zero", None)
-    assert rows["9780000000004"] == ("10:04", None)
-    assert rows["9780000000005"] == ("Spider-Man", None)
-    assert rows["9780000000006"] == ("Dune Messiah", None)
+    # Splitting here would race the instance still writing combined titles, so
+    # every stored title stays as it is until the backfill script runs.
+    assert rows == {isbn: (title, None) for isbn, title in titles.items()}
     assert stamped == "0011"
 
 
