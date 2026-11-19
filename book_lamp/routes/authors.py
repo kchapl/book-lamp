@@ -94,9 +94,7 @@ def api_author_page(author_slug: str):
                 isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
                 if isbn and isbn in owned_isbns:
                     continue
-                if any(
-                    _same_work(book, ext_book.get("title"), ext_book.get("subtitle")) for book in author_books
-                ):
+                if any(_same_work(book, ext_book.get("title"), ext_book.get("subtitle")) for book in author_books):
                     continue
                 norm_title = _title_key(ext_book.get("title"), ext_book.get("subtitle"))
                 if norm_title in seen_external_titles:
