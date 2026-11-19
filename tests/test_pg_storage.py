@@ -101,6 +101,32 @@ def test_add_book_and_get_by_isbn(pg_storage):
     assert book["authors"] == ["Aldous Huxley"]
 
 
+def test_the_subtitle_fill_does_not_land_beside_an_edited_title(pg_storage):
+    """A provider answer is dropped when the reader changed the title meanwhile.
+
+    The edit route can store ``Piranesi: A Novel`` with no subtitle while the
+    provider is being asked; writing ``A Novel`` beside that title would store
+    the same words twice, so the write guards on the title it read.
+    """
+    from scripts.backfill_subtitles import _write_subtitle
+
+    book = pg_storage.add_book(isbn13="9780241181346", title="Piranesi", authors=["Susanna Clarke"])
+    read_book = {"id": book["id"], "title": "Piranesi"}
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13="9780241181346",
+        title="Piranesi: A Novel",
+        authors=["Susanna Clarke"],
+    )
+
+    wrote = _write_subtitle(pg_storage.pool, read_book, "9780241181346", "A Novel")
+
+    assert wrote is False
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert stored["title"] == "Piranesi: A Novel"
+    assert stored["subtitle"] is None
+
+
 def test_subtitle_is_stored_and_updated(pg_storage):
     pg_storage.add_book(
         isbn13="9780241181346",

@@ -27,7 +27,7 @@ def test_it_fills_only_a_missing_subtitle():
             "9780000000001": "The Greatest Espionage Story of the Cold War",
             "9780000000002": "A Different Subtitle",
         }.get(isbn),
-        write=lambda book_id, isbn, subtitle: writes.append((book_id, isbn, subtitle)) or True,
+        write=lambda book, isbn, subtitle: writes.append((book["id"], isbn, subtitle)) or True,
     )
 
     assert counts == {"updated": 1, "skipped": 2, "failed": 0}
@@ -37,7 +37,7 @@ def test_it_fills_only_a_missing_subtitle():
 def test_a_second_run_finds_nothing_to_fill():
     books = _books()
     lookup = lambda isbn: "A Subtitle"  # noqa: E731
-    write = lambda book_id, isbn, subtitle: books[0].update(subtitle=subtitle) or True  # noqa: E731
+    write = lambda book, isbn, subtitle: book.update(subtitle=subtitle) or True  # noqa: E731
 
     backfill_missing_subtitles(books, lookup=lookup, write=write)
 
@@ -53,7 +53,7 @@ def test_a_provider_failure_is_counted_and_does_not_stop_the_run():
     counts = backfill_missing_subtitles(
         _books(),
         lookup=lookup,
-        write=lambda book_id, isbn, subtitle: True,
+        write=lambda book, isbn, subtitle: True,
     )
 
     assert counts["failed"] == 1
@@ -83,7 +83,7 @@ def test_a_title_that_still_carries_its_subtitle_is_left_for_the_split():
     counts = backfill_missing_subtitles(
         [{"id": 1, "isbn13": "9780000000001", "title": "Piranesi: A Novel", "subtitle": None}],
         lookup=lambda isbn: "A Novel",
-        write=lambda book_id, isbn, subtitle: True,
+        write=lambda book, isbn, subtitle: True,
     )
 
     assert counts == {"updated": 0, "skipped": 1, "failed": 0}

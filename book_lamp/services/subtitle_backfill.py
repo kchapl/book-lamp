@@ -19,7 +19,7 @@ from typing import Any, Callable, Dict, Iterable, Optional
 from book_lamp.utils.books import full_title, normalize_isbn, split_title_parts
 
 SubtitleLookup = Callable[[str], Optional[str]]
-SubtitleWriter = Callable[[int, str, str], bool]
+SubtitleWriter = Callable[[Dict[str, Any], str, str], bool]
 TitleSplitWriter = Callable[[Dict[str, Any], str, str], bool]
 
 
@@ -104,9 +104,11 @@ def backfill_missing_subtitles(
     carries its subtitle is skipped too, because filling only the subtitle would
     store the pair twice, and splitting the title is ``split_stored_titles``'s
     job.
-    ``write`` is called with (book id, ISBN, subtitle) and must itself keep the
-    row only when the subtitle is still null, which is what makes a concurrent
-    edit win.
+    ``write`` is called with the Book as it was read, its ISBN and the subtitle,
+    and must itself keep the row only when the title, ISBN and null subtitle are
+    still the ones the run read: a reader can give the Book a combined title
+    while the provider is being asked, and filling the subtitle beside it would
+    show the subtitle twice.
     """
     candidates = list(books)
     counts = {"updated": 0, "skipped": 0, "failed": 0}
@@ -136,7 +138,7 @@ def backfill_missing_subtitles(
             continue
 
         try:
-            wrote = write(book["id"], isbn, subtitle) if write else False
+            wrote = write(book, isbn, subtitle) if write else False
         except Exception:
             counts["failed"] += 1
         else:

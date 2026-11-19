@@ -102,16 +102,21 @@ def _write_split(pool, book: Dict[str, Any], title: str, subtitle: str) -> bool:
     return row is not None
 
 
-def _write_subtitle(pool, book_id: int, isbn13: str, subtitle: str) -> bool:
-    """Fill a subtitle only while the row is still the one the run read."""
+def _write_subtitle(pool, book: Dict[str, Any], isbn13: str, subtitle: str) -> bool:
+    """Fill a subtitle only while the row is still the one the run read.
+
+    The title is part of the guard: a reader can replace ``Piranesi`` with
+    ``Piranesi: A Novel`` while a provider is being asked, and writing the
+    subtitle beside that title would store the same words twice.
+    """
     with pool.connection() as conn:
         row = conn.execute(
             """
             UPDATE books SET subtitle = %s
-            WHERE id = %s AND isbn13 = %s AND subtitle IS NULL
+            WHERE id = %s AND isbn13 = %s AND title = %s AND subtitle IS NULL
             RETURNING id
             """,
-            [subtitle, book_id, isbn13],
+            [subtitle, book["id"], isbn13, book["title"]],
         ).fetchone()
     return row is not None
 
@@ -160,7 +165,7 @@ def main() -> None:
 
     counts = backfill_missing_subtitles(
         _books_missing_subtitle(pool),
-        write=None if args.dry_run else lambda book_id, isbn, subtitle: _write_subtitle(pool, book_id, isbn, subtitle),
+        write=None if args.dry_run else lambda book, isbn, subtitle: _write_subtitle(pool, book, isbn, subtitle),
         on_progress=progress,
     )
     print("Subtitle backfill: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
