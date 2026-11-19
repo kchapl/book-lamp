@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import Category, full_title, normalize_isbn, normalise_title_pair, resolve_category
+from book_lamp.utils.books import Category, full_title, normalise_title_pair, normalize_isbn, resolve_category
 from book_lamp.utils.readings import require_end_date, require_rating
 
 logger = logging.getLogger(__name__)

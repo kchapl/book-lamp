@@ -27,8 +27,8 @@ from book_lamp.utils.books import (
     cover_is_blank,
     full_title,
     isbn10_to_isbn13,
-    normalize_isbn,
     normalise_title_pair,
+    normalize_isbn,
 )
 from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
