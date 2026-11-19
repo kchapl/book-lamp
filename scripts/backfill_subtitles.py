@@ -10,17 +10,19 @@ release has switched over:
 
 That run divides the stored titles the shared rule can divide, then fills the
 subtitles no title carried from Open Library and Google Books. Later runs fill
-subtitles only, and are safe to repeat:
+subtitles only:
 
     uv run python scripts/backfill_subtitles.py
     uv run python scripts/backfill_subtitles.py --report
     uv run python scripts/backfill_subtitles.py --dry-run
 
-``--split-titles`` must not be repeated: clearing a subtitle is how a reader
-keeps a whole title such as ``Foo Bar: Baz`` after undoing a split, and another
-run would divide it again. ``--report`` makes no changes and only counts what
-the subtitle fill would find. Lookups are sequential and use the app's shared
-HTTP session, which keeps the providers' rate limits in view.
+A repeat never overwrites a stored subtitle, but it cannot tell one the reader
+cleared from one never filled: the edit form stores a cleared subtitle as NULL,
+so a suggestion the reader removed can come back. ``--report`` and
+``--dry-run`` show what a run would write. ``--split-titles`` must not be
+repeated at all: clearing a subtitle is also how a reader keeps a whole title
+such as ``Foo Bar: Baz`` after undoing a split. Lookups are sequential and use
+the app's shared HTTP session, which keeps the providers' rate limits in view.
 """
 
 import argparse

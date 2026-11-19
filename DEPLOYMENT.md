@@ -98,7 +98,7 @@ both jobs.
 
 Do not repeat `--split-titles`: clearing a subtitle is how a reader keeps a
 whole title such as `Foo Bar: Baz` after undoing a split, and another run would
-divide it again. Later runs fill subtitles only, and are safe to repeat:
+divide it again. Later runs fill subtitles only:
 
 ```bash
 uv run python scripts/backfill_subtitles.py
@@ -106,8 +106,10 @@ uv run python scripts/backfill_subtitles.py
 
 The fill asks Open Library first and Google Books second, fills only rows whose
 subtitle is NULL, and skips a title that still carries its subtitle rather than
-store the pair twice. `--report` counts what it would find without writing, and
-`--dry-run` does the work without saving it.
+store the pair twice. A repeat never overwrites a stored subtitle, but it cannot
+tell one a reader cleared from one never filled: a cleared subtitle is stored as
+NULL, so a suggestion the reader removed can come back. `--report` counts what a
+run would find without writing, and `--dry-run` does the work without saving it.
 
 A wrong split is recovered by editing the Book: the edit form stores the title
 and subtitle as typed.

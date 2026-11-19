@@ -97,10 +97,13 @@ def backfill_missing_subtitles(
     """Fill each Book's missing subtitle from a provider.
 
     Returns updated / skipped / failed counts. A Book with no ISBN cannot be
-    looked up, and one that already has a subtitle is not asked about, so the
-    run is idempotent: a second run finds nothing to fill. A title that still
-    carries its subtitle is skipped too: filling only the subtitle would store
-    the pair twice, and splitting the title is ``split_stored_titles``'s job.
+    looked up, and one that already has a subtitle is not asked about, so a
+    second run fills nothing new. A cleared subtitle is stored as NULL and reads
+    exactly like one never filled, though, so a suggestion the reader removed
+    can be filled again: this run cannot tell the two apart. A title that still
+    carries its subtitle is skipped too, because filling only the subtitle would
+    store the pair twice, and splitting the title is ``split_stored_titles``'s
+    job.
     ``write`` is called with (book id, ISBN, subtitle) and must itself keep the
     row only when the subtitle is still null, which is what makes a concurrent
     edit win.
