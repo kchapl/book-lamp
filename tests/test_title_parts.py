@@ -64,6 +64,15 @@ def test_a_subtitle_repeated_inside_the_title_is_held_once():
     assert normalise_title_pair("Re: Zero", "Zero") == ("Re: Zero", "Zero")
 
 
+def test_the_full_title_does_not_repeat_a_subtitle_the_title_already_has():
+    """A stale write during the deploy must not read as a doubled name."""
+    assert full_title("Piranesi: A Novel", "A Novel") == "Piranesi: A Novel"
+    # A title that already carries its subtitle is returned as it stands.
+    assert full_title("Piranesi - A Novel", "A Novel") == "Piranesi - A Novel"
+    # A colon inside a stored title is not a heading: display never re-splits.
+    assert full_title('=HYPERLINK("https://example.com")', None) == '=HYPERLINK("https://example.com")'
+
+
 def test_the_full_title_recombines_the_parts_for_export_and_the_log():
     assert full_title("Piranesi", "A Novel") == "Piranesi: A Novel"
     assert full_title("Piranesi", None) == "Piranesi"

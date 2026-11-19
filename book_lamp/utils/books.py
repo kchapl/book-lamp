@@ -82,11 +82,39 @@ def normalise_title_pair(title: Optional[str], subtitle: Optional[str] = None) -
     return main, second
 
 
+#: What may join a title to a subtitle its title already carries.
+_PAIR_JOINERS = (":", " -", " \u2013", " \u2014")
+
+
+def _carries_subtitle(title: str, subtitle: str) -> bool:
+    """Whether ``title`` already ends with ``subtitle`` after a separator.
+
+    A suffix check, not a split: the stored title is already the main title, so
+    a colon inside it (``10:04``, a URL) is not a heading, and display must
+    never re-guess one. Only a tail that is exactly the subtitle is read as a
+    second copy of it.
+    """
+    if not subtitle or len(title) <= len(subtitle):
+        return False
+    if title[-len(subtitle) :].lower() != subtitle.lower():
+        return False
+    head = title[: len(title) - len(subtitle)].rstrip()
+    return any(head.endswith(joiner) and head[: -len(joiner)].strip() for joiner in _PAIR_JOINERS)
+
+
 def full_title(title: Optional[str], subtitle: Optional[str] = None) -> str:
-    """A Book's whole title, as one string: the form exports and the log use."""
+    """A Book's whole title, as one string: the form exports and the log use.
+
+    A title that already carries its subtitle says it once. Migration 0011 lands
+    while the previous instance is still writing combined titles, so a Book
+    edited during the deploy can hold "Piranesi: A Novel" beside the subtitle
+    "A Novel", which would otherwise read as "Piranesi: A Novel: A Novel".
+    """
     main = str(title or "").strip()
     second = str(subtitle or "").strip()
-    return f"{main}: {second}" if main and second else main
+    if not (main and second) or _carries_subtitle(main, second):
+        return main
+    return f"{main}: {second}"
 
 
 def normalize_isbn(isbn: str) -> str:

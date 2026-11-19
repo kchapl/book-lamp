@@ -84,8 +84,10 @@ whitespace the rule normalises.
 
 Because the rewrite happens while the previous instance is still serving (see
 "Schema changes that span two releases"), that instance briefly shows the main
-title without its subtitle. It is a presentation difference during the deploy,
-not data loss.
+title without its subtitle. It also keeps writing the title the way it always
+did, so a Book edited during the deploy can hold the combined title beside the
+subtitle this migration set. Nothing is lost: the application reads that pair as
+one name, and the next save through this release stores the two parts again.
 
 After the release, fill in subtitles the migration could not split and that no
 provider has supplied yet:
