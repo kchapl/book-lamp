@@ -27,7 +27,6 @@ from book_lamp.utils.books import (
     cover_is_blank,
     full_title,
     isbn10_to_isbn13,
-    normalise_edited_title_pair,
     normalise_title_pair,
     normalize_isbn,
 )
@@ -555,9 +554,9 @@ def api_update_book(book_id: int):
 
     # An edit states both fields, so a title is stored as typed: a reader who
     # clears the subtitle can keep "Foo Bar: Baz" whole and undo a wrong split.
-    # Only the pair a stale write leaves behind (the combined title beside its
-    # subtitle) is reduced, so no surface reads the subtitle twice.
-    title, subtitle = normalise_edited_title_pair(data.get("title"), data.get("subtitle"))
+    # Only a title that still carries the subtitle submitted beside it is
+    # reduced, so no surface reads the subtitle twice.
+    title, subtitle = normalise_title_pair(data.get("title"), data.get("subtitle"), infer_subtitle=False)
     authors = _payload_authors(data)
 
     if not title or not authors:

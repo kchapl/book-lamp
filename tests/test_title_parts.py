@@ -6,12 +6,7 @@ split, and only where the split is safe. These are the cases the issue names.
 
 import pytest
 
-from book_lamp.utils.books import (
-    full_title,
-    normalise_edited_title_pair,
-    normalise_title_pair,
-    split_title_parts,
-)
+from book_lamp.utils.books import full_title, normalise_title_pair, split_title_parts
 
 
 @pytest.mark.parametrize(
@@ -71,21 +66,13 @@ def test_a_subtitle_repeated_inside_the_title_is_held_once():
 
 def test_an_edited_pair_is_stored_as_typed():
     """A reader's edit can undo a split; only a repeated subtitle is dropped."""
-    assert normalise_edited_title_pair("Foo Bar: Baz", None) == ("Foo Bar: Baz", None)
-    assert normalise_edited_title_pair("Foo Bar: Baz", "") == ("Foo Bar: Baz", None)
-    assert normalise_edited_title_pair("Piranesi: A Novel", "A Novel") == ("Piranesi", "A Novel")
-    assert normalise_edited_title_pair("Re: Zero", "Zero") == ("Re: Zero", "Zero")
-
-
-def test_the_full_title_does_not_repeat_a_subtitle_the_title_already_has():
-    """A stale write during the deploy must not read as a doubled name."""
-    assert full_title("Piranesi: A Novel", "A Novel") == "Piranesi: A Novel"
-    # A title that already carries its subtitle is returned as it stands.
-    assert full_title("Piranesi - A Novel", "A Novel") == "Piranesi - A Novel"
-    # A colon inside a stored title is not a heading: with a subtitle that does
-    # not match, the title passes through the suffix check whole, not re-split.
-    url_title = '=HYPERLINK("https://example.com")'
-    assert full_title(url_title, "A Novel") == f"{url_title}: A Novel"
+    assert normalise_title_pair("Foo Bar: Baz", None, infer_subtitle=False) == ("Foo Bar: Baz", None)
+    assert normalise_title_pair("Foo Bar: Baz", "", infer_subtitle=False) == ("Foo Bar: Baz", None)
+    assert normalise_title_pair("Piranesi: A Novel", "A Novel", infer_subtitle=False) == (
+        "Piranesi",
+        "A Novel",
+    )
+    assert normalise_title_pair("Re: Zero", "Zero", infer_subtitle=False) == ("Re: Zero", "Zero")
 
 
 def test_the_full_title_recombines_the_parts_for_export_and_the_log():

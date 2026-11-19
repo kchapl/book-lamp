@@ -74,65 +74,37 @@ def _drop_repeated_subtitle(main: str, second: Optional[str]) -> tuple[str, Opti
     return main, second
 
 
-def normalise_title_pair(title: Optional[str], subtitle: Optional[str] = None) -> tuple[str, Optional[str]]:
-    """A title and its subtitle read as one pair, holding the subtitle once.
+def normalise_title_pair(
+    title: Optional[str],
+    subtitle: Optional[str] = None,
+    *,
+    infer_subtitle: bool = True,
+) -> tuple[str, Optional[str]]:
+    """A title and its subtitle as the pair a Book stores, the subtitle once.
 
-    A provider may leave the subtitle inside the title ("Piranesi: A Novel") and
-    also supply it beside ("A Novel"). Read apart the pair is harmless, but
-    recombined it says the subtitle twice, in every export and the Reading Log.
-    The title is split first, and only a tail that is that subtitle is dropped,
-    so a title the split rule cannot divide is left exactly as it arrived.
+    ``infer_subtitle`` reads a combined title as provider text: a provider may
+    leave the subtitle inside the title ("Piranesi: A Novel") and also supply
+    it beside ("A Novel"), so the title is split and a tail that is that
+    subtitle is dropped. A title the rule cannot divide is left as it arrived.
+
+    An edit states both fields itself, so it passes ``infer_subtitle=False``: a
+    whole title such as ``Foo Bar: Baz`` stays whole, which is how a wrong split
+    is undone. Either way only a title that still ends with the subtitle beside
+    it is reduced.
     """
-    return _drop_repeated_subtitle(*split_title_parts(title, subtitle))
-
-
-def normalise_edited_title_pair(title: Optional[str], subtitle: Optional[str] = None) -> tuple[str, Optional[str]]:
-    """A title and subtitle a reader typed, stored as entered apart from a repeat.
-
-    An edit states both fields, so ``Foo Bar: Baz`` with the subtitle cleared is
-    a whole title: splitting it again would make a wrong split impossible to
-    undo, though editing a Book is the recovery the migration describes. Only a
-    title that still carries the subtitle submitted beside it is reduced, the
-    pair the previous instance can leave behind while a deploy lands.
-    """
-    main = re.sub(r"\s+", " ", str(title or "")).strip()
-    second = re.sub(r"\s+", " ", str(subtitle or "")).strip() or None
+    if infer_subtitle:
+        main, second = split_title_parts(title, subtitle)
+    else:
+        main = re.sub(r"\s+", " ", str(title or "")).strip()
+        second = re.sub(r"\s+", " ", str(subtitle or "")).strip() or None
     return _drop_repeated_subtitle(main, second)
 
 
-#: What may join a title to a subtitle its title already carries.
-_PAIR_JOINERS = (":", " -", " \u2013", " \u2014")
-
-
-def _carries_subtitle(title: str, subtitle: str) -> bool:
-    """Whether ``title`` already ends with ``subtitle`` after a separator.
-
-    A suffix check, not a split: the stored title is already the main title, so
-    a colon inside it (``10:04``, a URL) is not a heading, and display must
-    never re-guess one. Only a tail that is exactly the subtitle is read as a
-    second copy of it.
-    """
-    if not subtitle or len(title) <= len(subtitle):
-        return False
-    if title[-len(subtitle) :].lower() != subtitle.lower():
-        return False
-    head = title[: len(title) - len(subtitle)].rstrip()
-    return any(head.endswith(joiner) and head[: -len(joiner)].strip() for joiner in _PAIR_JOINERS)
-
-
 def full_title(title: Optional[str], subtitle: Optional[str] = None) -> str:
-    """A Book's whole title, as one string: the form exports and the log use.
-
-    A title that already carries its subtitle says it once. Migration 0011 lands
-    while the previous instance is still writing combined titles, so a Book
-    edited during the deploy can hold "Piranesi: A Novel" beside the subtitle
-    "A Novel", which would otherwise read as "Piranesi: A Novel: A Novel".
-    """
+    """A Book's whole title, as one string: the form exports and the log use."""
     main = str(title or "").strip()
     second = str(subtitle or "").strip()
-    if not (main and second) or _carries_subtitle(main, second):
-        return main
-    return f"{main}: {second}"
+    return f"{main}: {second}" if main and second else main
 
 
 def normalize_isbn(isbn: str) -> str:

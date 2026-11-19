@@ -14,7 +14,6 @@ from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
     Category,
     full_title,
-    normalise_edited_title_pair,
     normalise_title_pair,
     normalize_isbn,
     resolve_category,
@@ -793,8 +792,11 @@ class PostgresStorage:
                 for item in items:
                     book_data = item["book"]
                     record_data = item["record"]
-                    pair = normalise_title_pair if infer_subtitles else normalise_edited_title_pair
-                    title, subtitle = pair(book_data["title"], book_data.get("subtitle"))
+                    title, subtitle = normalise_title_pair(
+                        book_data["title"],
+                        book_data.get("subtitle"),
+                        infer_subtitle=infer_subtitles,
+                    )
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
