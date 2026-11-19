@@ -375,6 +375,9 @@ class PostgresStorage:
                 # The Reading Log names a Book by its whole title, the way it
                 # reads on the cover; the parts stay stored on the Book.
                 enriched["book_title"] = full_title(row["book_title"], row.get("book_subtitle"))
+                # The whole title already carries the subtitle; a client that
+                # showed both fields would print the second half twice.
+                enriched.pop("book_subtitle", None)
                 enriched["book_authors"] = [name for name in (row["book_author_names"] or []) if name is not None]
                 enriched["book_author"] = display(enriched["book_authors"])
 

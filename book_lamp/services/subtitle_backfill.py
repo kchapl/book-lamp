@@ -1,10 +1,11 @@
 """Fill in a Book's subtitle from a metadata provider, one look at a time.
 
-The stored title is the main title; the subtitle is a separate fact. A Book
-migrated from a combined title may carry a split that guessed, and a provider
-may know the real one. This run only ever fills a *missing* subtitle: it reads
-the provider by ISBN (Open Library first, Google Books second), refuses to
-overwrite a subtitle already stored, and never rewrites the title.
+The stored title is the main title; the subtitle is a separate fact. This run
+only ever fills a *missing* subtitle: it reads the provider by ISBN (Open
+Library first, Google Books second), refuses to overwrite a subtitle already
+stored, and never rewrites the title. A split migration 0011 guessed from a
+combined title is therefore left as it is; only a Book whose subtitle is NULL
+can be changed by this script.
 
 ``report`` answers the discovery questions the issue asks for before a run:
 how many stored titles split under the shared rule, of those how many the

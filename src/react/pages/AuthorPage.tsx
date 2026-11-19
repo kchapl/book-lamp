@@ -37,6 +37,9 @@ const AuthorPage: React.FC = () => {
             // making a second copy.
             await createBook({
                 title: book.title,
+                // The endpoint stores what it is given rather than looking the
+                // result up again, so a subtitle left out here stays NULL.
+                subtitle: book.subtitle,
                 author: book.author || data?.author_name || '',
                 // The names themselves, not only their display string: that one
                 // joins them with a comma, which storage reads as one person.

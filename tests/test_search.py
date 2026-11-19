@@ -34,6 +34,28 @@ def test_search_books_by_subtitle():
     assert results[0]["subtitle"] == "The Greatest Espionage Story of the Cold War"
 
 
+def test_a_stored_title_still_answers_to_the_name_it_was_split_from():
+    """A split title is stored in two fields; the old combined name still finds it.
+
+    Migration 0011 rewrote ``Piranesi: A Novel`` as the title ``Piranesi`` plus
+    the subtitle ``A Novel``, and neither stored field carries the separator a
+    reader types from memory.
+    """
+    books = [
+        {
+            "id": 1,
+            "isbn13": "9781635575637",
+            "title": "Piranesi",
+            "subtitle": "A Novel",
+            "author": "Susanna Clarke",
+            "authors": ["Susanna Clarke"],
+        }
+    ]
+
+    for written in ("Piranesi: A Novel", "Piranesi - A Novel"):
+        assert [b["title"] for b in search_books(books, [], written)] == ["Piranesi"]
+
+
 def test_search_books_by_author():
     """Test searching books by author."""
     books = [

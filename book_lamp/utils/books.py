@@ -9,10 +9,29 @@ def cover_is_blank(value: object) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-#: The punctuation that separates a subtitle: a colon, or a dash with space on
-#: both sides. A bare hyphen stays in the word it belongs to ("Spider-Man"),
-#: and a colon is only a separator when what precedes it can stand as a title.
-_SUBTITLE_SEPARATOR = re.compile(r"\s*:\s*|\s+[\u2013\u2014-]\s+")
+#: A dash that separates a subtitle, with the spaces on both sides that make
+#: it a separator. A bare hyphen stays in the word it belongs to ("Spider-Man").
+_SPACED_DASHES = (" - ", " \u2013 ", " \u2014 ")
+
+
+def _separator_span(text: str) -> Optional[tuple[int, int]]:
+    """Where a subtitle separator starts and ends in ``text``, or None.
+
+    Scanned rather than matched: the whitespace around a separator is already a
+    single space, and a pattern that allows a run of spaces before the colon
+    rescans that run from every start position — quadratic work on a title the
+    reader supplies, and the shape CodeQL reports as a polynomial regex. A
+    colon is only a separator when what precedes it can stand as a title, which
+    the caller decides; here it is one wherever it appears.
+    """
+    colon = text.find(":")
+    dash = min((index for index in (text.find(d) for d in _SPACED_DASHES) if index != -1), default=-1)
+
+    if colon == -1 and dash == -1:
+        return None
+    if dash == -1 or (colon != -1 and colon < dash):
+        return colon, colon + 1
+    return dash, dash + 3
 
 
 def split_title_parts(
@@ -32,12 +51,13 @@ def split_title_parts(
     if given:
         return main, given
 
-    separator = _SUBTITLE_SEPARATOR.search(main)
-    if not separator:
+    span = _separator_span(main)
+    if span is None:
         return main, None
 
-    head = main[: separator.start()].strip()
-    tail = main[separator.end() :].strip()
+    start, end = span
+    head = main[:start].strip()
+    tail = main[end:].strip()
     if len(head) <= 3 or not tail:
         # "Re: Zero", "10:04" and "Colon:" are titles, not a heading with a
         # subtitle: a prefix that short does not stand on its own.

@@ -272,7 +272,10 @@ class MockStorage:
                 book_id=existing["id"],
                 isbn13=isbn13,
                 title=title,
-                subtitle=subtitle,
+                # Postgres keeps the stored subtitle when an upsert supplies
+                # none, so the mock must too: re-adding a Book without one does
+                # not erase the subtitle it already had.
+                subtitle=subtitle if subtitle is not None else existing.get("subtitle"),
                 authors=authors,
                 publication_year=publication_year,
                 thumbnail_url=thumbnail_url,
@@ -546,7 +549,6 @@ class MockStorage:
                 # Create a copy of the record and enrich it
                 enriched_record = record.copy()
                 enriched_record["book_title"] = full_title(book["title"], book.get("subtitle"))
-                enriched_record["book_subtitle"] = book.get("subtitle")
                 enriched_record["book_author"] = book["author"]
                 enriched_record["book_authors"] = book.get("authors", [])
                 enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")

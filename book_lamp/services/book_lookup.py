@@ -15,6 +15,7 @@ from book_lamp.utils.books import (
     normalise_provider_title,
     normalize_isbn,
     parse_publication_year,
+    split_title_parts,
 )
 
 logger = logging.getLogger("book_lamp")
@@ -997,10 +998,36 @@ def _lookup_penguin_cover(
     return None
 
 
+def _split_title_pair(book: Dict[str, Any]) -> None:
+    """Read a title/subtitle pair as the separate parts a Book stores, in place.
+
+    A provider may put the subtitle inside the title ("Piranesi: A Novel") or
+    beside it ("Piranesi" with "A Novel"). Reading both the same way before a
+    merge is what stops the two halves of one name being taken from different
+    providers and stored twice.
+    """
+    if not book.get("title") and not book.get("subtitle"):
+        return
+    title, subtitle = split_title_parts(book.get("title"), book.get("subtitle"))
+    if book.get("title"):
+        book["title"] = title
+    if subtitle and not book.get("subtitle"):
+        book["subtitle"] = subtitle
+
+
 def _merge_metadata(target: Dict[str, Any], source: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Merge non-empty metadata fields from source into target."""
+    """Merge non-empty metadata fields from source into target.
+
+    The title and its subtitle are one name, so each pair is read as separate
+    parts before merging: a combined title from one provider plus a separate
+    subtitle from another would otherwise be stored as "Piranesi: A Novel: A
+    Novel" in every export and the Reading Log.
+    """
     if not source:
         return target
+    _split_title_pair(target)
+    source = dict(source)
+    _split_title_pair(source)
     for k, v in source.items():
         if v and not (isinstance(v, str) and not v.strip()):
             if not target.get(k):

@@ -120,6 +120,10 @@ def _book_summary(book: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "isbn13": book.get("isbn13", ""),
         "title": book.get("title", ""),
+        # The title and subtitle are stored apart, so a client that shows only
+        # the title would lose half of a migrated name such as "Piranesi: A
+        # Novel". Both parts travel, as they do on every other surface.
+        "subtitle": book.get("subtitle"),
         "author": book.get("author", ""),
         "publication_year": book.get("publication_year"),
         "series": book.get("series"),

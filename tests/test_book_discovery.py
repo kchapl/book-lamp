@@ -13,6 +13,27 @@ def _candidate(isbn: str, title: str = "Dune", **extra):
     return {"isbn13": isbn, "title": title, "author": "Frank Herbert", **extra}
 
 
+def test_a_combined_title_and_a_separate_pair_do_not_double_the_subtitle():
+    """One provider's title carries the subtitle; the other keeps it beside."""
+    merged = lookup_module._merge_metadata(
+        {"title": "Piranesi: A Novel"},
+        {"title": "Piranesi", "subtitle": "A Novel"},
+    )
+
+    assert merged["title"] == "Piranesi"
+    assert merged["subtitle"] == "A Novel"
+
+
+def test_a_separate_pair_and_a_combined_title_do_not_double_the_subtitle():
+    """The same merge with the providers arriving in the other order."""
+    merged = lookup_module._merge_metadata(
+        {"title": "Piranesi", "subtitle": "A Novel"},
+        {"title": "Piranesi: A Novel"},
+    )
+
+    assert (merged["title"], merged["subtitle"]) == ("Piranesi", "A Novel")
+
+
 def test_search_books_merges_providers_and_dedupes_on_isbn(monkeypatch):
     """One edition described by two providers is one candidate."""
     monkeypatch.setattr(

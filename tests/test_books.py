@@ -142,6 +142,25 @@ def test_create_stores_a_combined_title_as_two_parts(authenticated_client):
     assert stored["subtitle"] == body["subtitle"]
 
 
+def test_re_adding_a_book_without_a_subtitle_keeps_the_stored_one(authenticated_client):
+    """An add that carries no subtitle is not a reader clearing it.
+
+    Postgres keeps the stored subtitle on an upsert, so the mock has to as well;
+    otherwise mock-backed route tests cannot catch a regression here.
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9781635575637",
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["Susanna Clarke"],
+    )
+
+    storage.upsert_book(isbn13=book["isbn13"], title="Piranesi", authors=["Susanna Clarke"])
+
+    assert storage.get_book_by_isbn(book["isbn13"])["subtitle"] == "A Novel"
+
+
 def test_create_keeps_the_subtitle_the_provider_separated(authenticated_client):
     resp = authenticated_client.post(
         "/api/books",

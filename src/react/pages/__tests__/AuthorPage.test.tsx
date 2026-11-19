@@ -99,6 +99,7 @@ describe('AuthorPage external results', () => {
         await waitFor(() =>
             expect(create).toHaveBeenCalledWith({
                 title: 'Emma',
+                subtitle: undefined,
                 author: 'Jane Austen',
                 isbn: '9780141439600',
                 publication_year: 1815,
@@ -156,6 +157,24 @@ describe('AuthorPage external results', () => {
                     author: 'Neil Gaiman, Terry Pratchett',
                     authors: names,
                 })
+            )
+        );
+    });
+
+    it("forwards a result's separated subtitle so the created Book keeps it", async () => {
+        authorPage.mockResolvedValue(
+            page([{ ...externalBook, title: 'Piranesi', subtitle: 'A Novel' }])
+        );
+        create.mockResolvedValue({ ...queuedBook, title: 'Piranesi', subtitle: 'A Novel' });
+
+        renderPage();
+        await screen.findByText('From Open Library (1)');
+
+        fireEvent.click(addButton());
+
+        await waitFor(() =>
+            expect(create).toHaveBeenCalledWith(
+                expect.objectContaining({ title: 'Piranesi', subtitle: 'A Novel' })
             )
         );
     });
