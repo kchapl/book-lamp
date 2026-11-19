@@ -440,10 +440,6 @@ class MockStorage:
                 book_data.get("subtitle"),
                 infer_subtitle=infer_subtitles,
             )
-            existing = self.get_book_by_isbn(book_data["isbn13"])
-            if subtitle is None and existing:
-                # A file without a subtitle is not a reader clearing one.
-                subtitle = existing.get("subtitle")
             book = self.upsert_book(
                 isbn13=book_data["isbn13"],
                 title=title,
