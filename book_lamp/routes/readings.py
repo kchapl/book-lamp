@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 from book_lamp.middleware.auth import authorisation_required
 from book_lamp.middleware.csrf import csrf_protect
 from book_lamp.services.storage_factory import get_storage
-from book_lamp.utils.readings import RatingBeforeCompleted, ReadingEndsWithoutADate, end_date_problem
+from book_lamp.utils.readings import ReadingEndsWithoutADate, end_date_problem, rating_problem
 
 readings_bp = Blueprint("readings", __name__)
 
@@ -34,6 +34,10 @@ def api_create_reading(book_id: int):
     if problem:
         return jsonify({"error": problem}), 400
 
+    problem = rating_problem(status, rating)
+    if problem:
+        return jsonify({"error": problem}), 400
+
     try:
         record = storage.add_reading(
             book_id=book_id,
@@ -46,8 +50,6 @@ def api_create_reading(book_id: int):
         return jsonify(record), 201
     except ReadingEndsWithoutADate:
         return jsonify({"error": "An end date is required when a Reading is completed or abandoned"}), 400
-    except RatingBeforeCompleted as exc:
-        return jsonify({"error": str(exc)}), 400
     except Exception:
         current_app.logger.exception(f"api_create_reading: failed for book_id={book_id}")
         return jsonify({"error": "Failed to create reading"}), 500
@@ -77,6 +79,10 @@ def api_update_reading(reading_id: int):
     if problem:
         return jsonify({"error": problem}), 400
 
+    problem = rating_problem(status, rating)
+    if problem:
+        return jsonify({"error": problem}), 400
+
     try:
         storage.update_reading(
             reading_id=reading_id,
@@ -89,8 +95,6 @@ def api_update_reading(reading_id: int):
         return jsonify({"success": True})
     except ReadingEndsWithoutADate:
         return jsonify({"error": "An end date is required when a Reading is completed or abandoned"}), 400
-    except RatingBeforeCompleted as exc:
-        return jsonify({"error": str(exc)}), 400
     except Exception:
         current_app.logger.exception(f"api_update_reading: failed for reading_id={reading_id}")
         return jsonify({"error": "Failed to update reading"}), 500
