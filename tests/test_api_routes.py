@@ -476,6 +476,27 @@ def test_api_search_books_with_results(authenticated_client):
     assert any(bk["title"] == "Searchable Title" for bk in body["books"])
 
 
+def test_api_search_finds_a_split_title_by_its_old_combined_name(authenticated_client):
+    """A reader typing ``Piranesi: A Novel`` finds the Book stored as two parts.
+
+    The split leaves neither field holding the separator, so the colon in the
+    query must not become a token no stored part can match.
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9781635575637",
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["Susanna Clarke"],
+    )
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-15")
+
+    resp = authenticated_client.get("/api/books/search?q=Piranesi%3A+A+Novel")
+
+    assert resp.status_code == 200
+    assert [b["title"] for b in _json(resp)["books"]] == ["Piranesi"]
+
+
 # ---------------------------------------------------------------------------
 # Books – ISBN lookup
 # ---------------------------------------------------------------------------
