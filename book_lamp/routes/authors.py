@@ -24,6 +24,25 @@ def _title_key(title: object, subtitle: object = None) -> str:
     return (normalise_provider_title(full_title(str(title or ""), str(subtitle or ""))) or "").lower()
 
 
+def _same_work(owned: dict, title: object, subtitle: object) -> bool:
+    """Whether a search result names a work the reader already has.
+
+    A title and its subtitle name one work, so two editions of different works
+    under one main title stay apart. But a Book stored without a subtitle does
+    not say which work it is either, and author lookup supplies whatever
+    subtitle an edition carries: an owned ``Dune`` must not reappear as unread
+    beside ``Dune`` / ``Book One of the Dune Chronicles``. An empty subtitle is
+    therefore unknown, and only two non-empty subtitles that disagree make two
+    works.
+    """
+    main_title = _title_key(title)
+    if not main_title or _title_key(owned.get("title")) != main_title:
+        return False
+    owned_subtitle = _title_key(owned.get("subtitle"))
+    result_subtitle = _title_key(subtitle)
+    return not owned_subtitle or not result_subtitle or owned_subtitle == result_subtitle
+
+
 @authors_bp.route("/api/author/<path:author_slug>", methods=["GET"])
 @authorisation_required
 def api_author_page(author_slug: str):
@@ -69,20 +88,24 @@ def api_author_page(author_slug: str):
             owned_isbns = {
                 b.get("isbn13", "").replace("-", "").replace(" ", "") for b in author_books if b.get("isbn13")
             }
-            owned_norm_titles = {_title_key(b.get("title"), b.get("subtitle")) for b in author_books}
+            seen_external_titles: set[str] = set()
 
             for ext_book in external_books:
                 isbn = (ext_book.get("isbn13") or "").replace("-", "").replace(" ", "")
-                norm_title = _title_key(ext_book.get("title"), ext_book.get("subtitle"))
                 if isbn and isbn in owned_isbns:
                     continue
-                if norm_title in owned_norm_titles:
+                if any(
+                    _same_work(book, ext_book.get("title"), ext_book.get("subtitle")) for book in author_books
+                ):
+                    continue
+                norm_title = _title_key(ext_book.get("title"), ext_book.get("subtitle"))
+                if norm_title in seen_external_titles:
                     continue
                 ext_book["is_owned"] = False
                 ext_book["in_reading_list"] = False
                 ext_book["id"] = None
                 unread_books.append(ext_book)
-                owned_norm_titles.add(norm_title)
+                seen_external_titles.add(norm_title)
         except Exception:
             current_app.logger.warning(f"Failed to fetch external books for author: {display_author_name}")
 

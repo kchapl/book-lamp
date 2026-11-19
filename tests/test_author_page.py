@@ -307,6 +307,71 @@ def test_an_external_result_matching_an_owned_isbn_creates_no_duplicate(authenti
     assert [item["book_id"] for item in storage.get_reading_list()] == [existing["id"]]
 
 
+def test_an_owned_book_without_a_subtitle_matches_the_edition_that_has_one(authenticated_client, monkeypatch):
+    """A stored title alone must not offer the work again once an edition names it.
+
+    The reader owns ``Dune`` with no subtitle; the author lookup returns the same
+    work under another edition's ISBN with ``Book One of the Dune Chronicles``.
+    An empty subtitle says nothing about which work it is, so the result is owned.
+    """
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    storage.add_book(isbn13="9780441013593", title="Dune", authors=["Frank Herbert"])
+
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "Dune",
+                "subtitle": "Book One of the Dune Chronicles",
+                "author": "Frank Herbert",
+                "isbn13": "9780441172719",
+            }
+        ],
+    )
+
+    page = authenticated_client.get("/api/author/frank-herbert").get_json()
+
+    assert page["unread_books"] == []
+    assert [b["title"] for b in page["read_books"]] == ["Dune"]
+
+
+def test_two_subtitles_that_disagree_are_two_works(authenticated_client, monkeypatch):
+    """An owned pair does not swallow a different work under the same main title."""
+    import book_lamp.routes.authors as authors_route
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    storage.add_book(
+        isbn13="9780316129084",
+        title="The Expanse",
+        subtitle="Leviathan Wakes",
+        authors=["James S. A. Corey"],
+    )
+
+    monkeypatch.setattr(authors_route, "is_test_mode", lambda: False)
+    monkeypatch.setattr(
+        authors_route,
+        "lookup_books_by_author",
+        lambda _name: [
+            {
+                "title": "The Expanse",
+                "subtitle": "Caliban's War",
+                "author": "James S. A. Corey",
+                "isbn13": "9780316129060",
+            }
+        ],
+    )
+
+    page = authenticated_client.get("/api/author/james-s-a-corey").get_json()
+
+    assert [b["subtitle"] for b in page["unread_books"]] == ["Caliban's War"]
+
+
 @pytest.mark.skipif(
     os.environ.get("TEST_MODE") == "1",
     reason="Test expects unauthorized redirect but TEST_MODE forces authorised state",
