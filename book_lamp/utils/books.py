@@ -65,6 +65,15 @@ def split_title_parts(
     return head, tail
 
 
+def _drop_repeated_subtitle(main: str, second: Optional[str]) -> tuple[str, Optional[str]]:
+    """Reduce a main title that still ends with the subtitle beside it."""
+    if main and second:
+        head, tail = split_title_parts(main)
+        if tail and tail.casefold() == second.casefold():
+            main = head
+    return main, second
+
+
 def normalise_title_pair(title: Optional[str], subtitle: Optional[str] = None) -> tuple[str, Optional[str]]:
     """A title and its subtitle read as one pair, holding the subtitle once.
 
@@ -74,12 +83,21 @@ def normalise_title_pair(title: Optional[str], subtitle: Optional[str] = None) -
     The title is split first, and only a tail that is that subtitle is dropped,
     so a title the split rule cannot divide is left exactly as it arrived.
     """
-    main, second = split_title_parts(title, subtitle)
-    if main and second:
-        head, tail = split_title_parts(main)
-        if tail and tail.casefold() == second.casefold():
-            main = head
-    return main, second
+    return _drop_repeated_subtitle(*split_title_parts(title, subtitle))
+
+
+def normalise_edited_title_pair(title: Optional[str], subtitle: Optional[str] = None) -> tuple[str, Optional[str]]:
+    """A title and subtitle a reader typed, stored as entered apart from a repeat.
+
+    An edit states both fields, so ``Foo Bar: Baz`` with the subtitle cleared is
+    a whole title: splitting it again would make a wrong split impossible to
+    undo, though editing a Book is the recovery the migration describes. Only a
+    title that still carries the subtitle submitted beside it is reduced, the
+    pair the previous instance can leave behind while a deploy lands.
+    """
+    main = re.sub(r"\s+", " ", str(title or "")).strip()
+    second = re.sub(r"\s+", " ", str(subtitle or "")).strip() or None
+    return _drop_repeated_subtitle(main, second)
 
 
 #: What may join a title to a subtitle its title already carries.

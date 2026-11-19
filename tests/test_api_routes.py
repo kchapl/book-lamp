@@ -289,6 +289,27 @@ def test_api_update_book_normalises_a_title_that_carries_its_subtitle(authentica
     assert updated["subtitle"] == "A Novel"
 
 
+def test_api_update_book_stores_a_title_a_reader_meant_whole(authenticated_client):
+    """An edit can undo a split: clearing the subtitle keeps the title whole."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="558", title="Foo Bar", subtitle="Baz", authors=["An Author"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "title": "Foo Bar: Baz",
+            "subtitle": "",
+            "author": "An Author",
+            "isbn13": "9780306406157",
+        },
+    )
+
+    assert resp.status_code == 200
+    updated = storage.get_book_by_id(book["id"])
+    assert updated["title"] == "Foo Bar: Baz"
+    assert not updated["subtitle"]
+
+
 def test_api_update_book_keeps_the_names_it_is_given(authenticated_client):
     """An edit that carries the list replaces the Authors with exactly those."""
     storage = get_storage()

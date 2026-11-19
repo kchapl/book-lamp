@@ -6,7 +6,12 @@ split, and only where the split is safe. These are the cases the issue names.
 
 import pytest
 
-from book_lamp.utils.books import full_title, normalise_title_pair, split_title_parts
+from book_lamp.utils.books import (
+    full_title,
+    normalise_edited_title_pair,
+    normalise_title_pair,
+    split_title_parts,
+)
 
 
 @pytest.mark.parametrize(
@@ -62,6 +67,14 @@ def test_a_subtitle_repeated_inside_the_title_is_held_once():
     # and an unsplittable title is left exactly as it arrived.
     assert normalise_title_pair("Piranesi: A Novel", "A Memoir") == ("Piranesi: A Novel", "A Memoir")
     assert normalise_title_pair("Re: Zero", "Zero") == ("Re: Zero", "Zero")
+
+
+def test_an_edited_pair_is_stored_as_typed():
+    """A reader's edit can undo a split; only a repeated subtitle is dropped."""
+    assert normalise_edited_title_pair("Foo Bar: Baz", None) == ("Foo Bar: Baz", None)
+    assert normalise_edited_title_pair("Foo Bar: Baz", "") == ("Foo Bar: Baz", None)
+    assert normalise_edited_title_pair("Piranesi: A Novel", "A Novel") == ("Piranesi", "A Novel")
+    assert normalise_edited_title_pair("Re: Zero", "Zero") == ("Re: Zero", "Zero")
 
 
 def test_the_full_title_does_not_repeat_a_subtitle_the_title_already_has():
