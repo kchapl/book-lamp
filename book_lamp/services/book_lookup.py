@@ -1256,6 +1256,11 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                 logger.warning(f"No lookup result for {title} (ISBN: {isbn})")
                 return False
 
+            # The batch parser leaves a provider's combined title whole, and the
+            # pair is what gets stored: read it as parts first, the way the deep
+            # merge does, so a combined title is not written beside a subtitle.
+            _split_title_pair(info)
+
             logger.debug(f"Found data from {source} for {title}: {info}")
 
             has_updates = False
