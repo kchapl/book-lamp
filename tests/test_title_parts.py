@@ -6,7 +6,7 @@ split, and only where the split is safe. These are the cases the issue names.
 
 import pytest
 
-from book_lamp.utils.books import full_title, split_title_parts
+from book_lamp.utils.books import full_title, normalise_title_pair, split_title_parts
 
 
 @pytest.mark.parametrize(
@@ -52,6 +52,16 @@ def test_a_blank_provider_subtitle_falls_back_to_the_split_rule():
 
 def test_a_missing_provider_subtitle_falls_back_to_the_split_rule():
     assert split_title_parts("Piranesi: A Novel", None) == ("Piranesi", "A Novel")
+
+
+def test_a_subtitle_repeated_inside_the_title_is_held_once():
+    """Wherever a provider puts the subtitle, the pair stores it once."""
+    assert normalise_title_pair("Piranesi: A Novel", "A Novel") == ("Piranesi", "A Novel")
+    assert normalise_title_pair("Piranesi - A Novel", "A Novel") == ("Piranesi", "A Novel")
+    # A subtitle that disagrees with the one in the title is not the same name,
+    # and an unsplittable title is left exactly as it arrived.
+    assert normalise_title_pair("Piranesi: A Novel", "A Memoir") == ("Piranesi: A Novel", "A Memoir")
+    assert normalise_title_pair("Re: Zero", "Zero") == ("Re: Zero", "Zero")
 
 
 def test_the_full_title_recombines_the_parts_for_export_and_the_log():

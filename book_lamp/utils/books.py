@@ -65,6 +65,23 @@ def split_title_parts(
     return head, tail
 
 
+def normalise_title_pair(title: Optional[str], subtitle: Optional[str] = None) -> tuple[str, Optional[str]]:
+    """A title and its subtitle read as one pair, holding the subtitle once.
+
+    A provider may leave the subtitle inside the title ("Piranesi: A Novel") and
+    also supply it beside ("A Novel"). Read apart the pair is harmless, but
+    recombined it says the subtitle twice, in every export and the Reading Log.
+    The title is split first, and only a tail that is that subtitle is dropped,
+    so a title the split rule cannot divide is left exactly as it arrived.
+    """
+    main, second = split_title_parts(title, subtitle)
+    if main and second:
+        head, tail = split_title_parts(main)
+        if tail and tail.casefold() == second.casefold():
+            main = head
+    return main, second
+
+
 def full_title(title: Optional[str], subtitle: Optional[str] = None) -> str:
     """A Book's whole title, as one string: the form exports and the log use."""
     main = str(title or "").strip()

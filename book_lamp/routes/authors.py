@@ -6,7 +6,7 @@ from book_lamp.middleware.auth import authorisation_required
 from book_lamp.services.book_lookup import lookup_books_by_author
 from book_lamp.services.storage_factory import get_storage, is_test_mode
 from book_lamp.utils.authors import matches
-from book_lamp.utils.books import full_title, normalise_provider_title, split_title_parts
+from book_lamp.utils.books import full_title, normalise_provider_title, normalise_title_pair
 from book_lamp.utils.publishers import normalize_publisher, publisher_slug
 
 authors_bp = Blueprint("authors", __name__)
@@ -29,16 +29,10 @@ def _title_parts(title: object, subtitle: object) -> tuple[str, str]:
 
     Storage keeps a title and its subtitle apart, but author lookup returns a
     provider's title untouched, so a result may still carry ``Foo: Bar`` as its
-    title with no subtitle of its own. The split is taken before comparing, or
-    the combined key would never equal the stored main title.
+    title with no subtitle of its own. The pair is read the shared way before
+    comparing, or the combined key would never equal the stored main title.
     """
-    main, second = split_title_parts(str(title or ""), str(subtitle or ""))
-    if second:
-        # A provider may also leave the subtitle inside the title while giving
-        # it separately; the stored pair repeats it once, never twice.
-        head, tail = split_title_parts(main)
-        if tail and tail.casefold() == second.casefold():
-            main = head
+    main, second = normalise_title_pair(str(title or ""), str(subtitle or ""))
     return _title_key(main), _title_key(second)
 
 
