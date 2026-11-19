@@ -119,7 +119,7 @@ def test_the_plain_run_does_not_split_a_title_the_reader_kept_whole(monkeypatch)
 
     splits = []
     monkeypatch.setattr(backfill_subtitles, "_pool", lambda: object())
-    monkeypatch.setattr(backfill_subtitles, "_books_missing_subtitle", lambda pool: [])
+    monkeypatch.setattr(backfill_subtitles, "_books_without_subtitle", lambda pool: [])
     monkeypatch.setattr(
         backfill_subtitles,
         "split_stored_titles",
@@ -146,7 +146,6 @@ def test_the_split_flag_runs_the_deferred_rewrite(monkeypatch):
     calls = []
     monkeypatch.setattr(backfill_subtitles, "_pool", lambda: object())
     monkeypatch.setattr(backfill_subtitles, "_books_without_subtitle", lambda pool: stored)
-    monkeypatch.setattr(backfill_subtitles, "_books_missing_subtitle", lambda pool: [])
     monkeypatch.setattr(
         backfill_subtitles,
         "split_stored_titles",

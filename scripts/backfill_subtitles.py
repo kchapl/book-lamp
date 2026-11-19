@@ -49,22 +49,16 @@ def _pool():
 
 
 def _books_without_subtitle(pool) -> List[Dict[str, Any]]:
+    """Every Book with no subtitle, for both phases to read.
+
+    The fill skips the rows without an ISBN itself, since such a Book cannot be
+    looked up, so the two phases need no separate queries.
+    """
     with pool.connection() as conn:
         rows = conn.execute("""
             SELECT id, isbn13, title, subtitle
             FROM books
             WHERE subtitle IS NULL
-            ORDER BY id
-            """).fetchall()
-    return [dict(row) for row in rows]
-
-
-def _books_missing_subtitle(pool) -> List[Dict[str, Any]]:
-    with pool.connection() as conn:
-        rows = conn.execute("""
-            SELECT id, isbn13, title, subtitle
-            FROM books
-            WHERE subtitle IS NULL AND btrim(isbn13) <> ''
             ORDER BY id
             """).fetchall()
     return [dict(row) for row in rows]
@@ -164,7 +158,7 @@ def main() -> None:
         print("Stored titles split: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
 
     counts = backfill_missing_subtitles(
-        _books_missing_subtitle(pool),
+        _books_without_subtitle(pool),
         write=None if args.dry_run else lambda book, isbn, subtitle: _write_subtitle(pool, book, isbn, subtitle),
         on_progress=progress,
     )
