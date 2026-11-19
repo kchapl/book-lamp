@@ -37,9 +37,9 @@ def test_search_books_by_subtitle():
 def test_a_stored_title_still_answers_to_the_name_it_was_split_from():
     """A split title is stored in two fields; the old combined name still finds it.
 
-    Migration 0011 rewrote ``Piranesi: A Novel`` as the title ``Piranesi`` plus
-    the subtitle ``A Novel``, and neither stored field carries the separator a
-    reader types from memory.
+    The subtitle backfill rewrote ``Piranesi: A Novel`` as the title ``Piranesi``
+    plus the subtitle ``A Novel``, and neither stored field carries the separator
+    a reader types from memory.
     """
     books = [
         {

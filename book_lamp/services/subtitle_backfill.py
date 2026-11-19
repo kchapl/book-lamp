@@ -55,6 +55,11 @@ def split_stored_titles(
     so a late save cannot put the subtitle back into the title. Only a title the
     shared rule divides is touched, a row that already has a subtitle is not,
     and ``write`` receives the whole book so it can guard on the title it read.
+
+    This is a one-off step, not a routine sweep: clearing a subtitle is how a
+    reader keeps a whole title after undoing a split, so a later run must not
+    divide that title again. The script therefore gates it behind
+    ``--split-titles``.
     """
     candidates = list(books)
     counts = {"updated": 0, "skipped": 0, "failed": 0}

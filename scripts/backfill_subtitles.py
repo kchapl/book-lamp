@@ -1,20 +1,26 @@
 #!/usr/bin/env python
-"""Split stored Book titles and fill in missing subtitles (#384).
+"""Split stored Book titles once, and fill in missing subtitles (#384).
 
-Run this once after the release has switched over, and again only if a provider
-record has been corrected. Migration 0011 adds the column but leaves the titles
-already stored alone, because it lands while the previous instance is still
-serving and writes combined titles. This script does the rewrite instead: it
-first divides the titles the shared rule can divide, then fills the subtitles no
-title carried from Open Library and Google Books, and reports what it did.
+Migration 0011 adds the column but leaves the titles already stored alone,
+because it lands while the previous instance is still serving and writes
+combined titles. The rewrite is this script's one-off step, run after the
+release has switched over:
+
+    uv run python scripts/backfill_subtitles.py --split-titles
+
+That run divides the stored titles the shared rule can divide, then fills the
+subtitles no title carried from Open Library and Google Books. Later runs fill
+subtitles only, and are safe to repeat:
 
     uv run python scripts/backfill_subtitles.py
     uv run python scripts/backfill_subtitles.py --report
     uv run python scripts/backfill_subtitles.py --dry-run
 
-``--report`` makes no changes and only counts what the run would find. Lookups
-are sequential and use the app's shared HTTP session, which keeps the
-providers' rate limits in view.
+``--split-titles`` must not be repeated: clearing a subtitle is how a reader
+keeps a whole title such as ``Foo Bar: Baz`` after undoing a split, and another
+run would divide it again. ``--report`` makes no changes and only counts what
+the subtitle fill would find. Lookups are sequential and use the app's shared
+HTTP session, which keeps the providers' rate limits in view.
 """
 
 import argparse
@@ -111,6 +117,11 @@ def _write_subtitle(pool, book_id: int, isbn13: str, subtitle: str) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--split-titles",
+        action="store_true",
+        help="one-off: divide the stored titles migration 0011 left whole",
+    )
+    parser.add_argument(
         "--report",
         action="store_true",
         help="count what the backfill would do, without writing anything",
@@ -137,12 +148,13 @@ def main() -> None:
         if done == total or done % 25 == 0:
             print(f"  {done}/{total}", file=sys.stderr)
 
-    counts = split_stored_titles(
-        _books_without_subtitle(pool),
-        write=None if args.dry_run else lambda book, title, subtitle: _write_split(pool, book, title, subtitle),
-        on_progress=progress,
-    )
-    print("Stored titles split: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
+    if args.split_titles:
+        counts = split_stored_titles(
+            _books_without_subtitle(pool),
+            write=None if args.dry_run else lambda book, title, subtitle: _write_split(pool, book, title, subtitle),
+            on_progress=progress,
+        )
+        print("Stored titles split: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
 
     counts = backfill_missing_subtitles(
         _books_missing_subtitle(pool),

@@ -82,22 +82,32 @@ did: a rewrite in the migration could be undone by an edit opened before the
 deploy and saved after it, leaving the combined title beside the new subtitle
 and showing the subtitle twice.
 
-The split therefore waits until the old writers have stopped. After the release
-has switched over, run:
+The split therefore waits until the old writers have stopped, and is a one-off
+step. After the release has switched over, run:
+
+```bash
+uv run python scripts/backfill_subtitles.py --split-titles
+```
+
+It divides the stored titles by the shared rule: a colon or a spaced dash, a
+main title longer than three characters, and a non-empty remainder. `Re: Zero`,
+`10:04`, `Spider-Man` and a title with no separator stay whole, and the parts
+recombine into the original apart from the whitespace the rule normalises. The
+same run then fills the missing subtitles described below, so one command does
+both jobs.
+
+Do not repeat `--split-titles`: clearing a subtitle is how a reader keeps a
+whole title such as `Foo Bar: Baz` after undoing a split, and another run would
+divide it again. Later runs fill subtitles only, and are safe to repeat:
 
 ```bash
 uv run python scripts/backfill_subtitles.py
 ```
 
-The script first divides the stored titles by the shared rule: a colon or a
-spaced dash, a main title longer than three characters, and a non-empty
-remainder. `Re: Zero`, `10:04`, `Spider-Man` and a title with no separator stay
-whole, and the parts recombine into the original apart from the whitespace the
-rule normalises. It then asks Open Library first and Google Books second for
-subtitles of the rows the rule could not divide, fills only rows whose subtitle
-is NULL, and skips a title that still carries its subtitle rather than store the
-pair twice. It is idempotent. `--report` counts what a run would find without
-writing, and `--dry-run` does the work without saving it.
+The fill asks Open Library first and Google Books second, fills only rows whose
+subtitle is NULL, and skips a title that still carries its subtitle rather than
+store the pair twice. `--report` counts what it would find without writing, and
+`--dry-run` does the work without saving it.
 
 A wrong split is recovered by editing the Book: the edit form stores the title
 and subtitle as typed.

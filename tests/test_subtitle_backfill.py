@@ -1,5 +1,8 @@
-"""The one-off subtitle backfill only fills a gap, and reports what it did."""
+"""The subtitle backfill splits once, then only fills gaps, and reports what it did."""
 
+import sys
+
+from book_lamp.services.search import search_books
 from book_lamp.services.subtitle_backfill import (
     backfill_missing_subtitles,
     report_subtitles,
@@ -84,6 +87,82 @@ def test_a_title_that_still_carries_its_subtitle_is_left_for_the_split():
     )
 
     assert counts == {"updated": 0, "skipped": 1, "failed": 0}
+
+
+def test_the_split_title_still_answers_to_its_old_combined_name():
+    """Search never relied on the separator being stored, so the split keeps it.
+
+    Migration 0011 only adds the column and the backfill divides the title, so a
+    reader typing ``Piranesi: A Novel`` must find the Book from its two stored
+    parts: the title answers for ``Piranesi`` and the subtitle for ``A Novel``.
+    """
+    books = [
+        {"id": 1, "isbn13": "9781635575637", "title": "Piranesi: A Novel", "subtitle": None},
+    ]
+
+    split_stored_titles(
+        books,
+        write=lambda book, title, subtitle: book.update(title=title, subtitle=subtitle) or True,
+    )
+
+    assert (books[0]["title"], books[0]["subtitle"]) == ("Piranesi", "A Novel")
+    assert [book["title"] for book in search_books(books, [], "Piranesi: A Novel")] == ["Piranesi"]
+
+
+def test_the_plain_run_does_not_split_a_title_the_reader_kept_whole(monkeypatch):
+    """Only ``--split-titles`` rewrites titles: a cleared subtitle stays cleared.
+
+    Clearing the subtitle is how a wrong split is undone, so the routine fill
+    that the docs call repeatable must not divide the title again.
+    """
+    from scripts import backfill_subtitles
+
+    splits = []
+    monkeypatch.setattr(backfill_subtitles, "_pool", lambda: object())
+    monkeypatch.setattr(backfill_subtitles, "_books_missing_subtitle", lambda pool: [])
+    monkeypatch.setattr(
+        backfill_subtitles,
+        "split_stored_titles",
+        lambda books, write=None, on_progress=None: splits.append(list(books))
+        or {"updated": 0, "skipped": 0, "failed": 0},
+    )
+    monkeypatch.setattr(
+        backfill_subtitles,
+        "backfill_missing_subtitles",
+        lambda books, write=None, on_progress=None: {"updated": 0, "skipped": 0, "failed": 0},
+    )
+    monkeypatch.setattr(sys, "argv", ["backfill_subtitles.py"])
+
+    backfill_subtitles.main()
+
+    assert splits == []
+
+
+def test_the_split_flag_runs_the_deferred_rewrite(monkeypatch):
+    """The one-off step runs when it is asked for, over the rows it was read."""
+    from scripts import backfill_subtitles
+
+    stored = [{"id": 1, "isbn13": "9780000000001", "title": "Piranesi: A Novel", "subtitle": None}]
+    calls = []
+    monkeypatch.setattr(backfill_subtitles, "_pool", lambda: object())
+    monkeypatch.setattr(backfill_subtitles, "_books_without_subtitle", lambda pool: stored)
+    monkeypatch.setattr(backfill_subtitles, "_books_missing_subtitle", lambda pool: [])
+    monkeypatch.setattr(
+        backfill_subtitles,
+        "split_stored_titles",
+        lambda books, write=None, on_progress=None: calls.append(list(books))
+        or {"updated": 0, "skipped": 0, "failed": 0},
+    )
+    monkeypatch.setattr(
+        backfill_subtitles,
+        "backfill_missing_subtitles",
+        lambda books, write=None, on_progress=None: {"updated": 0, "skipped": 0, "failed": 0},
+    )
+    monkeypatch.setattr(sys, "argv", ["backfill_subtitles.py", "--split-titles"])
+
+    backfill_subtitles.main()
+
+    assert calls == [stored]
 
 
 def test_the_report_counts_the_split_and_the_provider_only_subtitles():
