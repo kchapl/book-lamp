@@ -292,9 +292,7 @@ def test_a_libpq_only_url_parameter_is_removed_for_asyncpg() -> None:
     """Neon's shared URL may carry options libpq knows and asyncpg does not."""
     url = "postgresql://reader:secret@db.example.com/book-lamp?sslmode=require&channel_binding=require"
 
-    assert mcp_server.asyncpg_dsn(url) == (
-        "postgresql://reader:secret@db.example.com/book-lamp?sslmode=require"
-    )
+    assert mcp_server.asyncpg_dsn(url) == ("postgresql://reader:secret@db.example.com/book-lamp?sslmode=require")
 
 
 def test_the_store_pool_is_small_and_has_no_statement_cache(monkeypatch) -> None:
