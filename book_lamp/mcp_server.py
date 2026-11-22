@@ -15,11 +15,18 @@ Run it with `python -m book_lamp.mcp_server`, which needs the `mcp` extra.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, List, Optional, Union
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+import asyncpg
+from cryptography.fernet import Fernet
 from fastmcp import FastMCP
+from fastmcp.server.auth.jwt_issuer import derive_jwt_key
 from fastmcp.server.auth.providers.google import GoogleProvider
 from fastmcp.server.dependencies import get_access_token
+from key_value.aio.stores.postgresql import PostgreSQLStore
+from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
@@ -33,6 +40,11 @@ READER_EMAIL_ENV = "BOOK_LAMP_USER_EMAIL"
 CLIENT_ID_ENV = "BOOK_LAMP_MCP_CLIENT_ID"
 CLIENT_SECRET_ENV = "BOOK_LAMP_MCP_CLIENT_SECRET"
 BASE_URL_ENV = "BOOK_LAMP_MCP_BASE_URL"
+DATABASE_URL_ENV = "DATABASE_URL"
+
+#: The table the MCP service owns. It is created on first use, so the OAuth state
+#: does not need an Alembic migration or a release that touches the app's schema.
+OAUTH_STATE_TABLE = "mcp_oauth_state"
 
 #: What the server asks Google for: who the reader is, and nothing else. Both are
 #: non-sensitive scopes, so publishing the consent screen needs no verification.
@@ -70,13 +82,98 @@ def reader_email() -> str:
     return _required(READER_EMAIL_ENV).lower()
 
 
-def auth_provider() -> GoogleProvider:
-    """Google as the authenticator, behind a proxy that speaks MCP's OAuth."""
+#: Libpq accepts these URL parameters, but asyncpg treats unknown query
+#: parameters as server startup settings and refuses the connection.
+_LIBPQ_ONLY_PARAMETERS = frozenset({"channel_binding"})
+
+
+def asyncpg_dsn(url: str) -> str:
+    """Remove libpq-only query parameters before handing a URL to asyncpg."""
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+
+    query = [
+        (name, value)
+        for name, value in parse_qsl(parts.query, keep_blank_values=True)
+        if name not in _LIBPQ_ONLY_PARAMETERS
+    ]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+class BookLampOAuthStore(PostgreSQLStore):
+    """The OAuth key-value store, with a pool built for Neon's pooler.
+
+    The service has one reader, so a couple of connections is all it needs. The
+    statement cache has to stay off because ``DATABASE_URL`` points at Neon's
+    PgBouncer endpoint: named prepared statements belong to a backend connection,
+    and transaction pooling hands the next query a different one.
+    """
+
+    async def _create_pool(self) -> asyncpg.Pool:
+        if not self._url:
+            raise RuntimeError("the OAuth state store needs DATABASE_URL")
+        return await asyncpg.create_pool(
+            asyncpg_dsn(self._url),
+            min_size=1,
+            max_size=2,
+            statement_cache_size=0,
+        )
+
+
+def oauth_state_store() -> PostgreSQLStore:
+    """The unencrypted store, created lazily and set up in the server lifespan."""
+    return BookLampOAuthStore(
+        url=_required(DATABASE_URL_ENV),
+        table_name=OAUTH_STATE_TABLE,
+    )
+
+
+def _storage_encryption_key(client_secret: str) -> bytes:
+    """A stable Fernet key from the Google client secret.
+
+    No new setting is needed, and the same secret decrypts the store after a
+    restart. A rotated secret deliberately cannot read the old rows.
+    """
+    return derive_jwt_key(high_entropy_material=client_secret, salt="book-lamp-mcp-oauth-state")
+
+
+def encrypted_client_storage(store: Any, client_secret: str) -> FernetEncryptionWrapper:
+    """Encrypt OAuth registrations and upstream tokens before they reach Postgres."""
+    return FernetEncryptionWrapper(
+        key_value=store,
+        fernet=Fernet(key=_storage_encryption_key(client_secret)),
+        raise_on_decryption_error=False,
+    )
+
+
+def oauth_state_lifespan(store: Any):
+    """Set the store up before FastMCP binds its port.
+
+    An unreachable database therefore fails startup rather than producing a
+    service that passes its health check and refuses every OAuth request.
+    """
+
+    @asynccontextmanager
+    async def lifespan(_server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
+        await store.setup()
+        yield {}
+
+    return lifespan
+
+
+def auth_provider(client_storage: Any) -> GoogleProvider:
+    """Google as the authenticator, behind a proxy that speaks MCP's OAuth.
+
+    The storage is required so it cannot be built without the lifespan that sets
+    it up, which is what makes an unreachable database fail startup.
+    """
     return GoogleProvider(
         client_id=_required(CLIENT_ID_ENV),
         client_secret=_required(CLIENT_SECRET_ENV),
         base_url=_required(BASE_URL_ENV),
         required_scopes=list(READER_SCOPES),
+        client_storage=client_storage,
     )
 
 
@@ -137,13 +234,14 @@ def _reading_fields(reading: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def build_server(auth: Optional[Any] = None) -> FastMCP:
+def build_server(auth: Optional[Any] = None, lifespan: Optional[Any] = None) -> FastMCP:
     """The server and its three tools.
 
     ``auth`` is passed in rather than read from the environment so a test can
     build the server without Google credentials; only :func:`main` reads them.
+    ``lifespan`` is where a real server sets up persistent OAuth storage.
     """
-    server = FastMCP(name="Book Lamp", instructions=INSTRUCTIONS, auth=auth)
+    server = FastMCP(name="Book Lamp", instructions=INSTRUCTIONS, auth=auth, lifespan=lifespan)
 
     @server.tool
     def search_books(query: str) -> List[Dict[str, Any]]:
@@ -229,7 +327,12 @@ def main() -> None:
     # Left to the tools, a deploy missing only that one would bind, pass its health
     # check and refuse every call — a service that looks like a working one.
     reader_email()
-    server = build_server(auth=auth_provider())
+    store = oauth_state_store()
+    client_storage = encrypted_client_storage(store, _required(CLIENT_SECRET_ENV))
+    server = build_server(
+        auth=auth_provider(client_storage=client_storage),
+        lifespan=oauth_state_lifespan(store),
+    )
     server.run(transport="http", host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
 
 

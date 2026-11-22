@@ -54,10 +54,9 @@ HTTP and sharing the application's PostgreSQL database.
 - Because the endpoint writes nothing, publishing its URL costs disclosure of a
   reading history, not damage to it. That is what made it acceptable to build the
   read path first and prove the transport with it.
-- Client registrations and tokens are held in memory, so a deploy makes Gemini
-  register and consent again. This is a deliberate deferral: the alternative is a
-  Redis-backed store, which is a second managed service for a single-reader
-  application.
+- Client registrations and tokens are held in an encrypted Postgres store, so
+  they survive deploys and idle spin-downs (ADR-0006). A deploy no longer makes
+  Gemini register and consent again.
 - The requested scopes (`openid`, `userinfo.email`) are non-sensitive, so the
   Google consent screen can be published to Production without going through
   Google's verification review. That matters more than it looks: an app left in

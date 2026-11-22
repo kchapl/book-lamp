@@ -169,14 +169,16 @@ application's `DATABASE_URL` but nothing else.
 | Start Command | `uv run --no-dev --extra mcp python -m book_lamp.mcp_server` |
 | Health check path | `/.well-known/oauth-protected-resource/mcp` |
 
-`--extra mcp` is what installs `fastmcp`. The Flask service does not pass it, so
-the extra never reaches that deploy.
+`--extra mcp` is what installs `fastmcp` and the asyncpg driver for the OAuth
+store. The Flask service does not pass it, so the extra never reaches that
+deploy. The store creates its `mcp_oauth_state` table on first use; no migration
+step is needed.
 
 ### Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | The same PostgreSQL connection string the app uses |
+| `DATABASE_URL` | The same PostgreSQL connection string the app uses. The MCP service also keeps its OAuth state in a table here |
 | `BOOK_LAMP_USER_EMAIL` | The one reader this server serves. The verified Google address must equal it, and the address must already be a Book Lamp user |
 | `BOOK_LAMP_MCP_CLIENT_ID` | Client ID of the MCP OAuth client (below) |
 | `BOOK_LAMP_MCP_CLIENT_SECRET` | Client secret of the same client |
@@ -224,6 +226,14 @@ setting is missing. That is intended; there is no fallback reader.
 `BOOK_LAMP_USER_EMAIL`, or that address has never signed in to the app, so no
 `users` row exists for it. Sign in to Book Lamp once with that account.
 
-**Gemini asks for consent again after every deploy** — client registrations and
-tokens are held in memory. Persisting them needs a `client_storage` backend (Redis)
-and a `jwt_signing_key`; it is deliberately deferred in ADR-0004.
+**Gemini shows "Client Not Registered"** — the client ID Gemini sends is not in
+the OAuth store. Client registrations and upstream tokens are persisted in
+`mcp_oauth_state` and survive deploys and idle spin-downs (ADR-0006), so this
+means the database was reset or `BOOK_LAMP_MCP_CLIENT_SECRET` changed and the old
+rows can no longer be decrypted. Remove the custom app in Gemini and add it again
+to register a new client. If it recurs on every deploy, check that `DATABASE_URL`
+points at the same database and that the service is not recreating the table.
+
+**Gemini asks for consent again after every deploy** — it should not: the store
+is persistent. Repeated consent means the registration is being lost, so check
+the two causes above before changing the OAuth client.

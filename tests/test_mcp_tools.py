@@ -10,6 +10,7 @@ tokenless call, and the sign-in finally leaving for Google.
 import asyncio
 import base64
 import hashlib
+import json
 import os
 import re
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ pytest.importorskip("fastmcp")
 
 from fastmcp import Client  # noqa: E402
 from fastmcp.exceptions import ToolError  # noqa: E402
+from key_value.aio.stores.memory import MemoryStore  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402
 
 from book_lamp import mcp_server  # noqa: E402
@@ -228,13 +230,20 @@ def _all_settings(monkeypatch) -> None:
         mcp_server.CLIENT_ID_ENV: "123.apps.googleusercontent.com",
         mcp_server.CLIENT_SECRET_ENV: "GOCSPX-not-a-real-secret",
         mcp_server.BASE_URL_ENV: BASE_URL,
+        mcp_server.DATABASE_URL_ENV: "postgresql://book-lamp.invalid/book-lamp",
     }.items():
         monkeypatch.setenv(name, value)
 
 
 @pytest.mark.parametrize(
     "missing",
-    [mcp_server.READER_EMAIL_ENV, mcp_server.CLIENT_ID_ENV, mcp_server.CLIENT_SECRET_ENV, mcp_server.BASE_URL_ENV],
+    [
+        mcp_server.READER_EMAIL_ENV,
+        mcp_server.CLIENT_ID_ENV,
+        mcp_server.CLIENT_SECRET_ENV,
+        mcp_server.BASE_URL_ENV,
+        mcp_server.DATABASE_URL_ENV,
+    ],
 )
 def test_a_missing_setting_stops_the_server_rather_than_defaulting(monkeypatch, missing: str) -> None:
     """There is no unauthenticated mode to fall back into, so this cannot be soft."""
@@ -279,6 +288,50 @@ def test_starting_serves_once_every_setting_is_present(monkeypatch) -> None:
     assert served == {"transport": "http", "host": "0.0.0.0", "port": 8123}
 
 
+def test_a_libpq_only_url_parameter_is_removed_for_asyncpg() -> None:
+    """Neon's shared URL may carry options libpq knows and asyncpg does not."""
+    url = "postgresql://reader:secret@db.example.com/book-lamp?sslmode=require&channel_binding=require"
+
+    assert mcp_server.asyncpg_dsn(url) == ("postgresql://reader:secret@db.example.com/book-lamp?sslmode=require")
+
+
+def test_the_store_pool_is_small_and_has_no_statement_cache(monkeypatch) -> None:
+    """PgBouncer transaction pooling cannot keep asyncpg's prepared statements."""
+    captured: dict = {}
+
+    async def fake_create_pool(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(mcp_server.asyncpg, "create_pool", fake_create_pool)
+    store = mcp_server.BookLampOAuthStore(url="postgresql://db.example.com/book-lamp?channel_binding=require")
+
+    asyncio.run(store._create_pool())
+
+    assert captured["url"] == "postgresql://db.example.com/book-lamp"
+    assert captured["min_size"] == 1
+    assert captured["max_size"] == 2
+    assert captured["statement_cache_size"] == 0
+
+
+def test_startup_fails_when_the_oauth_store_cannot_be_set_up() -> None:
+    """An unreachable database must stop the service before it serves anything."""
+
+    class UnreachableStore:
+        async def setup(self) -> None:
+            raise ConnectionError("database unreachable")
+
+    lifespan = mcp_server.oauth_state_lifespan(UnreachableStore())
+
+    async def start() -> None:
+        async with lifespan(None):
+            raise AssertionError("served with an unreachable OAuth store")
+
+    with pytest.raises(ConnectionError, match="database unreachable"):
+        asyncio.run(start())
+
+
 # ---------------------------------------------------------------------------
 # The auth boundary, over HTTP
 # ---------------------------------------------------------------------------
@@ -291,7 +344,7 @@ def google_app(monkeypatch):
     monkeypatch.setenv(mcp_server.CLIENT_SECRET_ENV, "GOCSPX-not-a-real-secret")
     monkeypatch.setenv(mcp_server.BASE_URL_ENV, BASE_URL)
 
-    return mcp_server.build_server(auth=mcp_server.auth_provider()).http_app()
+    return _server_with(MemoryStore())
 
 
 def test_the_mcp_endpoint_refuses_a_tokenless_call(google_app) -> None:
@@ -312,6 +365,14 @@ def test_discovery_points_clients_at_this_server(google_app) -> None:
     assert document["resource"] == f"{BASE_URL}/mcp"
     assert document["authorization_servers"] == [f"{BASE_URL}/"]
     assert SCOPE.split()[1] in document["scopes_supported"]
+
+
+def _server_with(store):
+    """A server whose OAuth state lives in this store, set up by its lifespan."""
+    return mcp_server.build_server(
+        auth=mcp_server.auth_provider(client_storage=store),
+        lifespan=mcp_server.oauth_state_lifespan(store),
+    ).http_app()
 
 
 def _register(client: TestClient) -> str:
@@ -343,6 +404,43 @@ def _authorize(client: TestClient, client_id: str) -> str:
 
     assert response.status_code == 302, response.text
     return response.headers["location"]
+
+
+def test_a_registration_survives_rebuilding_the_server(monkeypatch) -> None:
+    """A deploy rebuilds the server; the client Gemini registered must still work.
+
+    This is the failure from issue #389: the OAuth routes accepted a client ID
+    into an ephemeral store, the next instance did not know it, and Gemini was
+    sent to the "Client Not Registered" page.
+    """
+    _all_settings(monkeypatch)
+    store = MemoryStore()
+
+    with TestClient(_server_with(store)) as first:
+        client_id = _register(first)
+
+    with TestClient(_server_with(store)) as second:
+        consent_url = _authorize(second, client_id)
+
+    assert consent_url.startswith(f"{BASE_URL}/")
+
+
+def test_oauth_state_is_encrypted_with_the_client_secret() -> None:
+    """The same secret reopens the store; a different one cannot read the value."""
+    underlying = MemoryStore()
+    first = mcp_server.encrypted_client_storage(underlying, "GOCSPX-secret-one")
+    value = {"upstream_token": "plaintext-token"}
+    asyncio.run(first.put("reader", value, collection="mcp-upstream-tokens"))
+
+    stored = asyncio.run(underlying.get("reader", collection="mcp-upstream-tokens"))
+    assert stored is not None
+    assert "plaintext-token" not in json.dumps(stored)
+
+    same_secret = mcp_server.encrypted_client_storage(underlying, "GOCSPX-secret-one")
+    assert asyncio.run(same_secret.get("reader", collection="mcp-upstream-tokens")) == value
+
+    different_secret = mcp_server.encrypted_client_storage(underlying, "GOCSPX-secret-two")
+    assert asyncio.run(different_secret.get("reader", collection="mcp-upstream-tokens")) is None
 
 
 def test_consenting_hands_the_reader_to_google(google_app) -> None:
