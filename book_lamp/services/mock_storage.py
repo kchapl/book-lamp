@@ -420,12 +420,19 @@ class MockStorage:
                 pos += 1
         self.reading_list = new_list
 
-    def bulk_import(self, items: list[dict[str, Any]], infer_subtitles: bool = False) -> int:
+    def bulk_import(
+        self,
+        items: list[dict[str, Any]],
+        infer_subtitles: bool = False,
+        write_names: bool = True,
+    ) -> int:
         """Write imported rows, keeping a stored Book's title and subtitle apart.
 
         Only ``infer_subtitles`` reads a combined title as provider text; the
         metadata backfill resends every stored Book, and a reader may have kept
-        ``Foo Bar: Baz`` whole by clearing its subtitle.
+        ``Foo Bar: Baz`` whole by clearing its subtitle. That backfill also
+        passes ``write_names=False``, because its snapshot predates the lookups
+        and a title split may have landed since.
         """
         import_count = 0
         for item in items:
@@ -433,11 +440,16 @@ class MockStorage:
             record_data = item["record"]
 
             imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
-            title, subtitle = normalise_title_pair(
-                book_data["title"],
-                book_data.get("subtitle"),
-                infer_subtitle=infer_subtitles,
-            )
+            if write_names:
+                title, subtitle = normalise_title_pair(
+                    book_data["title"],
+                    book_data.get("subtitle"),
+                    infer_subtitle=infer_subtitles,
+                )
+            else:
+                existing = self.get_book_by_isbn(book_data["isbn13"])
+                title = existing["title"] if existing else book_data["title"]
+                subtitle = existing.get("subtitle") if existing else book_data.get("subtitle")
             book = self.upsert_book(
                 isbn13=book_data["isbn13"],
                 title=title,

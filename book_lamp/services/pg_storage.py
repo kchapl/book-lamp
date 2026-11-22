@@ -777,7 +777,12 @@ class PostgresStorage:
                         [i + 1, self.user_id, bid],
                     )
 
-    def bulk_import(self, items: list[dict[str, Any]], infer_subtitles: bool = False) -> int:
+    def bulk_import(
+        self,
+        items: list[dict[str, Any]],
+        infer_subtitles: bool = False,
+        write_names: bool = True,
+    ) -> int:
         """Write imported rows, keeping a stored Book's title and subtitle apart.
 
         ``infer_subtitles`` reads a combined title with no subtitle as provider
@@ -785,6 +790,10 @@ class PostgresStorage:
         back through here, and a reader may have kept ``Foo Bar: Baz`` whole by
         clearing its subtitle, so that split is only made when the caller says
         the rows are external.
+
+        ``write_names`` is false for that backfill: its snapshot predates the
+        provider calls, so a title split that lands meanwhile must not be
+        overwritten by the stored title the snapshot carries.
         """
         import_count = 0
         with self.pool.connection() as conn:
@@ -816,9 +825,10 @@ class PostgresStorage:
                         )
 
                         # Update book (simplified for bulk)
-                        query = """
+                        name_assignments = "title = %s, subtitle = COALESCE(%s, subtitle), " if write_names else ""
+                        query = f"""
                             UPDATE books SET
-                                title = %s, subtitle = COALESCE(%s, subtitle), publication_year = %s,
+                                {name_assignments}publication_year = %s,
                                 publisher = %s, description = %s, series = %s,
                                 bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
                                 language = %s, page_count = %s, physical_format = %s, edition = %s,
@@ -829,8 +839,7 @@ class PostgresStorage:
                         conn.execute(
                             query,
                             [
-                                title,
-                                subtitle,
+                                *([title, subtitle] if write_names else []),
                                 book_data["publication_year"],
                                 book_data.get("publisher"),
                                 book_data.get("description"),
@@ -848,7 +857,12 @@ class PostgresStorage:
                             ],
                         )
                     else:
-                        query = """
+                        conflict_assignments = (
+                            "title = EXCLUDED.title, " "subtitle = COALESCE(EXCLUDED.subtitle, books.subtitle), "
+                            if write_names
+                            else ""
+                        )
+                        query = f"""
                             INSERT INTO books (
                                 isbn13, title, subtitle, publication_year, thumbnail_url,
                                 publisher, description, series, bisac_category,
@@ -856,9 +870,7 @@ class PostgresStorage:
                                 page_count, physical_format, edition, cover_url
                             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (isbn13) DO UPDATE SET
-                                title = EXCLUDED.title,
-                                subtitle = COALESCE(EXCLUDED.subtitle, books.subtitle),
-                                publication_year = EXCLUDED.publication_year,
+                                {conflict_assignments}publication_year = EXCLUDED.publication_year,
                                 thumbnail_url = EXCLUDED.thumbnail_url
                             RETURNING id
                         """

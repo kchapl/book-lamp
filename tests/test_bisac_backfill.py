@@ -109,6 +109,44 @@ def test_the_metadata_backfill_keeps_the_stored_name(monkeypatch):
     assert stored["bisac_category"] == "FICTION / General"
 
 
+def test_the_metadata_backfill_does_not_undo_a_split_that_lands_mid_run(monkeypatch):
+    """A split that lands while providers run must survive the write back."""
+    from book_lamp.routes.books import _background_fetch_missing_data
+    from book_lamp.services.storage_factory import get_storage
+
+    storage = get_storage()
+    isbn = "9780000000008"
+    book = storage.add_book(isbn13=isbn, title="Piranesi: A Novel", authors=["An Author"])
+
+    def lookup(isbns, force_refresh=False):
+        # The deferred subtitle backfill splits the row while the provider is
+        # being asked, after the metadata refresh took its snapshot.
+        storage.update_book(
+            book_id=book["id"],
+            isbn13=isbn,
+            title="Piranesi",
+            subtitle="A Novel",
+            authors=["An Author"],
+        )
+        return {
+            isbn: {
+                "title": "Piranesi",
+                "subtitle": "A Novel",
+                "bisac_category": "FICTION / General",
+                "bisac_main_category": "FICTION",
+                "bisac_sub_category": "General",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        }
+
+    monkeypatch.setattr("book_lamp.services.book_lookup.lookup_books_batch", lookup)
+
+    _background_fetch_missing_data("job-split", user_id=1)
+
+    stored = storage.get_book_by_id(book["id"])
+    assert (stored["title"], stored["subtitle"]) == ("Piranesi", "A Novel")
+
+
 def test_the_backfill_does_not_count_a_name_it_was_told_to_keep():
     """A Book whose only provider data is its name was not updated.
 

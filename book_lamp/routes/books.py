@@ -52,7 +52,8 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         logger.info(f"Background job {job_id}: checking {len(books)} books for missing data...")
 
         # A Book's name is the reader's: an edit is how a wrong split is undone,
-        # and a provider knows nothing of that choice.
+        # and a provider knows nothing of that choice. The write leaves both
+        # name fields alone too, because this snapshot predates the lookups.
         updated_count = enhance_books_batch(
             books,
             force_refresh=True,
@@ -60,7 +61,7 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         )
 
         items_to_update = [{"book": b, "record": None} for b in books]
-        storage.bulk_import(items_to_update)
+        storage.bulk_import(items_to_update, write_names=False)
 
         result_msg = (
             f"Found and updated missing data for {updated_count} book(s)."

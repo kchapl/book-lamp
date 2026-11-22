@@ -216,6 +216,26 @@ def test_bulk_import_keeps_a_title_the_reader_kept_whole(pg_storage):
     assert stored["subtitle"] is None
 
 
+def test_bulk_import_can_leave_a_name_changed_since_the_snapshot(pg_storage):
+    """A metadata refresh must not write the title its snapshot carried."""
+    isbn = "9780241181348"
+    book = pg_storage.add_book(isbn13=isbn, title="Piranesi: A Novel", authors=["An Author"])
+    stale = dict(book)
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=isbn,
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["An Author"],
+    )
+
+    pg_storage.bulk_import([{"book": stale, "record": None}], write_names=False)
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert (stored["title"], stored["subtitle"]) == ("Piranesi", "A Novel")
+
+
 def test_bulk_import_splits_a_combined_title_only_when_asked(pg_storage):
     """An imported file is external text, so its caller asks for the split."""
     pg_storage.bulk_import(
