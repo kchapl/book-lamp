@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 from cryptography.fernet import Fernet
@@ -81,6 +82,25 @@ def reader_email() -> str:
     return _required(READER_EMAIL_ENV).lower()
 
 
+#: Libpq accepts these URL parameters, but asyncpg treats unknown query
+#: parameters as server startup settings and refuses the connection.
+_LIBPQ_ONLY_PARAMETERS = frozenset({"channel_binding"})
+
+
+def asyncpg_dsn(url: str) -> str:
+    """Remove libpq-only query parameters before handing a URL to asyncpg."""
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+
+    query = [
+        (name, value)
+        for name, value in parse_qsl(parts.query, keep_blank_values=True)
+        if name not in _LIBPQ_ONLY_PARAMETERS
+    ]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 class BookLampOAuthStore(PostgreSQLStore):
     """The OAuth key-value store, with a pool built for Neon's pooler.
 
@@ -91,8 +111,10 @@ class BookLampOAuthStore(PostgreSQLStore):
     """
 
     async def _create_pool(self) -> asyncpg.Pool:
+        if not self._url:
+            raise RuntimeError("the OAuth state store needs DATABASE_URL")
         return await asyncpg.create_pool(
-            self._url or _required(DATABASE_URL_ENV),
+            asyncpg_dsn(self._url),
             min_size=1,
             max_size=2,
             statement_cache_size=0,
@@ -140,13 +162,12 @@ def oauth_state_lifespan(store: PostgreSQLStore):
     return lifespan
 
 
-def auth_provider(client_storage: Optional[Any] = None) -> GoogleProvider:
-    """Google as the authenticator, behind a proxy that speaks MCP's OAuth."""
-    if client_storage is None:
-        client_storage = encrypted_client_storage(
-            oauth_state_store(), _required(CLIENT_SECRET_ENV)
-        )
+def auth_provider(client_storage: Any) -> GoogleProvider:
+    """Google as the authenticator, behind a proxy that speaks MCP's OAuth.
 
+    The storage is required so it cannot be built without the lifespan that sets
+    it up, which is what makes an unreachable database fail startup.
+    """
     return GoogleProvider(
         client_id=_required(CLIENT_ID_ENV),
         client_secret=_required(CLIENT_SECRET_ENV),
