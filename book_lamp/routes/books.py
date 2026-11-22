@@ -23,7 +23,13 @@ from book_lamp.utils import (
     sort_books,
 )
 from book_lamp.utils.authors import display, parse
-from book_lamp.utils.books import cover_is_blank, isbn10_to_isbn13, normalize_isbn
+from book_lamp.utils.books import (
+    cover_is_blank,
+    full_title,
+    isbn10_to_isbn13,
+    normalise_title_pair,
+    normalize_isbn,
+)
 from book_lamp.utils.publishers import publisher_slug
 from book_lamp.utils.reading_status import latest_reading_by_book, with_reading_status
 
@@ -45,10 +51,17 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         books = storage.get_all_books()
         logger.info(f"Background job {job_id}: checking {len(books)} books for missing data...")
 
-        updated_count = enhance_books_batch(books, force_refresh=True)
+        # A Book's name is the reader's: an edit is how a wrong split is undone,
+        # and a provider knows nothing of that choice. The write leaves both
+        # name fields alone too, because this snapshot predates the lookups.
+        updated_count = enhance_books_batch(
+            books,
+            force_refresh=True,
+            skip_fields=("title", "subtitle"),
+        )
 
         items_to_update = [{"book": b, "record": None} for b in books]
-        storage.bulk_import(items_to_update)
+        storage.bulk_import(items_to_update, write_names=False)
 
         result_msg = (
             f"Found and updated missing data for {updated_count} book(s)."
@@ -261,7 +274,9 @@ def api_export_csv():
                 _safe_csv_cell(value)
                 for value in [
                     book.get("isbn13", ""),
-                    book.get("title", ""),
+                    # The export keeps one full-title column, so existing
+                    # spreadsheets do not change shape.
+                    full_title(book.get("title"), book.get("subtitle")),
                     display(authors),
                     book.get("publication_year", ""),
                     book.get("publisher", ""),
@@ -420,6 +435,7 @@ def api_create_book():
     if title and authors:
         book_data = {
             "title": title,
+            "subtitle": data.get("subtitle"),
             "authors": authors,
             "publisher": data.get("publisher"),
             "publish_date": data.get("publication_year"),
@@ -452,7 +468,11 @@ def api_create_book():
         if not book_data:
             return jsonify({"error": f"No book data found for ISBN {isbn}"}), 404
 
-    title = str(book_data.get("title") or "")
+    # A provider that separates the subtitle is believed; a combined one is
+    # split by the same rule everywhere else uses, and a subtitle the title
+    # already repeats is held once. The split happens here, at the write, so
+    # every surface reads the stored parts.
+    title, subtitle = normalise_title_pair(book_data.get("title"), book_data.get("subtitle"))
     authors = _book_data_authors(book_data)
 
     if not title or not authors:
@@ -469,6 +489,7 @@ def api_create_book():
         created = storage.add_book(
             isbn13=isbn,
             title=title[:300],
+            subtitle=(subtitle[:300] if subtitle else None),
             authors=[name[:200] for name in authors],
             publication_year=year,
             thumbnail_url=(thumbnail_url[:500] if thumbnail_url else None),
@@ -529,7 +550,11 @@ def api_update_book(book_id: int):
     storage = get_storage()
     data = request.get_json(silent=True) or {}
 
-    title = str(data.get("title", "") or "").strip()
+    # An edit states both fields, so a title is stored as typed: a reader who
+    # clears the subtitle can keep "Foo Bar: Baz" whole and undo a wrong split.
+    # Only a title that still carries the subtitle submitted beside it is
+    # reduced, so no surface reads the subtitle twice.
+    title, subtitle = normalise_title_pair(data.get("title"), data.get("subtitle"), infer_subtitle=False)
     authors = _payload_authors(data)
 
     if not title or not authors:
@@ -556,6 +581,7 @@ def api_update_book(book_id: int):
             book_id=book_id,
             isbn13=isbn13,
             title=title[:300],
+            subtitle=(subtitle[:300] if subtitle else None),
             authors=[name[:200] for name in authors],
             publication_year=publication_year,
             thumbnail_url=(str(data.get("thumbnail_url", "") or "").strip() or None),

@@ -1,8 +1,9 @@
 /**
- * A Book card's title, when the stored title carries a subtitle.
+ * A Book card's title and subtitle, as the Book stores them.
  *
- * The split is presentation only: the heading announces the main title, and
- * the subtitle is supporting text inside the same card link.
+ * The split is not made here: the heading is the stored title and the subtitle
+ * is stored beside it, so the card, Series, Author and the Reading List all
+ * show the same two parts.
  */
 import React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -11,12 +12,10 @@ import { MemoryRouter } from 'react-router-dom';
 import BookExhibit from '../BookExhibit';
 import type { Book } from '../../types';
 
-const book = (title: string): Book => ({ id: 1, title, author: 'An Author' });
-
-const renderExhibit = (title: string, titleAs?: 'h2' | 'h3') =>
+const renderExhibit = (book: Book, titleAs?: 'h2' | 'h3') =>
     render(
         <MemoryRouter>
-            <BookExhibit book={book(title)} titleAs={titleAs} />
+            <BookExhibit book={book} titleAs={titleAs} />
         </MemoryRouter>
     );
 
@@ -24,8 +23,8 @@ const mainTitle = 'A History of England in 100 Places';
 const subtitle = 'From Stonehenge to the Gherkin';
 
 describe('BookExhibit', () => {
-    it('shows the subtitle beneath the main title, outside the heading', () => {
-        renderExhibit(`${mainTitle}: ${subtitle}`);
+    it('shows the stored subtitle beneath the main title, outside the heading', () => {
+        renderExhibit({ id: 1, title: mainTitle, subtitle, author: 'An Author' });
 
         const heading = screen.getByRole('heading', { name: mainTitle });
         expect(heading.textContent).toBe(mainTitle);
@@ -36,21 +35,22 @@ describe('BookExhibit', () => {
     });
 
     it('keeps the requested heading level for the main title only', () => {
-        renderExhibit(`Title: Subtitle`, 'h2');
+        renderExhibit({ id: 1, title: 'Title', subtitle: 'Subtitle' }, 'h2');
 
         expect(screen.getByRole('heading', { level: 2, name: 'Title' })).toBeTruthy();
         expect(screen.queryByRole('heading', { name: 'Subtitle' })).toBeNull();
     });
 
-    it('renders a Book with no separable subtitle as one heading, as before', () => {
-        renderExhibit('Piranesi');
+    it('renders a Book with no subtitle as one heading, as before', () => {
+        renderExhibit({ id: 1, title: 'Piranesi' });
 
         expect(screen.getByRole('heading', { name: 'Piranesi' })).toBeTruthy();
         expect(document.querySelector('.exhibit-subtitle')).toBeNull();
     });
 
-    it('leaves a title the rule refuses to split whole', () => {
-        renderExhibit('Re: Zero');
+    it('does not split a title that carries a separator but no stored subtitle', () => {
+        // The rule ran when the Book was stored; the card never re-derives it.
+        renderExhibit({ id: 1, title: 'Re: Zero' });
 
         expect(screen.getByRole('heading', { name: 'Re: Zero' })).toBeTruthy();
         expect(document.querySelector('.exhibit-subtitle')).toBeNull();

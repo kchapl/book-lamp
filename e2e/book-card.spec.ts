@@ -5,7 +5,7 @@ test.beforeEach(async ({ request }) => {
     await resetAndSeed(request);
 });
 
-test('a Book card shows a separable subtitle under its title', async ({ page, request }) => {
+test('a Book card shows the stored subtitle under its title', async ({ page, request }) => {
     const created = await request.post('/api/books', {
         data: {
             isbn: '9780306406157',
@@ -28,4 +28,20 @@ test('a Book card shows a separable subtitle under its title', async ({ page, re
     const card = page.locator('.exhibit').filter({ hasText: 'From Stonehenge to the Gherkin' });
     await expect(card.getByRole('heading', { name: 'A History of England in 100 Places' })).toBeVisible();
     await expect(card).toContainText('From Stonehenge to the Gherkin');
+});
+
+test('a provider-separated subtitle is stored as its own part', async ({ request }) => {
+    const created = await request.post('/api/books', {
+        data: {
+            isbn: '9780241181346',
+            title: 'The Spy and the Traitor',
+            subtitle: 'The Greatest Espionage Story of the Cold War',
+            author: 'Ben Macintyre',
+        },
+    });
+    expect(created.ok()).toBeTruthy();
+
+    const book = await created.json();
+    expect(book.title).toBe('The Spy and the Traitor');
+    expect(book.subtitle).toBe('The Greatest Espionage Story of the Cold War');
 });

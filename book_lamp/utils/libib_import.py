@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from book_lamp.utils.authors import parse
-from book_lamp.utils.books import normalize_isbn
+from book_lamp.utils.books import normalize_isbn, split_title_parts
 from book_lamp.utils.readings import ENDING_STATUSES, RATED_STATUS
 
 
@@ -95,6 +95,10 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         if not title.strip() or not isbn.strip():
             continue
 
+        # An imported title is text from a file and may carry its subtitle in
+        # the same cell, so it is split where it is read.
+        title, subtitle = split_title_parts(title)
+
         # Basic year extraction from publish_date
         year = None
         if publish_date:
@@ -174,6 +178,7 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
                 "book": {
                     "isbn13": isbn,
                     "title": title,
+                    "subtitle": subtitle,
                     # A CSV cell is text that lists names, so it is read once
                     # here, at the file edge.
                     "authors": parse(author),

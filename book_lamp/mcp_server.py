@@ -120,6 +120,7 @@ def _book_summary(book: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "isbn13": book.get("isbn13", ""),
         "title": book.get("title", ""),
+        "subtitle": book.get("subtitle"),
         "author": book.get("author", ""),
         "publication_year": book.get("publication_year"),
         "series": book.get("series"),

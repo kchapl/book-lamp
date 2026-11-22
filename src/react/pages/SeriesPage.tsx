@@ -64,6 +64,9 @@ const SeriesPage: React.FC = () => {
                                 <Link to={`/books/${book.id}`} className="book-title">
                                     {book.title}
                                 </Link>
+                                {book.subtitle && (
+                                    <span className="book-subtitle">{book.subtitle}</span>
+                                )}
                                 {book.publication_year && (
                                     <span className="year">({book.publication_year})</span>
                                 )}

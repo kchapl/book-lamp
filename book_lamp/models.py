@@ -12,6 +12,7 @@ class Book:
     id: Optional[int] = None
     isbn13: str = ""
     title: str = ""
+    subtitle: Optional[str] = None
     author: str = ""
     authors: List[str] = field(default_factory=list)
     publication_year: Optional[int] = None
@@ -52,6 +53,7 @@ class Book:
             id=data.get("id"),
             isbn13=str(data.get("isbn13") or ""),
             title=str(data.get("title") or ""),
+            subtitle=data.get("subtitle") or None,
             author=author,
             authors=authors,
             publication_year=data.get("publication_year"),

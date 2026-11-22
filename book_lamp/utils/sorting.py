@@ -73,11 +73,12 @@ def sort_by_title(books: List[Dict[str, Any]], reverse: bool = False) -> List[Di
         Sorted list of books.
     """
 
-    def sort_key(book: Dict[str, Any]) -> Tuple[str, str, str]:
+    def sort_key(book: Dict[str, Any]) -> Tuple[str, str, str, str]:
         title = _normalise_title_for_sort(book.get("title", "") or "")
+        subtitle = _normalise_title_for_sort(book.get("subtitle", "") or "")
         author = book.get("author", "") or ""
         last_name, first_name = author_sort_key(author)
-        return (title, last_name, first_name)
+        return (title, subtitle, last_name, first_name)
 
     return sorted(books, key=sort_key, reverse=reverse)
 

@@ -1,6 +1,23 @@
 from book_lamp.services.mock_storage import MockStorage
 
 
+def test_reading_list_carries_a_books_subtitle(authenticated_client):
+    from book_lamp.app import get_storage
+
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="The Greatest Espionage Story of the Cold War",
+        authors=["Ben Macintyre"],
+    )
+    storage.add_to_reading_list(book["id"])
+
+    response = authenticated_client.get("/api/reading-list")
+
+    assert response.get_json()["books"][0]["subtitle"] == ("The Greatest Espionage Story of the Cold War")
+
+
 def test_reading_list_mock_storage():
     storage = MockStorage()
 

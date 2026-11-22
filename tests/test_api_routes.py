@@ -95,6 +95,23 @@ def test_api_export_csv_requires_authentication(client, monkeypatch):
     assert response.json == {"error": "Unauthorized"}
 
 
+def test_api_export_csv_keeps_one_full_title_column(authenticated_client):
+    """The export's shape does not change: the subtitle joins the title."""
+    storage = get_storage()
+    storage.add_book(
+        isbn13="9780241181346",
+        title="The Spy and the Traitor",
+        subtitle="The Greatest Espionage Story of the Cold War",
+        authors=["Ben Macintyre"],
+    )
+
+    response = authenticated_client.get("/api/export/csv")
+    rows = list(csv.DictReader(io.StringIO(response.data.decode("utf-8-sig"))))
+
+    assert rows[0]["Title"] == "The Spy and the Traitor: The Greatest Espionage Story of the Cold War"
+    assert "Subtitle" not in rows[0]
+
+
 # ---------------------------------------------------------------------------
 # Books – create
 # ---------------------------------------------------------------------------
@@ -244,6 +261,53 @@ def test_api_update_book_success(authenticated_client):
 
     updated = storage.get_book_by_id(book["id"])
     assert updated["title"] == "New Title"
+
+
+def test_api_update_book_normalises_a_title_that_carries_its_subtitle(authenticated_client):
+    """A Book edited during the deploy is saved as its parts, not doubled.
+
+    The previous instance writes the combined title while 0011 lands, and its
+    edit form sends that title beside the stored subtitle. Saving must store
+    the two fields apart again, or the page shows the subtitle twice.
+    """
+    storage = get_storage()
+    book = storage.add_book(isbn13="557", title="Piranesi", subtitle="A Novel", authors=["Susanna Clarke"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "title": "Piranesi: A Novel",
+            "subtitle": "A Novel",
+            "author": "Susanna Clarke",
+            "isbn13": "9780306406157",
+        },
+    )
+
+    assert resp.status_code == 200
+    updated = storage.get_book_by_id(book["id"])
+    assert updated["title"] == "Piranesi"
+    assert updated["subtitle"] == "A Novel"
+
+
+def test_api_update_book_stores_a_title_a_reader_meant_whole(authenticated_client):
+    """An edit can undo a split: clearing the subtitle keeps the title whole."""
+    storage = get_storage()
+    book = storage.add_book(isbn13="558", title="Foo Bar", subtitle="Baz", authors=["An Author"])
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "title": "Foo Bar: Baz",
+            "subtitle": "",
+            "author": "An Author",
+            "isbn13": "9780306406157",
+        },
+    )
+
+    assert resp.status_code == 200
+    updated = storage.get_book_by_id(book["id"])
+    assert updated["title"] == "Foo Bar: Baz"
+    assert not updated["subtitle"]
 
 
 def test_api_update_book_keeps_the_names_it_is_given(authenticated_client):
@@ -410,6 +474,27 @@ def test_api_search_books_with_results(authenticated_client):
     assert resp.status_code == 200
     body = _json(resp)
     assert any(bk["title"] == "Searchable Title" for bk in body["books"])
+
+
+def test_api_search_finds_a_split_title_by_its_old_combined_name(authenticated_client):
+    """A reader typing ``Piranesi: A Novel`` finds the Book stored as two parts.
+
+    The split leaves neither field holding the separator, so the colon in the
+    query must not become a token no stored part can match.
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9781635575637",
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["Susanna Clarke"],
+    )
+    storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-15")
+
+    resp = authenticated_client.get("/api/books/search?q=Piranesi%3A+A+Novel")
+
+    assert resp.status_code == 200
+    assert [b["title"] for b in _json(resp)["books"]] == ["Piranesi"]
 
 
 # ---------------------------------------------------------------------------

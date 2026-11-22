@@ -9,6 +9,101 @@ def cover_is_blank(value: object) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
 
 
+#: A dash that separates a subtitle, with the spaces on both sides that make
+#: it a separator. A bare hyphen stays in the word it belongs to ("Spider-Man").
+_SPACED_DASHES = (" - ", " \u2013 ", " \u2014 ")
+
+
+def _separator_span(text: str) -> Optional[tuple[int, int]]:
+    """Where a subtitle separator starts and ends in ``text``, or None.
+
+    Scanned rather than matched, so a reader-supplied run of spaces cannot make
+    the check quadratic. Whether what precedes a separator can stand as a title
+    is the caller's decision.
+    """
+    colon = text.find(":")
+    dash = min((index for index in (text.find(d) for d in _SPACED_DASHES) if index != -1), default=-1)
+
+    if colon == -1 and dash == -1:
+        return None
+    if dash == -1 or (colon != -1 and colon < dash):
+        return colon, colon + 1
+    return dash, dash + 3
+
+
+def split_title_parts(
+    title: Optional[str],
+    subtitle: Optional[str] = None,
+) -> tuple[str, Optional[str]]:
+    """Split a title into the main title and an optional subtitle.
+
+    A subtitle the provider supplied is used as given: it is what the edition
+    (or the reader) says the second half is. Only when there is none does the
+    combined title get split, by the rule that has always decided how a Book is
+    presented: a colon or a spaced dash separates the parts, the main title must
+    be longer than three characters, and the remainder must say something.
+    """
+    main = re.sub(r"\s+", " ", str(title or "")).strip()
+    given = re.sub(r"\s+", " ", str(subtitle or "")).strip()
+    if given:
+        return main, given
+
+    span = _separator_span(main)
+    if span is None:
+        return main, None
+
+    start, end = span
+    head = main[:start].strip()
+    tail = main[end:].strip()
+    if len(head) <= 3 or not tail:
+        # "Re: Zero", "10:04" and "Colon:" are titles, not a heading with a
+        # subtitle: a prefix that short does not stand on its own.
+        return main, None
+    return head, tail
+
+
+def _drop_repeated_subtitle(main: str, second: Optional[str]) -> tuple[str, Optional[str]]:
+    """Reduce a main title that still ends with the subtitle beside it."""
+    if main and second:
+        head, tail = split_title_parts(main)
+        if tail and tail.casefold() == second.casefold():
+            main = head
+    return main, second
+
+
+def normalise_title_pair(
+    title: Optional[str],
+    subtitle: Optional[str] = None,
+    *,
+    infer_subtitle: bool = True,
+) -> tuple[str, Optional[str]]:
+    """A title and its subtitle as the pair a Book stores, the subtitle once.
+
+    ``infer_subtitle`` reads a combined title as provider text: a provider may
+    leave the subtitle inside the title ("Piranesi: A Novel") and also supply
+    it beside ("A Novel"), so the title is split and a tail that is that
+    subtitle is dropped. A title the rule cannot divide is left as it arrived.
+
+    An edit states both fields itself, so it passes ``infer_subtitle=False``: a
+    whole title such as ``Foo Bar: Baz`` stays whole, which is how a wrong split
+    is undone. Either way only a title that still ends with the subtitle beside
+    it is reduced.
+    """
+    if infer_subtitle:
+        main, second = split_title_parts(title, subtitle)
+    else:
+        main = re.sub(r"\s+", " ", str(title or "")).strip()
+        second = re.sub(r"\s+", " ", str(subtitle or "")).strip() or None
+    return _drop_repeated_subtitle(main, second)
+
+
+def full_title(title: Optional[str], subtitle: Optional[str] = None) -> str:
+    """A Book's whole title, as one string: the form exports and the log use."""
+    main = str(title or "").strip()
+    second = str(subtitle or "").strip()
+    return f"{main}: {second}" if main and second else main
+
+
 def normalize_isbn(isbn: str) -> str:
     """Remove hyphens and other non-digit characters from ISBN, preserving final 'X'."""
     if not isbn:

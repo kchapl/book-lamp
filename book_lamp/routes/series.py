@@ -28,14 +28,19 @@ def normalise_series_name(name: str) -> str:
     return " ".join(name.split()).casefold()
 
 
-def _publication_order(book: Dict[str, Any]) -> tuple[bool, int, str]:
+def _publication_order(book: Dict[str, Any]) -> tuple[bool, int, str, str]:
     """Order Books by publication year, with an unknown year after a known one."""
     raw_year = book.get("publication_year")
     try:
         year = int(raw_year) if raw_year else None
     except (TypeError, ValueError):
         year = None
-    return (year is None, year or 0, str(book.get("title") or "").casefold())
+    return (
+        year is None,
+        year or 0,
+        str(book.get("title") or "").casefold(),
+        str(book.get("subtitle") or "").casefold(),
+    )
 
 
 @series_bp.route("/api/series/<path:series_slug>", methods=["GET"])

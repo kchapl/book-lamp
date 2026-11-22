@@ -121,6 +121,101 @@ def test_edit_book_success(authenticated_client):
     assert updated_book["title"] == "Updated Title"
 
 
+def test_create_stores_a_combined_title_as_two_parts(authenticated_client):
+    """A reader-typed title is split once, at the write."""
+    resp = authenticated_client.post(
+        "/api/books",
+        json={
+            "isbn": "9780306406157",
+            "title": "A History of England in 100 Places: From Stonehenge to the Gherkin",
+            "author": "David Long",
+        },
+    )
+
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["title"] == "A History of England in 100 Places"
+    assert body["subtitle"] == "From Stonehenge to the Gherkin"
+
+    stored = get_storage().get_book_by_isbn("9780306406157")
+    assert stored["title"] == body["title"]
+    assert stored["subtitle"] == body["subtitle"]
+
+
+def test_re_adding_a_book_without_a_subtitle_keeps_the_stored_one(authenticated_client):
+    """An add that carries no subtitle is not a reader clearing it.
+
+    Postgres keeps the stored subtitle on an upsert, so the mock has to as well;
+    otherwise mock-backed route tests cannot catch a regression here.
+    """
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9781635575637",
+        title="Piranesi",
+        subtitle="A Novel",
+        authors=["Susanna Clarke"],
+    )
+
+    storage.upsert_book(isbn13=book["isbn13"], title="Piranesi", authors=["Susanna Clarke"])
+
+    assert storage.get_book_by_isbn(book["isbn13"])["subtitle"] == "A Novel"
+
+
+def test_create_keeps_the_subtitle_the_provider_separated(authenticated_client):
+    resp = authenticated_client.post(
+        "/api/books",
+        json={
+            "isbn": "9780241181346",
+            "title": "The Spy and the Traitor",
+            "subtitle": "The Greatest Espionage Story of the Cold War",
+            "author": "Ben Macintyre",
+        },
+    )
+
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["title"] == "The Spy and the Traitor"
+    assert body["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
+def test_edit_stores_a_corrected_subtitle(authenticated_client):
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780306406157",
+        title="The Spy and the Traitor",
+        subtitle="A Novel",
+        authors=["Ben Macintyre"],
+    )
+
+    resp = authenticated_client.post(
+        f"/api/books/{book['id']}/edit",
+        json={
+            "isbn13": "9780306406157",
+            "title": "The Spy and the Traitor",
+            "subtitle": "The Greatest Espionage Story of the Cold War",
+            "author": "Ben Macintyre",
+        },
+    )
+
+    assert resp.status_code == 200
+    stored = storage.get_book_by_id(book["id"])
+    assert stored["title"] == "The Spy and the Traitor"
+    assert stored["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
+def test_a_title_sort_orders_by_subtitle_when_the_main_titles_match():
+    from book_lamp.utils.sorting import sort_books
+
+    books = [
+        {"title": "The Expanse", "subtitle": "Leviathan Wakes"},
+        {"title": "The Expanse", "subtitle": "Abaddon's Gate"},
+    ]
+
+    ordered = sort_books(books, sort_by="title")
+
+    assert [book["subtitle"] for book in ordered] == ["Abaddon's Gate", "Leviathan Wakes"]
+
+
 def _titles(payload):
     return {b["title"] for b in payload["books"]}
 

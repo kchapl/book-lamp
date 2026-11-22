@@ -40,6 +40,7 @@ const externalBook: ExternalBook = {
 const queuedBook: Book = {
     id: 7,
     title: 'Emma',
+    subtitle: 'A Novel',
     author: 'Jane Austen',
     isbn13: '9780141439600',
     publication_year: 1815,
@@ -72,6 +73,17 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
+describe('AuthorPage stored subtitles', () => {
+    it("shows a Book's subtitle under its title", async () => {
+        authorPage.mockResolvedValue(page([], [queuedBook]));
+
+        renderPage();
+
+        await screen.findByText('Emma');
+        expect(screen.getByText('A Novel')).toHaveClass('book-subtitle');
+    });
+});
+
 describe('AuthorPage external results', () => {
     it('creates the Book from the result and moves it onto the Reading List', async () => {
         authorPage
@@ -87,6 +99,7 @@ describe('AuthorPage external results', () => {
         await waitFor(() =>
             expect(create).toHaveBeenCalledWith({
                 title: 'Emma',
+                subtitle: undefined,
                 author: 'Jane Austen',
                 isbn: '9780141439600',
                 publication_year: 1815,
@@ -144,6 +157,24 @@ describe('AuthorPage external results', () => {
                     author: 'Neil Gaiman, Terry Pratchett',
                     authors: names,
                 })
+            )
+        );
+    });
+
+    it("forwards a result's separated subtitle so the created Book keeps it", async () => {
+        authorPage.mockResolvedValue(
+            page([{ ...externalBook, title: 'Piranesi', subtitle: 'A Novel' }])
+        );
+        create.mockResolvedValue({ ...queuedBook, title: 'Piranesi', subtitle: 'A Novel' });
+
+        renderPage();
+        await screen.findByText('From Open Library (1)');
+
+        fireEvent.click(addButton());
+
+        await waitFor(() =>
+            expect(create).toHaveBeenCalledWith(
+                expect.objectContaining({ title: 'Piranesi', subtitle: 'A Novel' })
             )
         );
     });

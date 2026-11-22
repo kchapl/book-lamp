@@ -53,6 +53,143 @@ def test_enhance_books_replaces_dewey_with_bisac(mock_storage):
     assert updated_book["bisac_sub_category"] == "General"
 
 
+def test_a_combined_provider_title_is_split_before_it_is_stored():
+    """The batch parser leaves a title whole; enhancement reads it as parts.
+
+    Open Library's parsed title is not split, so a combined ``Piranesi: A
+    Novel`` would otherwise be written as the title with no subtitle.
+    """
+    books = [{"isbn13": "9780000000006", "title": "Placeholder", "authors": ["An Author"]}]
+
+    with patch(
+        "book_lamp.services.book_lookup.lookup_books_batch",
+        return_value={
+            "9780000000006": {
+                "title": "Piranesi: A Novel",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        },
+    ):
+        enhance_books_batch(books, force_refresh=True)
+
+    assert (books[0]["title"], books[0]["subtitle"]) == ("Piranesi", "A Novel")
+
+
+def test_the_metadata_backfill_keeps_the_stored_name(monkeypatch):
+    """Refreshing metadata must not rename a Book the reader corrected.
+
+    The reader kept ``Foo Bar: Baz`` whole by clearing its subtitle, and the
+    provider knows a different name and subtitle. The backfill has to leave the
+    stored pair alone while it refreshes everything else.
+    """
+    from book_lamp.routes.books import _background_fetch_missing_data
+    from book_lamp.services.storage_factory import get_storage
+
+    storage = get_storage()
+    book = storage.add_book(isbn13="9780000000005", title="Foo Bar: Baz", authors=["An Author"])
+
+    monkeypatch.setattr(
+        "book_lamp.services.book_lookup.lookup_books_batch",
+        lambda isbns, force_refresh=False: {
+            "9780000000005": {
+                "title": "Piranesi: A Novel",
+                "subtitle": "A Novel",
+                "bisac_category": "FICTION / General",
+                "bisac_main_category": "FICTION",
+                "bisac_sub_category": "General",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        },
+    )
+
+    _background_fetch_missing_data("job-1", user_id=1)
+
+    stored = storage.get_book_by_id(book["id"])
+    assert (stored["title"], stored["subtitle"]) == ("Foo Bar: Baz", None)
+    assert stored["bisac_category"] == "FICTION / General"
+
+
+def test_the_metadata_backfill_does_not_undo_a_split_that_lands_mid_run(monkeypatch):
+    """A split that lands while providers run must survive the write back."""
+    from book_lamp.routes.books import _background_fetch_missing_data
+    from book_lamp.services.storage_factory import get_storage
+
+    storage = get_storage()
+    isbn = "9780000000008"
+    book = storage.add_book(isbn13=isbn, title="Piranesi: A Novel", authors=["An Author"])
+
+    def lookup(isbns, force_refresh=False):
+        # The deferred subtitle backfill splits the row while the provider is
+        # being asked, after the metadata refresh took its snapshot.
+        storage.update_book(
+            book_id=book["id"],
+            isbn13=isbn,
+            title="Piranesi",
+            subtitle="A Novel",
+            authors=["An Author"],
+        )
+        return {
+            isbn: {
+                "title": "Piranesi",
+                "subtitle": "A Novel",
+                "bisac_category": "FICTION / General",
+                "bisac_main_category": "FICTION",
+                "bisac_sub_category": "General",
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        }
+
+    monkeypatch.setattr("book_lamp.services.book_lookup.lookup_books_batch", lookup)
+
+    _background_fetch_missing_data("job-split", user_id=1)
+
+    stored = storage.get_book_by_id(book["id"])
+    assert (stored["title"], stored["subtitle"]) == ("Piranesi", "A Novel")
+
+
+def test_the_backfill_does_not_count_a_name_it_was_told_to_keep():
+    """A Book whose only provider data is its name was not updated.
+
+    The metadata backfill skips the stored title and subtitle, so a provider
+    answer that changes nothing else must not be reported as an update.
+    """
+    books = [
+        {
+            "isbn13": "9780000000007",
+            "title": "Foo Bar: Baz",
+            "subtitle": None,
+            "authors": ["An Author"],
+            "publication_year": 2020,
+            "publisher": "A Publisher",
+            "description": "A description",
+            "bisac_category": "FICTION / General",
+            "thumbnail_url": "http://example.com/cover.jpg",
+            "cover_url": "http://example.com/cover.jpg",
+        }
+    ]
+
+    with (
+        patch(
+            "book_lamp.services.book_lookup.lookup_books_batch",
+            return_value={
+                "9780000000007": {
+                    "title": "Piranesi: A Novel",
+                    "subtitle": "A Novel",
+                }
+            },
+        ),
+        patch("book_lamp.services.book_lookup.lookup_book_by_isbn13", return_value=None),
+    ):
+        updated_count = enhance_books_batch(
+            books,
+            force_refresh=True,
+            skip_fields=("title", "subtitle"),
+        )
+
+    assert updated_count == 0
+    assert (books[0]["title"], books[0]["subtitle"]) == ("Foo Bar: Baz", None)
+
+
 def test_enhance_books_preserves_bisac(mock_storage):
     # Setup: A book already has a BISAC category
     book = mock_storage.add_book(

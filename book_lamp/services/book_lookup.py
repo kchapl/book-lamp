@@ -1,7 +1,7 @@
 import html
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Collection, Dict, List, Optional
 
 import requests
 
@@ -13,6 +13,7 @@ from book_lamp.utils.books import (
     isbn13_to_isbn10,
     normalise_bisac_category,
     normalise_provider_title,
+    normalise_title_pair,
     normalize_isbn,
     parse_publication_year,
 )
@@ -156,6 +157,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "title": normalise_provider_title(title),
+        "subtitle": normalise_provider_title(data.get("subtitle")),
         # The provider gives a list, so the list is what travels; the display
         # string is derived from it for anything that still reads one.
         "authors": names,
@@ -239,7 +241,7 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
             params = {
                 "q": q,
                 "limit": "10",
-                "fields": "key,title,author_name,cover_i,first_publish_year,publisher",
+                "fields": "key,title,subtitle,author_name,cover_i,first_publish_year,publisher",
             }
             response = session.get(OPEN_LIBRARY_SEARCH_API, params=params, timeout=10)
             docs = response.json().get("docs") or []
@@ -251,6 +253,7 @@ def _lookup_open_library_search(title: str, author: Optional[str] = None) -> Opt
                 publishers = doc.get("publisher") or []
                 return {
                     "title": normalise_provider_title(doc.get("title")),
+                    "subtitle": normalise_provider_title(doc.get("subtitle")),
                     "authors": list(authors),
                     "author": display(authors) if authors else None,
                     "thumbnail_url": f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg",
@@ -342,7 +345,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
     params: Dict[str, str] = {
         "author": author_name,
         "limit": str(min(max_results, 100)),
-        "fields": ("key,title,author_name,cover_i,first_publish_year," "isbn,publisher,subject,language"),
+        "fields": ("key,title,subtitle,author_name,cover_i,first_publish_year," "isbn,publisher,subject,language"),
     }
 
     books: List[Dict[str, Any]] = []
@@ -359,10 +362,12 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
             raw_title = normalise_provider_title(doc.get("title"))
             if not raw_title:
                 continue
+            raw_subtitle = normalise_provider_title(doc.get("subtitle"))
 
             # Dedupe on the title the reader would see, so two records that
-            # differ only in case are one entry.
-            norm_title = raw_title.lower()
+            # differ only in case are one entry, and two subtitles of one main
+            # title are two works.
+            norm_title = f"{raw_title}\u0000{raw_subtitle or ''}".lower()
 
             year_val = doc.get("first_publish_year")
             try:
@@ -389,6 +394,7 @@ def lookup_books_by_author(author_name: str, max_results: int = 50, strict: bool
 
             entry: Dict[str, Any] = {
                 "title": raw_title,
+                "subtitle": raw_subtitle,
                 "author": author_str,
                 # The display string joins names with a comma, which storage reads
                 # back as one "Last, First" person; the list is what keeps them
@@ -577,7 +583,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
     field would need: the edition the reader means still has to be in it.
     """
     session = _get_session()
-    fields = "title,author_name,isbn,cover_i,first_publish_year,publisher"
+    fields = "title,subtitle,author_name,isbn,cover_i,first_publish_year,publisher"
     query = f"{title} {author}" if author else title
 
     try:
@@ -610,6 +616,7 @@ def _open_library_title_search(title: str, author: Optional[str], strict: bool =
         results.append(
             {
                 "title": normalise_provider_title(doc.get("title") or ""),
+                "subtitle": normalise_provider_title(doc.get("subtitle")),
                 "authors": names,
                 "author": display(names),
                 "isbn13": isbn13,
@@ -807,6 +814,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
 
     return {
         "title": normalise_provider_title(info.get("title", "")),
+        "subtitle": normalise_provider_title(info.get("subtitle")),
         "authors": [html.unescape(name) for name in info.get("authors", [])],
         "author": display(info.get("authors", [])) if info.get("authors") else None,
         "publish_date": info.get("publishedDate"),
@@ -990,10 +998,38 @@ def _lookup_penguin_cover(
     return None
 
 
+def _split_title_pair(book: Dict[str, Any]) -> None:
+    """Read a title/subtitle pair as the separate parts a Book stores, in place.
+
+    A provider may put the subtitle inside the title ("Piranesi: A Novel") or
+    beside it ("Piranesi" with "A Novel"). Reading both the same way before a
+    merge is what stops the two halves of one name being taken from different
+    providers and stored twice.
+    """
+    if not book.get("title") and not book.get("subtitle"):
+        return
+    # The shared rule reads both halves the same way, including a subtitle a
+    # provider repeated inside its own title.
+    title, subtitle = normalise_title_pair(book.get("title"), book.get("subtitle"))
+    if book.get("title"):
+        book["title"] = title
+    if subtitle and not book.get("subtitle"):
+        book["subtitle"] = subtitle
+
+
 def _merge_metadata(target: Dict[str, Any], source: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Merge non-empty metadata fields from source into target."""
+    """Merge non-empty metadata fields from source into target.
+
+    The title and its subtitle are one name, so each pair is read as separate
+    parts before merging: a combined title from one provider plus a separate
+    subtitle from another would otherwise be stored as "Piranesi: A Novel: A
+    Novel" in every export and the Reading Log.
+    """
     if not source:
         return target
+    _split_title_pair(target)
+    source = dict(source)
+    _split_title_pair(source)
     for k, v in source.items():
         if v and not (isinstance(v, str) and not v.strip()):
             if not target.get(k):
@@ -1087,6 +1123,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     """Create an empty metadata template."""
     return {
         "title": None,
+        "subtitle": None,
         "author": None,
         "publish_date": None,
         "thumbnail_url": None,
@@ -1103,11 +1140,17 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     }
 
 
-def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False) -> int:
+def enhance_books_batch(
+    books: List[Dict[str, Any]],
+    max_workers: int = 5,
+    force_refresh: bool = False,
+    skip_fields: Collection[str] = (),
+) -> int:
     """Enhance a list of books with missing metadata/covers in parallel.
 
-    Updates the books list in-place.
-    Returns the number of books successfully updated.
+    Updates the books list in-place. ``skip_fields`` names fields the provider
+    must not write, such as a Book's stored name. Returns the number of books
+    successfully updated without counting skipped fields.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1219,6 +1262,11 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                 logger.warning(f"No lookup result for {title} (ISBN: {isbn})")
                 return False
 
+            # The batch parser leaves a provider's combined title whole, and the
+            # pair is what gets stored: read it as parts first, the way the deep
+            # merge does, so a combined title is not written beside a subtitle.
+            _split_title_pair(info)
+
             logger.debug(f"Found data from {source} for {title}: {info}")
 
             has_updates = False
@@ -1227,6 +1275,7 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
                 "thumbnail_url": "thumbnail_url",
                 "cover_url": "cover_url",
                 "title": "title",
+                "subtitle": "subtitle",
                 "authors": "authors",
                 "publisher": "publisher",
                 "description": "description",
@@ -1240,6 +1289,8 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
             }
 
             for target, source_field in field_map.items():
+                if target in skip_fields:
+                    continue
                 if needs_update(target, book_item.get(target)) and info.get(source_field):
                     val = info[source_field]
                     # Specific handling for strings/lengths

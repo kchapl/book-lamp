@@ -20,6 +20,7 @@ def api_get_reading_list():
         book = {
             "id": item["book_id"],
             "title": item["title"],
+            "subtitle": item.get("subtitle"),
             "author": item["author"],
             "thumbnail_url": item.get("thumbnail_url"),
         }

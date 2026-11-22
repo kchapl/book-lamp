@@ -9,6 +9,7 @@ from book_lamp.utils import (
     UNKNOWN_CATEGORY,
     category_label,
     category_label_for_book,
+    full_title,
     normalise_bisac_category,
 )
 from book_lamp.utils.publishers import normalize_publisher
@@ -231,7 +232,10 @@ def calculate_collection_stats(
         if series:
             if series not in series_bins:
                 series_bins[series] = []
-            title = b.get("title", "Unknown")
+            # The title and its subtitle are one name, so two Books of a series
+            # that share a main title ("The Expanse") are told apart by the
+            # subtitle the split stored ("Leviathan Wakes"), not counted once.
+            title = full_title(b.get("title") or "Unknown", b.get("subtitle"))
             if title not in series_bins[series]:
                 series_bins[series].append(title)
 

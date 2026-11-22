@@ -95,6 +95,80 @@ def test_a_missing_title_stays_missing():
     assert normalise_provider_title("   ") == ""
 
 
+def test_the_open_library_isbn_parser_keeps_a_separate_subtitle():
+    parsed = lookup_module._parse_open_library_data(
+        {
+            "title": "The Spy and the Traitor",
+            "subtitle": "The Greatest Espionage Story of the Cold War",
+            "authors": [{"name": "Ben Macintyre"}],
+        }
+    )
+
+    assert parsed["title"] == "The Spy and the Traitor"
+    assert parsed["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
+def test_the_google_books_parser_keeps_a_separate_subtitle():
+    parsed = lookup_module._parse_google_books_item(
+        {
+            "volumeInfo": {
+                "title": "The Spy and the Traitor",
+                "subtitle": "The Greatest Espionage Story of the Cold War",
+                "authors": ["Ben Macintyre"],
+            }
+        }
+    )
+
+    assert parsed["title"] == "The Spy and the Traitor"
+    assert parsed["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
+def test_the_open_library_title_search_carries_its_subtitle(monkeypatch):
+    monkeypatch.setattr(
+        lookup_module,
+        "_get_session",
+        lambda: _session_returning(
+            {
+                "docs": [
+                    {
+                        "title": "The Spy and the Traitor",
+                        "subtitle": "The Greatest Espionage Story of the Cold War",
+                        "isbn": ["9780241181346"],
+                        "author_name": ["Ben Macintyre"],
+                    }
+                ]
+            }
+        ),
+    )
+
+    found = lookup_module._open_library_title_search("The Spy and the Traitor", None)
+
+    assert found[0]["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
+def test_the_author_search_carries_its_subtitle(monkeypatch):
+    monkeypatch.setattr(
+        lookup_module,
+        "_get_session",
+        lambda: _session_returning(
+            {
+                "docs": [
+                    {
+                        "title": "The Spy and the Traitor",
+                        "subtitle": "The Greatest Espionage Story of the Cold War",
+                        "author_name": ["Ben Macintyre"],
+                        "isbn": [],
+                    }
+                ]
+            }
+        ),
+    )
+
+    found = lookup_module.lookup_books_by_author("Ben Macintyre")
+
+    assert found[0]["subtitle"] == "The Greatest Espionage Story of the Cold War"
+
+
 def test_the_open_library_isbn_parser_normalises_its_title():
     parsed = lookup_module._parse_open_library_data(
         {"title": "SCHEME FOR FULL EMPLOYMENT.", "authors": [{"name": "A. Author"}]}

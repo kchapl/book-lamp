@@ -23,6 +23,24 @@ def _wait_for_latest_job(timeout=30):
     return False
 
 
+def test_libib_import_splits_a_combined_title():
+    from book_lamp.utils.libib_import import parse_libib_csv
+
+    parsed = parse_libib_csv("Title,Author,ISBN\nPiranesi: A Novel,Susanna Clarke,9781635575637\n")
+
+    assert parsed[0]["book"]["title"] == "Piranesi"
+    assert parsed[0]["book"]["subtitle"] == "A Novel"
+
+
+def test_libib_import_leaves_a_title_it_cannot_split():
+    from book_lamp.utils.libib_import import parse_libib_csv
+
+    parsed = parse_libib_csv("Title,Author,ISBN\nRe: Zero,Tappei Nagatsuki,9780316395344\n")
+
+    assert parsed[0]["book"]["title"] == "Re: Zero"
+    assert parsed[0]["book"]["subtitle"] is None
+
+
 def test_libib_import_success(authenticated_client):
     storage = get_storage()
     csv_content = (
