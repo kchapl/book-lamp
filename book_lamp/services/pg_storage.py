@@ -18,7 +18,7 @@ from book_lamp.utils.books import (
     normalize_isbn,
     resolve_category,
 )
-from book_lamp.utils.readings import require_end_date, require_rating
+from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
 
@@ -363,13 +363,15 @@ class PostgresStorage:
         query = """
             SELECT rr.*, b.title as book_title, b.subtitle as book_subtitle,
                    b.thumbnail_url as book_thumbnail_url,
+                   b.cover_url as book_cover_url,
+                   b.publication_year as book_publication_year,
                    array_agg(a.name ORDER BY ba.position) FILTER (WHERE a.name IS NOT NULL) AS book_author_names
             FROM readings rr
             JOIN books b ON rr.book_id = b.id
             LEFT JOIN book_authors ba ON ba.book_id = b.id
             LEFT JOIN authors a ON ba.author_id = a.id
             WHERE rr.user_id = %s AND rr.status IN ('In Progress', 'Completed', 'Abandoned')
-            GROUP BY rr.id, b.title, b.subtitle, b.thumbnail_url
+            GROUP BY rr.id, b.title, b.subtitle, b.thumbnail_url, b.cover_url, b.publication_year
             ORDER BY rr.start_date DESC, rr.created_at DESC
         """
         with self.pool.connection() as conn:
@@ -380,12 +382,14 @@ class PostgresStorage:
                 enriched = dict(row)
                 # The Reading Log names a Book by its whole title, the way it
                 # reads on the cover; the parts stay stored on the Book.
+                enriched["book_title_main"] = row["book_title"]
                 enriched["book_title"] = full_title(row["book_title"], row.get("book_subtitle"))
-                # The whole title already carries the subtitle; a client that
-                # showed both fields would print the second half twice.
-                enriched.pop("book_subtitle", None)
                 enriched["book_authors"] = [name for name in (row["book_author_names"] or []) if name is not None]
                 enriched["book_author"] = display(enriched["book_authors"])
+                # Postgres hands back date objects; the Reading Log and its
+                # filters expect the same ISO shape the in-memory adapter stores.
+                for field in ("start_date", "end_date", "created_at"):
+                    enriched[field] = iso_date_string(enriched.get(field))
 
                 history.append(enriched)
             return history

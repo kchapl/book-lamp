@@ -27,7 +27,17 @@ export interface Book {
 export interface Reading {
     id: number;
     book_id: number;
+    /** The whole title, as the Reading Log and the MCP tools name the Book. */
     book_title?: string;
+    /** The stored main title and subtitle, for a Book exhibit. */
+    book_title_main?: string;
+    book_subtitle?: string;
+    book_author?: string;
+    book_authors?: string[];
+    book_thumbnail_url?: string;
+    book_cover_url?: string;
+    book_publication_year?: number;
+    latest_status?: string;
     status: string;
     rating?: number;
     start_date?: string;
