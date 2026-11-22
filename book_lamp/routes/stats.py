@@ -8,6 +8,7 @@ from book_lamp.routes.books import _background_fetch_missing_data
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.stats_calculator import calculate_collection_stats
 from book_lamp.services.storage_factory import get_storage, is_test_mode
+from book_lamp.utils.reading_status import READING_STATUSES, latest_reading_by_book
 from book_lamp.utils.readings import filter_reading_log, sort_reading_log
 
 stats_bp = Blueprint("stats", __name__)
@@ -20,6 +21,15 @@ def api_reading_history():
     storage = get_storage()
 
     history = storage.get_reading_history()
+
+    # The badge has to agree with the Books grid, which considers every record a
+    # Book has, including a later Reading List entry that is not a Reading Status.
+    latest = latest_reading_by_book(storage.get_readings())
+    for record in history:
+        current = latest.get(record.get("book_id"))
+        status = current.get("status") if current else None
+        record["latest_status"] = status if status in READING_STATUSES else None
+
     all_statuses = sorted(list(set(r.get("status") for r in history if r.get("status"))))
 
     status_filter = request.args.get("status")

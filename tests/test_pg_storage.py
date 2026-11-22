@@ -256,7 +256,9 @@ def test_reading_history_matches_the_mock_adapter_shape(pg_storage):
         assert row["book_author"] == "Susanna Clarke"
         assert row["book_cover_url"] == "https://example.com/cover.jpg"
         assert row["book_publication_year"] == 2020
-        assert row["latest_status"] == "Completed"
+        # The route adds the current status from every Reading, so it appears
+        # once for both adapters rather than being duplicated in each of them.
+        assert "latest_status" not in row
 
 
 def test_bulk_import_can_leave_a_name_changed_since_the_snapshot(pg_storage):

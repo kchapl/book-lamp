@@ -18,7 +18,6 @@ from book_lamp.utils.books import (
     normalize_isbn,
     resolve_category,
 )
-from book_lamp.utils.reading_status import latest_reading_by_book
 from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
@@ -393,11 +392,6 @@ class PostgresStorage:
                     enriched[field] = iso_date_string(enriched.get(field))
 
                 history.append(enriched)
-
-            latest = latest_reading_by_book(history)
-            for enriched in history:
-                current = latest.get(enriched["book_id"])
-                enriched["latest_status"] = current.get("status") if current else None
             return history
 
     def search(self, query: str) -> list[dict[str, Any]]:

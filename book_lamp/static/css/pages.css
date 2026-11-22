@@ -450,22 +450,6 @@
     margin-bottom: var(--bl-space-3);
 }
 
-.group-title {
-    font-family: var(--bl-font-display);
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0 0 var(--bl-space-3);
-    padding-bottom: var(--bl-space-2);
-    border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.group-title a {
-    color: var(--md-sys-color-on-surface);
-    text-decoration: none;
-}
-
-.group-title a:hover { color: var(--md-sys-color-primary); }
-
 .history-group .records-list { margin-top: 0; }
 
 /* =============================================================================

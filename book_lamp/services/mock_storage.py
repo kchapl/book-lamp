@@ -10,7 +10,7 @@ from book_lamp.utils.books import (
     normalise_title_pair,
     resolve_category,
 )
-from book_lamp.utils.reading_status import READING_STATUSES, latest_reading_by_book
+from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, iso_date_string, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
@@ -576,10 +576,6 @@ class MockStorage:
                     enriched_record[field] = iso_date_string(enriched_record.get(field))
                 history.append(enriched_record)
 
-        latest = latest_reading_by_book(history)
-        for enriched_record in history:
-            current = latest.get(enriched_record["book_id"])
-            enriched_record["latest_status"] = current.get("status") if current else None
         return history
 
     def search(self, query: str) -> list[dict[str, Any]]:
