@@ -149,17 +149,25 @@ def main() -> None:
         if done == total or done % 25 == 0:
             print(f"  {done}/{total}", file=sys.stderr)
 
+    def write_split(book: Dict[str, Any], title: str, subtitle: str) -> bool:
+        """Store a split, or count the write a dry run would make."""
+        return True if args.dry_run else _write_split(pool, book, title, subtitle)
+
+    def write_subtitle(book: Dict[str, Any], isbn: str, subtitle: str) -> bool:
+        """Store a subtitle, or count the write a dry run would make."""
+        return True if args.dry_run else _write_subtitle(pool, book, isbn, subtitle)
+
     if args.split_titles:
         counts = split_stored_titles(
             _books_without_subtitle(pool),
-            write=None if args.dry_run else lambda book, title, subtitle: _write_split(pool, book, title, subtitle),
+            write=write_split,
             on_progress=progress,
         )
         print("Stored titles split: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))
 
     counts = backfill_missing_subtitles(
         _books_without_subtitle(pool),
-        write=None if args.dry_run else lambda book, isbn, subtitle: _write_subtitle(pool, book, isbn, subtitle),
+        write=write_subtitle,
         on_progress=progress,
     )
     print("Subtitle backfill: updated {updated}, skipped {skipped}, failed {failed}.".format(**counts))

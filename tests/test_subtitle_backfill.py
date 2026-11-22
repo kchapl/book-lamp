@@ -164,6 +164,34 @@ def test_the_split_flag_runs_the_deferred_rewrite(monkeypatch):
     assert calls == [stored]
 
 
+def test_dry_run_counts_what_it_would_write_without_writing(monkeypatch, capsys):
+    """A dry run reports the writes a real run would make, not zero updates."""
+    from scripts import backfill_subtitles
+
+    stored = [{"id": 1, "isbn13": "9780000000001", "title": "Piranesi: A Novel", "subtitle": None}]
+
+    def fail(*args):
+        raise AssertionError("a dry run wrote to the database")
+
+    def fill(books, write=None, on_progress=None):
+        assert write is not None
+        assert write(books[0], "9780000000001", "A Novel") is True
+        return {"updated": 1, "skipped": 0, "failed": 0}
+
+    monkeypatch.setattr(backfill_subtitles, "_pool", lambda: object())
+    monkeypatch.setattr(backfill_subtitles, "_books_without_subtitle", lambda pool: stored)
+    monkeypatch.setattr(backfill_subtitles, "_write_split", fail)
+    monkeypatch.setattr(backfill_subtitles, "_write_subtitle", fail)
+    monkeypatch.setattr(backfill_subtitles, "backfill_missing_subtitles", fill)
+    monkeypatch.setattr(sys, "argv", ["backfill_subtitles.py", "--split-titles", "--dry-run"])
+
+    backfill_subtitles.main()
+
+    output = capsys.readouterr().out
+    assert "Stored titles split: updated 1, skipped 0, failed 0." in output
+    assert "Subtitle backfill: updated 1, skipped 0, failed 0." in output
+
+
 def test_the_report_counts_the_split_and_the_provider_only_subtitles():
     counts = report_subtitles(
         [
