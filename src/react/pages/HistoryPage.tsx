@@ -1,12 +1,13 @@
 import React from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import BookExhibit from '../components/BookExhibit';
 import { getHistory } from '../services/api';
 import { Button, Select, SelectOption } from '../ui';
 import { useResource } from '../hooks/useResource';
 import { useUrlFilters } from '../hooks/useUrlFilters';
 import { formatDate } from '../utils/format';
 import { RATED_STATUS, statusClass } from '../utils/status';
-import type { HistoryFilters, Reading } from '../types';
+import type { Book, HistoryFilters, Reading } from '../types';
 
 /** The reading log's filters, as they appear in the URL. */
 const FILTER_KEYS = ['status', 'min_rating', 'year', 'sort'] as const;
@@ -14,7 +15,7 @@ const FILTER_KEYS = ['status', 'min_rating', 'year', 'sort'] as const;
 /** One Book's Readings, as the log groups them for display. */
 interface HistoryGroup {
     bookId: number;
-    title: string;
+    book: Book;
     records: Reading[];
 }
 
@@ -55,7 +56,17 @@ const HistoryPage: React.FC = () => {
         } else {
             groups.set(record.book_id, {
                 bookId: record.book_id,
-                title: record.book_title || 'Unknown Book',
+                book: {
+                    id: record.book_id,
+                    title: record.book_title_main || record.book_title || 'Unknown Book',
+                    subtitle: record.book_subtitle,
+                    author: record.book_author,
+                    authors: record.book_authors,
+                    thumbnail_url: record.book_thumbnail_url,
+                    cover_url: record.book_cover_url,
+                    publication_year: record.book_publication_year,
+                    latest_status: record.latest_status,
+                },
                 records: [record],
             });
         }
@@ -126,9 +137,9 @@ const HistoryPage: React.FC = () => {
                 <div className="history-list">
                     {[...groupedHistory.values()].map((group) => (
                         <div key={group.bookId} className="history-group">
-                            <h2 className="group-title">
-                                <Link to={`/books/${group.bookId}`}>{group.title}</Link>
-                            </h2>
+                            <div className="history-book">
+                                <BookExhibit book={group.book} titleAs="h2" />
+                            </div>
                             <div className="records-list">
                                 {group.records.map((record) => (
                                     <div key={record.id} className="history-record">

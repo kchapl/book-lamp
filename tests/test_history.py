@@ -29,7 +29,11 @@ def test_get_reading_history_populated(authenticated_client):
     history = response.get_json()["history"]
     assert len(history) == 1
     assert history[0]["book_title"] == "Pride and Prejudice"
+    assert history[0]["book_title_main"] == "Pride and Prejudice"
+    assert history[0]["book_author"] == "Jane Austen"
+    assert history[0]["latest_status"] == "Completed"
     assert history[0]["status"] == "Completed"
+    assert history[0]["start_date"] == "2023-01-01"
     assert history[0]["end_date"] == "2023-01-15"
 
 

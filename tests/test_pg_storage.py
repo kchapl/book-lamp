@@ -216,6 +216,49 @@ def test_bulk_import_keeps_a_title_the_reader_kept_whole(pg_storage):
     assert stored["subtitle"] is None
 
 
+def test_reading_history_matches_the_mock_adapter_shape(pg_storage):
+    """Both adapters return ISO dates and the same Book fields for the log."""
+    from book_lamp.services.mock_storage import MockStorage
+
+    isbn = "9780241181349"
+    mock = MockStorage()
+    books = {
+        "pg": pg_storage.add_book(
+            isbn13=isbn,
+            title="Piranesi",
+            subtitle="A Novel",
+            authors=["Susanna Clarke"],
+            publication_year=2020,
+            cover_url="https://example.com/cover.jpg",
+            thumbnail_url="https://example.com/thumb.jpg",
+        ),
+        "mock": mock.add_book(
+            isbn13=isbn,
+            title="Piranesi",
+            subtitle="A Novel",
+            authors=["Susanna Clarke"],
+            publication_year=2020,
+            cover_url="https://example.com/cover.jpg",
+            thumbnail_url="https://example.com/thumb.jpg",
+        ),
+    }
+    pg_storage.add_reading(books["pg"]["id"], "Completed", "2024-03-01", "2024-03-20", 5)
+    mock.add_reading(books["mock"]["id"], "Completed", "2024-03-01", "2024-03-20", 5)
+
+    rows = [pg_storage.get_reading_history()[0], mock.get_reading_history()[0]]
+    for row in rows:
+        assert row["start_date"] == "2024-03-01"
+        assert row["end_date"] == "2024-03-20"
+        assert isinstance(row["created_at"], str)
+        assert row["book_title"] == "Piranesi: A Novel"
+        assert row["book_title_main"] == "Piranesi"
+        assert row["book_subtitle"] == "A Novel"
+        assert row["book_author"] == "Susanna Clarke"
+        assert row["book_cover_url"] == "https://example.com/cover.jpg"
+        assert row["book_publication_year"] == 2020
+        assert row["latest_status"] == "Completed"
+
+
 def test_bulk_import_can_leave_a_name_changed_since_the_snapshot(pg_storage):
     """A metadata refresh must not write the title its snapshot carried."""
     isbn = "9780241181348"

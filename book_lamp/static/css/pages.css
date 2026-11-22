@@ -445,6 +445,11 @@
 
 .history-group { position: relative; }
 
+.history-book {
+    max-width: 260px;
+    margin-bottom: var(--bl-space-3);
+}
+
 .group-title {
     font-family: var(--bl-font-display);
     font-size: 1.2rem;

@@ -10,8 +10,8 @@ from book_lamp.utils.books import (
     normalise_title_pair,
     resolve_category,
 )
-from book_lamp.utils.reading_status import READING_STATUSES
-from book_lamp.utils.readings import RATED_STATUS, require_end_date, require_rating
+from book_lamp.utils.reading_status import READING_STATUSES, latest_reading_by_book
+from book_lamp.utils.readings import RATED_STATUS, iso_date_string, require_end_date, require_rating
 
 logger = logging.getLogger(__name__)
 
@@ -564,11 +564,22 @@ class MockStorage:
             if book:
                 # Create a copy of the record and enrich it
                 enriched_record = record.copy()
+                enriched_record["book_title_main"] = book["title"]
+                enriched_record["book_subtitle"] = book.get("subtitle")
                 enriched_record["book_title"] = full_title(book["title"], book.get("subtitle"))
                 enriched_record["book_author"] = book["author"]
                 enriched_record["book_authors"] = book.get("authors", [])
                 enriched_record["book_thumbnail_url"] = book.get("thumbnail_url")
+                enriched_record["book_cover_url"] = book.get("cover_url")
+                enriched_record["book_publication_year"] = book.get("publication_year")
+                for field in ("start_date", "end_date", "created_at"):
+                    enriched_record[field] = iso_date_string(enriched_record.get(field))
                 history.append(enriched_record)
+
+        latest = latest_reading_by_book(history)
+        for enriched_record in history:
+            current = latest.get(enriched_record["book_id"])
+            enriched_record["latest_status"] = current.get("status") if current else None
         return history
 
     def search(self, query: str) -> list[dict[str, Any]]:
