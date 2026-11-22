@@ -164,9 +164,16 @@ missing section means one of them is unmet rather than something to wait for. Th
 heading also varies: **Custom apps** in Google's help, **Custom apps for Spark**
 on some screens.
 
-**Gemini asks for consent again after every deploy.** Client registrations and
-tokens are held in memory, so a deploy makes Gemini register and consent again.
-Deliberate, and deferred in ADR-0004.
+**Gemini says "Client Not Registered".** The client ID it sends is not in the
+service's OAuth store. Registrations and upstream tokens are kept in Book Lamp's
+Postgres database, so they normally survive deploys and idle spin-downs. If the
+database was reset, or `BOOK_LAMP_MCP_CLIENT_SECRET` changed and the old rows can
+no longer be decrypted, remove the custom app in Gemini and add it again to
+register a fresh client.
+
+**Gemini asks for consent again after every deploy.** It should not: OAuth state
+is persistent. Repeated consent points at the same lost-registration causes
+above, not at the Google OAuth client.
 
 **The service refuses to start.** A missing environment variable — intended.
 There is no unauthenticated mode and no default reader, so it stops rather than
