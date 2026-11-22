@@ -147,7 +147,7 @@ def encrypted_client_storage(store: Any, client_secret: str) -> FernetEncryption
     )
 
 
-def oauth_state_lifespan(store: PostgreSQLStore):
+def oauth_state_lifespan(store: Any):
     """Set the store up before FastMCP binds its port.
 
     An unreachable database therefore fails startup rather than producing a
