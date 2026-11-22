@@ -21,15 +21,22 @@ def test_get_reading_history_populated(authenticated_client):
         end_date="2023-01-15",
         rating=5,
     )
-    # also add the book to the reading list; it should not appear in history
+    # A later non-status record, such as one imported as "Plan to read", is not
+    # a Reading in the log. The old Completed Reading still appears, but the
+    # Book's current record has no Reading Status, so the exhibit must not badge it.
     storage.add_to_reading_list(book["id"])
+    storage.add_reading(book_id=book["id"], status="Plan to read", start_date="2023-02-01")
 
     response = authenticated_client.get("/api/history")
     assert response.status_code == 200
     history = response.get_json()["history"]
     assert len(history) == 1
     assert history[0]["book_title"] == "Pride and Prejudice"
+    assert history[0]["book_title_main"] == "Pride and Prejudice"
+    assert history[0]["book_author"] == "Jane Austen"
+    assert history[0]["latest_status"] is None
     assert history[0]["status"] == "Completed"
+    assert history[0]["start_date"] == "2023-01-01"
     assert history[0]["end_date"] == "2023-01-15"
 
 
@@ -46,6 +53,7 @@ def test_reading_history_filtering(authenticated_client):
     response = authenticated_client.get("/api/history?status=Completed")
     history = response.get_json()["history"]
     assert [r["book_title"] for r in history] == ["Book 1"]
+    assert history[0]["latest_status"] == "Completed"
     assert response.get_json()["filters"]["status"] == "Completed"
 
 

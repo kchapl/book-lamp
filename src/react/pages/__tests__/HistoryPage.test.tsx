@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HistoryPage from '../HistoryPage';
 import { getHistory } from '../../services/api';
@@ -44,9 +44,9 @@ const renderPage = () =>
         </MemoryRouter>
     );
 
-/** The group headings, in the order the log draws them. */
+/** The exhibits' headings, in the order the log draws them. */
 const groupTitles = (container: HTMLElement) =>
-    [...container.querySelectorAll('.group-title')].map((heading) => heading.textContent);
+    [...container.querySelectorAll('.history-group .exhibit-title')].map((heading) => heading.textContent);
 
 /** The readings drawn under each group heading. */
 const recordCounts = (container: HTMLElement) =>
@@ -86,6 +86,40 @@ describe('HistoryPage grouping', () => {
         await waitFor(() => expect(groupTitles(container)).toHaveLength(2));
         expect(groupTitles(container)).toEqual(['Collected Poems', 'Collected Poems']);
         expect(recordCounts(container)).toEqual([1, 1]);
+    });
+
+    it('mounts a Book as an exhibit with its stored details and formatted dates', async () => {
+        history.mockResolvedValue(
+            response([
+                reading({
+                    id: 1,
+                    book_id: 10,
+                    book_title: 'Piranesi: A Novel',
+                    book_title_main: 'Piranesi',
+                    book_subtitle: 'A Novel',
+                    book_author: 'Susanna Clarke',
+                    book_publication_year: 2020,
+                    latest_status: 'Completed',
+                    status: 'Completed',
+                    start_date: '2024-03-01',
+                    end_date: '2024-03-20',
+                }),
+            ])
+        );
+
+        const { container } = renderPage();
+
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: 'Piranesi' })).toBeTruthy()
+        );
+        expect(screen.getByText('A Novel')).toBeTruthy();
+        expect(screen.getByText('Susanna Clarke')).toBeTruthy();
+        expect(container.querySelector('.history-book .exhibit-accession')?.textContent).toBe('2020');
+        expect(container.querySelector('.history-book .exhibit-meta')?.textContent).toContain('Completed');
+
+        const dates = container.querySelector('.history-record .dates')?.textContent ?? '';
+        expect(dates).toContain('Mar');
+        expect(dates).not.toContain('2024-03-01');
     });
 
     it("gathers one Book's Readings under a single heading", async () => {

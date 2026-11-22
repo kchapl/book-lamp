@@ -15,6 +15,11 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional
 ENDING_STATUSES = ("Completed", "Abandoned")
 
 
+def iso_date_string(value: Any) -> Any:
+    """A date or datetime as an ISO string; anything else is left alone."""
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
 class ReadingEndsWithoutADate(ValueError):
     """Raised when a Reading is given an ending status but no end date."""
 
