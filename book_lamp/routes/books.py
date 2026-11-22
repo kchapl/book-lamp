@@ -51,16 +51,13 @@ def _background_fetch_missing_data(job_id: str, user_id: int):
         books = storage.get_all_books()
         logger.info(f"Background job {job_id}: checking {len(books)} books for missing data...")
 
-        # The run refreshes metadata, but a Book's name is the reader's: an edit
-        # is how a wrong split is undone, and the provider knows nothing of that
-        # choice. Keep the stored title and subtitle while the rest refreshes.
-        names = {book["id"]: (book.get("title"), book.get("subtitle")) for book in books}
-        updated_count = enhance_books_batch(books, force_refresh=True)
-        for book in books:
-            stored_title, stored_subtitle = names[book["id"]]
-            if stored_title:
-                book["title"] = stored_title
-                book["subtitle"] = stored_subtitle
+        # A Book's name is the reader's: an edit is how a wrong split is undone,
+        # and a provider knows nothing of that choice.
+        updated_count = enhance_books_batch(
+            books,
+            force_refresh=True,
+            skip_fields=("title", "subtitle"),
+        )
 
         items_to_update = [{"book": b, "record": None} for b in books]
         storage.bulk_import(items_to_update)

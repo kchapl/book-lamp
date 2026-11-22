@@ -1,7 +1,7 @@
 import html
 import logging
 import re
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Collection, Dict, List, Optional
 
 import requests
 
@@ -1140,11 +1140,17 @@ def _empty_result() -> Dict[str, Optional[Any]]:
     }
 
 
-def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force_refresh: bool = False) -> int:
+def enhance_books_batch(
+    books: List[Dict[str, Any]],
+    max_workers: int = 5,
+    force_refresh: bool = False,
+    skip_fields: Collection[str] = (),
+) -> int:
     """Enhance a list of books with missing metadata/covers in parallel.
 
-    Updates the books list in-place.
-    Returns the number of books successfully updated.
+    Updates the books list in-place. ``skip_fields`` names fields the provider
+    must not write, such as a Book's stored name. Returns the number of books
+    successfully updated without counting skipped fields.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -1283,6 +1289,8 @@ def enhance_books_batch(books: List[Dict[str, Any]], max_workers: int = 5, force
             }
 
             for target, source_field in field_map.items():
+                if target in skip_fields:
+                    continue
                 if needs_update(target, book_item.get(target)) and info.get(source_field):
                     val = info[source_field]
                     # Specific handling for strings/lengths

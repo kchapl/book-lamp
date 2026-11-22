@@ -39,8 +39,6 @@ def _background_import_books(job_id: str, content: str, fetch_metadata: bool, us
             books = [item["book"] for item in items]
             enhanced_count = enhance_books_batch(books)
 
-        # A file's titles are provider text, so a combined one is split here;
-        # the metadata backfill, which resends stored Books, never infers.
         import_count = storage.bulk_import(items, infer_subtitles=True)
         msg = f"Successfully imported {import_count} entries"
         if enhanced_count > 0:

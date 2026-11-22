@@ -432,8 +432,6 @@ class MockStorage:
             book_data = item["book"]
             record_data = item["record"]
 
-            # An imported row is text from a file, so its names are read there;
-            # a row that already carries the list is taken as given.
             imported_authors = book_data.get("authors") or parse(str(book_data.get("author") or ""))
             title, subtitle = normalise_title_pair(
                 book_data["title"],

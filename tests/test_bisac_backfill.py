@@ -109,6 +109,49 @@ def test_the_metadata_backfill_keeps_the_stored_name(monkeypatch):
     assert stored["bisac_category"] == "FICTION / General"
 
 
+def test_the_backfill_does_not_count_a_name_it_was_told_to_keep():
+    """A Book whose only provider data is its name was not updated.
+
+    The metadata backfill skips the stored title and subtitle, so a provider
+    answer that changes nothing else must not be reported as an update.
+    """
+    books = [
+        {
+            "isbn13": "9780000000007",
+            "title": "Foo Bar: Baz",
+            "subtitle": None,
+            "authors": ["An Author"],
+            "publication_year": 2020,
+            "publisher": "A Publisher",
+            "description": "A description",
+            "bisac_category": "FICTION / General",
+            "thumbnail_url": "http://example.com/cover.jpg",
+            "cover_url": "http://example.com/cover.jpg",
+        }
+    ]
+
+    with (
+        patch(
+            "book_lamp.services.book_lookup.lookup_books_batch",
+            return_value={
+                "9780000000007": {
+                    "title": "Piranesi: A Novel",
+                    "subtitle": "A Novel",
+                }
+            },
+        ),
+        patch("book_lamp.services.book_lookup.lookup_book_by_isbn13", return_value=None),
+    ):
+        updated_count = enhance_books_batch(
+            books,
+            force_refresh=True,
+            skip_fields=("title", "subtitle"),
+        )
+
+    assert updated_count == 0
+    assert (books[0]["title"], books[0]["subtitle"]) == ("Foo Bar: Baz", None)
+
+
 def test_enhance_books_preserves_bisac(mock_storage):
     # Setup: A book already has a BISAC category
     book = mock_storage.add_book(

@@ -17,12 +17,9 @@ _SPACED_DASHES = (" - ", " \u2013 ", " \u2014 ")
 def _separator_span(text: str) -> Optional[tuple[int, int]]:
     """Where a subtitle separator starts and ends in ``text``, or None.
 
-    Scanned rather than matched: the whitespace around a separator is already a
-    single space, and a pattern that allows a run of spaces before the colon
-    rescans that run from every start position — quadratic work on a title the
-    reader supplies, and the shape CodeQL reports as a polynomial regex. A
-    colon is only a separator when what precedes it can stand as a title, which
-    the caller decides; here it is one wherever it appears.
+    Scanned rather than matched, so a reader-supplied run of spaces cannot make
+    the check quadratic. Whether what precedes a separator can stand as a title
+    is the caller's decision.
     """
     colon = text.find(":")
     dash = min((index for index in (text.find(d) for d in _SPACED_DASHES) if index != -1), default=-1)
