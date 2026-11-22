@@ -55,4 +55,39 @@ describe('BookExhibit', () => {
         expect(screen.getByRole('heading', { name: 'Re: Zero' })).toBeTruthy();
         expect(document.querySelector('.exhibit-subtitle')).toBeNull();
     });
+
+    it('shows the publication year on its own accession line above the status row', () => {
+        const { container } = renderExhibit({
+            id: 1,
+            title: 'London Parks',
+            author: 'Hunter Davies',
+            publication_year: 2022,
+            latest_status: 'Completed',
+        });
+
+        const year = container.querySelector('.exhibit-accession');
+        const meta = container.querySelector('.exhibit-meta');
+
+        expect(year?.textContent).toBe('2022');
+        expect(year?.closest('.exhibit-meta')).toBeNull();
+        expect(meta?.textContent).toBe('Completed');
+        expect(meta?.querySelector('.exhibit-accession')).toBeNull();
+        expect(
+            year!.compareDocumentPosition(meta!) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
+
+    it('renders no accession line or status row when the Book has neither', () => {
+        const { container } = renderExhibit({ id: 1, title: 'Piranesi' });
+
+        expect(container.querySelector('.exhibit-accession')).toBeNull();
+        expect(container.querySelector('.exhibit-meta')).toBeNull();
+    });
+
+    it('still shows the year when the Book has no Reading Status', () => {
+        const { container } = renderExhibit({ id: 1, title: 'Piranesi', publication_year: 2020 });
+
+        expect(container.querySelector('.exhibit-accession')?.textContent).toBe('2020');
+        expect(container.querySelector('.exhibit-meta')).toBeNull();
+    });
 });
