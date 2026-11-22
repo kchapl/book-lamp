@@ -11,6 +11,7 @@ test('a Book card shows the stored subtitle under its title', async ({ page, req
             isbn: '9780306406157',
             title: 'A History of England in 100 Places: From Stonehenge to the Gherkin',
             author: 'David Long',
+            publication_year: 2022,
         },
     });
     expect(created.ok()).toBeTruthy();
@@ -28,6 +29,16 @@ test('a Book card shows the stored subtitle under its title', async ({ page, req
     const card = page.locator('.exhibit').filter({ hasText: 'From Stonehenge to the Gherkin' });
     await expect(card.getByRole('heading', { name: 'A History of England in 100 Places' })).toBeVisible();
     await expect(card).toContainText('From Stonehenge to the Gherkin');
+
+    const year = card.locator('.exhibit-accession');
+    const statusRow = card.locator('.exhibit-meta');
+    await expect(year).toHaveText('2022');
+    await expect(statusRow).toContainText('In Progress');
+    await expect(statusRow.locator('.exhibit-accession')).toHaveCount(0);
+
+    const yearBox = await year.boundingBox();
+    const statusBox = await statusRow.boundingBox();
+    expect(yearBox!.y).toBeLessThan(statusBox!.y);
 });
 
 test('a provider-separated subtitle is stored as its own part', async ({ request }) => {
