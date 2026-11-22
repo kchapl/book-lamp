@@ -39,16 +39,16 @@ const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) =
                 <Title className="exhibit-title">{book.title}</Title>
                 {book.subtitle && <p className="exhibit-subtitle">{book.subtitle}</p>}
                 <p className="exhibit-author">{book.author || 'Unknown author'}</p>
-                <div className="exhibit-meta">
-                    {book.latest_status && (
+                {book.publication_year && (
+                    <span className="exhibit-accession">{book.publication_year}</span>
+                )}
+                {book.latest_status && (
+                    <div className="exhibit-meta">
                         <span className={`status-badge ${statusClass(book.latest_status)}`}>
                             {book.latest_status}
                         </span>
-                    )}
-                    {book.publication_year && (
-                        <span className="exhibit-accession">{book.publication_year}</span>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </Link>
     );
