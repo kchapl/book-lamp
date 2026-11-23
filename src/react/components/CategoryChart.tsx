@@ -15,7 +15,6 @@ interface CategoryDetail {
 
 interface CategoryChartProps {
     categories: CategoryDetail[];
-    maxCount: number;
     onCategoryClick?: (category: string) => void;
 }
 
@@ -49,11 +48,7 @@ const CATEGORY_COLORS: { background: string; color: string }[] = [
     },
 ];
 
-const CategoryChart: React.FC<CategoryChartProps> = ({
-    categories,
-    maxCount,
-    onCategoryClick,
-}) => {
+const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryClick }) => {
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const navigate = useNavigate();
@@ -156,7 +151,6 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
         <div className="category-treemap">
             <div className="category-grid">
                 {categories.map((category, idx) => {
-                    const percentage = (category.count / maxCount) * 100;
                     const sharePercent = ((category.count / totalBooks) * 100).toFixed(1);
                     const hasSubcategories = category.subcategories && category.subcategories.length > 0;
 
@@ -176,7 +170,6 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                                 <div
                                     className="category-block"
                                     style={{
-                                        height: `${percentage}%`,
                                         backgroundColor: getColor(idx),
                                         color: getTextColor(idx),
                                     }}
