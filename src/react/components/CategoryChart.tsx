@@ -49,6 +49,18 @@ const CATEGORY_COLORS: { background: string; color: string }[] = [
     },
 ];
 
+/* A tile's height follows its subject's share of the largest subject, but never
+   drops below the height that fits the placard's own lines (name, count, share
+   and the expand hint). Sizing it by share alone made a small tile shorter than
+   its text, and the bottom-anchored placard lost its first line — the name. */
+const TILE_CONTENT_HEIGHT = 96;
+const TILE_MAX_EXTRA_HEIGHT = 64;
+const tileHeight = (percentage: number): number =>
+    Math.round(
+        TILE_CONTENT_HEIGHT +
+            (Math.min(Math.max(percentage, 0), 100) / 100) * TILE_MAX_EXTRA_HEIGHT
+    );
+
 const CategoryChart: React.FC<CategoryChartProps> = ({
     categories,
     maxCount,
@@ -176,7 +188,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({
                                 <div
                                     className="category-block"
                                     style={{
-                                        height: `${percentage}%`,
+                                        minHeight: tileHeight(percentage),
                                         backgroundColor: getColor(idx),
                                         color: getTextColor(idx),
                                     }}
