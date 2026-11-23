@@ -108,16 +108,26 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 # A Book is in a reader's collection when they have a Reading or a Reading List
-# entry for it. Every read of the collection scopes rows this way, so the joins
-# and the scope live in one place rather than in each query that needs them.
+# entry for it. Every read of the collection scopes rows this way, so the scope
+# lives in one place rather than in each query that needs them.
+#
+# Authors are read in a subquery of their own rather than joined beside the
+# scope: a Book's Authors do not depend on how many Readings or Reading List
+# entries put it in the collection, and a join would repeat each link per row.
+# The subquery names each Author once, in `position` order (ADR-0005).
 _COLLECTION_SCOPE = """
-    SELECT DISTINCT b.*, array_agg(a.name ORDER BY ba.position) as author_names
+    SELECT b.*, ARRAY(
+        SELECT a.name
+        FROM book_authors ba
+        JOIN authors a ON a.id = ba.author_id
+        WHERE ba.book_id = b.id
+        ORDER BY ba.position
+    ) AS author_names
     FROM books b
-    LEFT JOIN readings rr ON b.id = rr.book_id AND rr.user_id = %s
-    LEFT JOIN reading_list rl ON b.id = rl.book_id AND rl.user_id = %s
-    LEFT JOIN book_authors ba ON b.id = ba.book_id
-    LEFT JOIN authors a ON ba.author_id = a.id
-    WHERE (rr.id IS NOT NULL OR rl.book_id IS NOT NULL)
+    WHERE (
+        EXISTS (SELECT 1 FROM readings rr WHERE rr.book_id = b.id AND rr.user_id = %s)
+        OR EXISTS (SELECT 1 FROM reading_list rl WHERE rl.book_id = b.id AND rl.user_id = %s)
+    )
 """
 
 
@@ -173,7 +183,6 @@ class PostgresStorage:
         query = _COLLECTION_SCOPE
         for condition in conditions or []:
             query += f" AND {condition}"
-        query += " GROUP BY b.id"
 
         scope_user_id = user_id or self.user_id
         with self.pool.connection() as conn:

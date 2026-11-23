@@ -623,6 +623,57 @@ def test_a_books_authors_keep_the_order_they_were_entered_in(pg_storage):
     assert history["book_author"] == display
 
 
+def test_a_book_read_twice_names_each_author_once(pg_storage):
+    """A Book read more than once still lists its Author once (#394).
+
+    The collection query joins a Book's Readings and Reading List entries to
+    decide what belongs to the reader, and an aggregate over those joins sees
+    each Author link once per Reading. Grouping collapsed the Book's row but not
+    the repeated name, so a Book read twice was named "Richard Rhodes, Richard
+    Rhodes" on every surface fed by `get_all_books()`.
+    """
+    book = pg_storage.add_book(isbn13="9780374158913", title="Energy", authors=["Richard Rhodes"])
+    pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
+    pg_storage.add_reading(book["id"], "Completed", "2025-01-01", "2025-01-10")
+
+    collection = pg_storage.get_all_books()
+    assert [b["id"] for b in collection] == [book["id"]]
+    assert collection[0]["authors"] == ["Richard Rhodes"]
+    assert collection[0]["author"] == "Richard Rhodes"
+
+
+def test_several_readings_keep_each_author_once_in_order(pg_storage):
+    """Two Readings do not double a co-authored Book's Authors, or reorder them."""
+    book = pg_storage.add_book(
+        isbn13="9780575081567",
+        title="The Difference Engine",
+        authors=["Bruce Sterling", "William Gibson"],
+    )
+    pg_storage.add_to_reading_list(book["id"])
+    pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
+    pg_storage.add_reading(book["id"], "Completed", "2025-02-01", "2025-02-10")
+
+    from_collection = next(b for b in pg_storage.get_all_books() if b["id"] == book["id"])
+    assert from_collection["authors"] == ["Bruce Sterling", "William Gibson"]
+    assert from_collection["author"] == "Bruce Sterling, William Gibson"
+
+
+def test_the_covers_run_names_each_author_once(pg_storage):
+    """The missing-covers run shares the collection scope and its Author read.
+
+    It returns one row per Book either way, so what a Book with two Readings
+    has to prove here is the Authors it carries: the run must name each once.
+    """
+    book = pg_storage.add_book(isbn13="9780000000301", title="Uncovered", authors=["An Author"])
+    pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
+    pg_storage.add_reading(book["id"], "Completed", "2025-01-01", "2025-01-10")
+
+    missing = pg_storage.get_books_missing_covers()
+    assert [b["id"] for b in missing] == [book["id"]]
+    assert missing[0]["authors"] == ["An Author"]
+    assert missing[0]["author"] == "An Author"
+
+
 def test_both_adapters_present_a_books_authors_the_same_way(pg_storage):
     """The in-memory adapter and Postgres agree on a Book's authors (ADR-0005)."""
     from book_lamp.services.mock_storage import MockStorage
