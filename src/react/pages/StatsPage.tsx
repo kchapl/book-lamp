@@ -51,7 +51,6 @@ const StatsPage: React.FC = () => {
     const maxYearCount = stats.max_year_count || 1;
     const maxMonthCount = stats.max_month_count || 1;
     const maxFormatCount = stats.format_distribution?.[0]?.count || 1;
-    const maxLanguageCount = stats.language_distribution?.[0]?.count || 1;
     const maxRatingCount = Math.max(...stats.rating_distribution.map(([, count]) => count), 1);
     const barWidth = (value: number): React.CSSProperties =>
         ({ '--bar-width': `${value}%` } as React.CSSProperties);
@@ -420,25 +419,6 @@ const StatsPage: React.FC = () => {
                                     <span className="bar-label">{label}</span>
                                     <div className="bar-track">
                                         <div className="bar-fill" style={barWidth((count / maxFormatCount) * 100)} />
-                                    </div>
-                                    <span className="bar-value numeric">{count}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {stats.language_distribution && stats.language_distribution.length > 0 && (
-                    <section className="panel" aria-labelledby="languages-heading">
-                        <h2 id="languages-heading" className="panel-title">
-                            Languages
-                        </h2>
-                        <div className="bar-list">
-                            {stats.language_distribution.slice(0, 6).map(({ label, count }) => (
-                                <div key={label} className="bar-row">
-                                    <span className="bar-label">{label}</span>
-                                    <div className="bar-track">
-                                        <div className="bar-fill" style={barWidth((count / maxLanguageCount) * 100)} />
                                     </div>
                                     <span className="bar-value numeric">{count}</span>
                                 </div>
