@@ -131,6 +131,28 @@ describe('StatsPage reading-status board', () => {
         );
     });
 
+    it('lists the formats a Book names and hides the panel when there are none', async () => {
+        vi.mocked(getStats).mockResolvedValue({
+            ...mockStats,
+            format_distribution: [
+                { label: 'Paperback', count: 4 },
+                { label: 'Ebook', count: 2 },
+            ],
+        } as never);
+
+        const { unmount } = renderPage();
+
+        expect(await screen.findByText('Formats')).toBeInTheDocument();
+        expect(screen.getByText('Paperback')).toBeInTheDocument();
+        expect(screen.getByText('Ebook')).toBeInTheDocument();
+
+        unmount();
+        vi.mocked(getStats).mockResolvedValue(mockStats as never);
+        renderPage();
+        await waitFor(() => expect(screen.getByText('Ratings')).toBeInTheDocument());
+        expect(screen.queryByText('Formats')).not.toBeInTheDocument();
+    });
+
     it('shows an empty lectern when nothing is in progress', async () => {
         renderPage();
 

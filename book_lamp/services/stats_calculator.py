@@ -15,6 +15,45 @@ from book_lamp.utils import (
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
 
+# A binding is a format a reader recognises. Sources have also written their
+# media type (Google's printType: "BOOK", "MAGAZINE") and Libib's item type
+# ("book") into this column, and one Book carries a language code. Those are not
+# bindings, so only the spellings below count; anything else stays out of the
+# panel rather than being listed as a format. Old rows need no migration.
+FORMAT_ALIASES: Dict[str, str] = {
+    "paperback": "Paperback",
+    "paper back": "Paperback",
+    "softcover": "Paperback",
+    "soft cover": "Paperback",
+    "trade paperback": "Paperback",
+    "mass market paperback": "Paperback",
+    "hardcover": "Hardcover",
+    "hardback": "Hardcover",
+    "hard cover": "Hardcover",
+    "hard back": "Hardcover",
+    "library binding": "Library Binding",
+    "board book": "Board Book",
+    "ebook": "Ebook",
+    "e-book": "Ebook",
+    "e book": "Ebook",
+    "kindle": "Kindle",
+    "audiobook": "Audiobook",
+    "audio book": "Audiobook",
+    "audio cd": "Audiobook",
+    "mp3 cd": "Audiobook",
+    "large print": "Large Print",
+    "spiral bound": "Spiral-bound",
+    "leather bound": "Leather Bound",
+}
+
+
+def normalise_physical_format(value: Optional[str]) -> Optional[str]:
+    """The binding a stored physical-format value names, or None if it names none."""
+    if not value:
+        return None
+    key = " ".join(value.lower().replace("_", " ").split())
+    return FORMAT_ALIASES.get(key)
+
 
 def calculate_collection_stats(
     books: List[Dict[str, Any]],
@@ -210,9 +249,9 @@ def calculate_collection_stats(
 
     format_bins: Counter[str] = Counter()
     for b in completed_books:
-        fmt = b.get("physical_format")
-        if fmt:
-            format_bins[fmt] += 1
+        label = normalise_physical_format(b.get("physical_format"))
+        if label:
+            format_bins[label] += 1
     format_distribution = [
         {"label": label, "count": count} for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
     ]

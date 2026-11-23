@@ -824,7 +824,10 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "description": info.get("description"),
         "page_count": info.get("pageCount"),
         "language": info.get("language"),
-        "physical_format": info.get("printType"),
+        # printType is Google's media type (BOOK, MAGAZINE), not a binding, so it
+        # is not a physical format. With no binding from the provider the field
+        # stays empty rather than being filled with "BOOK".
+        "physical_format": None,
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
         "bisac_sub_category": sub_cat,

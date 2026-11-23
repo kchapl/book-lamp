@@ -123,6 +123,13 @@ def test_the_google_books_parser_keeps_a_separate_subtitle():
     assert parsed["subtitle"] == "The Greatest Espionage Story of the Cold War"
 
 
+def test_the_google_books_parser_does_not_take_a_media_type_as_a_format():
+    for print_type in ("BOOK", "MAGAZINE"):
+        parsed = lookup_module._parse_google_books_item({"volumeInfo": {"title": "A Book", "printType": print_type}})
+
+        assert parsed["physical_format"] is None
+
+
 def test_the_open_library_title_search_carries_its_subtitle(monkeypatch):
     monkeypatch.setattr(
         lookup_module,
