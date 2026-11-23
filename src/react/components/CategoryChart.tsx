@@ -15,7 +15,6 @@ interface CategoryDetail {
 
 interface CategoryChartProps {
     categories: CategoryDetail[];
-    maxCount: number;
     onCategoryClick?: (category: string) => void;
 }
 
@@ -49,11 +48,7 @@ const CATEGORY_COLORS: { background: string; color: string }[] = [
     },
 ];
 
-const CategoryChart: React.FC<CategoryChartProps> = ({
-    categories,
-    maxCount,
-    onCategoryClick,
-}) => {
+const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryClick }) => {
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const navigate = useNavigate();

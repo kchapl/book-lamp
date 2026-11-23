@@ -361,10 +361,7 @@ const StatsPage: React.FC = () => {
                     </h2>
                     <div className="panel">
                         {stats.category_details && stats.category_details.length > 0 ? (
-                            <CategoryChart
-                                categories={stats.category_details}
-                                maxCount={stats.max_category_count}
-                            />
+                            <CategoryChart categories={stats.category_details} />
                         ) : (
                             <div className="bar-list">
                                 {stats.category_distribution.map(({ label, count }) => (

@@ -20,10 +20,10 @@ interface Category {
     subcategories: { name: string; count: number }[];
 }
 
-const renderChart = (categories: Category[], maxCount = 52) =>
+const renderChart = (categories: Category[]) =>
     render(
         <MemoryRouter>
-            <CategoryChart categories={categories} maxCount={maxCount} />
+            <CategoryChart categories={categories} />
         </MemoryRouter>
     );
 
