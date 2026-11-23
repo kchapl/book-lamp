@@ -65,7 +65,6 @@ const HistoryPage: React.FC = () => {
                     thumbnail_url: record.book_thumbnail_url,
                     cover_url: record.book_cover_url,
                     publication_year: record.book_publication_year,
-                    latest_status: record.latest_status,
                 },
                 records: [record],
             });
@@ -138,7 +137,7 @@ const HistoryPage: React.FC = () => {
                     {[...groupedHistory.values()].map((group) => (
                         <div key={group.bookId} className="history-group">
                             <div className="history-book">
-                                <BookExhibit book={group.book} titleAs="h2" />
+                                <BookExhibit book={group.book} titleAs="h2" showStatus={false} />
                             </div>
                             <div className="records-list">
                                 {group.records.map((record) => (

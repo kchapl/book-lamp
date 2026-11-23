@@ -12,10 +12,10 @@ import { MemoryRouter } from 'react-router-dom';
 import BookExhibit from '../BookExhibit';
 import type { Book } from '../../types';
 
-const renderExhibit = (book: Book, titleAs?: 'h2' | 'h3') =>
+const renderExhibit = (book: Book, titleAs?: 'h2' | 'h3', showStatus?: boolean) =>
     render(
         <MemoryRouter>
-            <BookExhibit book={book} titleAs={titleAs} />
+            <BookExhibit book={book} titleAs={titleAs} showStatus={showStatus} />
         </MemoryRouter>
     );
 
@@ -82,6 +82,17 @@ describe('BookExhibit', () => {
 
         expect(container.querySelector('.exhibit-accession')).toBeNull();
         expect(container.querySelector('.exhibit-meta')).toBeNull();
+    });
+
+    it('can leave the status chip to the surface that states the status beside it', () => {
+        const { container } = renderExhibit(
+            { id: 1, title: 'Piranesi', publication_year: 2020, latest_status: 'Completed' },
+            'h2',
+            false
+        );
+
+        expect(container.querySelector('.exhibit-meta')).toBeNull();
+        expect(container.querySelector('.exhibit-accession')?.textContent).toBe('2020');
     });
 
     it('still shows the year when the Book has no Reading Status', () => {
