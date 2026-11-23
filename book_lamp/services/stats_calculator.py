@@ -16,35 +16,47 @@ from book_lamp.utils import (
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
 
-# A binding is a format a reader recognises. Sources write it as free text
-# ("Perfect Paperback", "Kindle Edition", "Audio Cassette") as well as alone,
-# and they have also written their media type (Google's printType: "BOOK",
-# "MAGAZINE") and Libib's item type ("book") into this column, plus one
-# language code. A known binding anywhere in the value is a format; anything
-# else — a media type, a language, "print", "audio" — is not, and old rows need
-# no migration because this filter is what hides them.
+# A binding is a format a reader recognises, and the dashboard asks for four of
+# them: paperback, hardback, ebook and audiobook. Sources write free text
+# ("Perfect Paperback", "Kindle Edition", "Audio Cassette") as well as their
+# media type (Google's printType: "BOOK", "MAGAZINE"; Libib's item type: "book")
+# and one language code. Each value is matched for the binding it names and
+# folded into one of the four; a value that names no binding is not counted at
+# all, and old rows need no migration because this filter is what hides them.
+# A print size with no binding ("Large Print") names none of the four, so it is
+# left out rather than guessed at.
 FORMAT_ALIASES: Dict[str, str] = {
     "paperback": "Paperback",
     "paper back": "Paperback",
     "softcover": "Paperback",
     "soft cover": "Paperback",
-    "hardcover": "Hardcover",
-    "hardback": "Hardcover",
-    "hard cover": "Hardcover",
-    "hard back": "Hardcover",
-    "library binding": "Library Binding",
-    "board book": "Board Book",
+    "softback": "Paperback",
+    "soft back": "Paperback",
+    "trade paper": "Paperback",
+    "mass market": "Paperback",
+    "pocket book": "Paperback",
+    "spiral": "Paperback",
+    "comb binding": "Paperback",
+    "pamphlet": "Paperback",
+    "hardcover": "Hardback",
+    "hardback": "Hardback",
+    "hard cover": "Hardback",
+    "hard back": "Hardback",
+    "library binding": "Hardback",
+    "board book": "Hardback",
+    "leather": "Hardback",
+    "cloth": "Hardback",
     "ebook": "Ebook",
     "e book": "Ebook",
     "kindle": "Ebook",
+    "epub": "Ebook",
+    "nook": "Ebook",
     "audiobook": "Audiobook",
     "audio book": "Audiobook",
     "audio cd": "Audiobook",
     "audio cassette": "Audiobook",
     "mp3 cd": "Audiobook",
-    "large print": "Large Print",
-    "spiral": "Spiral-bound",
-    "leather": "Leather Bound",
+    "audible": "Audiobook",
 }
 
 
