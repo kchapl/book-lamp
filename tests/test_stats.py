@@ -172,10 +172,15 @@ def test_dashboard_counts_only_bindings_as_formats():
     formats = [
         "Paperback",
         "paperback",
+        "Perfect Paperback",
         "Hardback",
         "Hardcover",
         "Ebook",
+        "Kindle Edition",
         "Audiobook",
+        "Audio Cassette",
+        "Spiral-bound",
+        "Leather-bound",
         "BOOK",
         "book",
         "MAGAZINE",
@@ -189,10 +194,12 @@ def test_dashboard_counts_only_bindings_as_formats():
     stats = calculate_collection_stats(books, records)
 
     assert stats["format_distribution"] == [
-        {"label": "Paperback", "count": 2},
+        {"label": "Paperback", "count": 3},
         {"label": "Hardcover", "count": 2},
-        {"label": "Ebook", "count": 1},
-        {"label": "Audiobook", "count": 1},
+        {"label": "Ebook", "count": 2},
+        {"label": "Audiobook", "count": 2},
+        {"label": "Spiral-bound", "count": 1},
+        {"label": "Leather Bound", "count": 1},
     ]
 
 

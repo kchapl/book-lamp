@@ -2,6 +2,7 @@
 
 import calendar
 import datetime
+import re
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
@@ -15,18 +16,18 @@ from book_lamp.utils import (
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
 
-# A binding is a format a reader recognises. Sources have also written their
-# media type (Google's printType: "BOOK", "MAGAZINE") and Libib's item type
-# ("book") into this column, and one Book carries a language code. Those are not
-# bindings, so only the spellings below count; anything else stays out of the
-# panel rather than being listed as a format. Old rows need no migration.
+# A binding is a format a reader recognises. Sources write it as free text
+# ("Perfect Paperback", "Kindle Edition", "Audio Cassette") as well as alone,
+# and they have also written their media type (Google's printType: "BOOK",
+# "MAGAZINE") and Libib's item type ("book") into this column, plus one
+# language code. A known binding anywhere in the value is a format; anything
+# else — a media type, a language, "print", "audio" — is not, and old rows need
+# no migration because this filter is what hides them.
 FORMAT_ALIASES: Dict[str, str] = {
     "paperback": "Paperback",
     "paper back": "Paperback",
     "softcover": "Paperback",
     "soft cover": "Paperback",
-    "trade paperback": "Paperback",
-    "mass market paperback": "Paperback",
     "hardcover": "Hardcover",
     "hardback": "Hardcover",
     "hard cover": "Hardcover",
@@ -34,16 +35,16 @@ FORMAT_ALIASES: Dict[str, str] = {
     "library binding": "Library Binding",
     "board book": "Board Book",
     "ebook": "Ebook",
-    "e-book": "Ebook",
     "e book": "Ebook",
-    "kindle": "Kindle",
+    "kindle": "Ebook",
     "audiobook": "Audiobook",
     "audio book": "Audiobook",
     "audio cd": "Audiobook",
+    "audio cassette": "Audiobook",
     "mp3 cd": "Audiobook",
     "large print": "Large Print",
-    "spiral bound": "Spiral-bound",
-    "leather bound": "Leather Bound",
+    "spiral": "Spiral-bound",
+    "leather": "Leather Bound",
 }
 
 
@@ -51,8 +52,13 @@ def normalise_physical_format(value: Optional[str]) -> Optional[str]:
     """The binding a stored physical-format value names, or None if it names none."""
     if not value:
         return None
-    key = " ".join(value.lower().replace("_", " ").split())
-    return FORMAT_ALIASES.get(key)
+    # Separators are equivalent: "Spiral-bound", "spiral_bound" and "spiral bound"
+    # are one binding, and a whole word match keeps "notebook" out of "Ebook".
+    key = " ".join(value.lower().replace("_", " ").replace("-", " ").split())
+    for alias, label in sorted(FORMAT_ALIASES.items(), key=lambda item: -len(item[0])):
+        if re.search(rf"\b{re.escape(alias)}\b", key):
+            return label
+    return None
 
 
 def calculate_collection_stats(
