@@ -131,6 +131,20 @@ describe('StatsPage reading-status board', () => {
         );
     });
 
+    it('has no Languages panel, even when the payload carries a distribution', async () => {
+        vi.mocked(getStats).mockResolvedValue({
+            ...mockStats,
+            language_distribution: [{ label: 'English', count: 3 }],
+            format_distribution: [{ label: 'Paperback', count: 3 }],
+        } as never);
+
+        renderPage();
+
+        expect(await screen.findByText('Formats')).toBeInTheDocument();
+        expect(screen.queryByText('Languages')).not.toBeInTheDocument();
+        expect(screen.queryByText('English')).not.toBeInTheDocument();
+    });
+
     it('shows an empty lectern when nothing is in progress', async () => {
         renderPage();
 
