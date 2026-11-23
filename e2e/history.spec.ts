@@ -16,7 +16,9 @@ test('filters and sorts the Reading Log', async ({ page }) => {
         'The Dispossessed',
     ]);
     await expect(page.locator('.history-group .exhibit-accession')).toHaveText(['2006', '2021', '1974']);
-    await expect(page.locator('.history-group .exhibit-meta')).toContainText([
+    // A Reading states its status on its own row; the exhibit does not repeat it.
+    await expect(page.locator('.history-group .exhibit-meta')).toHaveCount(0);
+    await expect(page.locator('.history-record .status-badge')).toHaveText([
         'In Progress',
         'Completed',
         'Completed',
