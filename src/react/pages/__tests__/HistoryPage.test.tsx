@@ -115,11 +115,31 @@ describe('HistoryPage grouping', () => {
         expect(screen.getByText('A Novel')).toBeTruthy();
         expect(screen.getByText('Susanna Clarke')).toBeTruthy();
         expect(container.querySelector('.history-book .exhibit-accession')?.textContent).toBe('2020');
-        expect(container.querySelector('.history-book .exhibit-meta')?.textContent).toContain('Completed');
+        // The Reading row states the status; the exhibit above it does not repeat it.
+        expect(container.querySelector('.history-book .exhibit-meta')).toBeNull();
+        expect(container.querySelector('.history-record .status-badge')?.textContent).toBe('Completed');
 
         const dates = container.querySelector('.history-record .dates')?.textContent ?? '';
         expect(dates).toContain('Mar');
         expect(dates).not.toContain('2024-03-01');
+    });
+
+    it("states each Reading's status only on its own row", async () => {
+        history.mockResolvedValue(
+            response([
+                reading({ id: 1, book_id: 10, book_title: 'Dune', status: 'In Progress', latest_status: 'In Progress' }),
+                reading({ id: 2, book_id: 10, book_title: 'Dune', status: 'Completed', latest_status: 'In Progress' }),
+            ])
+        );
+
+        const { container } = renderPage();
+
+        await waitFor(() => expect(groupTitles(container)).toHaveLength(1));
+        expect(container.querySelector('.history-book .exhibit-meta')).toBeNull();
+        const rowStatuses = [...container.querySelectorAll('.history-record .status-badge')].map(
+            (badge) => badge.textContent
+        );
+        expect(rowStatuses).toEqual(['In Progress', 'Completed']);
     });
 
     it("gathers one Book's Readings under a single heading", async () => {

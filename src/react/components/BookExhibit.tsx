@@ -13,6 +13,12 @@ interface BookExhibitProps {
      * its own section heading. Defaults to `h3`.
      */
     titleAs?: 'h2' | 'h3';
+    /**
+     * Whether the placard carries the Book's latest Reading Status. Surfaces
+     * that already state a status beside the exhibit (the Reading Log) turn it
+     * off so the same status is not said twice. Defaults to `true`.
+     */
+    showStatus?: boolean;
 }
 
 /**
@@ -20,7 +26,7 @@ interface BookExhibitProps {
  * with the title, author and an accession line. Used by the books grid,
  * the home page and publisher pages so every Book reads the same way.
  */
-const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) => {
+const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3', showStatus = true }) => {
     const cover = book.cover_url || book.thumbnail_url;
     const Title = titleAs;
 
@@ -42,7 +48,7 @@ const BookExhibit: React.FC<BookExhibitProps> = ({ book, to, titleAs = 'h3' }) =
                 {book.publication_year && (
                     <span className="exhibit-accession">{book.publication_year}</span>
                 )}
-                {book.latest_status && (
+                {showStatus && book.latest_status && (
                     <div className="exhibit-meta">
                         <span className={`status-badge ${statusClass(book.latest_status)}`}>
                             {book.latest_status}

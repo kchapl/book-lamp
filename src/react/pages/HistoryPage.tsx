@@ -138,7 +138,7 @@ const HistoryPage: React.FC = () => {
                     {[...groupedHistory.values()].map((group) => (
                         <div key={group.bookId} className="history-group">
                             <div className="history-book">
-                                <BookExhibit book={group.book} titleAs="h2" />
+                                <BookExhibit book={group.book} titleAs="h2" showStatus={false} />
                             </div>
                             <div className="records-list">
                                 {group.records.map((record) => (
