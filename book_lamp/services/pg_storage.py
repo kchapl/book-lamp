@@ -111,12 +111,10 @@ def with_retry(func: Callable[..., Any]) -> Callable[..., Any]:
 # entry for it. Every read of the collection scopes rows this way, so the scope
 # lives in one place rather than in each query that needs them.
 #
-# Authors are read in a subquery of their own rather than by joining
-# `book_authors` beside the scope. A Book belongs to the reader through any
-# number of Readings and Reading List entries, and a join to those multiplies
-# each Author link once per row: grouping collapses the Book's row but not the
-# repeated name, which #394 is. One subquery, ordered by `position`, names each
-# Author exactly once (ADR-0005).
+# Authors are read in a subquery of their own rather than joined beside the
+# scope: a Book's Authors do not depend on how many Readings or Reading List
+# entries put it in the collection, and a join would repeat each link per row.
+# The subquery names each Author once, in `position` order (ADR-0005).
 _COLLECTION_SCOPE = """
     SELECT b.*, ARRAY(
         SELECT a.name

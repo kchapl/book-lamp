@@ -658,18 +658,20 @@ def test_several_readings_keep_each_author_once_in_order(pg_storage):
     assert from_collection["author"] == "Bruce Sterling, William Gibson"
 
 
-def test_the_covers_run_sees_a_book_read_twice_once(pg_storage):
-    """The missing-covers run shares the collection scope, so it sees a Book once.
+def test_the_covers_run_names_each_author_once(pg_storage):
+    """The missing-covers run shares the collection scope and its Author read.
 
-    It reads Books no cover was found for, and a repeated Author used to mean a
-    repeated row for the same Book — the run would then look twice and charge
-    the same Book twice against its progress.
+    It returns one row per Book either way, so what a Book with two Readings
+    has to prove here is the Authors it carries: the run must name each once.
     """
     book = pg_storage.add_book(isbn13="9780000000301", title="Uncovered", authors=["An Author"])
     pg_storage.add_reading(book["id"], "Completed", "2024-01-01", "2024-01-10")
     pg_storage.add_reading(book["id"], "Completed", "2025-01-01", "2025-01-10")
 
-    assert [b["id"] for b in pg_storage.get_books_missing_covers()] == [book["id"]]
+    missing = pg_storage.get_books_missing_covers()
+    assert [b["id"] for b in missing] == [book["id"]]
+    assert missing[0]["authors"] == ["An Author"]
+    assert missing[0]["author"] == "An Author"
 
 
 def test_both_adapters_present_a_books_authors_the_same_way(pg_storage):
