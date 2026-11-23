@@ -883,6 +883,9 @@
 
 .category-link { text-decoration: none; color: inherit; }
 
+/* The tile sizes to its placard: the minimum height is a floor for a short
+   subject, not a cap, because a height that is too short for the text clips its
+   first line (the subject name) against the bottom-anchored content. */
 .category-block {
     position: relative;
     display: flex;
@@ -895,7 +898,18 @@
 }
 
 .category-content { display: flex; flex-direction: column; }
-.category-name { font-family: var(--bl-font-display); font-weight: 600; font-size: 0.95rem; }
+.category-name {
+    font-family: var(--bl-font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    /* A long subject wraps to two lines and then shows an ellipsis, so it
+       stays visible instead of widening the tile or disappearing. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
 .category-count { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .category-percent { font-size: var(--md-sys-typescale-body-small-size); opacity: 0.9; }
 .category-expand-hint { font-size: 0.625rem; margin-top: var(--bl-space-1); }
