@@ -883,6 +883,9 @@
 
 .category-link { text-decoration: none; color: inherit; }
 
+/* The tile sizes to its placard: the minimum height is a floor for a short
+   subject, not a cap, because a height that is too short for the text clips its
+   first line (the subject name) against the bottom-anchored content. */
 .category-block {
     position: relative;
     display: flex;

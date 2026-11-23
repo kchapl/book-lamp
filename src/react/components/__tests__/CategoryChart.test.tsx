@@ -1,11 +1,12 @@
 /**
  * The Subjects treemap's tiles.
  *
- * A tile is a placard pinned to the bottom of a coloured block. Sizing that
- * block by the subject's share alone made a small tile shorter than its own
- * text, so the placard lost its first line — the subject name — and the tile
- * showed only a count and a share. The block is now floored at the height its
- * lines need, so the name is always drawn.
+ * A tile is a placard pinned to the bottom of a coloured block. The block used
+ * to be given a share-sized inline `height`, which could be shorter than its
+ * own text, so the placard lost its first line — the subject name — and the
+ * tile showed only a count and a share. It now sizes to its content above the
+ * CSS minimum. jsdom does no layout, so the rendered result is covered by the
+ * dashboard screenshot; these tests pin the sizing contract and the lines.
  */
 import React from 'react';
 import { describe, expect, it } from 'vitest';
@@ -44,14 +45,14 @@ describe('CategoryChart subject tiles', () => {
         expect(tile.querySelector('.category-link')).toHaveAttribute('href', '/books?category=Fiction');
     });
 
-    it('draws a small subject at the height its own lines need', () => {
+    it('does not pin a small subject to a share-sized height', () => {
         const { container } = renderChart([{ label: 'Rare', count: 1, subcategories: [] }]);
 
         const block = container.querySelector('.category-block') as HTMLElement;
-        // The share is tiny, but the placard still holds its name, count and share.
-        expect(parseInt(block.style.minHeight, 10)).toBeGreaterThanOrEqual(96);
+        // A tiny share used to become an inline height shorter than the placard.
         expect(block.style.height).toBe('');
         expect(block.querySelector('.category-name')?.textContent).toBe('Rare');
+        expect(block.querySelector('.category-count')?.textContent).toBe('1');
     });
 
     it('keeps a long subject name in the tile rather than dropping it', () => {
