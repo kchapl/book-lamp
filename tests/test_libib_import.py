@@ -32,6 +32,20 @@ def test_libib_import_splits_a_combined_title():
     assert parsed[0]["book"]["subtitle"] == "A Novel"
 
 
+def test_libib_import_does_not_import_the_item_type_as_a_format():
+    """Item Type is Libib's media type ("book"), not a binding."""
+
+    parsed = parse_libib_csv("Title,Author,ISBN,Item Type\nPiranesi,Susanna Clarke,9781635575637,book\n")
+
+    assert not parsed[0]["book"]["physical_format"]
+
+
+def test_libib_import_keeps_a_physical_format_column():
+    parsed = parse_libib_csv("Title,Author,ISBN,Physical Format\nPiranesi,Susanna Clarke,9781635575637,Paperback\n")
+
+    assert parsed[0]["book"]["physical_format"] == "Paperback"
+
+
 def test_libib_import_leaves_a_title_it_cannot_split():
     from book_lamp.utils.libib_import import parse_libib_csv
 

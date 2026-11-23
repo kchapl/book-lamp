@@ -2,6 +2,7 @@
 
 import calendar
 import datetime
+import re
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +15,62 @@ from book_lamp.utils import (
 )
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
+
+# A binding is a format a reader recognises, and the dashboard asks for four of
+# them: paperback, hardback, ebook and audiobook. Sources write free text
+# ("Perfect Paperback", "Kindle Edition", "Audio Cassette") as well as their
+# media type (Google's printType: "BOOK", "MAGAZINE"; Libib's item type: "book")
+# and one language code. Each value is matched for the binding it names and
+# folded into one of the four; a value that names no binding is not counted at
+# all, and old rows need no migration because this filter is what hides them.
+# A print size with no binding ("Large Print") names none of the four, so it is
+# left out rather than guessed at.
+FORMAT_ALIASES: Dict[str, str] = {
+    "paperback": "Paperback",
+    "paper back": "Paperback",
+    "softcover": "Paperback",
+    "soft cover": "Paperback",
+    "softback": "Paperback",
+    "soft back": "Paperback",
+    "trade paper": "Paperback",
+    "mass market": "Paperback",
+    "pocket book": "Paperback",
+    "spiral": "Paperback",
+    "comb binding": "Paperback",
+    "pamphlet": "Paperback",
+    "hardcover": "Hardback",
+    "hardback": "Hardback",
+    "hard cover": "Hardback",
+    "hard back": "Hardback",
+    "library binding": "Hardback",
+    "board book": "Hardback",
+    "leather": "Hardback",
+    "cloth": "Hardback",
+    "ebook": "Ebook",
+    "e book": "Ebook",
+    "kindle": "Ebook",
+    "epub": "Ebook",
+    "nook": "Ebook",
+    "audiobook": "Audiobook",
+    "audio book": "Audiobook",
+    "audio cd": "Audiobook",
+    "audio cassette": "Audiobook",
+    "mp3 cd": "Audiobook",
+    "audible": "Audiobook",
+}
+
+
+def normalise_physical_format(value: Optional[str]) -> Optional[str]:
+    """The binding a stored physical-format value names, or None if it names none."""
+    if not value:
+        return None
+    # Separators are equivalent: "Spiral-bound", "spiral_bound" and "spiral bound"
+    # are one binding, and a whole word match keeps "notebook" out of "Ebook".
+    key = " ".join(value.lower().replace("_", " ").replace("-", " ").split())
+    for alias, label in sorted(FORMAT_ALIASES.items(), key=lambda item: -len(item[0])):
+        if re.search(rf"\b{re.escape(alias)}\b", key):
+            return label
+    return None
 
 
 def calculate_collection_stats(
@@ -210,9 +267,9 @@ def calculate_collection_stats(
 
     format_bins: Counter[str] = Counter()
     for b in completed_books:
-        fmt = b.get("physical_format")
-        if fmt:
-            format_bins[fmt] += 1
+        label = normalise_physical_format(b.get("physical_format"))
+        if label:
+            format_bins[label] += 1
     format_distribution = [
         {"label": label, "count": count} for label, count in sorted(format_bins.items(), key=lambda x: -x[1])
     ]

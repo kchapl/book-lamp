@@ -165,3 +165,60 @@ def test_dashboard_ignores_a_rating_on_a_reading_that_has_not_completed():
 
     assert stats["avg_rating"] == 0.0
     assert dict(stats["rating_distribution"])[5] == 0
+
+
+def test_dashboard_counts_only_bindings_as_formats():
+    """Every binding folds into one of four, and a media type or language is not a format."""
+    formats = [
+        "Paperback",
+        "paperback",
+        "Perfect Paperback",
+        "Hardback",
+        "Hardcover",
+        "Ebook",
+        "Kindle Edition",
+        "Audiobook",
+        "Audio Cassette",
+        "Spiral-bound",
+        "Leather-bound",
+        "BOOK",
+        "book",
+        "MAGAZINE",
+        "print",
+        "audio",
+        "en",
+    ]
+    books = [{"id": i, "title": f"Book {i}", "physical_format": fmt} for i, fmt in enumerate(formats, start=1)]
+    records = [{"book_id": book["id"], "status": "Completed", "end_date": "2026-01-02"} for book in books]
+
+    stats = calculate_collection_stats(books, records)
+
+    assert stats["format_distribution"] == [
+        {"label": "Paperback", "count": 4},
+        {"label": "Hardback", "count": 3},
+        {"label": "Ebook", "count": 2},
+        {"label": "Audiobook", "count": 2},
+    ]
+
+
+def test_every_format_folds_into_one_of_four_bindings():
+    from book_lamp.services.stats_calculator import FORMAT_ALIASES, normalise_physical_format
+
+    four = {"Paperback", "Hardback", "Ebook", "Audiobook"}
+    assert set(FORMAT_ALIASES.values()) == four
+    assert {normalise_physical_format(value) for value in FORMAT_ALIASES} == four
+
+
+def test_dashboard_has_no_formats_when_no_book_names_one_of_the_four_bindings():
+    books = [
+        {"id": 1, "title": "A Book", "physical_format": "BOOK"},
+        {"id": 2, "title": "Another Book", "physical_format": "en"},
+    ]
+    records = [
+        {"book_id": 1, "status": "Completed", "end_date": "2026-01-02"},
+        {"book_id": 2, "status": "Completed", "end_date": "2026-01-03"},
+    ]
+
+    stats = calculate_collection_stats(books, records)
+
+    assert stats["format_distribution"] == []

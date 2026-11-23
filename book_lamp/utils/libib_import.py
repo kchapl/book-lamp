@@ -78,7 +78,9 @@ def parse_libib_csv(csv_content: str) -> List[Dict[str, Any]]:
         dewey_decimal = get_val(["DDC", "Dewey", "Classification"])
         language = get_val(["Language"])
         page_count_str = get_val(["Page Count", "Pages"])
-        physical_format = get_val(["Physical Format", "Item Type"])
+        # Item Type is Libib's media type ("book"), not a binding, so it is not a
+        # fallback for the physical format; without the column the field is empty.
+        physical_format = get_val(["Physical Format"])
         edition = get_val(["Edition"])
 
         thumbnail_url = get_val(["Thumbnail", "Image", "Image URL", "Cover", "Cover URL"])
