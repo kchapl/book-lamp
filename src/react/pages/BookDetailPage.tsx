@@ -356,6 +356,23 @@ const BookDetailPage: React.FC = () => {
                             })
                         }
                     />
+                    {/* The reader is the one person who knows which copy they
+                        read. The four choices are the bindings the dashboard
+                        counts, and "Not recorded" clears a wrong one. */}
+                    <Select
+                        id="edit-format"
+                        label="Format (optional)"
+                        value={editForm.physical_format || ''}
+                        onValueChange={(value) =>
+                            setEditForm({ ...editForm, physical_format: value })
+                        }
+                    >
+                        <SelectOption value="">Not recorded</SelectOption>
+                        <SelectOption value="Paperback">Paperback</SelectOption>
+                        <SelectOption value="Hardback">Hardback</SelectOption>
+                        <SelectOption value="Ebook">Ebook</SelectOption>
+                        <SelectOption value="Audiobook">Audiobook</SelectOption>
+                    </Select>
                     {editError && (
                         <p className="error-message" role="alert">
                             {editError}
@@ -429,6 +446,12 @@ const BookDetailPage: React.FC = () => {
                                     <div className="placard-row">
                                         <dt>ISBN</dt>
                                         <dd className="numeric">{book.isbn13}</dd>
+                                    </div>
+                                )}
+                                {book.physical_format && (
+                                    <div className="placard-row">
+                                        <dt>Format</dt>
+                                        <dd>{book.physical_format}</dd>
                                     </div>
                                 )}
                                 {subject && (

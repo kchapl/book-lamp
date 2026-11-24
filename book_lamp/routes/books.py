@@ -443,6 +443,7 @@ def api_create_book():
             "cover_url": data.get("cover_url"),
             "description": data.get("description"),
             "bisac_category": data.get("bisac_category"),
+            "physical_format": data.get("physical_format"),
         }
     elif title:
         # A Book has at least one Author, and a title alone is not a lookup: the
@@ -576,6 +577,11 @@ def api_update_book(book_id: int):
         except ValueError:
             pass
 
+    # A blank format from the form is a clear, not an absent field: the reader
+    # chose "Not recorded" and the stored binding must go. Presence of the key
+    # is what tells the two apart.
+    physical_format_provided = "physical_format" in data
+
     try:
         storage.update_book(
             book_id=book_id,
@@ -589,6 +595,8 @@ def api_update_book(book_id: int):
             description=(str(data.get("description", "") or "").strip() or None),
             series=(str(data.get("series", "") or "").strip() or None),
             bisac_category=(str(data.get("bisac_category", "") or "").strip() or None),
+            physical_format=(str(data.get("physical_format", "") or "").strip() or None),
+            physical_format_provided=physical_format_provided,
             cover_url=(str(data.get("cover_url", "") or "").strip() or None),
         )
         current_app.logger.info(f"BOOK_UPDATED (API): book_id={book_id}")

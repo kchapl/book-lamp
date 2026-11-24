@@ -13,6 +13,8 @@ export interface Book {
     description?: string;
     series?: string;
     bisac_category?: string;
+    /** The binding the reader recorded or a provider supplied. */
+    physical_format?: string;
     /** The major category label the collection filters by. */
     bisac_category_label?: string;
     /** The URL segment of the publisher's page, normalised by the API. */

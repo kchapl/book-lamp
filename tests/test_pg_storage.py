@@ -1697,3 +1697,51 @@ def test_the_missing_covers_run_reads_and_writes_only_covers(pg_storage):
         thumbnail_url="https://example.com/stale.jpg",
     )
     assert pg_storage.get_book_by_id(blank["id"])["thumbnail_url"] == "   "
+
+
+def test_a_binding_is_cleared_only_when_the_edit_says_so(pg_storage):
+    """A blank is a clear only when supplied; a lookup without one keeps it."""
+    book = pg_storage.add_book(
+        isbn13="9780000000110",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Paperback",
+    )
+
+    # An edit that says nothing about the format leaves it standing.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # A provider lookup with no binding does not erase the reader's choice.
+    pg_storage.add_book(
+        isbn13="9780000000110",
+        title="A Book",
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # The edit form's "Not recorded" is an explicit clear.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        physical_format=None,
+        physical_format_provided=True,
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] is None
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        physical_format="Ebook",
+        physical_format_provided=True,
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Ebook"

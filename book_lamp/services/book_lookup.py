@@ -854,6 +854,9 @@ def _lookup_itunes_search(title: str, author: Optional[str] = None) -> Optional[
                     "author": item.get("artistName"),
                     "thumbnail_url": thumbnail,
                     "cover_url": cover,
+                    # The search is restricted to the ebook catalogue, so a
+                    # match from it describes an ebook edition.
+                    "physical_format": "Ebook",
                 }
     except Exception:
         pass

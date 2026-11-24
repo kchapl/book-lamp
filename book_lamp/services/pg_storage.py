@@ -484,7 +484,10 @@ class PostgresStorage:
                         bisac_sub_category = EXCLUDED.bisac_sub_category,
                         language = EXCLUDED.language,
                         page_count = EXCLUDED.page_count,
-                        physical_format = EXCLUDED.physical_format,
+                        -- A provider lookup with no binding must not erase the
+                        -- reader's choice; a value from the lookup only fills
+                        -- a Book that has none.
+                        physical_format = COALESCE(books.physical_format, EXCLUDED.physical_format),
                         edition = EXCLUDED.edition,
                         cover_url = EXCLUDED.cover_url
                     RETURNING id
@@ -575,6 +578,7 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
@@ -618,7 +622,9 @@ class PostgresStorage:
                         resolved.sub,
                         language or existing["language"],
                         page_count or existing["page_count"],
-                        physical_format or existing["physical_format"],
+                        # A blank the caller supplied is an explicit clear; a
+                        # blank it did not supply keeps the stored binding.
+                        physical_format if physical_format_provided else physical_format or existing["physical_format"],
                         edition or existing["edition"],
                         cover_url or existing["cover_url"],
                         book_id,

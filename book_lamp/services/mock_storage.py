@@ -209,6 +209,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         for book in self.books:
             if book["id"] == book_id:
@@ -237,7 +238,14 @@ class MockStorage:
                         "bisac_sub_category": resolved.sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
-                        "physical_format": physical_format or book.get("physical_format"),
+                        # A blank that arrives from the edit form is an explicit
+                        # clear, so it is told apart from a field the caller never
+                        # mentioned rather than read as "keep the old value".
+                        "physical_format": (
+                            physical_format
+                            if physical_format_provided
+                            else physical_format or book.get("physical_format")
+                        ),
                         "edition": edition or book.get("edition"),
                         "cover_url": cover_url or book.get("cover_url"),
                     }
