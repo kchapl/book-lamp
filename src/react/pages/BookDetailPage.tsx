@@ -178,6 +178,8 @@ const BookDetailPage: React.FC = () => {
         // projection on the way out, never an input, so it is not sent.
         const payload: Partial<Book> = { ...editForm, authors };
         delete payload.author;
+        // The label is the API's read of the stored value, not a field to write.
+        delete payload.physical_format_label;
 
         setEditError(null);
         try {
@@ -356,6 +358,23 @@ const BookDetailPage: React.FC = () => {
                             })
                         }
                     />
+                    {/* The reader is the one person who knows which copy they
+                        read. The four choices are the bindings the dashboard
+                        counts, and "Not recorded" clears a wrong one. */}
+                    <Select
+                        id="edit-format"
+                        label="Format (optional)"
+                        value={editForm.physical_format || ''}
+                        onValueChange={(value) =>
+                            setEditForm({ ...editForm, physical_format: value })
+                        }
+                    >
+                        <SelectOption value="">Not recorded</SelectOption>
+                        <SelectOption value="Paperback">Paperback</SelectOption>
+                        <SelectOption value="Hardback">Hardback</SelectOption>
+                        <SelectOption value="Ebook">Ebook</SelectOption>
+                        <SelectOption value="Audiobook">Audiobook</SelectOption>
+                    </Select>
                     {editError && (
                         <p className="error-message" role="alert">
                             {editError}
@@ -431,6 +450,12 @@ const BookDetailPage: React.FC = () => {
                                         <dd className="numeric">{book.isbn13}</dd>
                                     </div>
                                 )}
+                                {book.physical_format_label && (
+                                    <div className="placard-row">
+                                        <dt>Format</dt>
+                                        <dd>{book.physical_format_label}</dd>
+                                    </div>
+                                )}
                                 {subject && (
                                     <div className="placard-row">
                                         <dt>Subject</dt>
@@ -465,7 +490,14 @@ const BookDetailPage: React.FC = () => {
                         <Button
                             variant="outlined"
                             onClick={() => {
-                                setEditForm({ ...book, authors: authorRows(book) });
+                                setEditForm({
+                                    ...book,
+                                    authors: authorRows(book),
+                                    // The form offers the four labels, so a
+                                    // provider spelling opens on the label it
+                                    // names rather than on no choice at all.
+                                    physical_format: book.physical_format_label || '',
+                                });
                                 setEditError(null);
                                 setIsEditing(true);
                             }}

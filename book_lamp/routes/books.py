@@ -14,6 +14,7 @@ from book_lamp.services.cover_placeholders import PLACEHOLDER_HOSTS, CoverFinger
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.services.stats_calculator import normalise_physical_format
 from book_lamp.services.storage_factory import TEST_ISBN, _mock_storage_singleton, get_storage, is_test_mode
 from book_lamp.utils import (
     SORT_OPTIONS,
@@ -443,6 +444,7 @@ def api_create_book():
             "cover_url": data.get("cover_url"),
             "description": data.get("description"),
             "bisac_category": data.get("bisac_category"),
+            "physical_format": data.get("physical_format"),
         }
     elif title:
         # A Book has at least one Author, and a title alone is not a lookup: the
@@ -536,6 +538,9 @@ def api_book_detail(book_id: int):
     # publisher routes, and the category filter. The label the filter uses is
     # derived here, by the same rule, so the link and the filter cannot disagree.
     book["bisac_category_label"] = category_label_for_book(book)
+    # The page shows the binding a value names, not the raw stored value: old
+    # rows carry media types and language codes that are not bindings at all.
+    book["physical_format_label"] = normalise_physical_format(book.get("physical_format"))
     if book.get("publisher"):
         book["publisher_slug"] = publisher_slug(book["publisher"])
 
@@ -576,6 +581,11 @@ def api_update_book(book_id: int):
         except ValueError:
             pass
 
+    # A blank format from the form is a clear, not an absent field: the reader
+    # chose "Not recorded" and the stored binding must go. Presence of the key
+    # is what tells the two apart.
+    physical_format_provided = "physical_format" in data
+
     try:
         storage.update_book(
             book_id=book_id,
@@ -589,6 +599,8 @@ def api_update_book(book_id: int):
             description=(str(data.get("description", "") or "").strip() or None),
             series=(str(data.get("series", "") or "").strip() or None),
             bisac_category=(str(data.get("bisac_category", "") or "").strip() or None),
+            physical_format=(str(data.get("physical_format", "") or "").strip() or None),
+            physical_format_provided=physical_format_provided,
             cover_url=(str(data.get("cover_url", "") or "").strip() or None),
         )
         current_app.logger.info(f"BOOK_UPDATED (API): book_id={book_id}")

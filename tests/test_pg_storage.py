@@ -1697,3 +1697,84 @@ def test_the_missing_covers_run_reads_and_writes_only_covers(pg_storage):
         thumbnail_url="https://example.com/stale.jpg",
     )
     assert pg_storage.get_book_by_id(blank["id"])["thumbnail_url"] == "   "
+
+
+def test_a_binding_is_cleared_only_when_the_edit_says_so(pg_storage):
+    """A blank is a clear only when supplied; a lookup without one keeps it."""
+    book = pg_storage.add_book(
+        isbn13="9780000000110",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Paperback",
+    )
+
+    # An edit that says nothing about the format leaves it standing.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # A provider lookup with no binding does not erase the reader's choice.
+    pg_storage.add_book(
+        isbn13="9780000000110",
+        title="A Book",
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # The edit form's "Not recorded" is an explicit clear.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        physical_format=None,
+        physical_format_provided=True,
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] is None
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        physical_format="Ebook",
+        physical_format_provided=True,
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Ebook"
+
+
+def test_a_provider_binding_fills_a_legacy_gap_and_never_replaces_a_choice(pg_storage):
+    """A real stored binding stands; a stored media type is a gap."""
+    book = pg_storage.add_book(
+        isbn13="9780000000127",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Perfect Paperback",
+    )
+    # A provider spelling is stored as the label the edit form offers.
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # A later lookup carrying a binding does not replace the stored one.
+    pg_storage.add_book(
+        isbn13="9780000000127",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Ebook",
+    )
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Paperback"
+
+    # An old row may hold Google's media type; a real binding may replace it.
+    gap = pg_storage.add_book(isbn13="9780000000134", title="Another Book", authors=["An Author"])
+    with pg_storage.pool.connection() as conn:
+        conn.execute("UPDATE books SET physical_format = 'BOOK' WHERE id = %s", [gap["id"]])
+    pg_storage.add_book(
+        isbn13="9780000000134",
+        title="Another Book",
+        authors=["An Author"],
+        physical_format="Hardback",
+    )
+    assert pg_storage.get_book_by_id(gap["id"])["physical_format"] == "Hardback"

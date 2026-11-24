@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
+from book_lamp.services.stats_calculator import resolve_physical_format
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
     Category,
@@ -163,6 +164,9 @@ class MockStorage:
         # One list and one display string, the string derived from the list, so
         # this adapter and Postgres present a Book's authors the same way.
         authors = [str(name).strip() for name in authors if str(name).strip()]
+        # A binding is stored as one of the four labels; a media type or a
+        # language code arriving in the field names no binding and is dropped.
+        physical_format = resolve_physical_format(physical_format)
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
@@ -209,6 +213,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         for book in self.books:
             if book["id"] == book_id:
@@ -237,7 +242,14 @@ class MockStorage:
                         "bisac_sub_category": resolved.sub,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
-                        "physical_format": physical_format or book.get("physical_format"),
+                        # A blank that arrives from the edit form is an explicit
+                        # clear, so it is told apart from a field the caller never
+                        # mentioned rather than read as "keep the old value".
+                        "physical_format": resolve_physical_format(
+                            physical_format,
+                            book.get("physical_format"),
+                            provided=physical_format_provided,
+                        ),
                         "edition": edition or book.get("edition"),
                         "cover_url": cover_url or book.get("cover_url"),
                     }

@@ -10,6 +10,7 @@ from psycopg import OperationalError
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+from book_lamp.services.stats_calculator import resolve_physical_format
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
     Category,
@@ -453,13 +454,20 @@ class PostgresStorage:
                 # stored category outranks an incoming Dewey code here too
                 # (see ADR-0002).
                 existing_raw = conn.execute(
-                    "SELECT bisac_category, bisac_main_category, bisac_sub_category FROM books WHERE isbn13 = %s",
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, physical_format "
+                    "FROM books WHERE isbn13 = %s",
                     [target_isbn],
                 ).fetchone()
                 stored = Category.from_mapping(cast(Dict[str, Any], existing_raw)) if existing_raw else Category()
                 resolved = resolve_category(
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
                     stored,
+                )
+                # A lookup may fill a Book that names no binding, but a stored
+                # binding — the reader's choice, however it was obtained — stays.
+                resolved_format = resolve_physical_format(
+                    physical_format,
+                    cast(Dict[str, Any], existing_raw).get("physical_format") if existing_raw else None,
                 )
 
                 # First try atomic upsert
@@ -484,6 +492,9 @@ class PostgresStorage:
                         bisac_sub_category = EXCLUDED.bisac_sub_category,
                         language = EXCLUDED.language,
                         page_count = EXCLUDED.page_count,
+                        -- The value was resolved against the stored one above:
+                        -- a real stored binding stands, and a lookup fills
+                        -- only a Book that names none.
                         physical_format = EXCLUDED.physical_format,
                         edition = EXCLUDED.edition,
                         cover_url = EXCLUDED.cover_url
@@ -507,7 +518,7 @@ class PostgresStorage:
                             resolved.sub,
                             language,
                             page_count,
-                            physical_format,
+                            resolved_format,
                             edition,
                             cover_url,
                         ],
@@ -575,6 +586,7 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
@@ -592,6 +604,11 @@ class PostgresStorage:
                 resolved = resolve_category(
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
                     Category.from_mapping(existing),
+                )
+                resolved_format = resolve_physical_format(
+                    physical_format,
+                    existing.get("physical_format"),
+                    provided=physical_format_provided,
                 )
 
                 query = """
@@ -618,7 +635,7 @@ class PostgresStorage:
                         resolved.sub,
                         language or existing["language"],
                         page_count or existing["page_count"],
-                        physical_format or existing["physical_format"],
+                        resolved_format,
                         edition or existing["edition"],
                         cover_url or existing["cover_url"],
                         book_id,
