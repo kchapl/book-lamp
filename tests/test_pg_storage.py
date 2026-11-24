@@ -1818,27 +1818,137 @@ def test_a_book_subject_list_survives_and_an_edit_can_replace_it(pg_storage):
     assert updated["bisac_main_category"] == "HISTORY"
 
 
-def test_0012_gives_each_book_its_stored_subject_and_none_where_there_is_none(own_database):
-    """An existing Book keeps the one subject it carried, as the list's only entry."""
+def test_0012_adds_the_subject_list_and_leaves_legacy_rows_to_the_read_fallback(own_database):
+    """The new column starts empty; a legacy row's subject stays in its columns.
+
+    `subjects_for_book` reads those columns when the list is empty, so the
+    migration does not need to rewrite data and its behaviour cannot drift with
+    the application's normalisation.
+    """
     _upgrade_database(own_database, "0011")
-    labelled_id = _write_book(own_database, "9780000002228", "A Mystery", ["An Author"])
-    bare_id = _write_book(own_database, "9780000002235", "A Mislabeled Book", ["An Author"])
+    book_id = _write_book(own_database, "9780000002228", "A Mystery", ["An Author"])
     with psycopg.connect(own_database) as conn:
         conn.execute(
             "UPDATE books SET bisac_category = %s, bisac_main_category = %s WHERE id = %s",
-            ["FICTION / Mystery", "FICTION", labelled_id],
+            ["FICTION / Mystery", "FICTION", book_id],
         )
-        # A language code is not a subject, so it must not become an entry.
-        conn.execute("UPDATE books SET bisac_category = %s WHERE id = %s", ["en", bare_id])
 
     _upgrade_database(own_database, "head")
 
     with psycopg.connect(own_database) as conn:
-        subjects = {isbn: value for isbn, value in conn.execute("SELECT isbn13, subjects FROM books ORDER BY isbn13")}
+        (subjects,) = conn.execute("SELECT subjects FROM books WHERE id = %s", [book_id]).fetchone()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
 
-    assert subjects == {
-        "9780000002228": [{"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"}],
-        "9780000002235": [],
-    }
+    assert subjects == []
     assert stamped == "0012"
+
+
+def test_a_bulk_refresh_merges_subjects_and_names_the_stored_first(pg_storage):
+    """A refresh adds subjects; the legacy triple still names the first entry.
+
+    This is the production path for a provider refresh, and it must agree with
+    the in-memory adapter's upsert.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780000002235",
+        title="A History",
+        authors=["An Author"],
+        bisac_category="HISTORY / Europe",
+        bisac_main_category="HISTORY",
+        bisac_sub_category="Europe",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": book["isbn13"],
+                    "title": "A History",
+                    "author": "An Author",
+                    "publication_year": None,
+                    "subjects": [{"category": "SCIENCE", "main": "SCIENCE", "sub": None}],
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert [subject["main"] for subject in stored["subjects"]] == ["HISTORY", "SCIENCE"]
+    assert stored["bisac_category"] == "HISTORY / Europe"
+    assert stored["bisac_main_category"] == "HISTORY"
+
+
+def test_an_edit_that_changes_the_category_replaces_the_subject_list(pg_storage):
+    """A reader's new category is what the page and filter show next."""
+    book = pg_storage.add_book(
+        isbn13="9780000002249",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=[
+            {"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"},
+            {"category": "MURDER", "main": "MURDER", "sub": None},
+        ],
+    )
+
+    updated = pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        bisac_category="HISTORY / Europe",
+    )
+
+    assert updated["subjects"] == [{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}]
+    assert updated["bisac_main_category"] == "HISTORY"
+
+
+def test_concurrent_creates_keep_every_subject(pg_storage):
+    """A create that loses the insert race still contributes its subjects."""
+    barrier = threading.Barrier(2)
+
+    def create(main: str) -> None:
+        barrier.wait()
+        pg_storage.add_book(
+            isbn13="9780000002256",
+            title="A Shared Book",
+            authors=["An Author"],
+            subjects=[{"category": main, "main": main, "sub": None}],
+        )
+
+    threads = [threading.Thread(target=create, args=(main,)) for main in ("FICTION", "MURDER")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    stored = pg_storage.get_book_by_isbn("9780000002256")
+    assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}
+
+
+def test_bulk_import_keeps_a_stored_binding(pg_storage):
+    """An imported binding never replaces one the Book already names."""
+    book = pg_storage.add_book(
+        isbn13="9780000002263",
+        title="A Bound Book",
+        authors=["An Author"],
+        physical_format="Hardback",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": book["isbn13"],
+                    "title": "A Bound Book",
+                    "author": "An Author",
+                    "publication_year": None,
+                    "physical_format": "Paperback",
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Hardback"

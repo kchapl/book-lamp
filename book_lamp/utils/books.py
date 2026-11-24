@@ -713,6 +713,55 @@ def subjects_for_book(book: Mapping[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def resolve_subjects(
+    stored_book: Mapping[str, Any],
+    subjects: object,
+    incoming_category: "Category",
+    *,
+    merge: bool = False,
+    category_is_authoritative: bool = False,
+) -> tuple[list[dict[str, Any]], "Category"]:
+    """The subject list a write stores, and the legacy triple naming its first.
+
+    ``merge`` unions the incoming subjects with the stored ones: a provider
+    refresh adds what it finds and never drops a stored subject. Without it the
+    incoming list replaces the stored one, and an edit that names a different
+    category rebuilds the list from that category, so the page and the filter
+    cannot keep showing a subject the reader has just replaced.
+
+    The legacy ``bisac_*`` columns are always derived from the resulting list's
+    first entry, so they and every surface that reads the list agree on which
+    subject the Book leads with.
+    """
+    stored = subjects_for_book(stored_book)
+    incoming = normalise_subjects(subjects)
+    if incoming:
+        first = incoming[0]
+        incoming_category = Category(first["category"], first["main"], first["sub"])
+
+    subject_list = merge_subjects(stored, incoming) if merge else incoming or stored
+
+    if category_is_authoritative and not incoming:
+        submitted = normalise_subject(incoming_category.category)
+        if submitted and (
+            not subject_list or category_label(submitted["main"]) != category_label(subject_list[0]["main"])
+        ):
+            subject_list = [submitted]
+
+    # The triple still resolves through the one rule (see ADR-0002); it only
+    # fills the list when the Book names no subject at all.
+    resolved = resolve_category(incoming_category, Category.from_mapping(stored_book))
+    if not subject_list and resolved.main:
+        subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
+
+    if subject_list:
+        first = subject_list[0]
+        legacy = Category(first["category"], first["main"], first["sub"])
+    else:
+        legacy = resolved
+    return subject_list, legacy
+
+
 def category_label(value: object) -> str:
     """Return the display label for a category, or "Unknown" when invalid."""
     major = normalise_major_bisac(value)
@@ -722,19 +771,22 @@ def category_label(value: object) -> str:
 
 
 def category_labels_for_book(book: Mapping[str, Any]) -> list[str]:
-    """Every label a Book's subjects are counted under, in stored order."""
+    """Every label a Book is counted under, in stored order.
+
+    A Book that names no subject is counted under Unknown, the same bucket the
+    statistics chart uses and links to the Books filter.
+    """
     labels: list[str] = []
     for subject in subjects_for_book(book):
         label = category_label(subject["main"])
         if label not in labels:
             labels.append(label)
-    return labels
+    return labels or [UNKNOWN_CATEGORY]
 
 
 def category_label_for_book(book: Mapping[str, Any]) -> str:
     """The first label a Book is counted under, or "Unknown" when it has none."""
-    labels = category_labels_for_book(book)
-    return labels[0] if labels else UNKNOWN_CATEGORY
+    return category_labels_for_book(book)[0]
 
 
 class Category(NamedTuple):

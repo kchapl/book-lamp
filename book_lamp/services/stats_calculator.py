@@ -187,7 +187,7 @@ def calculate_collection_stats(
     # is not reduced to one of them. A Book with no real subject is Unknown.
     category_bins: Counter[str] = Counter()
     for b in completed_books:
-        for bin_label in category_labels_for_book(b) or [UNKNOWN_CATEGORY]:
+        for bin_label in category_labels_for_book(b):
             category_bins[bin_label] += 1
 
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))

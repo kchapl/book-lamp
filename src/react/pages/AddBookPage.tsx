@@ -97,6 +97,13 @@ const AddBookPage: React.FC = () => {
         thumbnail_url?: string;
         cover_url?: string;
     } | null>(null);
+    // The subjects the lookup found, and the ISBN they belong to. They travel
+    // with the same rule as the cover: only an answer for the ISBN being saved
+    // may contribute, because a reader can edit the ISBN after the lookup.
+    const [lookupSubjects, setLookupSubjects] = useState<{
+        isbn: string;
+        subjects: NonNullable<Book['subjects']>;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
     // The editions a title-and-author search found. More than one means the
@@ -204,6 +211,7 @@ const AddBookPage: React.FC = () => {
                     thumbnail_url: book.thumbnail_url ?? undefined,
                     cover_url: book.cover_url ?? undefined,
                 });
+                setLookupSubjects(book.subjects?.length ? { isbn: cleanIsbn, subjects: book.subjects } : null);
             }
             if (book && (book.title || book.author)) {
                 setTitle(book.title || '');
@@ -393,6 +401,8 @@ const AddBookPage: React.FC = () => {
             // Only a cover looked up for this ISBN may be sent: one left behind
             // by an earlier ISBN is another edition's image.
             const usableCover = cover && normalizeIsbn(cover.isbn) === isbnToUse ? cover : null;
+            const usableSubjects =
+                lookupSubjects && normalizeIsbn(lookupSubjects.isbn) === isbnToUse ? lookupSubjects.subjects : undefined;
             let details: Partial<Book> = {
                 title: title.trim(),
                 subtitle: subtitle.trim() || undefined,
@@ -401,6 +411,7 @@ const AddBookPage: React.FC = () => {
                 publication_year: year ? parseInt(year, 10) || undefined : undefined,
                 thumbnail_url: usableCover?.thumbnail_url,
                 cover_url: usableCover?.cover_url,
+                subjects: usableSubjects,
             };
 
             if (!isbnToUse) {

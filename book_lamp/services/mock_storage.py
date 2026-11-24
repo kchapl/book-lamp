@@ -9,9 +9,8 @@ from book_lamp.utils.books import (
     cover_is_blank,
     full_title,
     merge_subjects,
-    normalise_subjects,
     normalise_title_pair,
-    resolve_category,
+    resolve_subjects,
     subjects_for_book,
 )
 from book_lamp.utils.reading_status import READING_STATUSES
@@ -171,15 +170,11 @@ class MockStorage:
         # A binding is stored as one of the four labels; a media type or a
         # language code arriving in the field names no binding and is dropped.
         physical_format = resolve_physical_format(physical_format)
-        subject_list = normalise_subjects(subjects)
-        if subject_list:
-            first = subject_list[0]
-            bisac_category = first["category"]
-            bisac_main_category = first["main"]
-            bisac_sub_category = first["sub"]
-        else:
-            raw_category = bisac_category or bisac_main_category
-            subject_list = normalise_subjects([raw_category]) if raw_category else []
+        subject_list, legacy = resolve_subjects(
+            {},
+            subjects,
+            Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+        )
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
@@ -193,9 +188,9 @@ class MockStorage:
             "publisher": publisher,
             "description": description,
             "series": series,
-            "bisac_category": bisac_category,
-            "bisac_main_category": bisac_main_category,
-            "bisac_sub_category": bisac_sub_category,
+            "bisac_category": legacy.category,
+            "bisac_main_category": legacy.main,
+            "bisac_sub_category": legacy.sub,
             "subjects": subject_list,
             "language": language,
             "page_count": page_count,
@@ -234,16 +229,15 @@ class MockStorage:
             if book["id"] == book_id:
                 authors = [str(name).strip() for name in authors if str(name).strip()]
                 # The triple resolves through the one rule, shared with the
-                # Postgres adapter and the import paths (see ADR-0002).
-                incoming_subjects = normalise_subjects(subjects)
-                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
-                if incoming_subjects:
-                    first = incoming_subjects[0]
-                    incoming = Category(first["category"], first["main"], first["sub"])
-                resolved = resolve_category(incoming, Category.from_mapping(book))
-                subject_list = incoming_subjects or normalise_subjects(book.get("subjects"))
-                if not subject_list and resolved.main:
-                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
+                # Postgres adapter and the import paths (see ADR-0002). An edit
+                # that names a different category replaces the list, so the page
+                # and filter cannot keep showing the old subject.
+                subject_list, legacy = resolve_subjects(
+                    book,
+                    subjects,
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    category_is_authoritative=True,
+                )
 
                 book.update(
                     {
@@ -257,9 +251,9 @@ class MockStorage:
                         "publisher": publisher or book.get("publisher"),
                         "description": description or book.get("description"),
                         "series": series or book.get("series"),
-                        "bisac_category": resolved.category,
-                        "bisac_main_category": resolved.main,
-                        "bisac_sub_category": resolved.sub,
+                        "bisac_category": legacy.category,
+                        "bisac_main_category": legacy.main,
+                        "bisac_sub_category": legacy.sub,
                         "subjects": subject_list,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),

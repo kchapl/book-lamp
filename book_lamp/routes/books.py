@@ -546,8 +546,7 @@ def api_book_detail(book_id: int):
     # filter cannot disagree.
     subjects = subjects_for_book(book)
     book["subjects"] = [{**subject, "label": category_label(subject["main"])} for subject in subjects]
-    labels = category_labels_for_book(book)
-    book["bisac_category_label"] = labels[0] if labels else category_label_for_book(book)
+    book["bisac_category_label"] = category_label_for_book(book)
     # The page shows the binding a value names, not the raw stored value: old
     # rows carry media types and language codes that are not bindings at all.
     book["physical_format_label"] = normalise_physical_format(book.get("physical_format"))

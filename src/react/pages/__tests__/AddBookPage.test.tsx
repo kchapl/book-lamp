@@ -769,3 +769,57 @@ describe('AddBookPage covers', () => {
         );
     });
 });
+
+describe('AddBookPage subjects', () => {
+    const subjects = [
+        { category: 'HISTORY / Europe', main: 'HISTORY', sub: 'Europe' },
+        { category: 'MURDER', main: 'MURDER', sub: null },
+    ];
+
+    const submit = async (container: HTMLElement) => {
+        await act(async () => {
+            fireEvent.submit(container.querySelector('.add-book-form') as HTMLFormElement);
+        });
+    };
+
+    it('sends the subjects an ISBN lookup found', async () => {
+        lookup.mockResolvedValue({
+            isbn13: '9781529339604',
+            title: 'A History of England in 100 Places',
+            author: 'Philip Wilkinson',
+            subjects,
+        } as never);
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        await doLookup('9781529339604');
+        await waitFor(() => expect(field('title')?.value).toBe('A History of England in 100 Places'));
+
+        await submit(container);
+
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ isbn: '9781529339604', subjects }));
+    });
+
+    it('does not send subjects whose lookup answered for the replaced ISBN', async () => {
+        lookup.mockResolvedValue({
+            isbn13: '9781529339604',
+            title: 'A History of England in 100 Places',
+            author: 'Philip Wilkinson',
+            subjects,
+        } as never);
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        await doLookup('9781529339604');
+        await waitFor(() => expect(field('title')?.value).toBe('A History of England in 100 Places'));
+
+        // The reader corrects the ISBN after the answer arrived; its subjects
+        // belong to the edition that was asked about.
+        typeInto('isbn', '9780306406157');
+        await submit(container);
+
+        const sent = create.mock.calls[0][0] as { isbn?: string; subjects?: unknown };
+        expect(sent.isbn).toBe('9780306406157');
+        expect(sent.subjects).toBeUndefined();
+    });
+});

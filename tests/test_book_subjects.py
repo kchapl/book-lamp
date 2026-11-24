@@ -105,3 +105,20 @@ def test_a_stored_subject_list_wins_over_the_legacy_pair():
     }
 
     assert category_labels_for_book(book) == ["Fiction", "Murder"]
+
+
+def test_a_book_with_no_subject_is_filtered_and_offered_as_unknown(authenticated_client):
+    """The Unknown bucket the chart counts is one the filter can actually open."""
+    response = authenticated_client.post(
+        "/api/books",
+        json={"isbn": "9780000002242", "title": "An Unclassified Book", "authors": ["An Author"]},
+    )
+    assert response.status_code == 201
+    book_id = response.get_json()["id"]
+
+    storage = get_storage()
+    storage.add_reading(book_id, "Completed", "2026-01-01", "2026-01-02", rating=4)
+
+    unknown = authenticated_client.get("/api/books?category=Unknown").get_json()
+    assert [book["id"] for book in unknown["books"]] == [book_id]
+    assert "Unknown" in unknown["categories"]

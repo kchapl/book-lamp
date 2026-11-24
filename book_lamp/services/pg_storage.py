@@ -16,12 +16,9 @@ from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
     Category,
     full_title,
-    merge_subjects,
-    normalise_subjects,
     normalise_title_pair,
     normalize_isbn,
-    resolve_category,
-    subjects_for_book,
+    resolve_subjects,
 )
 from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
@@ -455,6 +452,12 @@ class PostgresStorage:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
             with conn.transaction():
+                # Two creates for the same new ISBN would otherwise both read no
+                # stored subjects, and the later conflict update would replace
+                # the earlier list. One transaction-scoped lock per ISBN
+                # serialises the read/merge/write, including the case where the
+                # row does not exist yet.
+                conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", [target_isbn])
                 # This statement is also the create path's conflict path, so a
                 # stored category outranks an incoming Dewey code here too
                 # (see ADR-0002).
@@ -463,26 +466,22 @@ class PostgresStorage:
                     "subjects, physical_format FROM books WHERE isbn13 = %s",
                     [target_isbn],
                 ).fetchone()
-                stored = Category.from_mapping(cast(Dict[str, Any], existing_raw)) if existing_raw else Category()
                 existing = cast(Dict[str, Any], existing_raw) if existing_raw else None
-                stored_subjects = subjects_for_book(existing) if existing else []
                 # A lookup may fill a Book that names no binding, but a stored
                 # binding — the reader's choice, however it was obtained — stays.
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format") if existing else None,
                 )
-                incoming_subjects = normalise_subjects(subjects)
-                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
-                if incoming_subjects:
-                    first = incoming_subjects[0]
-                    incoming = Category(first["category"], first["main"], first["sub"])
-                resolved = resolve_category(incoming, stored)
                 # A refresh adds the subjects it finds; it never drops a stored
-                # one. The union is computed here, so the write below is exact.
-                subject_list = merge_subjects(stored_subjects, incoming_subjects)
-                if not subject_list and resolved.main:
-                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
+                # one. The legacy triple is derived from the merged list, so it
+                # and the page label cannot name different subjects.
+                subject_list, resolved = resolve_subjects(
+                    existing or {},
+                    subjects,
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    merge=True,
+                )
 
                 # First try atomic upsert
                 query = """
@@ -619,16 +618,15 @@ class PostgresStorage:
                 existing = cast(Dict[str, Any], existing_raw)
 
                 # The triple resolves through the one rule, shared with the
-                # in-memory adapter and the import paths (see ADR-0002).
-                incoming_subjects = normalise_subjects(subjects)
-                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
-                if incoming_subjects:
-                    first = incoming_subjects[0]
-                    incoming = Category(first["category"], first["main"], first["sub"])
-                resolved = resolve_category(incoming, Category.from_mapping(existing))
-                subject_list = incoming_subjects or normalise_subjects(existing.get("subjects"))
-                if not subject_list and resolved.main:
-                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
+                # in-memory adapter and the import paths (see ADR-0002). An edit
+                # that names a different category replaces the list, so the page
+                # and filter cannot keep showing the old subject.
+                subject_list, resolved = resolve_subjects(
+                    existing,
+                    subjects,
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    category_is_authoritative=True,
+                )
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format"),
@@ -876,13 +874,15 @@ class PostgresStorage:
                         row = cast(Dict[str, Any], row_raw)
                         book_id = row["id"]
 
-                        # An imported Dewey code must not undo a category this
-                        # Book already has (see ADR-0002).
-                        resolved = resolve_category(
+                        # A refresh adds the subjects it finds and keeps the
+                        # stored ones; the legacy triple names the first of the
+                        # merged list, as the in-memory adapter writes it.
+                        subject_list, resolved = resolve_subjects(
+                            row,
+                            book_data.get("subjects"),
                             Category.from_mapping(book_data),
-                            Category.from_mapping(row),
+                            merge=True,
                         )
-                        subject_list = merge_subjects(subjects_for_book(row), book_data.get("subjects"))
                         resolved_format = resolve_physical_format(
                             book_data.get("physical_format"),
                             row.get("physical_format"),
@@ -928,7 +928,11 @@ class PostgresStorage:
                             if write_names
                             else ""
                         )
-                        subject_list = merge_subjects([], book_data.get("subjects"))
+                        subject_list, resolved = resolve_subjects(
+                            {},
+                            book_data.get("subjects"),
+                            Category.from_mapping(book_data),
+                        )
                         resolved_format = resolve_physical_format(book_data.get("physical_format"))
                         query = f"""
                             INSERT INTO books (
@@ -953,9 +957,9 @@ class PostgresStorage:
                                 book_data.get("publisher"),
                                 book_data.get("description"),
                                 book_data.get("series"),
-                                book_data.get("bisac_category"),
-                                book_data.get("bisac_main_category"),
-                                book_data.get("bisac_sub_category"),
+                                resolved.category,
+                                resolved.main,
+                                resolved.sub,
                                 Jsonb(subject_list),
                                 book_data.get("language"),
                                 book_data.get("page_count"),
