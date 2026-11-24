@@ -131,6 +131,15 @@ describe('StatsPage reading-status board', () => {
         );
     });
 
+    it('keeps the Formats panel on the dashboard when no binding is recorded', async () => {
+        // The panel used to be hidden by an empty distribution, which read as
+        // the component disappearing rather than as no data.
+        renderPage();
+
+        expect(await screen.findByText('Formats')).toBeInTheDocument();
+        expect(screen.getByText('No formats recorded yet.')).toBeInTheDocument();
+    });
+
     it('has no Languages panel, even when the payload carries a distribution', async () => {
         vi.mocked(getStats).mockResolvedValue({
             ...mockStats,

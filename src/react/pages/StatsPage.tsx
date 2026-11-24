@@ -405,11 +405,14 @@ const StatsPage: React.FC = () => {
                     </section>
                 )}
 
-                {stats.format_distribution && stats.format_distribution.length > 0 && (
-                    <section className="panel" aria-labelledby="formats-heading">
-                        <h2 id="formats-heading" className="panel-title">
-                            Formats
-                        </h2>
+                {/* A panel with no bindings still belongs on the dashboard: the
+                    reader can see the four it counts and that no Book has one
+                    yet, rather than wondering where the panel went. */}
+                <section className="panel" aria-labelledby="formats-heading">
+                    <h2 id="formats-heading" className="panel-title">
+                        Formats
+                    </h2>
+                    {stats.format_distribution && stats.format_distribution.length > 0 ? (
                         <div className="bar-list">
                             {stats.format_distribution.map(({ label, count }) => (
                                 <div key={label} className="bar-row">
@@ -421,8 +424,10 @@ const StatsPage: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                    </section>
-                )}
+                    ) : (
+                        <p className="no-data">No formats recorded yet.</p>
+                    )}
+                </section>
             </div>
         </div>
     );
