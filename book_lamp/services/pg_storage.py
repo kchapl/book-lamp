@@ -865,6 +865,11 @@ class PostgresStorage:
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
+                    # Imports run on their own threads, so two for the same Book
+                    # would otherwise merge onto the same snapshot and the later
+                    # write would erase the other's subjects. This is the lock
+                    # add_book takes, so a create and an import serialise too.
+                    conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", [isbn13])
                     row_raw = conn.execute(
                         "SELECT id, bisac_category, bisac_main_category, bisac_sub_category, "
                         "subjects, physical_format FROM books WHERE isbn13 = %s",

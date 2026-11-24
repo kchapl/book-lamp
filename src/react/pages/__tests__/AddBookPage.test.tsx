@@ -822,4 +822,27 @@ describe('AddBookPage subjects', () => {
         expect(sent.isbn).toBe('9780306406157');
         expect(sent.subjects).toBeUndefined();
     });
+
+    it('saves the subjects of an edition chosen by Find ISBN', async () => {
+        findMatches.mockResolvedValue([
+            {
+                isbn13: '9781529339604',
+                title: 'A History of England in 100 Places',
+                author: 'Philip Wilkinson',
+                subjects,
+            },
+        ]);
+        create.mockResolvedValue({ id: 9 } as never);
+
+        const { container } = renderToBook();
+        fireEvent.click(button(/enter title & author/i));
+        typeInto('title', 'A History of England in 100 Places');
+        typeInto('author', 'Philip Wilkinson');
+        fireEvent.click(button(/find isbn from title & author/i));
+        await waitFor(() => expect(field('isbn')?.value).toBe('9781529339604'));
+
+        await submit(container);
+
+        expect(create).toHaveBeenCalledWith(expect.objectContaining({ isbn: '9781529339604', subjects }));
+    });
 });

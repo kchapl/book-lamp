@@ -1952,3 +1952,36 @@ def test_bulk_import_keeps_a_stored_binding(pg_storage):
     )
 
     assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Hardback"
+
+
+def test_concurrent_imports_keep_every_subject(pg_storage):
+    """Two imports for one Book merge their subjects instead of overwriting."""
+    pg_storage.add_book(isbn13="9780000002270", title="A Shared Book", authors=["An Author"])
+    barrier = threading.Barrier(2)
+
+    def import_subject(main: str) -> None:
+        barrier.wait()
+        pg_storage.bulk_import(
+            [
+                {
+                    "book": {
+                        "isbn13": "9780000002270",
+                        "title": "A Shared Book",
+                        "author": "An Author",
+                        "publication_year": None,
+                        "subjects": [{"category": main, "main": main, "sub": None}],
+                    },
+                    "record": None,
+                }
+            ]
+        )
+
+    threads = [threading.Thread(target=import_subject, args=(main,)) for main in ("FICTION", "MURDER")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    stored = pg_storage.get_book_by_isbn("9780000002270")
+    assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}

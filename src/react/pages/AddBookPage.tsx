@@ -246,14 +246,16 @@ const AddBookPage: React.FC = () => {
     /** Fill the form from a matched edition, ISBN included. */
     const applyMatch = (match: BookMatch) => {
         if (match.isbn13) {
+            const matchIsbn = normalizeIsbn(match.isbn13);
             changeIsbn(match.isbn13);
-            // The image belongs to the edition just chosen, not to an ISBN the
-            // reader had typed before the match.
+            // The image and subjects belong to the edition just chosen, not to
+            // an ISBN the reader had typed before the match.
             setCover({
-                isbn: normalizeIsbn(match.isbn13),
+                isbn: matchIsbn,
                 thumbnail_url: match.thumbnail_url ?? undefined,
                 cover_url: match.cover_url ?? undefined,
             });
+            setLookupSubjects(match.subjects?.length ? { isbn: matchIsbn, subjects: match.subjects } : null);
         }
         if (match.title) setTitle(match.title);
         setSubtitle(match.subtitle || '');
