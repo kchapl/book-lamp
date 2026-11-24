@@ -405,9 +405,8 @@ const StatsPage: React.FC = () => {
                     </section>
                 )}
 
-                {/* A panel with no bindings still belongs on the dashboard: the
-                    reader can see the four it counts and that no Book has one
-                    yet, rather than wondering where the panel went. */}
+                {/* A panel with no bindings still belongs on the dashboard,
+                    showing its empty state rather than disappearing. */}
                 <section className="panel" aria-labelledby="formats-heading">
                     <h2 id="formats-heading" className="panel-title">
                         Formats
