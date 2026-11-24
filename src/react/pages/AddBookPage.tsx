@@ -7,7 +7,7 @@ import {
     createBook,
 } from '../services/api';
 import { Button, TextField } from '../ui';
-import type { BookMatch } from '../types';
+import type { Book, BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
 /** One row of the discovery list: the candidate, and what the row shows of it. */
@@ -364,6 +364,7 @@ const AddBookPage: React.FC = () => {
                 cover_url: candidate.cover_url,
                 publisher: candidate.publisher,
                 description: candidate.description,
+                subjects: candidate.subjects,
             });
             if (book.id) {
                 navigate(`/books/${book.id}`);
@@ -392,7 +393,7 @@ const AddBookPage: React.FC = () => {
             // Only a cover looked up for this ISBN may be sent: one left behind
             // by an earlier ISBN is another edition's image.
             const usableCover = cover && normalizeIsbn(cover.isbn) === isbnToUse ? cover : null;
-            let details = {
+            let details: Partial<Book> = {
                 title: title.trim(),
                 subtitle: subtitle.trim() || undefined,
                 author: author.trim(),
@@ -412,13 +413,14 @@ const AddBookPage: React.FC = () => {
                     isbnToUse = match.isbn13 as string;
                     applyMatch(match);
                     details = {
-                        title: (match.title || details.title).trim(),
+                        title: (match.title || details.title || '').trim(),
                         subtitle: match.subtitle || details.subtitle,
-                        author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
+                        author: (match.author || (match.authors ?? []).join(', ') || details.author || '').trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
                         thumbnail_url: match.thumbnail_url ?? undefined,
                         cover_url: match.cover_url ?? undefined,
+                        subjects: match.subjects,
                     };
                 } else if (found.length > 1) {
                     setMatches(found);

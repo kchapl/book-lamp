@@ -1,4 +1,5 @@
 import html
+import json
 import re
 from collections.abc import Mapping
 from typing import Any, NamedTuple, Optional
@@ -618,6 +619,100 @@ def normalise_bisac_category(
     return full_category, major, sub_category
 
 
+def normalise_subject(value: object) -> Optional[dict[str, Any]]:
+    """One subject a Book carries, normalised on its own.
+
+    Accepts the stored mapping or a provider's raw string. A value that names
+    no subject at all — a Dewey code, a language code, a format — is not a
+    subject and returns None.
+    """
+    raw = value
+    if isinstance(value, Mapping):
+        raw = value.get("category") or value.get("main")
+    full_category, main, sub = normalise_bisac_category(raw)
+    if not main:
+        return None
+    return {"category": full_category, "main": main, "sub": sub}
+
+
+def normalise_subjects(values: object) -> list[dict[str, Any]]:
+    """Every subject a Book carries, each normalised and collapsed by label.
+
+    Sources publish lists, and a Book that genuinely carries several subjects
+    keeps them all. Two spellings that normalise to the same label are one
+    subject; the first spelling in the source's order is kept.
+    """
+    if values is None:
+        return []
+    if isinstance(values, str):
+        text = values.strip()
+        if not text:
+            return []
+        # An import may carry a JSON array in one field; a lone value is one
+        # subject, not a string to split on commas.
+        if text.startswith("["):
+            try:
+                values = json.loads(text)
+            except ValueError:
+                values = [text]
+        else:
+            values = [text]
+    elif isinstance(values, Mapping):
+        values = [values]
+
+    if not isinstance(values, (list, tuple, set)):
+        return []
+
+    subjects: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for value in values:
+        subject = normalise_subject(value)
+        if subject is None:
+            continue
+        key = subject["main"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        subjects.append(subject)
+    return subjects
+
+
+def merge_subjects(stored: object, incoming: object) -> list[dict[str, Any]]:
+    """Every subject either side names, the stored ones first.
+
+    A provider refresh adds the subjects it finds and never drops a stored one,
+    so the merge is a union by label: a label the Book already carries keeps
+    its stored spelling and place, and the provider's entry is kept only when
+    it names a label the Book did not have.
+    """
+    merged = normalise_subjects(stored)
+    seen = {subject["main"].casefold() for subject in merged}
+    for subject in normalise_subjects(incoming):
+        key = subject["main"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(subject)
+    return merged
+
+
+def subjects_for_book(book: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every subject stored on a Book, or its one legacy subject.
+
+    A row written before ``subjects`` existed has its category in the old
+    three columns; that value is one entry, never several. The validated
+    ``bisac_main_category`` is the fallback when the full value is junk.
+    """
+    stored = normalise_subjects(book.get("subjects"))
+    if stored:
+        return stored
+    for raw in (book.get("bisac_category"), book.get("bisac_main_category")):
+        subject = normalise_subject(raw)
+        if subject is not None:
+            return [subject]
+    return []
+
+
 def category_label(value: object) -> str:
     """Return the display label for a category, or "Unknown" when invalid."""
     major = normalise_major_bisac(value)
@@ -626,16 +721,20 @@ def category_label(value: object) -> str:
     return major.title() if len(major) > 3 else major.upper()
 
 
-def category_label_for_book(book: dict) -> str:
-    """Return the chart/filter label for a book.
+def category_labels_for_book(book: Mapping[str, Any]) -> list[str]:
+    """Every label a Book's subjects are counted under, in stored order."""
+    labels: list[str] = []
+    for subject in subjects_for_book(book):
+        label = category_label(subject["main"])
+        if label not in labels:
+            labels.append(label)
+    return labels
 
-    Prefers the validated ``bisac_main_category`` and falls back to the raw
-    ``bisac_category`` so rows written before normalisation still classify.
-    """
-    major = normalise_major_bisac(book.get("bisac_main_category"))
-    if major is None:
-        major = normalise_major_bisac(book.get("bisac_category"))
-    return category_label(major)
+
+def category_label_for_book(book: Mapping[str, Any]) -> str:
+    """The first label a Book is counted under, or "Unknown" when it has none."""
+    labels = category_labels_for_book(book)
+    return labels[0] if labels else UNKNOWN_CATEGORY
 
 
 class Category(NamedTuple):

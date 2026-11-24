@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, cast
 import psycopg
 from psycopg import OperationalError
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from book_lamp.services.stats_calculator import resolve_physical_format
@@ -15,9 +16,12 @@ from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
     Category,
     full_title,
+    merge_subjects,
+    normalise_subjects,
     normalise_title_pair,
     normalize_isbn,
     resolve_category,
+    subjects_for_book,
 )
 from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
@@ -446,6 +450,7 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
@@ -454,30 +459,39 @@ class PostgresStorage:
                 # stored category outranks an incoming Dewey code here too
                 # (see ADR-0002).
                 existing_raw = conn.execute(
-                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, physical_format "
-                    "FROM books WHERE isbn13 = %s",
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, "
+                    "subjects, physical_format FROM books WHERE isbn13 = %s",
                     [target_isbn],
                 ).fetchone()
                 stored = Category.from_mapping(cast(Dict[str, Any], existing_raw)) if existing_raw else Category()
-                resolved = resolve_category(
-                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    stored,
-                )
+                existing = cast(Dict[str, Any], existing_raw) if existing_raw else None
+                stored_subjects = subjects_for_book(existing) if existing else []
                 # A lookup may fill a Book that names no binding, but a stored
                 # binding — the reader's choice, however it was obtained — stays.
                 resolved_format = resolve_physical_format(
                     physical_format,
-                    cast(Dict[str, Any], existing_raw).get("physical_format") if existing_raw else None,
+                    existing.get("physical_format") if existing else None,
                 )
+                incoming_subjects = normalise_subjects(subjects)
+                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
+                if incoming_subjects:
+                    first = incoming_subjects[0]
+                    incoming = Category(first["category"], first["main"], first["sub"])
+                resolved = resolve_category(incoming, stored)
+                # A refresh adds the subjects it finds; it never drops a stored
+                # one. The union is computed here, so the write below is exact.
+                subject_list = merge_subjects(stored_subjects, incoming_subjects)
+                if not subject_list and resolved.main:
+                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
 
                 # First try atomic upsert
                 query = """
                     INSERT INTO books (
                         isbn13, title, subtitle, publication_year, thumbnail_url,
                         publisher, description, series, bisac_category,
-                        bisac_main_category, bisac_sub_category, language,
+                        bisac_main_category, bisac_sub_category, subjects, language,
                         page_count, physical_format, edition, cover_url
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (isbn13) DO UPDATE SET
                         title = EXCLUDED.title,
                         -- A provider that knows no subtitle must not erase one.
@@ -490,6 +504,9 @@ class PostgresStorage:
                         bisac_category = EXCLUDED.bisac_category,
                         bisac_main_category = EXCLUDED.bisac_main_category,
                         bisac_sub_category = EXCLUDED.bisac_sub_category,
+                        -- The list was unioned with the stored one above, so a
+                        -- provider's subjects are added and none is dropped.
+                        subjects = EXCLUDED.subjects,
                         language = EXCLUDED.language,
                         page_count = EXCLUDED.page_count,
                         -- The value was resolved against the stored one above:
@@ -516,6 +533,7 @@ class PostgresStorage:
                             resolved.category,
                             resolved.main,
                             resolved.sub,
+                            Jsonb(subject_list),
                             language,
                             page_count,
                             resolved_format,
@@ -586,13 +604,14 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
         physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
                 # Mirror BISAC prioritization logic from MockStorage
                 existing_raw = conn.execute(
-                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, thumbnail_url, publisher, description, series, language, page_count, physical_format, edition, cover_url FROM books WHERE id = %s",
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, subjects, thumbnail_url, publisher, description, series, language, page_count, physical_format, edition, cover_url FROM books WHERE id = %s",
                     [book_id],
                 ).fetchone()
                 if not existing_raw:
@@ -601,10 +620,15 @@ class PostgresStorage:
 
                 # The triple resolves through the one rule, shared with the
                 # in-memory adapter and the import paths (see ADR-0002).
-                resolved = resolve_category(
-                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    Category.from_mapping(existing),
-                )
+                incoming_subjects = normalise_subjects(subjects)
+                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
+                if incoming_subjects:
+                    first = incoming_subjects[0]
+                    incoming = Category(first["category"], first["main"], first["sub"])
+                resolved = resolve_category(incoming, Category.from_mapping(existing))
+                subject_list = incoming_subjects or normalise_subjects(existing.get("subjects"))
+                if not subject_list and resolved.main:
+                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format"),
@@ -616,6 +640,7 @@ class PostgresStorage:
                         isbn13 = %s, title = %s, subtitle = %s, publication_year = %s,
                         thumbnail_url = %s, publisher = %s, description = %s, series = %s,
                         bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
+                        subjects = %s,
                         language = %s, page_count = %s, physical_format = %s, edition = %s, cover_url = %s
                     WHERE id = %s
                 """
@@ -633,6 +658,7 @@ class PostgresStorage:
                         resolved.category,
                         resolved.main,
                         resolved.sub,
+                        Jsonb(subject_list),
                         language or existing["language"],
                         page_count or existing["page_count"],
                         resolved_format,
@@ -664,6 +690,7 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         # add_book now handles duplicates atomically with ON CONFLICT DO UPDATE
         return self.add_book(
@@ -684,6 +711,7 @@ class PostgresStorage:
             physical_format=physical_format,
             edition=edition,
             cover_url=cover_url,
+            subjects=subjects,
         )
 
     def delete_book(self, book_id: int) -> bool:
@@ -840,7 +868,8 @@ class PostgresStorage:
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
                     row_raw = conn.execute(
-                        "SELECT id, bisac_category, bisac_main_category, bisac_sub_category FROM books WHERE isbn13 = %s",
+                        "SELECT id, bisac_category, bisac_main_category, bisac_sub_category, "
+                        "subjects, physical_format FROM books WHERE isbn13 = %s",
                         [isbn13],
                     ).fetchone()
                     if row_raw:
@@ -853,6 +882,11 @@ class PostgresStorage:
                             Category.from_mapping(book_data),
                             Category.from_mapping(row),
                         )
+                        subject_list = merge_subjects(subjects_for_book(row), book_data.get("subjects"))
+                        resolved_format = resolve_physical_format(
+                            book_data.get("physical_format"),
+                            row.get("physical_format"),
+                        )
 
                         # Update book (simplified for bulk)
                         name_assignments = "title = %s, subtitle = COALESCE(%s, subtitle), " if write_names else ""
@@ -861,6 +895,7 @@ class PostgresStorage:
                                 {name_assignments}publication_year = %s,
                                 publisher = %s, description = %s, series = %s,
                                 bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
+                                subjects = %s,
                                 language = %s, page_count = %s, physical_format = %s, edition = %s,
                                 thumbnail_url = COALESCE(%s, thumbnail_url),
                                 cover_url = COALESCE(%s, cover_url)
@@ -877,9 +912,10 @@ class PostgresStorage:
                                 resolved.category,
                                 resolved.main,
                                 resolved.sub,
+                                Jsonb(subject_list),
                                 book_data.get("language"),
                                 book_data.get("page_count"),
-                                book_data.get("physical_format"),
+                                resolved_format,
                                 book_data.get("edition"),
                                 book_data.get("thumbnail_url"),
                                 book_data.get("cover_url"),
@@ -892,13 +928,15 @@ class PostgresStorage:
                             if write_names
                             else ""
                         )
+                        subject_list = merge_subjects([], book_data.get("subjects"))
+                        resolved_format = resolve_physical_format(book_data.get("physical_format"))
                         query = f"""
                             INSERT INTO books (
                                 isbn13, title, subtitle, publication_year, thumbnail_url,
                                 publisher, description, series, bisac_category,
-                                bisac_main_category, bisac_sub_category, language,
+                                bisac_main_category, bisac_sub_category, subjects, language,
                                 page_count, physical_format, edition, cover_url
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (isbn13) DO UPDATE SET
                                 {conflict_assignments}publication_year = EXCLUDED.publication_year,
                                 thumbnail_url = EXCLUDED.thumbnail_url
@@ -918,9 +956,10 @@ class PostgresStorage:
                                 book_data.get("bisac_category"),
                                 book_data.get("bisac_main_category"),
                                 book_data.get("bisac_sub_category"),
+                                Jsonb(subject_list),
                                 book_data.get("language"),
                                 book_data.get("page_count"),
-                                book_data.get("physical_format"),
+                                resolved_format,
                                 book_data.get("edition"),
                                 book_data.get("cover_url"),
                             ],

@@ -190,7 +190,8 @@ def test_the_backfill_does_not_count_a_name_it_was_told_to_keep():
     assert (books[0]["title"], books[0]["subtitle"]) == ("Foo Bar: Baz", None)
 
 
-def test_enhance_books_preserves_bisac(mock_storage):
+def test_enhance_books_adds_a_provider_subject_without_dropping_the_stored_one(mock_storage):
+    """#407: a refresh adds the subjects it finds and never drops a stored one."""
     # Setup: A book already has a BISAC category
     book = mock_storage.add_book(
         isbn13="9780000000002",
@@ -203,7 +204,7 @@ def test_enhance_books_preserves_bisac(mock_storage):
 
     books = [book]
 
-    # Mock lookup result returning a DIFFERENT BISAC (unlikely but to test prioritization)
+    # A provider answer names a different category as a second subject.
     mock_lookup_result = {
         "9780000000002": {
             "title": "BISAC Book",
@@ -211,6 +212,9 @@ def test_enhance_books_preserves_bisac(mock_storage):
             "bisac_category": "NEW CATEGORY / Sub",
             "bisac_main_category": "NEW CATEGORY",
             "bisac_sub_category": "Sub",
+            "subjects": [
+                {"category": "NEW CATEGORY / Sub", "main": "NEW CATEGORY", "sub": "Sub"},
+            ],
             "thumbnail_url": "http://example.com/cover.jpg",
         }
     }
@@ -223,10 +227,12 @@ def test_enhance_books_preserves_bisac(mock_storage):
         items_to_update = [{"book": b, "record": None} for b in books]
         mock_storage.bulk_import(items_to_update)
 
-    # Verify: Should favor the new non-Dewey category
+    # The stored subject stays first, and the provider's joins it. The legacy
+    # triple names the first entry, for the surfaces that predate the list.
     updated_book = mock_storage.get_book_by_id(book["id"])
-    assert updated_book["bisac_category"] == "NEW CATEGORY / Sub"
-    assert updated_book["bisac_main_category"] == "NEW CATEGORY"
+    assert [subject["main"] for subject in updated_book["subjects"]] == ["HISTORY", "NEW CATEGORY"]
+    assert updated_book["bisac_category"] == "HISTORY / Ancient / General"
+    assert updated_book["bisac_main_category"] == "HISTORY"
 
 
 def test_is_dewey_logic_in_storage(mock_storage):

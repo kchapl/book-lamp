@@ -8,8 +8,11 @@ from book_lamp.utils.books import (
     Category,
     cover_is_blank,
     full_title,
+    merge_subjects,
+    normalise_subjects,
     normalise_title_pair,
     resolve_category,
+    subjects_for_book,
 )
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, iso_date_string, require_end_date, require_rating
@@ -158,6 +161,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         from book_lamp.utils.books import normalize_isbn
 
@@ -167,6 +171,15 @@ class MockStorage:
         # A binding is stored as one of the four labels; a media type or a
         # language code arriving in the field names no binding and is dropped.
         physical_format = resolve_physical_format(physical_format)
+        subject_list = normalise_subjects(subjects)
+        if subject_list:
+            first = subject_list[0]
+            bisac_category = first["category"]
+            bisac_main_category = first["main"]
+            bisac_sub_category = first["sub"]
+        else:
+            raw_category = bisac_category or bisac_main_category
+            subject_list = normalise_subjects([raw_category]) if raw_category else []
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
@@ -183,6 +196,7 @@ class MockStorage:
             "bisac_category": bisac_category,
             "bisac_main_category": bisac_main_category,
             "bisac_sub_category": bisac_sub_category,
+            "subjects": subject_list,
             "language": language,
             "page_count": page_count,
             "physical_format": physical_format,
@@ -213,6 +227,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
         physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         for book in self.books:
@@ -220,10 +235,15 @@ class MockStorage:
                 authors = [str(name).strip() for name in authors if str(name).strip()]
                 # The triple resolves through the one rule, shared with the
                 # Postgres adapter and the import paths (see ADR-0002).
-                resolved = resolve_category(
-                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    Category.from_mapping(book),
-                )
+                incoming_subjects = normalise_subjects(subjects)
+                incoming = Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category)
+                if incoming_subjects:
+                    first = incoming_subjects[0]
+                    incoming = Category(first["category"], first["main"], first["sub"])
+                resolved = resolve_category(incoming, Category.from_mapping(book))
+                subject_list = incoming_subjects or normalise_subjects(book.get("subjects"))
+                if not subject_list and resolved.main:
+                    subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
 
                 book.update(
                     {
@@ -240,6 +260,7 @@ class MockStorage:
                         "bisac_category": resolved.category,
                         "bisac_main_category": resolved.main,
                         "bisac_sub_category": resolved.sub,
+                        "subjects": subject_list,
                         "language": language or book.get("language"),
                         "page_count": page_count or book.get("page_count"),
                         # A blank that arrives from the edit form is an explicit
@@ -277,6 +298,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -297,6 +319,9 @@ class MockStorage:
                 bisac_category=bisac_category,
                 bisac_main_category=bisac_main_category,
                 bisac_sub_category=bisac_sub_category,
+                # A refresh adds the subjects it finds and keeps the stored
+                # ones, the same union Postgres writes.
+                subjects=merge_subjects(subjects_for_book(existing), subjects),
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -317,6 +342,7 @@ class MockStorage:
                 bisac_category=bisac_category,
                 bisac_main_category=bisac_main_category,
                 bisac_sub_category=bisac_sub_category,
+                subjects=subjects,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -474,6 +500,7 @@ class MockStorage:
                 bisac_category=book_data.get("bisac_category"),
                 bisac_main_category=book_data.get("bisac_main_category"),
                 bisac_sub_category=book_data.get("bisac_sub_category"),
+                subjects=book_data.get("subjects"),
                 language=book_data.get("language"),
                 page_count=book_data.get("page_count"),
                 physical_format=book_data.get("physical_format"),

@@ -1,3 +1,13 @@
+export interface BookSubject {
+    /** The normalised full value, such as "FICTION / Fantasy". */
+    category: string;
+    /** The major label the subject is counted under. */
+    main: string;
+    sub?: string | null;
+    /** The display label the category filter and the page use. */
+    label?: string;
+}
+
 export interface Book {
     id: number;
     title: string;
@@ -19,6 +29,8 @@ export interface Book {
     physical_format_label?: string | null;
     /** The major category label the collection filters by. */
     bisac_category_label?: string;
+    /** Every subject the Book carries; a Book may carry several. */
+    subjects?: BookSubject[];
     /** The URL segment of the publisher's page, normalised by the API. */
     publisher_slug?: string;
     latest_status?: string;

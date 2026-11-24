@@ -9,9 +9,9 @@ from typing import Any, Dict, List, Optional
 from book_lamp.utils import (
     UNKNOWN_CATEGORY,
     category_label,
-    category_label_for_book,
+    category_labels_for_book,
     full_title,
-    normalise_bisac_category,
+    subjects_for_book,
 )
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
@@ -183,9 +183,12 @@ def calculate_collection_stats(
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
+    # A Book is counted under every subject it carries, so a Book with several
+    # is not reduced to one of them. A Book with no real subject is Unknown.
     category_bins: Counter[str] = Counter()
     for b in completed_books:
-        category_bins[category_label_for_book(b)] += 1
+        for bin_label in category_labels_for_book(b) or [UNKNOWN_CATEGORY]:
+            category_bins[bin_label] += 1
 
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
     category_distribution = all_categories_sorted[:10]
@@ -328,20 +331,29 @@ def calculate_collection_stats(
 
     category_details_list: List[Dict[str, Any]] = []
     for b in completed_books:
-        raw_category = b.get("bisac_category") or b.get("bisac_main_category")
-        major, sub_cat = normalise_bisac_category(raw_category)[1:]
-        norm_cat = category_label(major) if major else UNKNOWN_CATEGORY
-        existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
-        if not existing:
-            existing = {
-                "label": norm_cat,
-                "count": 0,
-                "subcategories": Counter(),
-            }
-            category_details_list.append(existing)
-        existing["count"] += 1
-        if sub_cat:
-            existing["subcategories"][sub_cat] += 1
+        entries = []
+        seen_labels: set[str] = set()
+        for subject in subjects_for_book(b):
+            subject_label = category_label(subject["main"])
+            if subject_label in seen_labels:
+                continue
+            seen_labels.add(subject_label)
+            entries.append((subject_label, subject["sub"]))
+        if not entries:
+            entries = [(UNKNOWN_CATEGORY, None)]
+
+        for norm_cat, sub_cat in entries:
+            existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
+            if not existing:
+                existing = {
+                    "label": norm_cat,
+                    "count": 0,
+                    "subcategories": Counter(),
+                }
+                category_details_list.append(existing)
+            existing["count"] += 1
+            if sub_cat:
+                existing["subcategories"][sub_cat] += 1
 
     category_details_list.sort(key=lambda x: -x["count"])
     category_details = [

@@ -979,7 +979,7 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
         ("9780441013593", "Dune", None),
     ]
     assert links == 2
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database):
@@ -1009,7 +1009,7 @@ def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database
     # Splitting here would race the instance still writing combined titles, so
     # every stored title stays as it is until the backfill script runs.
     assert rows == {isbn: (title, None) for isbn, title in titles.items()}
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
@@ -1042,7 +1042,7 @@ def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
     assert readings == [(real_id, "Completed", 5)]
     assert queued == [(real_id,)]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_database):
@@ -1068,7 +1068,7 @@ def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_d
         queued = conn.execute("SELECT book_id, position FROM reading_list").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert queued == [(real_id, 1)]
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
@@ -1127,7 +1127,7 @@ def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
     assert readings == [(real_id, "In Progress")]
     assert queued == []
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_folds_a_reading_logged_against_both_records(own_database):
@@ -1152,7 +1152,7 @@ def test_0010_folds_a_reading_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed", 4)]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_folds_a_reread_logged_against_both_records(own_database):
@@ -1184,7 +1184,7 @@ def test_0010_folds_a_reread_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
@@ -1217,7 +1217,7 @@ def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Abandoned"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
@@ -1354,7 +1354,7 @@ def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
         books = conn.execute("SELECT isbn13, title FROM books").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert books == [("9780008644833", "The Spy in the Archive")]
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
@@ -1408,7 +1408,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "In Progress")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):
@@ -1778,3 +1778,67 @@ def test_a_provider_binding_fills_a_legacy_gap_and_never_replaces_a_choice(pg_st
         physical_format="Hardback",
     )
     assert pg_storage.get_book_by_id(gap["id"])["physical_format"] == "Hardback"
+
+
+def test_a_book_subject_list_survives_and_an_edit_can_replace_it(pg_storage):
+    subjects = [
+        {"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"},
+        {"category": "MURDER", "main": "MURDER", "sub": None},
+    ]
+    book = pg_storage.add_book(
+        isbn13="9780000002228",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=subjects,
+    )
+
+    assert pg_storage.get_book_by_id(book["id"])["subjects"] == subjects
+
+    # An edit that says nothing about subjects leaves the list standing.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["subjects"] == subjects
+
+    # A stored provider list replaces the list, and its first entry becomes the
+    # legacy triple older surfaces read.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        subjects=[{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}],
+    )
+    updated = pg_storage.get_book_by_id(book["id"])
+    assert updated["subjects"] == [{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}]
+    assert updated["bisac_category"] == "HISTORY / Europe"
+    assert updated["bisac_main_category"] == "HISTORY"
+
+
+def test_0012_gives_each_book_its_stored_subject_and_none_where_there_is_none(own_database):
+    """An existing Book keeps the one subject it carried, as the list's only entry."""
+    _upgrade_database(own_database, "0011")
+    labelled_id = _write_book(own_database, "9780000002228", "A Mystery", ["An Author"])
+    bare_id = _write_book(own_database, "9780000002235", "A Mislabeled Book", ["An Author"])
+    with psycopg.connect(own_database) as conn:
+        conn.execute(
+            "UPDATE books SET bisac_category = %s, bisac_main_category = %s WHERE id = %s",
+            ["FICTION / Mystery", "FICTION", labelled_id],
+        )
+        # A language code is not a subject, so it must not become an entry.
+        conn.execute("UPDATE books SET bisac_category = %s WHERE id = %s", ["en", bare_id])
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        subjects = {isbn: value for isbn, value in conn.execute("SELECT isbn13, subjects FROM books ORDER BY isbn13")}
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert subjects == {
+        "9780000002228": [{"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"}],
+        "9780000002235": [],
+    }
+    assert stamped == "0012"
