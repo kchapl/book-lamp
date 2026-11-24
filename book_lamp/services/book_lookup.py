@@ -203,6 +203,33 @@ def _lookup_open_library(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
     return result
 
 
+def _lookup_open_library_physical_format(isbn13: str) -> Optional[str]:
+    """The binding Open Library records for this ISBN's edition, if any.
+
+    The ``jscmd=data`` response carries covers and subjects but not the
+    edition's ``physical_format``; ``jscmd=details`` nests the edition document,
+    which does. A missing edition is no answer rather than an error.
+    """
+    session = _get_session()
+    params: Dict[str, str] = {
+        "bibkeys": f"ISBN:{isbn13}",
+        "format": "json",
+        "jscmd": "details",
+    }
+    try:
+        response = session.get(OPEN_LIBRARY_API, params=params, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as e:
+        logger.debug(f"Open Library edition lookup failed for {isbn13}: {e}")
+        return None
+
+    entry = payload.get(f"ISBN:{isbn13}") or {}
+    details = entry.get("details") or {}
+    value = details.get("physical_format")
+    return str(value).strip() if isinstance(value, str) and value.strip() else None
+
+
 def _lookup_open_library_cover_direct(isbn13: str) -> Optional[str]:
     """Helper to check Open Library covers API directly."""
     session = _get_session()
@@ -854,9 +881,9 @@ def _lookup_itunes_search(title: str, author: Optional[str] = None) -> Optional[
                     "author": item.get("artistName"),
                     "thumbnail_url": thumbnail,
                     "cover_url": cover,
-                    # The search is restricted to the ebook catalogue, so a
-                    # match from it describes an ebook edition.
-                    "physical_format": "Ebook",
+                    # This search stands in for another edition's cover, so it
+                    # describes no binding of the Book being looked up.
+                    "physical_format": None,
                 }
     except Exception:
         pass

@@ -15,6 +15,8 @@ export interface Book {
     bisac_category?: string;
     /** The binding the reader recorded or a provider supplied. */
     physical_format?: string;
+    /** The binding that stored value names, or null when it names none. */
+    physical_format_label?: string | null;
     /** The major category label the collection filters by. */
     bisac_category_label?: string;
     /** The URL segment of the publisher's page, normalised by the API. */

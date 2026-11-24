@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from book_lamp.services.format_backfill import (  # noqa: E402
     backfill_missing_formats,
+    look_up_binding,
     report_formats,
 )
 
@@ -85,8 +86,6 @@ def main() -> None:
     pool = _pool()
 
     def slow_lookup(isbn: str):
-        from book_lamp.services.format_backfill import look_up_binding
-
         answer = look_up_binding(isbn)
         if args.delay:
             time.sleep(args.delay)

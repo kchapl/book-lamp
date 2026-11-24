@@ -178,6 +178,8 @@ const BookDetailPage: React.FC = () => {
         // projection on the way out, never an input, so it is not sent.
         const payload: Partial<Book> = { ...editForm, authors };
         delete payload.author;
+        // The label is the API's read of the stored value, not a field to write.
+        delete payload.physical_format_label;
 
         setEditError(null);
         try {
@@ -448,10 +450,10 @@ const BookDetailPage: React.FC = () => {
                                         <dd className="numeric">{book.isbn13}</dd>
                                     </div>
                                 )}
-                                {book.physical_format && (
+                                {book.physical_format_label && (
                                     <div className="placard-row">
                                         <dt>Format</dt>
-                                        <dd>{book.physical_format}</dd>
+                                        <dd>{book.physical_format_label}</dd>
                                     </div>
                                 )}
                                 {subject && (
@@ -488,7 +490,14 @@ const BookDetailPage: React.FC = () => {
                         <Button
                             variant="outlined"
                             onClick={() => {
-                                setEditForm({ ...book, authors: authorRows(book) });
+                                setEditForm({
+                                    ...book,
+                                    authors: authorRows(book),
+                                    // The form offers the four labels, so a
+                                    // provider spelling opens on the label it
+                                    // names rather than on no choice at all.
+                                    physical_format: book.physical_format_label || '',
+                                });
                                 setEditError(null);
                                 setIsEditing(true);
                             }}

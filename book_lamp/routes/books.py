@@ -14,6 +14,7 @@ from book_lamp.services.cover_placeholders import PLACEHOLDER_HOSTS, CoverFinger
 from book_lamp.services.job_queue import get_job_queue
 from book_lamp.services.mock_storage import MockStorage
 from book_lamp.services.pg_storage import PostgresStorage
+from book_lamp.services.stats_calculator import normalise_physical_format
 from book_lamp.services.storage_factory import TEST_ISBN, _mock_storage_singleton, get_storage, is_test_mode
 from book_lamp.utils import (
     SORT_OPTIONS,
@@ -537,6 +538,9 @@ def api_book_detail(book_id: int):
     # publisher routes, and the category filter. The label the filter uses is
     # derived here, by the same rule, so the link and the filter cannot disagree.
     book["bisac_category_label"] = category_label_for_book(book)
+    # The page shows the binding a value names, not the raw stored value: old
+    # rows carry media types and language codes that are not bindings at all.
+    book["physical_format_label"] = normalise_physical_format(book.get("physical_format"))
     if book.get("publisher"):
         book["publisher_slug"] = publisher_slug(book["publisher"])
 

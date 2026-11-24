@@ -84,7 +84,8 @@ def test_the_backfill_fills_only_a_gap():
 
     assert counts == {"updated": 1, "skipped": 3, "failed": 0}
     # A stored binding is never replaced, and a media type is not a binding.
-    assert writes == [(2, "9780000002044", "Perfect Paperback")]
+    # The provider's spelling is stored as the label the edit form offers.
+    assert writes == [(2, "9780000002044", "Paperback")]
 
 
 def test_the_backfill_treats_a_failed_provider_as_no_answer():
@@ -127,10 +128,84 @@ def test_the_report_counts_what_a_run_would_gain_and_where_it_came_from():
 def test_open_library_is_asked_first_and_a_media_type_is_not_an_answer(monkeypatch):
     from book_lamp.services import book_lookup
 
-    monkeypatch.setattr(book_lookup, "_lookup_open_library", lambda isbn: {"physical_format": "BOOK"})
-    monkeypatch.setattr(book_lookup, "_lookup_itunes", lambda isbn: {"physical_format": "Ebook"})
+    monkeypatch.setattr(book_lookup, "_lookup_open_library_physical_format", lambda isbn: "BOOK")
+    monkeypatch.setattr(book_lookup, "_lookup_itunes", lambda isbn: {"physical_format": "Kindle Edition"})
 
     assert look_up_binding("9780000002112") == BindingAnswer("Ebook", ITUNES)
 
     monkeypatch.setattr(book_lookup, "_lookup_itunes", lambda isbn: {"physical_format": "en"})
     assert look_up_binding("9780000002112") is None
+
+
+def test_open_library_binding_is_read_from_the_edition_document(monkeypatch):
+    from book_lamp.services import book_lookup
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"ISBN:9780000002129": {"details": {"physical_format": "Perfect Paperback"}}}
+
+    seen = {}
+
+    class Session:
+        def get(self, url, params=None, timeout=None):
+            seen["params"] = params
+            return Response()
+
+    monkeypatch.setattr(book_lookup, "_get_session", lambda: Session())
+
+    assert book_lookup._lookup_open_library_physical_format("9780000002129") == "Perfect Paperback"
+    # jscmd=data carries no binding; the edition document does.
+    assert seen["params"]["jscmd"] == "details"
+
+
+def test_the_mock_keeps_a_real_binding_and_fills_a_gap():
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780000002143",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Perfect Paperback",
+    )
+    # A provider spelling is stored as the label the edit form offers.
+    assert book["physical_format"] == "Paperback"
+
+    # A later lookup carrying a binding must not replace the reader's choice.
+    storage.upsert_book(
+        isbn13="9780000002143",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Ebook",
+    )
+    assert storage.get_book_by_isbn("9780000002143")["physical_format"] == "Paperback"
+
+    # A stored media type names no binding, so a real one may replace it.
+    gap = storage.add_book(isbn13="9780000002150", title="Another Book", authors=["An Author"])
+    gap["physical_format"] = "BOOK"
+    storage.upsert_book(
+        isbn13="9780000002150",
+        title="Another Book",
+        authors=["An Author"],
+        physical_format="Hardcover",
+    )
+    assert gap["physical_format"] == "Hardback"
+
+
+def test_the_book_detail_names_the_binding_or_reports_none(authenticated_client):
+    storage = get_storage()
+    book = storage.add_book(
+        isbn13="9780000002167",
+        title="A Book",
+        authors=["An Author"],
+        physical_format="Paperback",
+    )
+
+    detail = authenticated_client.get(f"/api/books/{book['id']}").get_json()
+    assert detail["physical_format_label"] == "Paperback"
+
+    # An old row may still hold a Google media type; the page shows none of it.
+    book["physical_format"] = "BOOK"
+    detail = authenticated_client.get(f"/api/books/{book['id']}").get_json()
+    assert detail["physical_format_label"] is None

@@ -73,6 +73,31 @@ def normalise_physical_format(value: Optional[str]) -> Optional[str]:
     return None
 
 
+def resolve_physical_format(
+    incoming: Optional[str],
+    stored: Optional[str] = None,
+    *,
+    provided: bool = False,
+) -> Optional[str]:
+    """The binding a write leaves on a Book.
+
+    A field the caller never mentioned keeps the stored value as it is. A value
+    the reader supplied is theirs: it replaces what is stored, and a blank
+    clears it. Anything else is a provider's answer, which may fill a gap — a
+    Book naming no binding, whether empty or a media type or language code — but
+    never replaces a stored value that already names one.
+
+    A binding is stored as one of the four labels, so a provider spelling such
+    as "Perfect Paperback" and the edit form's "Paperback" are one value.
+    """
+    binding = normalise_physical_format(incoming)
+    if provided:
+        return binding
+    if normalise_physical_format(stored):
+        return stored
+    return binding or stored or None
+
+
 def calculate_collection_stats(
     books: List[Dict[str, Any]],
     all_records: List[Dict[str, Any]],

@@ -14,6 +14,7 @@ run read, so a resumed run can repeat without overwriting a reader's choice.
 
 from typing import Any, Callable, Dict, Iterable, NamedTuple, Optional
 
+from book_lamp.services import book_lookup
 from book_lamp.services.stats_calculator import normalise_physical_format
 from book_lamp.utils.books import normalize_isbn
 
@@ -33,14 +34,23 @@ FormatWriter = Callable[[Dict[str, Any], str, str], bool]
 
 
 def _binding_from(value: object) -> Optional[str]:
-    """The provider's value when it names a binding, else None."""
-    text = str(value or "").strip()
-    if not text:
-        return None
-    # The panel folds provider spellings ("Perfect Paperback", "Kindle
-    # Edition") into the four labels; a value the fold does not recognise is
-    # not a binding and must not be stored as one.
-    return text if normalise_physical_format(text) else None
+    """The binding a provider's value names, as one of the four labels.
+
+    The panel folds provider spellings ("Perfect Paperback", "Kindle
+    Edition") into the four labels, and the run stores the folded label, so a
+    backfilled Book reads in the edit form exactly like a hand-picked one. A
+    value the fold does not recognise is not a binding and is never stored.
+    """
+    return normalise_physical_format(str(value or "").strip() or None)
+
+
+def _open_library_binding(isbn13: str) -> Optional[str]:
+    return book_lookup._lookup_open_library_physical_format(isbn13)
+
+
+def _itunes_binding(isbn13: str) -> Optional[str]:
+    info = book_lookup._lookup_itunes(isbn13) or {}
+    return info.get("physical_format")
 
 
 def look_up_binding(isbn13: str) -> Optional[BindingAnswer]:
@@ -49,15 +59,13 @@ def look_up_binding(isbn13: str) -> Optional[BindingAnswer]:
     A provider failure is an absent answer rather than a failed run, so one
     provider's bad day does not stop the backfill.
     """
-    from book_lamp.services.book_lookup import _lookup_itunes, _lookup_open_library
-
     isbn = normalize_isbn(isbn13)
-    for source, lookup in ((OPEN_LIBRARY, _lookup_open_library), (ITUNES, _lookup_itunes)):
+    for source, lookup in ((OPEN_LIBRARY, _open_library_binding), (ITUNES, _itunes_binding)):
         try:
-            info = lookup(isbn)
+            value = lookup(isbn)
         except Exception:
-            info = None
-        binding = _binding_from((info or {}).get("physical_format"))
+            value = None
+        binding = _binding_from(value)
         if binding:
             return BindingAnswer(binding, source)
     return None
