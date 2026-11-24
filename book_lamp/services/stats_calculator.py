@@ -7,11 +7,9 @@ from collections import Counter
 from typing import Any, Dict, List, Optional
 
 from book_lamp.utils import (
-    UNKNOWN_CATEGORY,
-    category_label,
+    category_entries_for_book,
     category_labels_for_book,
     full_title,
-    subjects_for_book,
 )
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
@@ -331,18 +329,7 @@ def calculate_collection_stats(
 
     category_details_list: List[Dict[str, Any]] = []
     for b in completed_books:
-        entries = []
-        seen_labels: set[str] = set()
-        for subject in subjects_for_book(b):
-            subject_label = category_label(subject["main"])
-            if subject_label in seen_labels:
-                continue
-            seen_labels.add(subject_label)
-            entries.append((subject_label, subject["sub"]))
-        if not entries:
-            entries = [(UNKNOWN_CATEGORY, None)]
-
-        for norm_cat, sub_cat in entries:
+        for norm_cat, sub_cat in category_entries_for_book(b):
             existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
             if not existing:
                 existing = {

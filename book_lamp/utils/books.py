@@ -770,18 +770,25 @@ def category_label(value: object) -> str:
     return major.title() if len(major) > 3 else major.upper()
 
 
-def category_labels_for_book(book: Mapping[str, Any]) -> list[str]:
-    """Every label a Book is counted under, in stored order.
+def category_entries_for_book(book: Mapping[str, Any]) -> list[tuple[str, Optional[str]]]:
+    """Each label a Book is counted under, with the sub-category it names.
 
-    A Book that names no subject is counted under Unknown, the same bucket the
-    statistics chart uses and links to the Books filter.
+    One entry per label: a Book carrying two subjects under one major label is
+    counted once there. A Book that names no subject is counted under Unknown,
+    the same bucket the statistics chart uses and links to the Books filter.
     """
-    labels: list[str] = []
+    entries: list[tuple[str, Optional[str]]] = []
     for subject in subjects_for_book(book):
         label = category_label(subject["main"])
-        if label not in labels:
-            labels.append(label)
-    return labels or [UNKNOWN_CATEGORY]
+        if any(existing_label == label for existing_label, _ in entries):
+            continue
+        entries.append((label, subject["sub"]))
+    return entries or [(UNKNOWN_CATEGORY, None)]
+
+
+def category_labels_for_book(book: Mapping[str, Any]) -> list[str]:
+    """Every label a Book is counted under, in stored order."""
+    return [label for label, _ in category_entries_for_book(book)]
 
 
 def category_label_for_book(book: Mapping[str, Any]) -> str:

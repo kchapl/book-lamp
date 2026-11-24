@@ -1,6 +1,7 @@
 from .books import (
     UNKNOWN_CATEGORY,
     Category,
+    category_entries_for_book,
     category_label,
     category_label_for_book,
     category_labels_for_book,
@@ -28,6 +29,7 @@ from .sorting import SORT_OPTIONS, sort_books
 __all__ = [
     "UNKNOWN_CATEGORY",
     "Category",
+    "category_entries_for_book",
     "category_label",
     "category_label_for_book",
     "category_labels_for_book",
