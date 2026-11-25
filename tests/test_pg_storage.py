@@ -1989,11 +1989,12 @@ def test_concurrent_imports_keep_every_subject(pg_storage):
     assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}
 
 
-def test_an_edit_that_names_no_subject_leaves_the_list_alone(pg_storage, monkeypatch):
-    """An unrelated edit must not write back the list it happened to read.
+def test_an_edit_that_keeps_the_category_leaves_the_list_alone(pg_storage, monkeypatch):
+    """An edit that sends the stored category back must not rewrite the list.
 
-    The edit takes its snapshot, an import adds a subject, and the edit commits:
-    the imported subject has to survive the edit.
+    The edit form starts from the Book it shows, so it sends the category the
+    Book already leads with. That edit takes its snapshot, an import adds a
+    subject, and the edit commits: the imported subject has to survive it.
     """
     book = pg_storage.add_book(
         isbn13="9780000002263",
@@ -2021,6 +2022,7 @@ def test_an_edit_that_names_no_subject_leaves_the_list_alone(pg_storage, monkeyp
         isbn13=book["isbn13"],
         title="A Mystery, Revised",
         authors=["An Author"],
+        bisac_category="FICTION",
     )
 
     stored = pg_storage.get_book_by_id(book["id"])

@@ -263,20 +263,19 @@ class MockStorage:
                     "edition": edition or book.get("edition"),
                     "cover_url": cover_url or book.get("cover_url"),
                 }
-                # An edit that names no subject leaves the columns alone, so a
-                # subject an import adds meanwhile is not erased by the list
-                # this edit happened to read.
-                if bool(subjects) or any(
-                    value and str(value).strip() for value in (bisac_category, bisac_main_category, bisac_sub_category)
-                ):
+                # Only the columns whose value actually changes are written, so
+                # the list this edit happened to read cannot undo a subject
+                # another writer added.
+                if Category(legacy.category, legacy.main, legacy.sub) != Category.from_mapping(book):
                     updates.update(
                         {
                             "bisac_category": legacy.category,
                             "bisac_main_category": legacy.main,
                             "bisac_sub_category": legacy.sub,
-                            "subjects": subject_list,
                         }
                     )
+                if subject_list != subjects_for_book(book):
+                    updates["subjects"] = subject_list
                 book.update(updates)
                 return book
         logger.error(f"Book with ID {book_id} not found")

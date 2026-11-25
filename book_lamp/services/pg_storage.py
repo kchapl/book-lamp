@@ -19,6 +19,7 @@ from book_lamp.utils.books import (
     normalise_title_pair,
     normalize_isbn,
     resolve_subjects,
+    subjects_for_book,
 )
 from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
@@ -608,6 +609,14 @@ class PostgresStorage:
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
+                # Every writer of a subject list takes this lock before it reads
+                # (add_book, bulk_import), so an edit takes it too: read, resolve
+                # and write are one step, and a subject an import adds meanwhile
+                # is seen by whichever of the two writes second.
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)",
+                    [normalize_isbn(isbn13)],
+                )
                 # Mirror BISAC prioritization logic from MockStorage
                 existing_raw = conn.execute(
                     "SELECT bisac_category, bisac_main_category, bisac_sub_category, subjects, thumbnail_url, publisher, description, series, language, page_count, physical_format, edition, cover_url FROM books WHERE id = %s",
@@ -627,24 +636,19 @@ class PostgresStorage:
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
                     category_is_authoritative=True,
                 )
-                # An edit that names no subject leaves the columns alone: the
-                # list read above can be stale by the time the row is written,
-                # and rewriting it would erase a subject an import added in
-                # between.
-                subject_assignments = ""
+                # Only the columns whose value actually changes are written. The
+                # edit form sends the stored category back, so writing the
+                # resolved list unconditionally would rewrite the snapshot this
+                # edit read and erase a subject another writer added since.
+                assignments: list[str] = []
                 subject_params: list[Any] = []
-                if bool(subjects) or any(
-                    value and str(value).strip() for value in (bisac_category, bisac_main_category, bisac_sub_category)
-                ):
-                    subject_assignments = (
-                        "bisac_category = %s, bisac_main_category = %s, " "bisac_sub_category = %s, subjects = %s,"
-                    )
-                    subject_params = [
-                        resolved.category,
-                        resolved.main,
-                        resolved.sub,
-                        Jsonb(subject_list),
-                    ]
+                if Category(resolved.category, resolved.main, resolved.sub) != Category.from_mapping(existing):
+                    assignments.append("bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s")
+                    subject_params.extend([resolved.category, resolved.main, resolved.sub])
+                if subject_list != subjects_for_book(existing):
+                    assignments.append("subjects = %s")
+                    subject_params.append(Jsonb(subject_list))
+                subject_assignments = "".join(f"{assignment}, " for assignment in assignments)
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format"),
