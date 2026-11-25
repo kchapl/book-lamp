@@ -130,6 +130,19 @@ def test_a_category_that_arrives_without_a_list_joins_the_merge():
     assert legacy.category == "FICTION"
 
 
+def test_an_edit_that_changes_only_the_sub_category_replaces_the_list():
+    """The reader named a different subject, so the page and filter must follow."""
+    subject_list, legacy = resolve_subjects(
+        {"subjects": [{"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"}]},
+        None,
+        Category("FICTION / Fantasy", "FICTION", "Fantasy"),
+        category_is_authoritative=True,
+    )
+
+    assert subject_list == [{"category": "FICTION / Fantasy", "main": "FICTION", "sub": "Fantasy"}]
+    assert legacy.category == "FICTION / Fantasy"
+
+
 def test_a_stored_subject_list_wins_over_the_legacy_pair():
     book = {
         "bisac_category": "Fiction",

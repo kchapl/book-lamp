@@ -749,10 +749,12 @@ def resolve_subjects(
 
     if category_is_authoritative and not incoming:
         submitted = normalise_subject(incoming_category.category)
-        if submitted and (
-            not subject_list or category_label(submitted["main"]) != category_label(subject_list[0]["main"])
-        ):
-            subject_list = [submitted]
+        if submitted:
+            # The whole subject is compared, not just its label: an edit that
+            # changes only the sub-category still names a different subject.
+            current = subject_list[0]["category"] if subject_list else None
+            if (submitted["category"] or "").casefold() != (current or "").casefold():
+                subject_list = [submitted]
 
     # The triple still resolves through the one rule (see ADR-0002); it only
     # fills the list when nothing above named a subject at all.
