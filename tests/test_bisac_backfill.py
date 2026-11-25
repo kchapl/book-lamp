@@ -235,6 +235,48 @@ def test_enhance_books_adds_a_provider_subject_without_dropping_the_stored_one(m
     assert updated_book["bisac_main_category"] == "HISTORY"
 
 
+def test_a_legacy_row_keeps_the_subject_the_provider_finds(mock_storage):
+    """#407: the merge compares against what the Book held, not what the loop wrote.
+
+    A row migrated from the single category has an empty list and reads its one
+    subject from the legacy triple. The refresh writes that triple before it
+    reads the subjects, so reading it after the write hides the subject the
+    provider just supplied.
+    """
+    book = mock_storage.add_book(isbn13="9780000000010", title="A Legacy Book", authors=["Author"])
+    book.update(
+        {
+            "subjects": [],
+            "bisac_category": None,
+            "bisac_main_category": "HISTORY",
+            "bisac_sub_category": None,
+        }
+    )
+
+    books = [book]
+    with patch(
+        "book_lamp.services.book_lookup.lookup_books_batch",
+        return_value={
+            "9780000000010": {
+                "title": "A Legacy Book",
+                "bisac_category": "SCIENCE / Physics",
+                "bisac_main_category": "SCIENCE",
+                "bisac_sub_category": "Physics",
+                "subjects": [
+                    {"category": "SCIENCE / Physics", "main": "SCIENCE", "sub": "Physics"},
+                ],
+                "thumbnail_url": "http://example.com/cover.jpg",
+            }
+        },
+    ):
+        enhance_books_batch(books, force_refresh=True)
+        mock_storage.bulk_import([{"book": b, "record": None} for b in books])
+
+    stored = mock_storage.get_book_by_id(book["id"])
+    assert [subject["main"] for subject in stored["subjects"]] == ["HISTORY", "SCIENCE"]
+    assert stored["bisac_main_category"] == "HISTORY"
+
+
 def test_is_dewey_logic_in_storage(mock_storage):
     # This specifically tests the logic in bulk_import/update_book
 

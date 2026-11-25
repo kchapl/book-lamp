@@ -738,6 +738,12 @@ def resolve_subjects(
     if incoming:
         first = incoming[0]
         incoming_category = Category(first["category"], first["main"], first["sub"])
+    elif merge:
+        # An upsert can name a category without a subject list, and a category
+        # is a subject: the merge adds it rather than dropping it.
+        named = normalise_subject(incoming_category.category)
+        if named is not None:
+            incoming = [named]
 
     subject_list = merge_subjects(stored, incoming) if merge else incoming or stored
 
@@ -749,7 +755,7 @@ def resolve_subjects(
             subject_list = [submitted]
 
     # The triple still resolves through the one rule (see ADR-0002); it only
-    # fills the list when the Book names no subject at all.
+    # fills the list when nothing above named a subject at all.
     resolved = resolve_category(incoming_category, Category.from_mapping(stored_book))
     if not subject_list and resolved.main:
         subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]

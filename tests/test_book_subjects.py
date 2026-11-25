@@ -3,8 +3,10 @@
 import book_lamp.services.book_lookup as lookup_module
 from book_lamp.app import get_storage
 from book_lamp.utils.books import (
+    Category,
     category_labels_for_book,
     normalise_subjects,
+    resolve_subjects,
     subjects_for_book,
 )
 
@@ -93,6 +95,39 @@ def test_the_open_library_parser_reads_the_whole_subjects_list():
 
     assert [subject["main"] for subject in parsed["subjects"]] == ["FICTION", "MURDER"]
     assert parsed["bisac_category"] == "FICTION"
+
+
+def test_the_open_library_parser_drops_catalogue_tags():
+    """A tag that says how a Book is held is not a subject it carries."""
+    parsed = lookup_module._parse_open_library_data(
+        {
+            "title": "A Book",
+            "subjects": [
+                {"name": "Fiction"},
+                {"name": "Accessible book"},
+                {"name": "Protected DAISY"},
+                {"name": "In library"},
+                {"name": "nyt:hardcover-fiction=2020-01-01"},
+                {"name": "Murder"},
+            ],
+        }
+    )
+
+    assert [subject["main"] for subject in parsed["subjects"]] == ["FICTION", "MURDER"]
+    assert parsed["bisac_category"] == "FICTION"
+
+
+def test_a_category_that_arrives_without_a_list_joins_the_merge():
+    """An upsert naming only a category adds it; the stored list still leads."""
+    subject_list, legacy = resolve_subjects(
+        {"subjects": [{"category": "FICTION", "main": "FICTION", "sub": None}]},
+        None,
+        Category("HISTORY", "HISTORY", None),
+        merge=True,
+    )
+
+    assert [subject["main"] for subject in subject_list] == ["FICTION", "HISTORY"]
+    assert legacy.category == "FICTION"
 
 
 def test_a_stored_subject_list_wins_over_the_legacy_pair():

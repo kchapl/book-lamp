@@ -627,18 +627,35 @@ class PostgresStorage:
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
                     category_is_authoritative=True,
                 )
+                # An edit that names no subject leaves the columns alone: the
+                # list read above can be stale by the time the row is written,
+                # and rewriting it would erase a subject an import added in
+                # between.
+                subject_assignments = ""
+                subject_params: list[Any] = []
+                if bool(subjects) or any(
+                    value and str(value).strip() for value in (bisac_category, bisac_main_category, bisac_sub_category)
+                ):
+                    subject_assignments = (
+                        "bisac_category = %s, bisac_main_category = %s, " "bisac_sub_category = %s, subjects = %s,"
+                    )
+                    subject_params = [
+                        resolved.category,
+                        resolved.main,
+                        resolved.sub,
+                        Jsonb(subject_list),
+                    ]
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format"),
                     provided=physical_format_provided,
                 )
 
-                query = """
+                query = f"""
                     UPDATE books SET
                         isbn13 = %s, title = %s, subtitle = %s, publication_year = %s,
                         thumbnail_url = %s, publisher = %s, description = %s, series = %s,
-                        bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
-                        subjects = %s,
+                        {subject_assignments}
                         language = %s, page_count = %s, physical_format = %s, edition = %s, cover_url = %s
                     WHERE id = %s
                 """
@@ -653,10 +670,7 @@ class PostgresStorage:
                         publisher or existing["publisher"],
                         description or existing["description"],
                         series or existing["series"],
-                        resolved.category,
-                        resolved.main,
-                        resolved.sub,
-                        Jsonb(subject_list),
+                        *subject_params,
                         language or existing["language"],
                         page_count or existing["page_count"],
                         resolved_format,

@@ -106,6 +106,19 @@ def _upgrade_google_books_image(url: Optional[str]) -> Optional[str]:
     return url
 
 
+# Open Library's ``subjects`` lists every tag its catalogue files an edition
+# under, which includes access and availability markers and the NYT list a Book
+# appeared on. None of them say what the Book is about, so none of them become
+# subjects.
+_OPEN_LIBRARY_TAG_NOISE = frozenset({"accessible book", "protected daisy", "in library", "lending library"})
+
+
+def _is_open_library_tag_noise(name: str) -> bool:
+    """Whether a ``subjects`` entry is a catalogue marker rather than a subject."""
+    folded = name.casefold()
+    return folded in _OPEN_LIBRARY_TAG_NOISE or folded.startswith("nyt:")
+
+
 def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Helper to parse a single book's data from Open Library."""
     title = data.get("title")
@@ -133,7 +146,9 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
                 if isinstance(name, dict):
                     name = name.get("name")
             if isinstance(name, str) and name.strip():
-                subject_names.append(name.strip())
+                cleaned = name.strip()
+                if not _is_open_library_tag_noise(cleaned):
+                    subject_names.append(cleaned)
 
     # The provider publishes a list and the list is what travels; the legacy
     # triple carries the first entry for surfaces that predate it.
@@ -1325,6 +1340,11 @@ def enhance_books_batch(
             logger.debug(f"Found data from {source} for {title}: {info}")
 
             has_updates = False
+            # The provider's legacy category fields are written by the loop
+            # below, and a legacy row reads its one subject from them: capture
+            # the stored list first so the subject merge compares against what
+            # the Book held, not against a value this loop has just replaced.
+            stored_subjects = subjects_for_book(book_item)
             # Map fields safely
             field_map = {
                 "thumbnail_url": "thumbnail_url",
@@ -1355,9 +1375,8 @@ def enhance_books_batch(
                     found = normalise_subjects(info.get(source_field))
                     if not found:
                         continue
-                    stored = subjects_for_book(book_item)
-                    merged = merge_subjects(stored, found)
-                    if merged != stored:
+                    merged = merge_subjects(stored_subjects, found)
+                    if merged != stored_subjects:
                         book_item["subjects"] = merged
                         has_updates = True
                     continue

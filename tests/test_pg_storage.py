@@ -13,7 +13,9 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
+import book_lamp.services.pg_storage as pg_storage_module
 from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
@@ -1985,3 +1987,42 @@ def test_concurrent_imports_keep_every_subject(pg_storage):
 
     stored = pg_storage.get_book_by_isbn("9780000002270")
     assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}
+
+
+def test_an_edit_that_names_no_subject_leaves_the_list_alone(pg_storage, monkeypatch):
+    """An unrelated edit must not write back the list it happened to read.
+
+    The edit takes its snapshot, an import adds a subject, and the edit commits:
+    the imported subject has to survive the edit.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780000002263",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=[{"category": "FICTION", "main": "FICTION", "sub": None}],
+    )
+
+    real_resolve = pg_storage_module.resolve_subjects
+    imported = [
+        {"category": "FICTION", "main": "FICTION", "sub": None},
+        {"category": "MURDER", "main": "MURDER", "sub": None},
+    ]
+
+    def resolve_after_an_import_lands(*args, **kwargs):
+        # Another writer commits a subject between this edit's read and its write.
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            conn.execute("UPDATE books SET subjects = %s WHERE id = %s", [Jsonb(imported), book["id"]])
+        return real_resolve(*args, **kwargs)
+
+    monkeypatch.setattr(pg_storage_module, "resolve_subjects", resolve_after_an_import_lands)
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title="A Mystery, Revised",
+        authors=["An Author"],
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert [subject["main"] for subject in stored["subjects"]] == ["FICTION", "MURDER"]
+    assert stored["title"] == "A Mystery, Revised"

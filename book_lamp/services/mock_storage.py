@@ -239,36 +239,45 @@ class MockStorage:
                     category_is_authoritative=True,
                 )
 
-                book.update(
-                    {
-                        "isbn13": isbn13,
-                        "title": title,
-                        "subtitle": subtitle,
-                        "author": display(authors),
-                        "authors": authors,
-                        "publication_year": publication_year,
-                        "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),
-                        "publisher": publisher or book.get("publisher"),
-                        "description": description or book.get("description"),
-                        "series": series or book.get("series"),
-                        "bisac_category": legacy.category,
-                        "bisac_main_category": legacy.main,
-                        "bisac_sub_category": legacy.sub,
-                        "subjects": subject_list,
-                        "language": language or book.get("language"),
-                        "page_count": page_count or book.get("page_count"),
-                        # A blank that arrives from the edit form is an explicit
-                        # clear, so it is told apart from a field the caller never
-                        # mentioned rather than read as "keep the old value".
-                        "physical_format": resolve_physical_format(
-                            physical_format,
-                            book.get("physical_format"),
-                            provided=physical_format_provided,
-                        ),
-                        "edition": edition or book.get("edition"),
-                        "cover_url": cover_url or book.get("cover_url"),
-                    }
-                )
+                updates: dict[str, Any] = {
+                    "isbn13": isbn13,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "author": display(authors),
+                    "authors": authors,
+                    "publication_year": publication_year,
+                    "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),
+                    "publisher": publisher or book.get("publisher"),
+                    "description": description or book.get("description"),
+                    "series": series or book.get("series"),
+                    "language": language or book.get("language"),
+                    "page_count": page_count or book.get("page_count"),
+                    # A blank that arrives from the edit form is an explicit
+                    # clear, so it is told apart from a field the caller never
+                    # mentioned rather than read as "keep the old value".
+                    "physical_format": resolve_physical_format(
+                        physical_format,
+                        book.get("physical_format"),
+                        provided=physical_format_provided,
+                    ),
+                    "edition": edition or book.get("edition"),
+                    "cover_url": cover_url or book.get("cover_url"),
+                }
+                # An edit that names no subject leaves the columns alone, so a
+                # subject an import adds meanwhile is not erased by the list
+                # this edit happened to read.
+                if bool(subjects) or any(
+                    value and str(value).strip() for value in (bisac_category, bisac_main_category, bisac_sub_category)
+                ):
+                    updates.update(
+                        {
+                            "bisac_category": legacy.category,
+                            "bisac_main_category": legacy.main,
+                            "bisac_sub_category": legacy.sub,
+                            "subjects": subject_list,
+                        }
+                    )
+                book.update(updates)
                 return book
         logger.error(f"Book with ID {book_id} not found")
         raise Exception(f"Book with ID {book_id} not found")
