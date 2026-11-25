@@ -20,10 +20,10 @@ interface Category {
     subcategories: { name: string; count: number }[];
 }
 
-const renderChart = (categories: Category[]) =>
+const renderChart = (categories: Category[], totalBooks?: number) =>
     render(
         <MemoryRouter>
-            <CategoryChart categories={categories} />
+            <CategoryChart categories={categories} totalBooks={totalBooks} />
         </MemoryRouter>
     );
 
@@ -60,6 +60,30 @@ describe('CategoryChart subject tiles', () => {
         const { container } = renderChart([{ label: name, count: 4, subcategories: [] }]);
 
         expect(container.querySelector('.category-name')?.textContent).toBe(name);
+    });
+
+    it('renders every subject the payload carries, not only the ten largest', () => {
+        const categories = Array.from({ length: 12 }, (_, index) => ({
+            label: `Subject ${index + 1}`,
+            count: 12 - index,
+            subcategories: [],
+        }));
+
+        const { container } = renderChart(categories, 12);
+
+        expect(container.querySelectorAll('.category-item-interactive')).toHaveLength(12);
+        const names = Array.from(container.querySelectorAll('.category-name')).map(
+            (node) => node.textContent
+        );
+        expect(names).toContain('Subject 12');
+    });
+
+    it('states each subject as a share of the books read', () => {
+        const { container } = renderChart([{ label: 'Fiction', count: 26, subcategories: [] }], 142);
+
+        // A Book can appear under more than one subject, so the share is of the
+        // books read rather than of the subject counts.
+        expect(container.querySelector('.category-percent')?.textContent).toBe('18.3%');
     });
 
     it('leaves the expand hint off a subject without subcategories', () => {

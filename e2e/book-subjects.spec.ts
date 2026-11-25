@@ -32,3 +32,40 @@ test('shows every subject a Book carries and filters by any of them', async ({ p
     await page.goto('/books?category=Murder');
     await expect(page.getByRole('heading', { name: 'A Mystery' })).toBeVisible();
 });
+
+test('shows a subject outside the ten largest on the dashboard', async ({ page, request }) => {
+    const subjects = [
+        'Fiction',
+        'History',
+        'Science',
+        'Poetry',
+        'Drama',
+        'Art',
+        'Music',
+        'Travel',
+        'Cooking',
+        'Gardening',
+        'Philosophy',
+        'Murder',
+    ];
+    const response = await request.post('/api/books', {
+        data: {
+            isbn: '9780000002235',
+            title: 'A Well-Labelled Book',
+            authors: ['An Author'],
+            subjects,
+        },
+    });
+    expect(response.ok()).toBeTruthy();
+    const book = await response.json();
+
+    const recorded = await request.post(`/api/books/${book.id}/readings`, {
+        data: { status: 'Completed', start_date: '2024-06-01', end_date: '2024-06-02', rating: 4 },
+    });
+    expect(recorded.ok()).toBeTruthy();
+
+    await page.goto('/dashboard');
+    // Two seeded Books are read, and this one is the third.
+    await expect(page.getByText(/3 books read/)).toBeVisible();
+    await expect(page.getByRole('link', { name: /Murder/ })).toBeVisible();
+});

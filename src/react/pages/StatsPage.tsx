@@ -358,9 +358,20 @@ const StatsPage: React.FC = () => {
                     <h2 id="subjects-heading" className="section-heading">
                         Subjects
                     </h2>
+                    {/* A Book is counted under each of its subjects, so the
+                        panel states the books it is counted against rather
+                        than letting the counts look like a partition. */}
+                    <p className="board-note">
+                        {stats.total_books} {stats.total_books === 1 ? 'book' : 'books'} read. A book is counted
+                        under every subject it carries, so the counts can add up to more than{' '}
+                        {stats.total_books}.
+                    </p>
                     <div className="panel">
                         {stats.category_details && stats.category_details.length > 0 ? (
-                            <CategoryChart categories={stats.category_details} />
+                            <CategoryChart
+                                categories={stats.category_details}
+                                totalBooks={stats.total_books}
+                            />
                         ) : (
                             <div className="bar-list">
                                 {stats.category_distribution.map(({ label, count }) => (

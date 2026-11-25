@@ -343,13 +343,17 @@ def calculate_collection_stats(
                 existing["subcategories"][sub_cat] += 1
 
     category_details_list.sort(key=lambda x: -x["count"])
+    # The Subjects panel lists every label, not a top ten: a subject outside the
+    # ten largest is still one a Book carries, and dropping it made the panel
+    # disagree with the Book's own page (#404). `category_distribution` keeps
+    # its top-ten/Other shape for the chart's bar-list fallback.
     category_details = [
         {
             "label": c["label"],
             "count": c["count"],
             "subcategories": [{"name": name, "count": count} for name, count in c["subcategories"].most_common(5)],
         }
-        for c in category_details_list[:10]
+        for c in category_details_list
     ]
 
     yearly_goal = None

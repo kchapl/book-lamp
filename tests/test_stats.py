@@ -47,6 +47,27 @@ def test_stats_category_limit(client, authenticated_client):
     assert "Fiction" in cats
 
 
+def test_dashboard_lists_every_subject_not_only_the_ten_largest():
+    """A subject outside the ten largest still belongs on the Subjects panel (#404)."""
+    books = [
+        {
+            "id": index,
+            "title": f"Book {index}",
+            "subjects": [{"category": f"SUBJECT {index}", "main": f"SUBJECT {index}", "sub": None}],
+        }
+        for index in range(1, 13)
+    ]
+    records = [{"book_id": book["id"], "status": "Completed", "end_date": "2026-01-02"} for book in books]
+
+    stats = calculate_collection_stats(books, records)
+
+    labels = [entry["label"] for entry in stats["category_details"]]
+    assert len(labels) == 12
+    assert "Subject 12" in labels
+    # The chart keeps its top-ten/Other shape for the bar-list fallback.
+    assert len(stats["category_distribution"]) == 11
+
+
 def test_stats_bulk_actions_are_in_overflow_menu(authenticated_client):
     resp = authenticated_client.get("/dashboard", follow_redirects=True)
     assert resp.status_code == 200
