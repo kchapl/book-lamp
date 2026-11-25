@@ -152,6 +152,21 @@ describe('StatsPage reading-status board', () => {
         expect(screen.queryByText('English')).not.toBeInTheDocument();
     });
 
+    it('states the books-read total the subjects are counted against', async () => {
+        vi.mocked(getStats).mockResolvedValue({
+            ...mockStats,
+            total_books: 6,
+            category_distribution: [{ label: 'Fiction', count: 4 }],
+            category_details: [{ label: 'Fiction', count: 4, subcategories: [] }],
+        } as never);
+
+        renderPage();
+
+        const note = await screen.findByText(/books read/);
+        expect(note).toHaveTextContent('6 books read');
+        expect(note).toHaveTextContent(/counted under every subject/i);
+    });
+
     it('shows an empty lectern when nothing is in progress', async () => {
         renderPage();
 

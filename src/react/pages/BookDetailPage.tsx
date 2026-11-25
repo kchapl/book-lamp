@@ -288,7 +288,13 @@ const BookDetailPage: React.FC = () => {
     // A Book's Authors are a list; the display string is only a fallback for a
     // payload that predates it. Each name gets its own page.
     const authors = book.authors?.length ? book.authors : book.author ? [book.author] : [];
-    const subject = book.bisac_category_label || book.bisac_category;
+    // Every subject the Book carries gets its own link. A payload from before
+    // the list existed still shows its one category.
+    const subjects = book.subjects?.length
+        ? book.subjects
+        : book.bisac_category
+          ? [{ category: book.bisac_category, label: book.bisac_category_label || book.bisac_category }]
+          : [];
 
     return (
         <div className="book-detail-page page">
@@ -456,17 +462,19 @@ const BookDetailPage: React.FC = () => {
                                         <dd>{book.physical_format_label}</dd>
                                     </div>
                                 )}
-                                {subject && (
+                                {subjects.length > 0 && (
                                     <div className="placard-row">
-                                        <dt>Subject</dt>
+                                        <dt>{subjects.length === 1 ? 'Subject' : 'Subjects'}</dt>
                                         <dd>
-                                            {book.bisac_category_label ? (
-                                                <Link to={categoryPath(book.bisac_category_label)}>
-                                                    {book.bisac_category_label}
-                                                </Link>
-                                            ) : (
-                                                subject
-                                            )}
+                                            {subjects.map((entry, index) => {
+                                                const label = entry.label || entry.category;
+                                                return (
+                                                    <React.Fragment key={`${label}-${index}`}>
+                                                        {index > 0 && ', '}
+                                                        <Link to={categoryPath(label)}>{label}</Link>
+                                                    </React.Fragment>
+                                                );
+                                            })}
                                         </dd>
                                     </div>
                                 )}

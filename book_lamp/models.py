@@ -24,6 +24,7 @@ class Book:
     bisac_category: Optional[str] = None
     bisac_main_category: Optional[str] = None
     bisac_sub_category: Optional[str] = None
+    subjects: List[Dict[str, Any]] = field(default_factory=list)
     language: Optional[str] = None
     page_count: Optional[int] = None
     physical_format: Optional[str] = None
@@ -65,6 +66,7 @@ class Book:
             bisac_category=data.get("bisac_category"),
             bisac_main_category=data.get("bisac_main_category"),
             bisac_sub_category=data.get("bisac_sub_category"),
+            subjects=list(data.get("subjects") or []),
             language=data.get("language"),
             page_count=data.get("page_count"),
             physical_format=data.get("physical_format"),

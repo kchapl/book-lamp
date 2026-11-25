@@ -7,11 +7,9 @@ from collections import Counter
 from typing import Any, Dict, List, Optional
 
 from book_lamp.utils import (
-    UNKNOWN_CATEGORY,
-    category_label,
-    category_label_for_book,
+    category_entries_for_book,
+    category_labels_for_book,
     full_title,
-    normalise_bisac_category,
 )
 from book_lamp.utils.publishers import normalize_publisher
 from book_lamp.utils.reading_status import with_reading_status
@@ -183,9 +181,12 @@ def calculate_collection_stats(
 
     max_month_count = max(monthly_counts.values()) if monthly_counts else 1
 
+    # A Book is counted under every subject it carries, so a Book with several
+    # is not reduced to one of them. A Book with no real subject is Unknown.
     category_bins: Counter[str] = Counter()
     for b in completed_books:
-        category_bins[category_label_for_book(b)] += 1
+        for bin_label in category_labels_for_book(b):
+            category_bins[bin_label] += 1
 
     all_categories_sorted = sorted(category_bins.items(), key=lambda x: (-x[1], x[0]))
     category_distribution = all_categories_sorted[:10]
@@ -328,29 +329,31 @@ def calculate_collection_stats(
 
     category_details_list: List[Dict[str, Any]] = []
     for b in completed_books:
-        raw_category = b.get("bisac_category") or b.get("bisac_main_category")
-        major, sub_cat = normalise_bisac_category(raw_category)[1:]
-        norm_cat = category_label(major) if major else UNKNOWN_CATEGORY
-        existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
-        if not existing:
-            existing = {
-                "label": norm_cat,
-                "count": 0,
-                "subcategories": Counter(),
-            }
-            category_details_list.append(existing)
-        existing["count"] += 1
-        if sub_cat:
-            existing["subcategories"][sub_cat] += 1
+        for norm_cat, sub_cat in category_entries_for_book(b):
+            existing = next((c for c in category_details_list if c["label"] == norm_cat), None)
+            if not existing:
+                existing = {
+                    "label": norm_cat,
+                    "count": 0,
+                    "subcategories": Counter(),
+                }
+                category_details_list.append(existing)
+            existing["count"] += 1
+            if sub_cat:
+                existing["subcategories"][sub_cat] += 1
 
     category_details_list.sort(key=lambda x: -x["count"])
+    # The Subjects panel lists every label, not a top ten: a subject outside the
+    # ten largest is still one a Book carries, and dropping it made the panel
+    # disagree with the Book's own page (#404). `category_distribution` keeps
+    # its top-ten/Other shape for the chart's bar-list fallback.
     category_details = [
         {
             "label": c["label"],
             "count": c["count"],
             "subcategories": [{"name": name, "count": count} for name, count in c["subcategories"].most_common(5)],
         }
-        for c in category_details_list[:10]
+        for c in category_details_list
     ]
 
     yearly_goal = None

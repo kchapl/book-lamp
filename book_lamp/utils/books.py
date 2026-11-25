@@ -1,4 +1,5 @@
 import html
+import json
 import re
 from collections.abc import Mapping
 from typing import Any, NamedTuple, Optional
@@ -618,6 +619,157 @@ def normalise_bisac_category(
     return full_category, major, sub_category
 
 
+def normalise_subject(value: object) -> Optional[dict[str, Any]]:
+    """One subject a Book carries, normalised on its own.
+
+    Accepts the stored mapping or a provider's raw string. A value that names
+    no subject at all — a Dewey code, a language code, a format — is not a
+    subject and returns None.
+    """
+    raw = value
+    if isinstance(value, Mapping):
+        raw = value.get("category") or value.get("main")
+    full_category, main, sub = normalise_bisac_category(raw)
+    if not main:
+        return None
+    return {"category": full_category, "main": main, "sub": sub}
+
+
+def normalise_subjects(values: object) -> list[dict[str, Any]]:
+    """Every subject a Book carries, each normalised and collapsed by label.
+
+    Sources publish lists, and a Book that genuinely carries several subjects
+    keeps them all. Two spellings that normalise to the same label are one
+    subject; the first spelling in the source's order is kept.
+    """
+    if values is None:
+        return []
+    if isinstance(values, str):
+        text = values.strip()
+        if not text:
+            return []
+        # An import may carry a JSON array in one field; a lone value is one
+        # subject, not a string to split on commas.
+        if text.startswith("["):
+            try:
+                values = json.loads(text)
+            except ValueError:
+                values = [text]
+        else:
+            values = [text]
+    elif isinstance(values, Mapping):
+        values = [values]
+
+    if not isinstance(values, (list, tuple, set)):
+        return []
+
+    subjects: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for value in values:
+        subject = normalise_subject(value)
+        if subject is None:
+            continue
+        key = subject["main"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        subjects.append(subject)
+    return subjects
+
+
+def merge_subjects(stored: object, incoming: object) -> list[dict[str, Any]]:
+    """Every subject either side names, the stored ones first.
+
+    A provider refresh adds the subjects it finds and never drops a stored one,
+    so the merge is a union by label: a label the Book already carries keeps
+    its stored spelling and place, and the provider's entry is kept only when
+    it names a label the Book did not have.
+    """
+    merged = normalise_subjects(stored)
+    seen = {subject["main"].casefold() for subject in merged}
+    for subject in normalise_subjects(incoming):
+        key = subject["main"].casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(subject)
+    return merged
+
+
+def subjects_for_book(book: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every subject stored on a Book, or its one legacy subject.
+
+    A row written before ``subjects`` existed has its category in the old
+    three columns; that value is one entry, never several. The validated
+    ``bisac_main_category`` is the fallback when the full value is junk.
+    """
+    stored = normalise_subjects(book.get("subjects"))
+    if stored:
+        return stored
+    for raw in (book.get("bisac_category"), book.get("bisac_main_category")):
+        subject = normalise_subject(raw)
+        if subject is not None:
+            return [subject]
+    return []
+
+
+def resolve_subjects(
+    stored_book: Mapping[str, Any],
+    subjects: object,
+    incoming_category: "Category",
+    *,
+    merge: bool = False,
+    category_is_authoritative: bool = False,
+) -> tuple[list[dict[str, Any]], "Category"]:
+    """The subject list a write stores, and the legacy triple naming its first.
+
+    ``merge`` unions the incoming subjects with the stored ones: a provider
+    refresh adds what it finds and never drops a stored subject. Without it the
+    incoming list replaces the stored one, and an edit that names a different
+    category rebuilds the list from that category, so the page and the filter
+    cannot keep showing a subject the reader has just replaced.
+
+    The legacy ``bisac_*`` columns are always derived from the resulting list's
+    first entry, so they and every surface that reads the list agree on which
+    subject the Book leads with.
+    """
+    stored = subjects_for_book(stored_book)
+    incoming = normalise_subjects(subjects)
+    if incoming:
+        first = incoming[0]
+        incoming_category = Category(first["category"], first["main"], first["sub"])
+    elif merge:
+        # An upsert can name a category without a subject list, and a category
+        # is a subject: the merge adds it rather than dropping it.
+        named = normalise_subject(incoming_category.category)
+        if named is not None:
+            incoming = [named]
+
+    subject_list = merge_subjects(stored, incoming) if merge else incoming or stored
+
+    if category_is_authoritative and not incoming:
+        submitted = normalise_subject(incoming_category.category)
+        if submitted:
+            # The whole subject is compared, not just its label: an edit that
+            # changes only the sub-category still names a different subject.
+            current = subject_list[0]["category"] if subject_list else None
+            if (submitted["category"] or "").casefold() != (current or "").casefold():
+                subject_list = [submitted]
+
+    # The triple still resolves through the one rule (see ADR-0002); it only
+    # fills the list when nothing above named a subject at all.
+    resolved = resolve_category(incoming_category, Category.from_mapping(stored_book))
+    if not subject_list and resolved.main:
+        subject_list = [{"category": resolved.category, "main": resolved.main, "sub": resolved.sub}]
+
+    if subject_list:
+        first = subject_list[0]
+        legacy = Category(first["category"], first["main"], first["sub"])
+    else:
+        legacy = resolved
+    return subject_list, legacy
+
+
 def category_label(value: object) -> str:
     """Return the display label for a category, or "Unknown" when invalid."""
     major = normalise_major_bisac(value)
@@ -626,16 +778,30 @@ def category_label(value: object) -> str:
     return major.title() if len(major) > 3 else major.upper()
 
 
-def category_label_for_book(book: dict) -> str:
-    """Return the chart/filter label for a book.
+def category_entries_for_book(book: Mapping[str, Any]) -> list[tuple[str, Optional[str]]]:
+    """Each label a Book is counted under, with the sub-category it names.
 
-    Prefers the validated ``bisac_main_category`` and falls back to the raw
-    ``bisac_category`` so rows written before normalisation still classify.
+    One entry per label: a Book carrying two subjects under one major label is
+    counted once there. A Book that names no subject is counted under Unknown,
+    the same bucket the statistics chart uses and links to the Books filter.
     """
-    major = normalise_major_bisac(book.get("bisac_main_category"))
-    if major is None:
-        major = normalise_major_bisac(book.get("bisac_category"))
-    return category_label(major)
+    entries: list[tuple[str, Optional[str]]] = []
+    for subject in subjects_for_book(book):
+        label = category_label(subject["main"])
+        if any(existing_label == label for existing_label, _ in entries):
+            continue
+        entries.append((label, subject["sub"]))
+    return entries or [(UNKNOWN_CATEGORY, None)]
+
+
+def category_labels_for_book(book: Mapping[str, Any]) -> list[str]:
+    """Every label a Book is counted under, in stored order."""
+    return [label for label, _ in category_entries_for_book(book)]
+
+
+def category_label_for_book(book: Mapping[str, Any]) -> str:
+    """The first label a Book is counted under, or "Unknown" when it has none."""
+    return category_labels_for_book(book)[0]
 
 
 class Category(NamedTuple):

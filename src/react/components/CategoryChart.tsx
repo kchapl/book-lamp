@@ -15,6 +15,8 @@ interface CategoryDetail {
 
 interface CategoryChartProps {
     categories: CategoryDetail[];
+    /** The books read the subjects are counted against, when the caller knows it. */
+    totalBooks?: number;
     onCategoryClick?: (category: string) => void;
 }
 
@@ -48,7 +50,7 @@ const CATEGORY_COLORS: { background: string; color: string }[] = [
     },
 ];
 
-const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryClick }) => {
+const CategoryChart: React.FC<CategoryChartProps> = ({ categories, totalBooks, onCategoryClick }) => {
     const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const navigate = useNavigate();
@@ -90,7 +92,12 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryCli
         return CATEGORY_COLORS[index % CATEGORY_COLORS.length].color;
     };
 
-    const totalBooks = categories.reduce((sum, c) => sum + c.count, 0);
+    // Each subject is a share of the books read, not of the other subjects: a
+    // Book counted under two subjects appears in both, so the shares can add up
+    // to more than 100%. Without the total, the counts are the only denominator
+    // the chart has.
+    const booksRead =
+        totalBooks && totalBooks > 0 ? totalBooks : categories.reduce((sum, c) => sum + c.count, 0);
 
     if (expandedCategory) {
         const category = categories.find(c => c.label === expandedCategory);
@@ -114,7 +121,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryCli
                     <div className="subcategory-grid">
                         {category.subcategories.map((sub, idx) => {
                             const percentage = (sub.count / maxSubCount) * 100;
-                            const sharePercent = ((sub.count / totalBooks) * 100).toFixed(1);
+                            const sharePercent = ((sub.count / booksRead) * 100).toFixed(1);
                             return (
                                 <a
                                     href={`/books?category=${encodeURIComponent(category.label)}&subcategory=${encodeURIComponent(sub.name)}`}
@@ -151,7 +158,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ categories, onCategoryCli
         <div className="category-treemap">
             <div className="category-grid">
                 {categories.map((category, idx) => {
-                    const sharePercent = ((category.count / totalBooks) * 100).toFixed(1);
+                    const sharePercent = ((category.count / booksRead) * 100).toFixed(1);
                     const hasSubcategories = category.subcategories && category.subcategories.length > 0;
 
                     return (

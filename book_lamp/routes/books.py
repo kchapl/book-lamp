@@ -18,10 +18,13 @@ from book_lamp.services.stats_calculator import normalise_physical_format
 from book_lamp.services.storage_factory import TEST_ISBN, _mock_storage_singleton, get_storage, is_test_mode
 from book_lamp.utils import (
     SORT_OPTIONS,
+    category_label,
     category_label_for_book,
+    category_labels_for_book,
     is_valid_isbn13,
     parse_publication_year,
     sort_books,
+    subjects_for_book,
 )
 from book_lamp.utils.authors import display, parse
 from book_lamp.utils.books import (
@@ -368,13 +371,14 @@ def api_list_books():
     if category_filter:
         filtered_books = []
         for b in books:
-            if category_label_for_book(b).lower() == category_filter.lower():
+            # A Book matches on any subject it carries, not only the first.
+            if any(label.lower() == category_filter.lower() for label in category_labels_for_book(b)):
                 filtered_books.append(b)
         books = filtered_books
 
     all_categories = set()
     for b in storage.get_all_books():
-        all_categories.add(category_label_for_book(b))
+        all_categories.update(category_labels_for_book(b))
     sorted_categories = sorted(list(all_categories))
 
     return jsonify(
@@ -444,6 +448,7 @@ def api_create_book():
             "cover_url": data.get("cover_url"),
             "description": data.get("description"),
             "bisac_category": data.get("bisac_category"),
+            "subjects": data.get("subjects"),
             "physical_format": data.get("physical_format"),
         }
     elif title:
@@ -498,6 +503,7 @@ def api_create_book():
             publisher=book_data.get("publisher"),
             description=book_data.get("description"),
             bisac_category=book_data.get("bisac_category"),
+            subjects=book_data.get("subjects"),
             language=book_data.get("language"),
             page_count=book_data.get("page_count"),
             physical_format=book_data.get("physical_format"),
@@ -535,8 +541,11 @@ def api_book_detail(book_id: int):
     book["is_planned"] = is_planned
 
     # The placard links to pages the collection already has: the author and
-    # publisher routes, and the category filter. The label the filter uses is
-    # derived here, by the same rule, so the link and the filter cannot disagree.
+    # publisher routes, and the category filter. Every subject is returned with
+    # its label, derived by the same rule the filter uses, so the links and the
+    # filter cannot disagree.
+    subjects = subjects_for_book(book)
+    book["subjects"] = [{**subject, "label": category_label(subject["main"])} for subject in subjects]
     book["bisac_category_label"] = category_label_for_book(book)
     # The page shows the binding a value names, not the raw stored value: old
     # rows carry media types and language codes that are not bindings at all.

@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, cast
 import psycopg
 from psycopg import OperationalError
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from book_lamp.services.stats_calculator import resolve_physical_format
@@ -17,7 +18,8 @@ from book_lamp.utils.books import (
     full_title,
     normalise_title_pair,
     normalize_isbn,
-    resolve_category,
+    resolve_subjects,
+    subjects_for_book,
 )
 from book_lamp.utils.readings import iso_date_string, require_end_date, require_rating
 
@@ -446,28 +448,40 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         target_isbn = normalize_isbn(isbn13)
         with self.pool.connection() as conn:
             with conn.transaction():
+                # Two creates for the same new ISBN would otherwise both read no
+                # stored subjects, and the later conflict update would replace
+                # the earlier list. One transaction-scoped lock per ISBN
+                # serialises the read/merge/write, including the case where the
+                # row does not exist yet.
+                conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", [target_isbn])
                 # This statement is also the create path's conflict path, so a
                 # stored category outranks an incoming Dewey code here too
                 # (see ADR-0002).
                 existing_raw = conn.execute(
-                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, physical_format "
-                    "FROM books WHERE isbn13 = %s",
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, "
+                    "subjects, physical_format FROM books WHERE isbn13 = %s",
                     [target_isbn],
                 ).fetchone()
-                stored = Category.from_mapping(cast(Dict[str, Any], existing_raw)) if existing_raw else Category()
-                resolved = resolve_category(
-                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    stored,
-                )
+                existing = cast(Dict[str, Any], existing_raw) if existing_raw else None
                 # A lookup may fill a Book that names no binding, but a stored
                 # binding — the reader's choice, however it was obtained — stays.
                 resolved_format = resolve_physical_format(
                     physical_format,
-                    cast(Dict[str, Any], existing_raw).get("physical_format") if existing_raw else None,
+                    existing.get("physical_format") if existing else None,
+                )
+                # A refresh adds the subjects it finds; it never drops a stored
+                # one. The legacy triple is derived from the merged list, so it
+                # and the page label cannot name different subjects.
+                subject_list, resolved = resolve_subjects(
+                    existing or {},
+                    subjects,
+                    Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+                    merge=True,
                 )
 
                 # First try atomic upsert
@@ -475,9 +489,9 @@ class PostgresStorage:
                     INSERT INTO books (
                         isbn13, title, subtitle, publication_year, thumbnail_url,
                         publisher, description, series, bisac_category,
-                        bisac_main_category, bisac_sub_category, language,
+                        bisac_main_category, bisac_sub_category, subjects, language,
                         page_count, physical_format, edition, cover_url
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (isbn13) DO UPDATE SET
                         title = EXCLUDED.title,
                         -- A provider that knows no subtitle must not erase one.
@@ -490,6 +504,9 @@ class PostgresStorage:
                         bisac_category = EXCLUDED.bisac_category,
                         bisac_main_category = EXCLUDED.bisac_main_category,
                         bisac_sub_category = EXCLUDED.bisac_sub_category,
+                        -- The list was unioned with the stored one above, so a
+                        -- provider's subjects are added and none is dropped.
+                        subjects = EXCLUDED.subjects,
                         language = EXCLUDED.language,
                         page_count = EXCLUDED.page_count,
                         -- The value was resolved against the stored one above:
@@ -516,6 +533,7 @@ class PostgresStorage:
                             resolved.category,
                             resolved.main,
                             resolved.sub,
+                            Jsonb(subject_list),
                             language,
                             page_count,
                             resolved_format,
@@ -586,13 +604,22 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
         physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         with self.pool.connection() as conn:
             with conn.transaction():
+                # Every writer of a subject list takes this lock before it reads
+                # (add_book, bulk_import), so an edit takes it too: read, resolve
+                # and write are one step, and a subject an import adds meanwhile
+                # is seen by whichever of the two writes second.
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)",
+                    [normalize_isbn(isbn13)],
+                )
                 # Mirror BISAC prioritization logic from MockStorage
                 existing_raw = conn.execute(
-                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, thumbnail_url, publisher, description, series, language, page_count, physical_format, edition, cover_url FROM books WHERE id = %s",
+                    "SELECT bisac_category, bisac_main_category, bisac_sub_category, subjects, thumbnail_url, publisher, description, series, language, page_count, physical_format, edition, cover_url FROM books WHERE id = %s",
                     [book_id],
                 ).fetchone()
                 if not existing_raw:
@@ -600,22 +627,39 @@ class PostgresStorage:
                 existing = cast(Dict[str, Any], existing_raw)
 
                 # The triple resolves through the one rule, shared with the
-                # in-memory adapter and the import paths (see ADR-0002).
-                resolved = resolve_category(
+                # in-memory adapter and the import paths (see ADR-0002). An edit
+                # that names a different category replaces the list, so the page
+                # and filter cannot keep showing the old subject.
+                subject_list, resolved = resolve_subjects(
+                    existing,
+                    subjects,
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    Category.from_mapping(existing),
+                    category_is_authoritative=True,
                 )
+                # Only the columns whose value actually changes are written. The
+                # edit form sends the stored category back, so writing the
+                # resolved list unconditionally would rewrite the snapshot this
+                # edit read and erase a subject another writer added since.
+                assignments: list[str] = []
+                subject_params: list[Any] = []
+                if Category(resolved.category, resolved.main, resolved.sub) != Category.from_mapping(existing):
+                    assignments.append("bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s")
+                    subject_params.extend([resolved.category, resolved.main, resolved.sub])
+                if subject_list != subjects_for_book(existing):
+                    assignments.append("subjects = %s")
+                    subject_params.append(Jsonb(subject_list))
+                subject_assignments = "".join(f"{assignment}, " for assignment in assignments)
                 resolved_format = resolve_physical_format(
                     physical_format,
                     existing.get("physical_format"),
                     provided=physical_format_provided,
                 )
 
-                query = """
+                query = f"""
                     UPDATE books SET
                         isbn13 = %s, title = %s, subtitle = %s, publication_year = %s,
                         thumbnail_url = %s, publisher = %s, description = %s, series = %s,
-                        bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
+                        {subject_assignments}
                         language = %s, page_count = %s, physical_format = %s, edition = %s, cover_url = %s
                     WHERE id = %s
                 """
@@ -630,9 +674,7 @@ class PostgresStorage:
                         publisher or existing["publisher"],
                         description or existing["description"],
                         series or existing["series"],
-                        resolved.category,
-                        resolved.main,
-                        resolved.sub,
+                        *subject_params,
                         language or existing["language"],
                         page_count or existing["page_count"],
                         resolved_format,
@@ -664,6 +706,7 @@ class PostgresStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         # add_book now handles duplicates atomically with ON CONFLICT DO UPDATE
         return self.add_book(
@@ -684,6 +727,7 @@ class PostgresStorage:
             physical_format=physical_format,
             edition=edition,
             cover_url=cover_url,
+            subjects=subjects,
         )
 
     def delete_book(self, book_id: int) -> bool:
@@ -839,19 +883,32 @@ class PostgresStorage:
 
                     # Reuse upsert_book logic but with the current transaction
                     isbn13 = normalize_isbn(book_data["isbn13"])
+                    # Imports run on their own threads, so two for the same Book
+                    # would otherwise merge onto the same snapshot and the later
+                    # write would erase the other's subjects. This is the lock
+                    # add_book takes, so a create and an import serialise too.
+                    conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s)::bigint)", [isbn13])
                     row_raw = conn.execute(
-                        "SELECT id, bisac_category, bisac_main_category, bisac_sub_category FROM books WHERE isbn13 = %s",
+                        "SELECT id, bisac_category, bisac_main_category, bisac_sub_category, "
+                        "subjects, physical_format FROM books WHERE isbn13 = %s",
                         [isbn13],
                     ).fetchone()
                     if row_raw:
                         row = cast(Dict[str, Any], row_raw)
                         book_id = row["id"]
 
-                        # An imported Dewey code must not undo a category this
-                        # Book already has (see ADR-0002).
-                        resolved = resolve_category(
+                        # A refresh adds the subjects it finds and keeps the
+                        # stored ones; the legacy triple names the first of the
+                        # merged list, as the in-memory adapter writes it.
+                        subject_list, resolved = resolve_subjects(
+                            row,
+                            book_data.get("subjects"),
                             Category.from_mapping(book_data),
-                            Category.from_mapping(row),
+                            merge=True,
+                        )
+                        resolved_format = resolve_physical_format(
+                            book_data.get("physical_format"),
+                            row.get("physical_format"),
                         )
 
                         # Update book (simplified for bulk)
@@ -861,6 +918,7 @@ class PostgresStorage:
                                 {name_assignments}publication_year = %s,
                                 publisher = %s, description = %s, series = %s,
                                 bisac_category = %s, bisac_main_category = %s, bisac_sub_category = %s,
+                                subjects = %s,
                                 language = %s, page_count = %s, physical_format = %s, edition = %s,
                                 thumbnail_url = COALESCE(%s, thumbnail_url),
                                 cover_url = COALESCE(%s, cover_url)
@@ -877,9 +935,10 @@ class PostgresStorage:
                                 resolved.category,
                                 resolved.main,
                                 resolved.sub,
+                                Jsonb(subject_list),
                                 book_data.get("language"),
                                 book_data.get("page_count"),
-                                book_data.get("physical_format"),
+                                resolved_format,
                                 book_data.get("edition"),
                                 book_data.get("thumbnail_url"),
                                 book_data.get("cover_url"),
@@ -892,13 +951,19 @@ class PostgresStorage:
                             if write_names
                             else ""
                         )
+                        subject_list, resolved = resolve_subjects(
+                            {},
+                            book_data.get("subjects"),
+                            Category.from_mapping(book_data),
+                        )
+                        resolved_format = resolve_physical_format(book_data.get("physical_format"))
                         query = f"""
                             INSERT INTO books (
                                 isbn13, title, subtitle, publication_year, thumbnail_url,
                                 publisher, description, series, bisac_category,
-                                bisac_main_category, bisac_sub_category, language,
+                                bisac_main_category, bisac_sub_category, subjects, language,
                                 page_count, physical_format, edition, cover_url
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (isbn13) DO UPDATE SET
                                 {conflict_assignments}publication_year = EXCLUDED.publication_year,
                                 thumbnail_url = EXCLUDED.thumbnail_url
@@ -915,12 +980,13 @@ class PostgresStorage:
                                 book_data.get("publisher"),
                                 book_data.get("description"),
                                 book_data.get("series"),
-                                book_data.get("bisac_category"),
-                                book_data.get("bisac_main_category"),
-                                book_data.get("bisac_sub_category"),
+                                resolved.category,
+                                resolved.main,
+                                resolved.sub,
+                                Jsonb(subject_list),
                                 book_data.get("language"),
                                 book_data.get("page_count"),
-                                book_data.get("physical_format"),
+                                resolved_format,
                                 book_data.get("edition"),
                                 book_data.get("cover_url"),
                             ],

@@ -13,7 +13,9 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
+import book_lamp.services.pg_storage as pg_storage_module
 from alembic import command
 from alembic.config import Config
 from book_lamp.services.pg_storage import PostgresStorage
@@ -979,7 +981,7 @@ def test_0010_deletes_the_empty_keyed_duplicate_of_the_real_book(own_database, r
         ("9780441013593", "Dune", None),
     ]
     assert links == 2
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database):
@@ -1009,7 +1011,7 @@ def test_0011_adds_the_column_and_leaves_the_titles_to_the_backfill(own_database
     # Splitting here would race the instance still writing combined titles, so
     # every stored title stays as it is until the backfill script runs.
     assert rows == {isbn: (title, None) for isbn, title in titles.items()}
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
@@ -1042,7 +1044,7 @@ def test_0010_moves_a_duplicates_history_to_the_real_book(own_database):
     assert readings == [(real_id, "Completed", 5)]
     assert queued == [(real_id,)]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_database):
@@ -1068,7 +1070,7 @@ def test_0010_keeps_a_queue_entry_the_reader_already_has_for_the_real_book(own_d
         queued = conn.execute("SELECT book_id, position FROM reading_list").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert queued == [(real_id, 1)]
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
@@ -1127,7 +1129,7 @@ def test_0010_does_not_deadlock_a_reading_started_while_it_runs(own_database):
     assert readings == [(real_id, "In Progress")]
     assert queued == []
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_folds_a_reading_logged_against_both_records(own_database):
@@ -1152,7 +1154,7 @@ def test_0010_folds_a_reading_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed", 4)]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_folds_a_reread_logged_against_both_records(own_database):
@@ -1184,7 +1186,7 @@ def test_0010_folds_a_reread_logged_against_both_records(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Completed"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
@@ -1217,7 +1219,7 @@ def test_0010_pairs_each_duplicate_reading_with_its_own_match(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "Abandoned"), (real_id, "Completed")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_keeps_a_rating_edited_while_the_fold_runs(own_database):
@@ -1354,7 +1356,7 @@ def test_0010_is_a_no_op_when_no_isbn_less_book_remains(own_database):
         books = conn.execute("SELECT isbn13, title FROM books").fetchall()
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert books == [("9780008644833", "The Spy in the Archive")]
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
@@ -1408,7 +1410,7 @@ def test_0010_does_not_lose_a_reading_saved_while_it_runs(own_database):
         stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
     assert readings == [(real_id, "In Progress")]
     assert duplicate == 0
-    assert stamped == "0011"
+    assert stamped == "0012"
 
 
 def test_0010_refuses_when_an_edit_changes_the_real_books_isbn_mid_migration(own_database):
@@ -1778,3 +1780,251 @@ def test_a_provider_binding_fills_a_legacy_gap_and_never_replaces_a_choice(pg_st
         physical_format="Hardback",
     )
     assert pg_storage.get_book_by_id(gap["id"])["physical_format"] == "Hardback"
+
+
+def test_a_book_subject_list_survives_and_an_edit_can_replace_it(pg_storage):
+    subjects = [
+        {"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"},
+        {"category": "MURDER", "main": "MURDER", "sub": None},
+    ]
+    book = pg_storage.add_book(
+        isbn13="9780000002228",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=subjects,
+    )
+
+    assert pg_storage.get_book_by_id(book["id"])["subjects"] == subjects
+
+    # An edit that says nothing about subjects leaves the list standing.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+    )
+    assert pg_storage.get_book_by_id(book["id"])["subjects"] == subjects
+
+    # A stored provider list replaces the list, and its first entry becomes the
+    # legacy triple older surfaces read.
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        subjects=[{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}],
+    )
+    updated = pg_storage.get_book_by_id(book["id"])
+    assert updated["subjects"] == [{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}]
+    assert updated["bisac_category"] == "HISTORY / Europe"
+    assert updated["bisac_main_category"] == "HISTORY"
+
+
+def test_0012_adds_the_subject_list_and_leaves_legacy_rows_to_the_read_fallback(own_database):
+    """The new column starts empty; a legacy row's subject stays in its columns.
+
+    `subjects_for_book` reads those columns when the list is empty, so the
+    migration does not need to rewrite data and its behaviour cannot drift with
+    the application's normalisation.
+    """
+    _upgrade_database(own_database, "0011")
+    book_id = _write_book(own_database, "9780000002228", "A Mystery", ["An Author"])
+    with psycopg.connect(own_database) as conn:
+        conn.execute(
+            "UPDATE books SET bisac_category = %s, bisac_main_category = %s WHERE id = %s",
+            ["FICTION / Mystery", "FICTION", book_id],
+        )
+
+    _upgrade_database(own_database, "head")
+
+    with psycopg.connect(own_database) as conn:
+        (subjects,) = conn.execute("SELECT subjects FROM books WHERE id = %s", [book_id]).fetchone()
+        stamped = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+
+    assert subjects == []
+    assert stamped == "0012"
+
+
+def test_a_bulk_refresh_merges_subjects_and_names_the_stored_first(pg_storage):
+    """A refresh adds subjects; the legacy triple still names the first entry.
+
+    This is the production path for a provider refresh, and it must agree with
+    the in-memory adapter's upsert.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780000002235",
+        title="A History",
+        authors=["An Author"],
+        bisac_category="HISTORY / Europe",
+        bisac_main_category="HISTORY",
+        bisac_sub_category="Europe",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": book["isbn13"],
+                    "title": "A History",
+                    "author": "An Author",
+                    "publication_year": None,
+                    "subjects": [{"category": "SCIENCE", "main": "SCIENCE", "sub": None}],
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert [subject["main"] for subject in stored["subjects"]] == ["HISTORY", "SCIENCE"]
+    assert stored["bisac_category"] == "HISTORY / Europe"
+    assert stored["bisac_main_category"] == "HISTORY"
+
+
+def test_an_edit_that_changes_the_category_replaces_the_subject_list(pg_storage):
+    """A reader's new category is what the page and filter show next."""
+    book = pg_storage.add_book(
+        isbn13="9780000002249",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=[
+            {"category": "FICTION / Mystery", "main": "FICTION", "sub": "Mystery"},
+            {"category": "MURDER", "main": "MURDER", "sub": None},
+        ],
+    )
+
+    updated = pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title=book["title"],
+        authors=["An Author"],
+        bisac_category="HISTORY / Europe",
+    )
+
+    assert updated["subjects"] == [{"category": "HISTORY / Europe", "main": "HISTORY", "sub": "Europe"}]
+    assert updated["bisac_main_category"] == "HISTORY"
+
+
+def test_concurrent_creates_keep_every_subject(pg_storage):
+    """A create that loses the insert race still contributes its subjects."""
+    barrier = threading.Barrier(2)
+
+    def create(main: str) -> None:
+        barrier.wait()
+        pg_storage.add_book(
+            isbn13="9780000002256",
+            title="A Shared Book",
+            authors=["An Author"],
+            subjects=[{"category": main, "main": main, "sub": None}],
+        )
+
+    threads = [threading.Thread(target=create, args=(main,)) for main in ("FICTION", "MURDER")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    stored = pg_storage.get_book_by_isbn("9780000002256")
+    assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}
+
+
+def test_bulk_import_keeps_a_stored_binding(pg_storage):
+    """An imported binding never replaces one the Book already names."""
+    book = pg_storage.add_book(
+        isbn13="9780000002263",
+        title="A Bound Book",
+        authors=["An Author"],
+        physical_format="Hardback",
+    )
+
+    pg_storage.bulk_import(
+        [
+            {
+                "book": {
+                    "isbn13": book["isbn13"],
+                    "title": "A Bound Book",
+                    "author": "An Author",
+                    "publication_year": None,
+                    "physical_format": "Paperback",
+                },
+                "record": None,
+            }
+        ]
+    )
+
+    assert pg_storage.get_book_by_id(book["id"])["physical_format"] == "Hardback"
+
+
+def test_concurrent_imports_keep_every_subject(pg_storage):
+    """Two imports for one Book merge their subjects instead of overwriting."""
+    pg_storage.add_book(isbn13="9780000002270", title="A Shared Book", authors=["An Author"])
+    barrier = threading.Barrier(2)
+
+    def import_subject(main: str) -> None:
+        barrier.wait()
+        pg_storage.bulk_import(
+            [
+                {
+                    "book": {
+                        "isbn13": "9780000002270",
+                        "title": "A Shared Book",
+                        "author": "An Author",
+                        "publication_year": None,
+                        "subjects": [{"category": main, "main": main, "sub": None}],
+                    },
+                    "record": None,
+                }
+            ]
+        )
+
+    threads = [threading.Thread(target=import_subject, args=(main,)) for main in ("FICTION", "MURDER")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    stored = pg_storage.get_book_by_isbn("9780000002270")
+    assert {subject["main"] for subject in stored["subjects"]} == {"FICTION", "MURDER"}
+
+
+def test_an_edit_that_keeps_the_category_leaves_the_list_alone(pg_storage, monkeypatch):
+    """An edit that sends the stored category back must not rewrite the list.
+
+    The edit form starts from the Book it shows, so it sends the category the
+    Book already leads with. That edit takes its snapshot, an import adds a
+    subject, and the edit commits: the imported subject has to survive it.
+    """
+    book = pg_storage.add_book(
+        isbn13="9780000002263",
+        title="A Mystery",
+        authors=["An Author"],
+        subjects=[{"category": "FICTION", "main": "FICTION", "sub": None}],
+    )
+
+    real_resolve = pg_storage_module.resolve_subjects
+    imported = [
+        {"category": "FICTION", "main": "FICTION", "sub": None},
+        {"category": "MURDER", "main": "MURDER", "sub": None},
+    ]
+
+    def resolve_after_an_import_lands(*args, **kwargs):
+        # Another writer commits a subject between this edit's read and its write.
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            conn.execute("UPDATE books SET subjects = %s WHERE id = %s", [Jsonb(imported), book["id"]])
+        return real_resolve(*args, **kwargs)
+
+    monkeypatch.setattr(pg_storage_module, "resolve_subjects", resolve_after_an_import_lands)
+
+    pg_storage.update_book(
+        book_id=book["id"],
+        isbn13=book["isbn13"],
+        title="A Mystery, Revised",
+        authors=["An Author"],
+        bisac_category="FICTION",
+    )
+
+    stored = pg_storage.get_book_by_id(book["id"])
+    assert [subject["main"] for subject in stored["subjects"]] == ["FICTION", "MURDER"]
+    assert stored["title"] == "A Mystery, Revised"

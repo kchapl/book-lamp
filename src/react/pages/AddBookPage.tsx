@@ -7,7 +7,7 @@ import {
     createBook,
 } from '../services/api';
 import { Button, TextField } from '../ui';
-import type { BookMatch } from '../types';
+import type { Book, BookMatch } from '../types';
 import type { Html5Qrcode } from 'html5-qrcode';
 
 /** One row of the discovery list: the candidate, and what the row shows of it. */
@@ -96,6 +96,13 @@ const AddBookPage: React.FC = () => {
         isbn: string;
         thumbnail_url?: string;
         cover_url?: string;
+    } | null>(null);
+    // The subjects the lookup found, and the ISBN they belong to. They travel
+    // with the same rule as the cover: only an answer for the ISBN being saved
+    // may contribute, because a reader can edit the ISBN after the lookup.
+    const [lookupSubjects, setLookupSubjects] = useState<{
+        isbn: string;
+        subjects: NonNullable<Book['subjects']>;
     } | null>(null);
     const [loading, setLoading] = useState(false);
     const [showManualEntry, setShowManualEntry] = useState(false);
@@ -204,6 +211,7 @@ const AddBookPage: React.FC = () => {
                     thumbnail_url: book.thumbnail_url ?? undefined,
                     cover_url: book.cover_url ?? undefined,
                 });
+                setLookupSubjects(book.subjects?.length ? { isbn: cleanIsbn, subjects: book.subjects } : null);
             }
             if (book && (book.title || book.author)) {
                 setTitle(book.title || '');
@@ -238,14 +246,16 @@ const AddBookPage: React.FC = () => {
     /** Fill the form from a matched edition, ISBN included. */
     const applyMatch = (match: BookMatch) => {
         if (match.isbn13) {
+            const matchIsbn = normalizeIsbn(match.isbn13);
             changeIsbn(match.isbn13);
-            // The image belongs to the edition just chosen, not to an ISBN the
-            // reader had typed before the match.
+            // The image and subjects belong to the edition just chosen, not to
+            // an ISBN the reader had typed before the match.
             setCover({
-                isbn: normalizeIsbn(match.isbn13),
+                isbn: matchIsbn,
                 thumbnail_url: match.thumbnail_url ?? undefined,
                 cover_url: match.cover_url ?? undefined,
             });
+            setLookupSubjects(match.subjects?.length ? { isbn: matchIsbn, subjects: match.subjects } : null);
         }
         if (match.title) setTitle(match.title);
         setSubtitle(match.subtitle || '');
@@ -364,6 +374,7 @@ const AddBookPage: React.FC = () => {
                 cover_url: candidate.cover_url,
                 publisher: candidate.publisher,
                 description: candidate.description,
+                subjects: candidate.subjects,
             });
             if (book.id) {
                 navigate(`/books/${book.id}`);
@@ -392,7 +403,9 @@ const AddBookPage: React.FC = () => {
             // Only a cover looked up for this ISBN may be sent: one left behind
             // by an earlier ISBN is another edition's image.
             const usableCover = cover && normalizeIsbn(cover.isbn) === isbnToUse ? cover : null;
-            let details = {
+            const usableSubjects =
+                lookupSubjects && normalizeIsbn(lookupSubjects.isbn) === isbnToUse ? lookupSubjects.subjects : undefined;
+            let details: Partial<Book> = {
                 title: title.trim(),
                 subtitle: subtitle.trim() || undefined,
                 author: author.trim(),
@@ -400,6 +413,7 @@ const AddBookPage: React.FC = () => {
                 publication_year: year ? parseInt(year, 10) || undefined : undefined,
                 thumbnail_url: usableCover?.thumbnail_url,
                 cover_url: usableCover?.cover_url,
+                subjects: usableSubjects,
             };
 
             if (!isbnToUse) {
@@ -412,13 +426,14 @@ const AddBookPage: React.FC = () => {
                     isbnToUse = match.isbn13 as string;
                     applyMatch(match);
                     details = {
-                        title: (match.title || details.title).trim(),
+                        title: (match.title || details.title || '').trim(),
                         subtitle: match.subtitle || details.subtitle,
-                        author: (match.author || (match.authors ?? []).join(', ') || details.author).trim(),
+                        author: (match.author || (match.authors ?? []).join(', ') || details.author || '').trim(),
                         publisher: match.publisher || details.publisher,
                         publication_year: match.publication_year ?? details.publication_year,
                         thumbnail_url: match.thumbnail_url ?? undefined,
                         cover_url: match.cover_url ?? undefined,
+                        subjects: match.subjects,
                     };
                 } else if (found.length > 1) {
                     setMatches(found);

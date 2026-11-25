@@ -11,11 +11,13 @@ from book_lamp.utils.books import (
     is_dewey_category,
     isbn10_to_isbn13,
     isbn13_to_isbn10,
-    normalise_bisac_category,
+    merge_subjects,
     normalise_provider_title,
+    normalise_subjects,
     normalise_title_pair,
     normalize_isbn,
     parse_publication_year,
+    subjects_for_book,
 )
 
 logger = logging.getLogger("book_lamp")
@@ -104,6 +106,19 @@ def _upgrade_google_books_image(url: Optional[str]) -> Optional[str]:
     return url
 
 
+# Open Library's ``subjects`` lists every tag its catalogue files an edition
+# under, which includes access and availability markers and the NYT list a Book
+# appeared on. None of them say what the Book is about, so none of them become
+# subjects.
+_OPEN_LIBRARY_TAG_NOISE = frozenset({"accessible book", "protected daisy", "in library", "lending library"})
+
+
+def _is_open_library_tag_noise(name: str) -> bool:
+    """Whether a ``subjects`` entry is a catalogue marker rather than a subject."""
+    folded = name.casefold()
+    return folded in _OPEN_LIBRARY_TAG_NOISE or folded.startswith("nyt:")
+
+
 def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Helper to parse a single book's data from Open Library."""
     title = data.get("title")
@@ -120,23 +135,27 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         publisher_name = first_pub.get("name")
 
     description = data.get("notes")
-    subjects = data.get("subjects") or []
-    # Extract the name from the first subject if it's a dict, otherwise use it as-is
-    # Ensure we always return a string or None, never a complex object
-    bisac = None
-    if subjects and isinstance(subjects, list):
-        first_subject = subjects[0]
-        if isinstance(first_subject, dict):
-            # Extract the "name" field from subject dict
-            bisac = first_subject.get("name")
-            # If name is also a dict (shouldn't happen, but be defensive), stringify it partially
-            if isinstance(bisac, dict) and "name" in bisac:
-                bisac = bisac.get("name")
-        elif isinstance(first_subject, str):
-            bisac = first_subject.strip() if first_subject else None
-        # If it's some other type, bisac stays None
+    raw_subjects = data.get("subjects") or []
+    subject_names: List[str] = []
+    if isinstance(raw_subjects, list):
+        for subject in raw_subjects:
+            name: Any = subject
+            if isinstance(subject, dict):
+                name = subject.get("name")
+                # A name that is itself a mapping is still one name.
+                if isinstance(name, dict):
+                    name = name.get("name")
+            if isinstance(name, str) and name.strip():
+                cleaned = name.strip()
+                if not _is_open_library_tag_noise(cleaned):
+                    subject_names.append(cleaned)
 
-    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
+    # The provider publishes a list and the list is what travels; the legacy
+    # triple carries the first entry for surfaces that predate it.
+    subjects = normalise_subjects(subject_names)
+    bisac = subjects[0]["category"] if subjects else None
+    main_cat = subjects[0]["main"] if subjects else None
+    sub_cat = subjects[0]["sub"] if subjects else None
 
     # Edition info
     page_count = data.get("number_of_pages")
@@ -170,6 +189,7 @@ def _parse_open_library_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
         "bisac_sub_category": sub_cat,
+        "subjects": subjects,
         "page_count": page_count,
         "language": language,
         "physical_format": physical_format,
@@ -836,8 +856,15 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
     image_links = info.get("imageLinks", {})
     thumbnail = _upgrade_google_books_image(image_links.get("thumbnail") or image_links.get("smallThumbnail"))
 
-    bisac = ", ".join(info.get("categories", [])) if info.get("categories") else None
-    bisac, main_cat, sub_cat = normalise_bisac_category(bisac)
+    # Google publishes a list of categories. Each entry is one subject; joining
+    # them with a comma made the second look like a subcategory of the first.
+    raw_categories = info.get("categories") or []
+    if not isinstance(raw_categories, list):
+        raw_categories = [raw_categories]
+    subjects = normalise_subjects([str(category) for category in raw_categories if category])
+    bisac = subjects[0]["category"] if subjects else None
+    main_cat = subjects[0]["main"] if subjects else None
+    sub_cat = subjects[0]["sub"] if subjects else None
 
     return {
         "title": normalise_provider_title(info.get("title", "")),
@@ -858,6 +885,7 @@ def _parse_google_books_item(item: Dict[str, Any]) -> Dict[str, Optional[Any]]:
         "bisac_category": bisac,
         "bisac_main_category": main_cat,
         "bisac_sub_category": sub_cat,
+        "subjects": subjects,
     }
 
 
@@ -933,6 +961,7 @@ def _lookup_itunes(isbn13: str) -> Optional[Dict[str, Optional[Any]]]:
             "bisac_category": None,
             "bisac_main_category": None,
             "bisac_sub_category": None,
+            "subjects": [],
             "page_count": None,
             "language": None,
             "physical_format": "Ebook",
@@ -1064,6 +1093,13 @@ def _merge_metadata(target: Dict[str, Any], source: Optional[Dict[str, Any]]) ->
     source = dict(source)
     _split_title_pair(source)
     for k, v in source.items():
+        # Subjects are a set, not one value: a second provider's list adds to
+        # the first's rather than losing to it.
+        if k == "subjects":
+            merged = merge_subjects(target.get(k), v)
+            if merged:
+                target[k] = merged
+            continue
         if v and not (isinstance(v, str) and not v.strip()):
             if not target.get(k):
                 target[k] = v
@@ -1166,6 +1202,7 @@ def _empty_result() -> Dict[str, Optional[Any]]:
         "bisac_category": None,
         "bisac_main_category": None,
         "bisac_sub_category": None,
+        "subjects": [],
         "page_count": None,
         "language": None,
         "physical_format": None,
@@ -1303,6 +1340,11 @@ def enhance_books_batch(
             logger.debug(f"Found data from {source} for {title}: {info}")
 
             has_updates = False
+            # The provider's legacy category fields are written by the loop
+            # below, and a legacy row reads its one subject from them: capture
+            # the stored list first so the subject merge compares against what
+            # the Book held, not against a value this loop has just replaced.
+            stored_subjects = subjects_for_book(book_item)
             # Map fields safely
             field_map = {
                 "thumbnail_url": "thumbnail_url",
@@ -1315,6 +1357,7 @@ def enhance_books_batch(
                 "bisac_category": "bisac_category",
                 "bisac_main_category": "bisac_main_category",
                 "bisac_sub_category": "bisac_sub_category",
+                "subjects": "subjects",
                 "language": "language",
                 "page_count": "page_count",
                 "physical_format": "physical_format",
@@ -1323,6 +1366,19 @@ def enhance_books_batch(
 
             for target, source_field in field_map.items():
                 if target in skip_fields:
+                    continue
+                if target == "subjects":
+                    # A refresh adds what it finds to the stored set. A provider
+                    # that names no subjects leaves the Book alone, so a
+                    # legacy-only row is not reported as updated for a value
+                    # the provider never supplied.
+                    found = normalise_subjects(info.get(source_field))
+                    if not found:
+                        continue
+                    merged = merge_subjects(stored_subjects, found)
+                    if merged != stored_subjects:
+                        book_item["subjects"] = merged
+                        has_updates = True
                     continue
                 if needs_update(target, book_item.get(target)) and info.get(source_field):
                     val = info[source_field]

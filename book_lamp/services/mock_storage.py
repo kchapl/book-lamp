@@ -8,8 +8,10 @@ from book_lamp.utils.books import (
     Category,
     cover_is_blank,
     full_title,
+    merge_subjects,
     normalise_title_pair,
-    resolve_category,
+    resolve_subjects,
+    subjects_for_book,
 )
 from book_lamp.utils.reading_status import READING_STATUSES
 from book_lamp.utils.readings import RATED_STATUS, iso_date_string, require_end_date, require_rating
@@ -158,6 +160,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         from book_lamp.utils.books import normalize_isbn
 
@@ -167,6 +170,11 @@ class MockStorage:
         # A binding is stored as one of the four labels; a media type or a
         # language code arriving in the field names no binding and is dropped.
         physical_format = resolve_physical_format(physical_format)
+        subject_list, legacy = resolve_subjects(
+            {},
+            subjects,
+            Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
+        )
         book = {
             "id": self.next_book_id,
             "isbn13": normalize_isbn(isbn13),
@@ -180,9 +188,10 @@ class MockStorage:
             "publisher": publisher,
             "description": description,
             "series": series,
-            "bisac_category": bisac_category,
-            "bisac_main_category": bisac_main_category,
-            "bisac_sub_category": bisac_sub_category,
+            "bisac_category": legacy.category,
+            "bisac_main_category": legacy.main,
+            "bisac_sub_category": legacy.sub,
+            "subjects": subject_list,
             "language": language,
             "page_count": page_count,
             "physical_format": physical_format,
@@ -213,47 +222,61 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
         physical_format_provided: bool = False,
     ) -> dict[str, Any]:
         for book in self.books:
             if book["id"] == book_id:
                 authors = [str(name).strip() for name in authors if str(name).strip()]
                 # The triple resolves through the one rule, shared with the
-                # Postgres adapter and the import paths (see ADR-0002).
-                resolved = resolve_category(
+                # Postgres adapter and the import paths (see ADR-0002). An edit
+                # that names a different category replaces the list, so the page
+                # and filter cannot keep showing the old subject.
+                subject_list, legacy = resolve_subjects(
+                    book,
+                    subjects,
                     Category.from_fields(bisac_category, bisac_main_category, bisac_sub_category),
-                    Category.from_mapping(book),
+                    category_is_authoritative=True,
                 )
 
-                book.update(
-                    {
-                        "isbn13": isbn13,
-                        "title": title,
-                        "subtitle": subtitle,
-                        "author": display(authors),
-                        "authors": authors,
-                        "publication_year": publication_year,
-                        "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),
-                        "publisher": publisher or book.get("publisher"),
-                        "description": description or book.get("description"),
-                        "series": series or book.get("series"),
-                        "bisac_category": resolved.category,
-                        "bisac_main_category": resolved.main,
-                        "bisac_sub_category": resolved.sub,
-                        "language": language or book.get("language"),
-                        "page_count": page_count or book.get("page_count"),
-                        # A blank that arrives from the edit form is an explicit
-                        # clear, so it is told apart from a field the caller never
-                        # mentioned rather than read as "keep the old value".
-                        "physical_format": resolve_physical_format(
-                            physical_format,
-                            book.get("physical_format"),
-                            provided=physical_format_provided,
-                        ),
-                        "edition": edition or book.get("edition"),
-                        "cover_url": cover_url or book.get("cover_url"),
-                    }
-                )
+                updates: dict[str, Any] = {
+                    "isbn13": isbn13,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "author": display(authors),
+                    "authors": authors,
+                    "publication_year": publication_year,
+                    "thumbnail_url": thumbnail_url or book.get("thumbnail_url"),
+                    "publisher": publisher or book.get("publisher"),
+                    "description": description or book.get("description"),
+                    "series": series or book.get("series"),
+                    "language": language or book.get("language"),
+                    "page_count": page_count or book.get("page_count"),
+                    # A blank that arrives from the edit form is an explicit
+                    # clear, so it is told apart from a field the caller never
+                    # mentioned rather than read as "keep the old value".
+                    "physical_format": resolve_physical_format(
+                        physical_format,
+                        book.get("physical_format"),
+                        provided=physical_format_provided,
+                    ),
+                    "edition": edition or book.get("edition"),
+                    "cover_url": cover_url or book.get("cover_url"),
+                }
+                # Only the columns whose value actually changes are written, so
+                # the list this edit happened to read cannot undo a subject
+                # another writer added.
+                if Category(legacy.category, legacy.main, legacy.sub) != Category.from_mapping(book):
+                    updates.update(
+                        {
+                            "bisac_category": legacy.category,
+                            "bisac_main_category": legacy.main,
+                            "bisac_sub_category": legacy.sub,
+                        }
+                    )
+                if subject_list != subjects_for_book(book):
+                    updates["subjects"] = subject_list
+                book.update(updates)
                 return book
         logger.error(f"Book with ID {book_id} not found")
         raise Exception(f"Book with ID {book_id} not found")
@@ -277,6 +300,7 @@ class MockStorage:
         edition: Optional[str] = None,
         cover_url: Optional[str] = None,
         subtitle: Optional[str] = None,
+        subjects: Optional[List[Any]] = None,
     ) -> dict[str, Any]:
         existing = self.get_book_by_isbn(isbn13)
         if existing:
@@ -297,6 +321,9 @@ class MockStorage:
                 bisac_category=bisac_category,
                 bisac_main_category=bisac_main_category,
                 bisac_sub_category=bisac_sub_category,
+                # A refresh adds the subjects it finds and keeps the stored
+                # ones, the same union Postgres writes.
+                subjects=merge_subjects(subjects_for_book(existing), subjects),
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -317,6 +344,7 @@ class MockStorage:
                 bisac_category=bisac_category,
                 bisac_main_category=bisac_main_category,
                 bisac_sub_category=bisac_sub_category,
+                subjects=subjects,
                 language=language,
                 page_count=page_count,
                 physical_format=physical_format,
@@ -474,6 +502,7 @@ class MockStorage:
                 bisac_category=book_data.get("bisac_category"),
                 bisac_main_category=book_data.get("bisac_main_category"),
                 bisac_sub_category=book_data.get("bisac_sub_category"),
+                subjects=book_data.get("subjects"),
                 language=book_data.get("language"),
                 page_count=book_data.get("page_count"),
                 physical_format=book_data.get("physical_format"),
